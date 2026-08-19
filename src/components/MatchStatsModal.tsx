@@ -8,7 +8,9 @@ import {
   Swords,
   BrainCircuit,
   Sparkles,
-  GitCompare
+  GitCompare,
+  Users,
+  Target
 } from 'lucide-react';
 import { FullMatchStats } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
@@ -21,7 +23,7 @@ interface MatchStatsModalProps {
   awayTeam: string;
 }
 
-type StatsTab = 'stats' | 'standings' | 'scorers' | 'common' | 'h2h' | 'scout';
+type StatsTab = 'stats' | 'standings' | 'scorers' | 'roster' | 'common' | 'h2h' | 'scout';
 
 export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   isOpen,
@@ -31,12 +33,14 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   awayTeam
 }) => {
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
+  const [rosterTeam, setRosterTeam] = useState<'home' | 'away'>('home');
 
   if (!stats) return null;
 
   const teamStats = stats.teamStats;
   const homeStats = teamStats?.home;
   const awayStats = teamStats?.away;
+  const currentRoster = rosterTeam === 'home' ? stats.squadRosters?.home : stats.squadRosters?.away;
 
   // Comparison Bar Helper Component
   const ComparisonBar: React.FC<{
@@ -194,6 +198,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none border-b border-border-subtle">
               {[
                 { id: 'stats', label: 'Tilastot', icon: BarChart3 },
+                { id: 'roster', label: 'Pelaajat & Maalit', icon: Users },
                 { id: 'standings', label: 'Sarjataulukko', icon: Trophy },
                 { id: 'scorers', label: 'Maalipörssi', icon: Award },
                 { id: 'common', label: 'Yhteiset vastustajat', icon: GitCompare },
@@ -263,7 +268,111 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 2: League Standings Table */}
+            {/* TAB 2: Squad Rosters & Individual Player Stats */}
+            {activeTab === 'roster' && (
+              <div className="flex flex-col gap-3">
+                {/* Team Switcher Pills */}
+                <div className="flex items-center gap-2 p-1 rounded-2xl bg-surface-elevated border border-border-subtle">
+                  <button
+                    onClick={() => setRosterTeam('home')}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      rosterTeam === 'home'
+                        ? 'bg-pitch text-text-inverse shadow-sm'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {homeTeam} (Kotijoukkue)
+                  </button>
+                  <button
+                    onClick={() => setRosterTeam('away')}
+                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      rosterTeam === 'away'
+                        ? 'bg-radar text-text-inverse shadow-sm'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    {awayTeam} (Vierasjoukkue)
+                  </button>
+                </div>
+
+                {/* Coach Info */}
+                {currentRoster?.coachName && (
+                  <div className="text-[11px] text-text-muted px-1 flex items-center justify-between">
+                    <span>Valmentaja: <strong>{currentRoster.coachName}</strong></span>
+                    <span>Kokoonpano: {currentRoster.players.length} pelaajaa</span>
+                  </div>
+                )}
+
+                {/* Players List Grid */}
+                <div className="flex flex-col gap-2">
+                  {currentRoster?.players.map((player) => (
+                    <div
+                      key={player.jerseyNumber}
+                      className="p-3 rounded-2xl bg-surface-elevated/60 border border-border-subtle flex items-center justify-between gap-3 hover:border-pitch/30 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Jersey Number Circle */}
+                        <div className="h-8 w-8 rounded-full bg-surface-elevated border border-border-strong flex items-center justify-center font-black text-xs text-text-primary font-tabular shrink-0">
+                          #{player.jerseyNumber}
+                        </div>
+
+                        <div>
+                          <div className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                            <span>{player.playerName}</span>
+                            {player.isCaptain && (
+                              <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-whistle/20 text-whistle border border-whistle/30">
+                                C
+                              </span>
+                            )}
+                            <span className="text-[10px] text-text-muted px-1 py-0.2 rounded bg-surface-base font-semibold">
+                              {player.position}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-text-muted mt-0.5">
+                            {player.matchesPlayed} ottelua pelattu
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Goals, Assists, Cards Stats */}
+                      <div className="flex items-center gap-3 text-right shrink-0">
+                        {player.goals > 0 && (
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs font-black text-pitch font-tabular flex items-center gap-0.5">
+                              <Target className="w-3 h-3 text-pitch" />
+                              {player.goals} maalia
+                            </span>
+                            {player.assists > 0 && (
+                              <span className="text-[10px] text-text-secondary">
+                                +{player.assists} syöttöä
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {player.goals === 0 && player.assists > 0 && (
+                          <span className="text-xs font-semibold text-text-secondary">
+                            {player.assists} syöttöä
+                          </span>
+                        )}
+
+                        {player.goals === 0 && player.assists === 0 && (
+                          <span className="text-xs text-text-muted">Puolustava</span>
+                        )}
+
+                        {player.yellowCards > 0 && (
+                          <span className="text-[10px] px-1 py-0.5 rounded bg-whistle/20 text-whistle font-bold">
+                            🟨 {player.yellowCards}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: League Standings Table */}
             {activeTab === 'standings' && (
               <div className="rounded-2xl border border-border-subtle overflow-hidden">
                 <div className="overflow-x-auto">
@@ -336,7 +445,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 3: Top Scorers (Maalipörssi) */}
+            {/* TAB 4: Top Scorers (Maalipörssi) */}
             {activeTab === 'scorers' && (
               <div className="flex flex-col gap-2">
                 {stats.topScorers.map((scorer) => (
@@ -369,7 +478,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 4: Common Opponents (Yhteiset vastustajat) */}
+            {/* TAB 5: Common Opponents (Yhteiset vastustajat) */}
             {activeTab === 'common' && (
               <div className="flex flex-col gap-3">
                 <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
@@ -438,7 +547,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 5: Head to Head History */}
+            {/* TAB 6: Head to Head History */}
             {activeTab === 'h2h' && (
               <div className="flex flex-col gap-2.5">
                 {stats.headToHeadHistory.map((h2h, idx) => (
@@ -462,7 +571,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 6: Tactical Scout Analysis */}
+            {/* TAB 7: Tactical Scout Analysis */}
             {activeTab === 'scout' && (
               <div className="p-4 rounded-2xl bg-surface-elevated/60 border border-border-subtle flex flex-col gap-3">
                 <div className="flex items-center gap-2 text-pitch font-bold text-xs">

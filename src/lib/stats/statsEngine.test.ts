@@ -14,6 +14,22 @@ describe('Stats Engine', () => {
     expect(stats.headToHeadHistory.length).toBeGreaterThanOrEqual(3);
   });
 
+  it('provides player-level statistics and squad rosters', () => {
+    const stats = generateOrResolveMatchStats('HJK T13', 'EPS Valkoinen', 'football');
+    expect(stats.squadRosters.home.players.length).toBeGreaterThanOrEqual(8);
+    expect(stats.squadRosters.away.players.length).toBeGreaterThanOrEqual(7);
+
+    const topScorer = stats.squadRosters.home.players.find((p) => p.jerseyNumber === 10);
+    expect(topScorer?.playerName).toBe('Maija Oinonen');
+    expect(topScorer?.goals).toBe(11);
+    expect(topScorer?.assists).toBe(4);
+    expect(topScorer?.position).toBe('FW');
+
+    const captain = stats.squadRosters.home.players.find((p) => p.isCaptain);
+    expect(captain).toBeDefined();
+    expect(captain?.jerseyNumber).toBe(4);
+  });
+
   it('generates appropriate league names for floorball', () => {
     const stats = generateOrResolveMatchStats('ErVi P11', 'Oilers Black', 'floorball');
     expect(stats.leagueName).toContain('Salibandyliitto');

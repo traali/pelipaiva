@@ -145,6 +145,25 @@ export interface CommonOpponentComparison {
   awayResult: { result: 'win' | 'draw' | 'loss'; score: string };
 }
 
+export interface PlayerDetailedStats {
+  jerseyNumber: number;
+  playerName: string;
+  position: 'GK' | 'DF' | 'MF' | 'FW';
+  goals: number;
+  assists: number;
+  matchesPlayed: number;
+  yellowCards: number;
+  redCards: number;
+  isCaptain?: boolean;
+  isStartingLineup?: boolean;
+}
+
+export interface TeamSquadRoster {
+  teamName: string;
+  coachName?: string;
+  players: PlayerDetailedStats[];
+}
+
 export interface FullMatchStats {
   leagueName: string; // e.g., "Palloliitto T13 Ykkönen (Lohko 1)"
   round?: string; // e.g., "Kierros 8 / 14"
@@ -165,6 +184,10 @@ export interface FullMatchStats {
   topScorers: TopScorer[];
   headToHeadHistory: HeadToHeadMatch[];
   commonOpponents: CommonOpponentComparison[];
+  squadRosters: {
+    home: TeamSquadRoster;
+    away: TeamSquadRoster;
+  };
   scoutAnalysis: string;
 }
 
