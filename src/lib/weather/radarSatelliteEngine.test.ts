@@ -11,7 +11,7 @@ describe('Radar & Satellite Imagery Engine', () => {
   it('builds valid FMI rain radar WMS URL', () => {
     const url = buildImageryUrl('fmi_rain_radar', mockCoords);
     expect(url).toContain('openwms.fmi.fi');
-    expect(url).toContain('Radar:suomi_rr_euref');
+    expect(url).toContain('Radar:suomi_rr_eureffin');
     expect(url).toContain('BBOX=');
     expect(url).toContain('TIME=');
   });

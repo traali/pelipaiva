@@ -73,7 +73,7 @@ export function buildImageryUrl(
 
   switch (layer) {
     case 'fmi_rain_radar':
-      return `https://openwms.fmi.fi/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=Radar:suomi_rr_euref&STYLES=&CRS=CRS:84&BBOX=${minLng},${minLat},${maxLng},${maxLat}&WIDTH=768&HEIGHT=512&FORMAT=image/png&TRANSPARENT=TRUE&TIME=${isoTime}`;
+      return `https://openwms.fmi.fi/geoserver/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=Radar:suomi_rr_eureffin&STYLES=&CRS=CRS:84&BBOX=${minLng},${minLat},${maxLng},${maxLat}&WIDTH=768&HEIGHT=512&FORMAT=image/png&TRANSPARENT=TRUE&TIME=${isoTime}`;
 
     case 'eumetsat_fog':
       return `https://eumetview.eumetsat.int/geoserv/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=msg_fes:rgb_fog&STYLES=&CRS=CRS:84&BBOX=${minLng},${minLat},${maxLng},${maxLat}&WIDTH=768&HEIGHT=512&FORMAT=image/jpeg&TIME=${isoTime}`;
