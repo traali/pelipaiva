@@ -6,9 +6,19 @@
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4.0-38B2AC?logo=tailwindcss&logoColor=white)
 ![Dexie.js](https://img.shields.io/badge/Dexie.js-v4.4-00A98F)
 ![PWA](https://img.shields.io/badge/PWA-100%25%20Local--First-10B981)
+![Deployment](https://img.shields.io/badge/Cloudflare%20Pages-LIVE%20%28200%20OK%29-F38020?logo=cloudflare)
 
 > **Suomalaisen juniori- ja amatööriurheilun ottelupäivän tilannekeskus.**  
-> 100% Local-First · Zero-Auth / Ei backend-tietokantaa · 100% GDPR-yhteensopiva · Multi-Device (Mobiili-PWA + Google Nest Hub).
+> 100% Local-First · Zero-Auth / Ei backend-tietokantaa · 100% GDPR-yhteensopiva · Multi-Device (Mobiili-PWA + Google Nest Hub).  
+> 🌐 **Live PWA:** [https://pelipaiva.pages.dev](https://pelipaiva.pages.dev)  
+> 📺 **Live Ambient Hub:** [https://pelipaiva.pages.dev/ambient](https://pelipaiva.pages.dev/ambient)
+
+---
+
+## 🚨 Golden Engineering Rule: Cloudflare Live Verification Mandate
+> **"Nothing is ready until it is confirmed running live in Cloudflare."**
+> 
+> Local tests passing and build success are necessary prerequisites, but no task, feature, or release is considered **Done** until it is deployed to Cloudflare and actively confirmed with an `HTTP 200` live edge response.
 
 ---
 
@@ -75,10 +85,10 @@ npm test
 npm run dev
 ```
 
-### Production Build
+### Production Build & Deploy
 ```bash
-# Typecheck and build optimized PWA with service worker precaching
-npm run build
+# Automated deploy pipeline (tests -> build -> Cloudflare Pages & Worker deploy)
+./deploy.ps1
 ```
 
 ---

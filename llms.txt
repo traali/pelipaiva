@@ -2,10 +2,16 @@
 
 > Comprehensive context file for AI agents, coding assistants, and RAG systems.
 
+## 🚨 Mandatory Engineering Rule: The Cloudflare Live Verification Mandate
+**"Nothing is ready until it is confirmed running live in Cloudflare."**
+- Local tests passing and clean builds are necessary intermediate steps, but NO task, feature, phase, or bugfix is marked "DONE" or "READY" without live edge deployment verification.
+- Mandatory verification step: Live HTTP GET/HEAD probe returning `HTTP 200` on `https://pelipaiva.pages.dev` and `https://pelipaiva-edge.sakkoja.workers.dev`.
+
 ## Project Summary
 Pelipäivä is a 100% local-first Progressive Web App (PWA) designed for Finnish amateur and junior sports families (football, floorball, basketball). It ingests calendar feeds (.ics), geocodes venues via LIPAS.fi and slang dictionaries, queries FMI microclimate weather and lightning safety, computes parking ease, and deterministic footwear (Nappisvahti) advice.
 
 ## Key Technical Decisions & Architecture
+- Definition of Done: Must be confirmed running live on Cloudflare Pages / Workers.
 - Local-First Storage: Dexie.js v4 on IndexedDB. Zero user accounts or backend database.
 - Multi-Theme UI: Nova Design Protocol dual themes (Daylight / Floodlight OLED) using Tailwind CSS v4 and fluid typography.
 - National Geocoder: LIPAS.fi (42k venues) + curated slang dictionary (Puotila Bubu, Väiski, Sahara, Kupla, Mosahalli, Kauppi).
@@ -13,7 +19,10 @@ Pelipäivä is a 100% local-first Progressive Web App (PWA) designed for Finnish
 - Smart Reasoning: Deterministic symbolic reasoner (Nappisvahti footwear, kit conflict, family schedule conflicts).
 - Nest Display: 10-foot Ambient View (/ambient) with ephemeral 7-day Cloudflare KV sync token.
 
-## Key File Locations
+## Key File Locations & Live Endpoints
+- Live PWA URL: https://pelipaiva.pages.dev
+- Live Ambient URL: https://pelipaiva.pages.dev/ambient
+- Live Edge Worker: https://pelipaiva-edge.sakkoja.workers.dev
 - Data Models: `src/types/matchday.ts`
 - Database Schema: `src/lib/storage/db.ts`
 - Geocoder & Aliases: `src/lib/geo/sportsGeocoder.ts`
