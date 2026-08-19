@@ -121,7 +121,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
             reason={event.briefing.gearAndPackingAdvice.footwearReason}
           />
         )}
-        {event.parking && <ParkingEaseBadge parking={event.parking} />}
+        {event.parking && <ParkingEaseBadge parking={event.parking} venueName={event.venue.name} />}
       </div>
 
       {/* Packing Advice & Spectator Note */}

@@ -73,7 +73,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <span>Sää, Nappis & Parkki</span>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              FMI:n mikroilmastoennuste, 30/30-salamaturvallisuus, LIPAS-kenttäprofiilit ja ParkkiSakko-indeksi.
+              FMI:n mikroilmastoennuste, 30/30-salamaturvallisuus, LIPAS-kenttäprofiilit ja Parkki-pysäköintiopas.
             </p>
           </div>
 
