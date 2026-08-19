@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pelipaiva-edge",
+  "main": "worker.ts",
+  "compatibility_date": "2026-08-19",
+  "kv_namespaces": [
+    {
+      "binding": "MATCHDAY_KV",
+      "id": "PELIPAIVA_SYNC_KV"
+    }
+  ]
+}

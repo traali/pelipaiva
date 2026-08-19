@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+@theme {
+  --color-canvas: var(--nv-bg-canvas);
+  --color-surface-base: var(--nv-bg-surface-base);
+  --color-surface-card: var(--nv-bg-surface-card);
+  --color-surface-elevated: var(--nv-bg-surface-elevated);
+  --color-surface-glass: var(--nv-bg-surface-glass);
+
+  --color-border-subtle: var(--nv-border-subtle);
+  --color-border-strong: var(--nv-border-strong);
+  --color-border-focus: var(--nv-border-focus);
+
+  --color-text-primary: var(--nv-text-primary);
+  --color-text-secondary: var(--nv-text-secondary);
+  --color-text-muted: var(--nv-text-muted);
+  --color-text-inverse: var(--nv-text-inverse);
+
+  --color-pitch: var(--nv-pitch-primary);
+  --color-whistle: var(--nv-whistle-amber);
+  --color-stoppage: var(--nv-stoppage-red);
+  --color-radar: var(--nv-radar-cyan);
+  --color-lightning: var(--nv-lightning-purple);
+
+  /* Fluid Typography Formulas (Antigravity §7 Standard) */
+  --text-xs: clamp(0.694rem, 0.65rem + 0.22vw, 0.8rem);
+  --text-sm: clamp(0.833rem, 0.78rem + 0.27vw, 0.96rem);
+  --text-base: clamp(1rem, 0.93rem + 0.33vw, 1.2rem);
+  --text-lg: clamp(1.2rem, 1.1rem + 0.45vw, 1.5rem);
+  --text-xl: clamp(1.44rem, 1.3rem + 0.63vw, 1.875rem);
+  --text-2xl: clamp(1.728rem, 1.53rem + 0.89vw, 2.34rem);
+  --text-3xl: clamp(2.074rem, 1.79rem + 1.27vw, 2.93rem);
+  --text-hero: clamp(2.488rem, 2.09rem + 1.78vw, 3.66rem);
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+.liquid-glass {
+  background-color: var(--nv-bg-surface-card);
+  backdrop-filter: var(--nv-glass-blur);
+  -webkit-backdrop-filter: var(--nv-glass-blur);
+  border: 1px solid var(--nv-border-subtle);
+  box-shadow: var(--nv-shadow-card);
+}

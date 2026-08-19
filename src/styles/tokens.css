@@ -1,0 +1,66 @@
+/* =========================================================================
+   PELIPÄIVÄ NOVA DESIGN SYSTEM TOKENS
+   Dual Theme: Daylight Matchday (Light) & Floodlight / Night Captain (Dark OLED)
+   ========================================================================= */
+
+@layer base {
+  /* ☀️ LIGHT THEME — Daylight Matchday */
+  :root {
+    --nv-bg-canvas: #f8fafc;
+    --nv-bg-surface-base: #ffffff;
+    --nv-bg-surface-card: rgba(255, 255, 255, 0.9);
+    --nv-bg-surface-elevated: #f1f5f9;
+    --nv-bg-surface-glass: rgba(255, 255, 255, 0.7);
+
+    --nv-border-subtle: rgba(15, 23, 42, 0.08);
+    --nv-border-strong: rgba(15, 23, 42, 0.16);
+    --nv-border-focus: #059669;
+
+    --nv-text-primary: #0f172a;
+    --nv-text-secondary: #475569;
+    --nv-text-muted: #94a3b8;
+    --nv-text-inverse: #ffffff;
+
+    --nv-pitch-primary: #059669;
+    --nv-pitch-glow: rgba(5, 150, 105, 0.18);
+    --nv-whistle-amber: #d97706;
+    --nv-whistle-glow: rgba(217, 119, 6, 0.16);
+    --nv-stoppage-red: #dc2626;
+    --nv-stoppage-glow: rgba(220, 38, 38, 0.16);
+    --nv-radar-cyan: #0284c7;
+    --nv-lightning-purple: #7c3aed;
+
+    --nv-glass-blur: blur(16px);
+    --nv-shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  }
+
+  /* 🌙 DARK THEME — Floodlight / Night Captain (OLED) */
+  .dark {
+    --nv-bg-canvas: #000000;
+    --nv-bg-surface-base: #06080b;
+    --nv-bg-surface-card: rgba(12, 16, 23, 0.82);
+    --nv-bg-surface-elevated: #151a24;
+    --nv-bg-surface-glass: rgba(18, 24, 38, 0.6);
+
+    --nv-border-subtle: rgba(255, 255, 255, 0.08);
+    --nv-border-strong: rgba(255, 255, 255, 0.18);
+    --nv-border-focus: #10b981;
+
+    --nv-text-primary: #f8fafc;
+    --nv-text-secondary: #94a3b8;
+    --nv-text-muted: #64748b;
+    --nv-text-inverse: #000000;
+
+    --nv-pitch-primary: #10b981;
+    --nv-pitch-glow: rgba(16, 185, 129, 0.28);
+    --nv-whistle-amber: #fbbf24;
+    --nv-whistle-glow: rgba(251, 191, 36, 0.25);
+    --nv-stoppage-red: #ef4444;
+    --nv-stoppage-glow: rgba(239, 68, 68, 0.28);
+    --nv-radar-cyan: #38bdf8;
+    --nv-lightning-purple: #a855f7;
+
+    --nv-glass-blur: blur(20px);
+    --nv-shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+}

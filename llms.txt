@@ -1,0 +1,26 @@
+# Pelipäivä (Matchday Hub) - LLM Context
+
+> Comprehensive context file for AI agents, coding assistants, and RAG systems.
+
+## Project Summary
+Pelipäivä is a 100% local-first Progressive Web App (PWA) designed for Finnish amateur and junior sports families (football, floorball, basketball). It ingests calendar feeds (.ics), geocodes venues via LIPAS.fi and slang dictionaries, queries FMI microclimate weather and lightning safety, computes parking ease, and deterministic footwear (Nappisvahti) advice.
+
+## Key Technical Decisions & Architecture
+- Local-First Storage: Dexie.js v4 on IndexedDB. Zero user accounts or backend database.
+- Multi-Theme UI: Nova Design Protocol dual themes (Daylight / Floodlight OLED) using Tailwind CSS v4 and fluid typography.
+- National Geocoder: LIPAS.fi (42k venues) + curated slang dictionary (Puotila Bubu, Väiski, Sahara, Kupla, Mosahalli, Kauppi).
+- Weather & Safety: FMI Point Forecast WFS + Real-Time Lightning 30/30 Safety State Machine.
+- Smart Reasoning: Deterministic symbolic reasoner (Nappisvahti footwear, kit conflict, family schedule conflicts).
+- Nest Display: 10-foot Ambient View (/ambient) with ephemeral 7-day Cloudflare KV sync token.
+
+## Key File Locations
+- Data Models: `src/types/matchday.ts`
+- Database Schema: `src/lib/storage/db.ts`
+- Geocoder & Aliases: `src/lib/geo/sportsGeocoder.ts`
+- Calendar Parser: `src/lib/calendar/icsParser.ts`
+- Weather Engine: `src/lib/weather/fmiWeatherEngine.ts`
+- Lightning State Machine: `src/lib/weather/lightningSafety.ts`
+- Parking Engine: `src/lib/parking/parkingEaseEngine.ts`
+- Deterministic Reasoner: `src/lib/ai/deterministicReasoner.ts`
+- UI Components: `src/components/`
+- Cloudflare Worker: `cloudflare-worker/worker.ts`
