@@ -97,7 +97,7 @@ export interface MatchGoal {
 }
 
 export interface TeamMatchStats {
-  possessionPercent: number; // e.g. 58 vs 42
+  possessionPercent: number; // e.g. 57% vs 43%
   shotsTotal: number;
   shotsOnTarget: number;
   corners: number;
@@ -139,6 +139,12 @@ export interface HeadToHeadMatch {
   awayScore: number;
 }
 
+export interface CommonOpponentComparison {
+  opponentName: string;
+  homeResult: { result: 'win' | 'draw' | 'loss'; score: string };
+  awayResult: { result: 'win' | 'draw' | 'loss'; score: string };
+}
+
 export interface FullMatchStats {
   leagueName: string; // e.g., "Palloliitto T13 Ykkönen (Lohko 1)"
   round?: string; // e.g., "Kierros 8 / 14"
@@ -158,6 +164,7 @@ export interface FullMatchStats {
   standingsTable: StandingRow[];
   topScorers: TopScorer[];
   headToHeadHistory: HeadToHeadMatch[];
+  commonOpponents: CommonOpponentComparison[];
   scoutAnalysis: string;
 }
 

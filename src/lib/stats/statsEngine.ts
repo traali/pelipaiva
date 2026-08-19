@@ -2,7 +2,7 @@ import { FullMatchStats, SportType } from '../../types/matchday';
 
 /**
  * Generates or extracts full league and matchday stats for a given fixture.
- * In production, this parses public federation sheets (Palloliitto Tulospalvelu, Salibandyliitto, Basket.fi).
+ * Integrates logic and structures directly aligned with traali/football-stats.
  */
 export function generateOrResolveMatchStats(
   homeTeam: string,
@@ -193,6 +193,23 @@ export function generateOrResolveMatchStats(
         awayTeam: awayTeam || 'EPS Valkoinen',
         homeScore: 4,
         awayScore: 0
+      }
+    ],
+    commonOpponents: [
+      {
+        opponentName: 'FC Honka Musta',
+        homeResult: { result: 'win', score: '3 - 1' },
+        awayResult: { result: 'loss', score: '1 - 2' }
+      },
+      {
+        opponentName: 'VJS Tytöt',
+        homeResult: { result: 'win', score: '4 - 0' },
+        awayResult: { result: 'win', score: '2 - 1' }
+      },
+      {
+        opponentName: 'PPJ Sininen',
+        homeResult: { result: 'win', score: '5 - 1' },
+        awayResult: { result: 'draw', score: '2 - 2' }
       }
     ],
     scoutAnalysis: `${homeTeam} johtaa sarjaa tappiottomalla tilastolla (7V-1T-0H). ${awayTeam || 'Vastustaja'} on vaarallinen vastaiskujoukkue, jonka ykköshyökkääjä Ella Virtanen on tehnyt 7 maalia tällä kaudella.`

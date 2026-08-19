@@ -7,7 +7,8 @@ import {
   Award,
   Swords,
   BrainCircuit,
-  Sparkles
+  Sparkles,
+  GitCompare
 } from 'lucide-react';
 import { FullMatchStats } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
@@ -20,7 +21,7 @@ interface MatchStatsModalProps {
   awayTeam: string;
 }
 
-type StatsTab = 'stats' | 'standings' | 'scorers' | 'h2h' | 'scout';
+type StatsTab = 'stats' | 'standings' | 'scorers' | 'common' | 'h2h' | 'scout';
 
 export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   isOpen,
@@ -195,6 +196,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 { id: 'stats', label: 'Tilastot', icon: BarChart3 },
                 { id: 'standings', label: 'Sarjataulukko', icon: Trophy },
                 { id: 'scorers', label: 'Maalipörssi', icon: Award },
+                { id: 'common', label: 'Yhteiset vastustajat', icon: GitCompare },
                 { id: 'h2h', label: 'Keskinäiset (H2H)', icon: Swords },
                 { id: 'scout', label: 'Taktinen katsaus', icon: BrainCircuit }
               ].map((tab) => {
@@ -367,7 +369,76 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 4: Head to Head History */}
+            {/* TAB 4: Common Opponents (Yhteiset vastustajat) */}
+            {activeTab === 'common' && (
+              <div className="flex flex-col gap-3">
+                <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                  Yhteiset vastustajat ({stats.commonOpponents?.length || 0})
+                </div>
+                {stats.commonOpponents?.map((c, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl bg-surface-elevated/60 border border-border-subtle text-xs"
+                  >
+                    <div className="font-bold text-text-primary mb-2 flex items-center justify-between">
+                      <span>vs {c.opponentName}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="p-2 rounded-lg bg-surface-base border border-border-subtle flex items-center justify-between">
+                        <span className="text-text-muted truncate max-w-[90px]">{homeTeam}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`font-bold ${
+                              c.homeResult.result === 'win'
+                                ? 'text-pitch'
+                                : c.homeResult.result === 'draw'
+                                ? 'text-whistle'
+                                : 'text-stoppage'
+                            }`}
+                          >
+                            {c.homeResult.result === 'win'
+                              ? 'V'
+                              : c.homeResult.result === 'draw'
+                              ? 'T'
+                              : 'H'}
+                          </span>
+                          <span className="font-tabular text-[11px] text-text-secondary">
+                            ({c.homeResult.score})
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-surface-base border border-border-subtle flex items-center justify-between">
+                        <span className="text-text-muted truncate max-w-[90px]">{awayTeam}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`font-bold ${
+                              c.awayResult.result === 'win'
+                                ? 'text-pitch'
+                                : c.awayResult.result === 'draw'
+                                ? 'text-whistle'
+                                : 'text-stoppage'
+                            }`}
+                          >
+                            {c.awayResult.result === 'win'
+                              ? 'V'
+                              : c.awayResult.result === 'draw'
+                              ? 'T'
+                              : 'H'}
+                          </span>
+                          <span className="font-tabular text-[11px] text-text-secondary">
+                            ({c.awayResult.score})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAB 5: Head to Head History */}
             {activeTab === 'h2h' && (
               <div className="flex flex-col gap-2.5">
                 {stats.headToHeadHistory.map((h2h, idx) => (
@@ -391,7 +462,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 5: Tactical Scout Analysis */}
+            {/* TAB 6: Tactical Scout Analysis */}
             {activeTab === 'scout' && (
               <div className="p-4 rounded-2xl bg-surface-elevated/60 border border-border-subtle flex flex-col gap-3">
                 <div className="flex items-center gap-2 text-pitch font-bold text-xs">
