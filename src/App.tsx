@@ -6,6 +6,8 @@ import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { ThemeToggle } from './components/ThemeToggle';
 import { CalendarImportModal } from './components/CalendarImportModal';
 import { AmbientView } from './components/AmbientView';
+import { OnboardingWizard } from './components/OnboardingWizard';
+import { DemoBanner } from './components/DemoBanner';
 import { parseICSFeed } from './lib/calendar/icsParser';
 import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
@@ -44,7 +46,7 @@ export const App: React.FC = () => {
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Check URL params for ?ambient=true (for Google Nest Hub webview)
+  // Check URL params for ?ambient=true
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -63,40 +65,45 @@ export const App: React.FC = () => {
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
   const rawEvents = useLiveQuery(() => db.events.toArray(), []) || [];
 
-  // Seed initial demo data if empty
-  useEffect(() => {
-    const seedInitialData = async () => {
-      const count = await db.profiles.count();
-      if (count === 0) {
-        const defaultProfile = {
-          id: 'profile-hjk',
-          playerName: 'Maija',
-          teamName: 'HJK T13',
-          sport: 'football' as SportType,
-          primaryColor: 'sininen',
-          secondaryColor: 'valkoinen',
-          calendarUrl: 'https://nimenhuuto.com/demo',
-          colorHex: '#059669'
-        };
-        await db.profiles.add(defaultProfile);
+  const isDemoActive = profiles.some((p) => p.id === 'profile-hjk-demo');
 
-        const parsed = await parseICSFeed(SAMPLE_INITIAL_ICS, defaultProfile.id, 'football');
+  // Seed sample demo data
+  const handleStartDemo = async () => {
+    await db.profiles.clear();
+    await db.events.clear();
 
-        for (const ev of parsed) {
-          const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-          const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-          const withData: MatchdayEvent = {
-            ...ev,
-            weather,
-            parking
-          };
-          withData.briefing = generateMatchdayBriefing(withData, parsed);
-          await db.events.put(withData);
-        }
-      }
+    const defaultProfile = {
+      id: 'profile-hjk-demo',
+      playerName: 'Maija',
+      teamName: 'HJK T13',
+      sport: 'football' as SportType,
+      primaryColor: 'sininen',
+      secondaryColor: 'valkoinen',
+      calendarUrl: 'https://nimenhuuto.com/demo',
+      colorHex: '#059669'
     };
-    seedInitialData();
-  }, []);
+    await db.profiles.add(defaultProfile);
+
+    const parsed = await parseICSFeed(SAMPLE_INITIAL_ICS, defaultProfile.id, 'football');
+
+    for (const ev of parsed) {
+      const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
+      const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
+      const withData: MatchdayEvent = {
+        ...ev,
+        weather,
+        parking
+      };
+      withData.briefing = generateMatchdayBriefing(withData, parsed);
+      await db.events.put(withData);
+    }
+  };
+
+  const handleClearData = async () => {
+    await db.profiles.clear();
+    await db.events.clear();
+    setActiveProfileId('all');
+  };
 
   // Filter events by selected profile
   const filteredEvents = rawEvents.filter((e) => {
@@ -110,6 +117,12 @@ export const App: React.FC = () => {
     sport: SportType,
     icsUrl: string
   ) => {
+    // If we're currently on demo data, clean demo data first
+    if (isDemoActive) {
+      await db.profiles.clear();
+      await db.events.clear();
+    }
+
     const profileId = `profile-${Date.now()}`;
     await db.profiles.add({
       id: profileId,
@@ -122,8 +135,10 @@ export const App: React.FC = () => {
     });
 
     try {
-      // In production, use proxy worker: /api/proxy/ics?url=...
-      const res = await fetch(icsUrl);
+      // Use Cloudflare Worker streaming proxy to bypass CORS
+      const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
+      const target = `${proxyUrl}?url=${encodeURIComponent(icsUrl)}`;
+      const res = await fetch(target);
       const text = await res.text();
       const parsed = await parseICSFeed(text, profileId, sport);
       for (const ev of parsed) {
@@ -134,14 +149,13 @@ export const App: React.FC = () => {
         await db.events.put(fullEv);
       }
     } catch (err) {
-      console.warn('Direct fetch failed (CORS), mock added for demonstration', err);
+      console.warn('Calendar fetch error:', err);
     }
   };
 
   const handleRefreshAll = async () => {
     setIsSyncing(true);
     try {
-      // Re-evaluate briefings and parking for all stored events
       for (const ev of rawEvents) {
         const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
         const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
@@ -156,6 +170,23 @@ export const App: React.FC = () => {
 
   if (isAmbientMode) {
     return <AmbientView events={filteredEvents} />;
+  }
+
+  // If no profiles exist yet, show the Interactive Onboarding Wizard
+  if (profiles.length === 0) {
+    return (
+      <>
+        <OnboardingWizard
+          onStartDemo={handleStartDemo}
+          onOpenImportModal={() => setIsImportModalOpen(true)}
+        />
+        <CalendarImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onImport={handleImportCalendar}
+        />
+      </>
+    );
   }
 
   return (
@@ -204,6 +235,14 @@ export const App: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-4xl mx-auto px-4 pt-4">
+        {/* Demo Mode Banner (if sample data is active) */}
+        {isDemoActive && (
+          <DemoBanner
+            onOpenImport={() => setIsImportModalOpen(true)}
+            onClearDemo={handleClearData}
+          />
+        )}
+
         {/* Multi-Profile Selector Bar */}
         <div className="mb-5">
           <MultiProfileHeader

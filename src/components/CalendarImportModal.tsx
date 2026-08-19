@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Calendar, Plus, ShieldCheck } from 'lucide-react';
+import { X, Calendar, Plus, ShieldCheck, HelpCircle } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
 
@@ -20,6 +20,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   const [sport, setSport] = useState<SportType>('football');
   const [icsUrl, setIcsUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,16 +53,16 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}
             transition={springTactile.gentle}
-            className="liquid-glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl z-10"
+            className="liquid-glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-pitch/15 text-pitch">
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-text-primary">Lisää ottelukalenteri</h3>
-                  <p className="text-xs text-text-muted">Nimenhuuto, MyClub, Jopox tai iCal</p>
+                  <p className="text-xs text-text-muted">Nimenhuuto, MyClub, Jopox tai Torneopal</p>
                 </div>
               </div>
               <button
@@ -117,9 +118,20 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  iCal-syötteen URL-osoite (.ics) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-text-secondary">
+                    iCal-syötteen URL-osoite (.ics) *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowGuide(!showGuide)}
+                    className="text-[11px] text-pitch hover:underline flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <HelpCircle className="w-3 h-3" />
+                    <span>Mistä löydän tämän?</span>
+                  </button>
+                </div>
+
                 <input
                   type="url"
                   required
@@ -128,9 +140,24 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                   onChange={(e) => setIcsUrl(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-sm focus:outline-none focus:border-pitch font-mono text-xs"
                 />
-                <p className="text-[11px] text-text-muted mt-1 flex items-center gap-1">
+
+                {/* Collapsible In-Modal Helper Guide */}
+                {showGuide && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-2 p-3 rounded-xl bg-surface-elevated text-[11px] text-text-secondary border border-border-subtle flex flex-col gap-1.5"
+                  >
+                    <div><strong>🔵 Nimenhuuto:</strong> Joukkueen sivu ➔ Kalenteri ➔ Tilaa kalenteri (.ics).</div>
+                    <div><strong>🟢 MyClub:</strong> Omat tiedot ➔ Kalenterisynkronointi ➔ Kopioi iCal-osoite.</div>
+                    <div><strong>🟠 Jopox:</strong> Pukukoppi ➔ Oma kalenteri ➔ Tilaa kalenteri (.ics).</div>
+                  </motion.div>
+                )}
+
+                <p className="text-[11px] text-text-muted mt-1.5 flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-pitch" />
-                  Syöte tallentuu vain tähän laitteeseen (100% paikallinen).
+                  100% Yksityinen: tallentuu vain puhelimesi muistiin.
                 </p>
               </div>
 
