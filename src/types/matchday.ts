@@ -87,6 +87,80 @@ export interface PlayerProfile {
   colorHex: string;
 }
 
+export interface MatchGoal {
+  minute: number;
+  player: string;
+  team: 'home' | 'away';
+  isPenalty?: boolean;
+  isOwnGoal?: boolean;
+  assistPlayer?: string;
+}
+
+export interface TeamMatchStats {
+  possessionPercent: number; // e.g. 58 vs 42
+  shotsTotal: number;
+  shotsOnTarget: number;
+  corners: number;
+  fouls: number;
+  yellowCards: number;
+  redCards: number;
+  saves: number;
+  offsides?: number;
+}
+
+export interface StandingRow {
+  rank: number;
+  teamName: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+  form: ('W' | 'D' | 'L')[];
+}
+
+export interface TopScorer {
+  rank: number;
+  playerName: string;
+  teamName: string;
+  goals: number;
+  matchesPlayed: number;
+}
+
+export interface HeadToHeadMatch {
+  date: string;
+  competition: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+}
+
+export interface FullMatchStats {
+  leagueName: string; // e.g., "Palloliitto T13 Ykkönen (Lohko 1)"
+  round?: string; // e.g., "Kierros 8 / 14"
+  liveScore?: {
+    home: number;
+    away: number;
+    isLive: boolean;
+    period?: string; // "1. puoliaika", "2. puoliaika", "Päättynyt"
+  };
+  goalsTimeline?: MatchGoal[];
+  teamStats?: {
+    home: TeamMatchStats;
+    away: TeamMatchStats;
+  };
+  homeStanding: StandingRow;
+  awayStanding: StandingRow;
+  standingsTable: StandingRow[];
+  topScorers: TopScorer[];
+  headToHeadHistory: HeadToHeadMatch[];
+  scoutAnalysis: string;
+}
+
 export interface MatchdayBriefing {
   scoutSummary: string;
   gearAndPackingAdvice: {
@@ -119,5 +193,6 @@ export interface MatchdayEvent {
   weather?: WeatherCondition;
   lightning?: LightningSafetyAlert;
   parking?: ParkingInfo;
+  stats?: FullMatchStats;
   briefing?: MatchdayBriefing;
 }

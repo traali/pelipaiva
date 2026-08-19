@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Clock, MapPin, Navigation, Shirt, AlertTriangle, Share2 } from 'lucide-react';
+import {
+  Clock,
+  MapPin,
+  Navigation,
+  Shirt,
+  AlertTriangle,
+  Share2,
+  BarChart3,
+  ChevronRight,
+  Trophy
+} from 'lucide-react';
 import { MatchdayEvent } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { NappisvahtiPill } from './NappisvahtiPill';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { RainRadarCurve } from './RainRadarCurve';
+import { MatchStatsModal } from './MatchStatsModal';
+import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 
 interface MatchdayCardProps {
   event: MatchdayEvent;
@@ -13,6 +25,8 @@ interface MatchdayCardProps {
 }
 
 export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToVenue }) => {
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
   const formattedKickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
@@ -24,6 +38,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
     minute: '2-digit'
   });
 
+  const stats = event.stats || generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport);
+
   const handleShareWhatsApp = () => {
     if (event.briefing?.postMatchWhatsAppTemplate) {
       const text = encodeURIComponent(event.briefing.postMatchWhatsAppTemplate);
@@ -32,143 +48,210 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
   };
 
   return (
-    <motion.div
-      layout
-      whileTap={{ scale: 0.99 }}
-      transition={springTactile.squishy}
-      className="liquid-glass relative overflow-hidden rounded-3xl p-5 md:p-6 transition-colors"
-    >
-      {/* Background Ambience Glow */}
-      <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-pitch/10 blur-3xl" />
+    <>
+      <motion.div
+        layout
+        whileTap={{ scale: 0.99 }}
+        transition={springTactile.squishy}
+        className="liquid-glass relative overflow-hidden rounded-3xl p-5 md:p-6 transition-colors"
+      >
+        {/* Background Ambience Glow */}
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-pitch/10 blur-3xl" />
 
-      {/* Conflict Warning Banner if Siblings Overlap */}
-      {event.briefing?.conflictWarning && (
-        <div className="mb-4 flex items-center gap-2 p-2.5 rounded-xl bg-whistle/15 border border-whistle/30 text-whistle text-xs font-semibold">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{event.briefing.conflictWarning}</span>
-        </div>
-      )}
+        {/* Conflict Warning Banner */}
+        {event.briefing?.conflictWarning && (
+          <div className="mb-4 flex items-center gap-2 p-2.5 rounded-xl bg-whistle/15 border border-whistle/30 text-whistle text-xs font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{event.briefing.conflictWarning}</span>
+          </div>
+        )}
 
-      {/* Lightning Danger Alert Banner */}
-      {event.lightning && event.lightning.status === 'danger' && (
-        <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold animate-pulse">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{event.lightning.alertMessage}</span>
-        </div>
-      )}
+        {/* Lightning Danger Alert Banner */}
+        {event.lightning && event.lightning.status === 'danger' && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold animate-pulse">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{event.lightning.alertMessage}</span>
+          </div>
+        )}
 
-      {/* Top Badges & Timers */}
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-pitch/15 text-pitch border border-pitch/25">
-            {event.sport === 'football'
-              ? '⚽ Jalkapallo'
-              : event.sport === 'floorball'
-              ? '🏑 Salibandy'
-              : event.sport === 'basketball'
-              ? '🏀 Koripallo'
-              : '🏅 Ottelu'}
-          </span>
-          {event.volunteerDuty && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-whistle/15 text-whistle border border-whistle/25">
-              {event.volunteerDuty}
+        {/* Top Badges & Timers */}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-pitch/15 text-pitch border border-pitch/25">
+              {event.sport === 'football'
+                ? '⚽ Jalkapallo'
+                : event.sport === 'floorball'
+                ? '🏑 Salibandy'
+                : event.sport === 'basketball'
+                ? '🏀 Koripallo'
+                : '🏅 Ottelu'}
             </span>
+            {event.volunteerDuty && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-whistle/15 text-whistle border border-whistle/25">
+                {event.volunteerDuty}
+              </span>
+            )}
+          </div>
+
+          {/* Live or Kickoff Info */}
+          {isLive ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stoppage/15 text-stoppage border border-stoppage/30 text-xs font-bold animate-pulse">
+              <span className="h-2 w-2 rounded-full bg-stoppage" />
+              KÄYNNISSÄ
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
+              <Clock className="w-3.5 h-3.5 text-pitch" />
+              <span>Alkulämpö klo {formattedWarmup} • Kickoff klo {formattedKickoff}</span>
+            </div>
           )}
         </div>
 
-        {/* Live or Kickoff Info */}
-        {isLive ? (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stoppage/15 text-stoppage border border-stoppage/30 text-xs font-bold animate-pulse">
-            <span className="h-2 w-2 rounded-full bg-stoppage" />
-            KÄYNNISSÄ
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
-            <Clock className="w-3.5 h-3.5 text-pitch" />
-            <span>Alkulämpö klo {formattedWarmup} • Kickoff klo {formattedKickoff}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Matchup Header */}
-      <div className="mb-5">
-        <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary flex items-baseline gap-2">
-          <span>{event.homeTeam}</span>
-          <span className="text-text-muted font-normal text-sm">vs</span>
-          <span>{event.awayTeam || 'Vastustaja'}</span>
-        </h2>
-        <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary">
-          <MapPin className="w-4 h-4 text-text-muted shrink-0" />
-          <span className="truncate">{event.venue.name}</span>
-          <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
-            {event.venue.isIndoor ? 'Sisähalli' : event.venue.surface.replace(/_/g, ' ')}
-          </span>
-        </div>
-      </div>
-
-      {/* Weather Rain Curve */}
-      {event.weather && (
+        {/* Matchup Header */}
         <div className="mb-4">
-          <RainRadarCurve weather={event.weather} isOutdoor={!event.venue.isIndoor} />
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary flex items-baseline gap-2">
+            <span>{event.homeTeam}</span>
+            <span className="text-text-muted font-normal text-sm">vs</span>
+            <span>{event.awayTeam || 'Vastustaja'}</span>
+          </h2>
+          <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary">
+            <MapPin className="w-4 h-4 text-text-muted shrink-0" />
+            <span className="truncate">{event.venue.name}</span>
+            <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
+              {event.venue.isIndoor ? 'Sisähalli' : event.venue.surface.replace(/_/g, ' ')}
+            </span>
+          </div>
         </div>
-      )}
 
-      {/* Bento Sub-Cards: Nappisvahti & Parking */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-        {event.briefing && (
-          <NappisvahtiPill
-            footwear={event.briefing.gearAndPackingAdvice.footwear}
-            reason={event.briefing.gearAndPackingAdvice.footwearReason}
-          />
+        {/* Modern Football & Sports Stats Preview Strip */}
+        {stats && (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.01 }}
+            transition={springTactile.snappy}
+            onClick={() => setIsStatsModalOpen(true)}
+            className="w-full mb-4 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle hover:border-pitch/40 cursor-pointer flex items-center justify-between gap-3 text-left transition-all group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-pitch/15 text-pitch shrink-0">
+                <Trophy className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-text-primary flex items-center gap-2">
+                  <span>
+                    {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
+                  </span>
+                  <span className="text-text-muted font-normal">vs</span>
+                  <span>
+                    {stats.awayStanding.rank}. {event.awayTeam || 'Vastustaja'} ({stats.awayStanding.points}p)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-text-muted">Kunto:</span>
+                    <div className="flex items-center gap-0.5">
+                      {stats.homeStanding.form.slice(-3).map((f, idx) => (
+                        <span
+                          key={idx}
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <span>•</span>
+                  <span className="truncate text-pitch font-medium">Avaa tilastot & sarjataulukko</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0 text-xs font-semibold text-pitch group-hover:translate-x-0.5 transition-transform">
+              <BarChart3 className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </motion.button>
         )}
-        {event.parking && <ParkingEaseBadge parking={event.parking} venueName={event.venue.name} />}
-      </div>
 
-      {/* Packing Advice & Spectator Note */}
-      {event.briefing && (
-        <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
-          <div className="font-semibold text-text-primary">🎒 Varustesuositus & Katsomo-opas:</div>
-          <div>{event.briefing.gearAndPackingAdvice.clothing} {event.briefing.gearAndPackingAdvice.spectatorGear}</div>
+        {/* Weather Rain Curve */}
+        {event.weather && (
+          <div className="mb-4">
+            <RainRadarCurve weather={event.weather} isOutdoor={!event.venue.isIndoor} />
+          </div>
+        )}
+
+        {/* Bento Sub-Cards: Nappisvahti & Parking */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          {event.briefing && (
+            <NappisvahtiPill
+              footwear={event.briefing.gearAndPackingAdvice.footwear}
+              reason={event.briefing.gearAndPackingAdvice.footwearReason}
+            />
+          )}
+          {event.parking && <ParkingEaseBadge parking={event.parking} venueName={event.venue.name} />}
         </div>
+
+        {/* Packing Advice & Spectator Note */}
+        {event.briefing && (
+          <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
+            <div className="font-semibold text-text-primary">🎒 Varustesuositus & Katsomo-opas:</div>
+            <div>
+              {event.briefing.gearAndPackingAdvice.clothing}{' '}
+              {event.briefing.gearAndPackingAdvice.spectatorGear}
+            </div>
+          </div>
+        )}
+
+        {/* Footer Action Bar */}
+        <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
+            <Shirt className="w-4 h-4 text-pitch" />
+            <span>{event.briefing?.gearAndPackingAdvice.kitRecommendation || 'Ykköspeliasu'}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={handleShareWhatsApp}
+              title="Jaa WhatsAppiin"
+              className="p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary cursor-pointer"
+            >
+              <Share2 className="w-4 h-4" />
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              transition={springTactile.snappy}
+              onClick={
+                onNavigateToVenue ||
+                (() => {
+                  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.venue.coordinates.lat},${event.venue.coordinates.lng}`;
+                  window.open(mapsUrl, '_blank');
+                })
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pitch text-text-inverse font-semibold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              <span>Navigoi kentälle</span>
+            </motion.button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Interactive Full Match Stats Modal */}
+      {stats && (
+        <MatchStatsModal
+          isOpen={isStatsModalOpen}
+          onClose={() => setIsStatsModalOpen(false)}
+          stats={stats}
+          homeTeam={event.homeTeam}
+          awayTeam={event.awayTeam || 'Vastustaja'}
+        />
       )}
-
-      {/* Footer Action Bar */}
-      <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
-          <Shirt className="w-4 h-4 text-pitch" />
-          <span>{event.briefing?.gearAndPackingAdvice.kitRecommendation || 'Ykköspeliasu'}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <motion.button
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.95 }}
-            transition={springTactile.snappy}
-            onClick={handleShareWhatsApp}
-            title="Jaa WhatsAppiin"
-            className="p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary cursor-pointer"
-          >
-            <Share2 className="w-4 h-4" />
-          </motion.button>
-
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.96 }}
-            transition={springTactile.snappy}
-            onClick={
-              onNavigateToVenue ||
-              (() => {
-                const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.venue.coordinates.lat},${event.venue.coordinates.lng}`;
-                window.open(mapsUrl, '_blank');
-              })
-            }
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pitch text-text-inverse font-semibold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer"
-          >
-            <Navigation className="w-3.5 h-3.5" />
-            <span>Navigoi kentälle</span>
-          </motion.button>
-        </div>
-      </div>
-    </motion.div>
+    </>
   );
 };
