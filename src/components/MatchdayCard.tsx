@@ -177,7 +177,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
         {/* Weather Rain Curve */}
         {event.weather && (
           <div className="mb-4">
-            <RainRadarCurve weather={event.weather} isOutdoor={!event.venue.isIndoor} />
+            <RainRadarCurve
+              weather={event.weather}
+              isOutdoor={!event.venue.isIndoor}
+              coordinates={event.venue.coordinates}
+              venueName={event.venue.name}
+            />
           </div>
         )}
 
