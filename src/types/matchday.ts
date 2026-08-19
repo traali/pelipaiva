@@ -1,4 +1,14 @@
-export type SportType = 'football' | 'floorball' | 'basketball' | 'futsal' | 'icehockey' | 'training' | 'other';
+export type SportType =
+  | 'football'
+  | 'floorball'
+  | 'basketball'
+  | 'volleyball'
+  | 'icehockey'
+  | 'futsal'
+  | 'training'
+  | 'other';
+
+export type EventType = 'match' | 'training' | 'tournament' | 'meeting' | 'other';
 
 export type PitchSurface =
   | 'artificial_turf_3g'
@@ -165,13 +175,15 @@ export interface TeamSquadRoster {
 }
 
 export interface FullMatchStats {
-  leagueName: string; // e.g., "Palloliitto T13 Ykkönen (Lohko 1)"
-  round?: string; // e.g., "Kierros 8 / 14"
+  leagueName: string; // e.g., "Lentopalloliitto N2 Torneopal"
+  round?: string;
+  scoreType?: 'goals' | 'sets' | 'points'; // Football/Floorball: goals, Volleyball: sets, Basketball: points
+  setScores?: string[]; // e.g. ["25-22", "23-25", "25-18", "25-20"]
   liveScore?: {
     home: number;
     away: number;
     isLive: boolean;
-    period?: string; // "1. puoliaika", "2. puoliaika", "Päättynyt"
+    period?: string;
   };
   goalsTimeline?: MatchGoal[];
   teamStats?: {
@@ -211,6 +223,8 @@ export interface MatchdayEvent {
   id: string;
   profileId: string;
   sport: SportType;
+  eventType: EventType;
+  isTraining: boolean;
   title: string;
   homeTeam: string;
   awayTeam: string;

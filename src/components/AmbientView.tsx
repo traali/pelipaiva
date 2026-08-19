@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MatchdayEvent } from '../types/matchday';
-import { MapPin, ShieldCheck, Thermometer } from 'lucide-react';
+import { MapPin, ShieldCheck, Thermometer, Dumbbell } from 'lucide-react';
 
 interface AmbientViewProps {
   events: MatchdayEvent[];
@@ -29,6 +29,25 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events }) => {
 
   const nextEvent = events[0];
 
+  const getSportBadge = (event: MatchdayEvent) => {
+    switch (event.sport) {
+      case 'volleyball':
+        return '🏐 Lentopallo';
+      case 'basketball':
+        return '🏀 Koripallo';
+      case 'floorball':
+        return '🏑 Salibandy';
+      case 'football':
+        return '⚽ Jalkapallo';
+      case 'icehockey':
+        return '🏒 Jääkiekko';
+      case 'futsal':
+        return '👟 Futsal';
+      default:
+        return event.isTraining ? '🏃‍♂️ Harjoitukset' : '🏅 Ottelu';
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-black text-white p-6 md:p-12 flex flex-col justify-between select-none">
       {/* Top Bar: Time & Kitchen Hub Status */}
@@ -43,19 +62,35 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events }) => {
         </div>
       </div>
 
-      {/* Center Hero: Next Upcoming Match */}
+      {/* Center Hero: Next Upcoming Match or Training */}
       {nextEvent ? (
         <div className="my-auto py-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs md:text-sm font-bold uppercase tracking-wider border border-emerald-500/30 mb-4">
-            {nextEvent.sport === 'football' ? '⚽ Jalkapallo' : '🏑 Salibandy'} • Kickoff klo{' '}
-            {new Date(nextEvent.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}
+            {nextEvent.isTraining ? (
+              <>
+                <Dumbbell className="w-4 h-4" />
+                <span>Harjoitus • {getSportBadge(nextEvent)}</span>
+              </>
+            ) : (
+              <span>{getSportBadge(nextEvent)} • Kickoff klo {new Date(nextEvent.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}</span>
+            )}
           </div>
 
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight flex items-baseline gap-3 flex-wrap">
-            <span>{nextEvent.homeTeam}</span>
-            <span className="text-zinc-500 font-normal text-xl md:text-3xl">vs</span>
-            <span>{nextEvent.awayTeam || 'Vastustaja'}</span>
-          </h1>
+          {nextEvent.isTraining ? (
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight text-white">
+              {nextEvent.title}
+            </h1>
+          ) : (
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tight flex items-baseline gap-3 flex-wrap">
+              <span>{nextEvent.homeTeam}</span>
+              {nextEvent.awayTeam && (
+                <>
+                  <span className="text-zinc-500 font-normal text-xl md:text-3xl">vs</span>
+                  <span>{nextEvent.awayTeam}</span>
+                </>
+              )}
+            </h1>
+          )}
 
           <div className="flex items-center gap-3 mt-4 text-base md:text-2xl text-zinc-300">
             <MapPin className="w-6 h-6 text-emerald-400" />
@@ -69,39 +104,49 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events }) => {
               <div className="text-2xl md:text-3xl font-black text-emerald-400 font-tabular">
                 klo {nextEvent.briefing?.recommendedDepartureTime || '16:45'}
               </div>
-              <div className="text-xs text-zinc-400 mt-1">Alkulämpöön klo {new Date(nextEvent.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="text-xs text-zinc-400 mt-1">
+                {nextEvent.isTraining ? 'Kokoontuminen' : 'Alkulämpö'} klo {new Date(nextEvent.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}
+              </div>
             </div>
 
             <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800">
-              <div className="text-xs text-zinc-400 font-semibold mb-1">Nappisvahti</div>
-              <div className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+              <div className="text-xs text-zinc-400 font-semibold mb-1">Sää & Alusta</div>
+              <div className="text-2xl md:text-3xl font-black text-white flex items-center gap-2">
+                <Thermometer className="w-6 h-6 text-emerald-400" />
+                {nextEvent.weather?.temperatureC ?? 18}°C
+              </div>
+              <div className="text-xs text-zinc-400 mt-1">
+                {nextEvent.venue.isIndoor ? 'Sisähalli (kuiva)' : 'Ulkoteconurmi'}
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800">
+              <div className="text-xs text-zinc-400 font-semibold mb-1">Varusteet</div>
+              <div className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <span>{nextEvent.briefing?.gearAndPackingAdvice.footwear === 'AG_ARTIFICIAL_GRASS' ? 'AG-Nappikset' : 'Turf-kengät'}</span>
+                {nextEvent.isTraining
+                  ? 'Sisäpelikengät & Juomapullo'
+                  : nextEvent.briefing?.gearAndPackingAdvice.footwear === 'AG_ARTIFICIAL_GRASS'
+                  ? 'AG-Tekonurminapit'
+                  : 'Sisäpelikengät'}
               </div>
-              <div className="text-xs text-zinc-400 mt-1 truncate">{nextEvent.venue.surface.replace(/_/g, ' ')}</div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800">
-              <div className="text-xs text-zinc-400 font-semibold mb-1">Kenttäsää</div>
-              <div className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                <Thermometer className="w-5 h-5 text-emerald-400" />
-                <span className="font-tabular">{nextEvent.weather?.temperatureC ?? 15}°C</span>
+              <div className="text-xs text-zinc-400 mt-1 truncate">
+                {nextEvent.volunteerDuty || (nextEvent.isTraining ? 'Treenivarustus' : 'Ykköspeliasu')}
               </div>
-              <div className="text-xs text-zinc-400 mt-1">Sade: {nextEvent.weather?.precipitationMmh ?? 0} mm/h</div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="my-auto text-center py-12">
-          <div className="text-4xl md:text-6xl font-bold text-zinc-600">Ei otteluita tänään</div>
-          <p className="text-zinc-400 text-lg mt-2">Nauti lepopäivästä tai tarkista huomisen kalenteri.</p>
+        <div className="my-auto py-12 text-center text-zinc-500">
+          <div className="text-3xl font-bold">Ei tulevia otteluita tai harjoituksia tänään</div>
+          <div className="text-sm mt-2">Nauti vapaapäivästä tai tarkista kalenterin tuonti.</div>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="text-xs text-zinc-600 flex items-center justify-between pt-4 border-t border-zinc-900">
-        <span>Pelipäivä Ambient Mode (Google Nest Hub 10-Foot UI)</span>
-        <span>100% Local-First & Zero-Auth</span>
+      {/* Footer Info */}
+      <div className="flex items-center justify-between text-xs text-zinc-500 border-t border-zinc-900 pt-4">
+        <span>Tieliikennelaki 2020 • FMI Avoin Data • Torneopal / Liitot</span>
+        <span>Päivittyy reaaliajassa</span>
       </div>
     </div>
   );

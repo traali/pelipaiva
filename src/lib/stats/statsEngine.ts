@@ -2,21 +2,36 @@ import { FullMatchStats, SportType, TeamSquadRoster } from '../../types/matchday
 
 /**
  * Generates or extracts full league and matchday stats for a given fixture,
- * including division-wide player rosters for all competing clubs.
+ * supporting Volleyball (Sets), Basketball (Points), Floorball (Goals), and Football.
  */
 export function generateOrResolveMatchStats(
   homeTeam: string,
   awayTeam: string,
   sport: SportType = 'football'
 ): FullMatchStats {
-  const isFootball = sport === 'football';
   const isFloorball = sport === 'floorball';
+  const isBasketball = sport === 'basketball';
+  const isVolleyball = sport === 'volleyball';
 
-  const leagueName = isFootball
-    ? 'Palloliitto T13 Eteläinen Ykkönen (Lohko 1)'
-    : isFloorball
-    ? 'Salibandyliitto P11 Kilpasarja'
-    : 'Koripalloliitto U14 Aluesarja';
+  let leagueName = 'Palloliitto T13 Eteläinen Ykkönen (Lohko 1)';
+  let scoreType: 'goals' | 'sets' | 'points' = 'goals';
+  let liveScore = { home: 2, away: 1, isLive: false, period: 'Päättynyt' };
+  let setScores: string[] | undefined;
+
+  if (isVolleyball) {
+    leagueName = 'Lentopalloliitto N2 Lohko 3 (Torneopal)';
+    scoreType = 'sets';
+    liveScore = { home: 3, away: 1, isLive: false, period: 'Päättynyt (Erät 3-1)' };
+    setScores = ['25-22', '23-25', '25-18', '25-20'];
+  } else if (isBasketball) {
+    leagueName = 'Koripalloliitto U14 Aluesarja (Basket.fi / Torneopal)';
+    scoreType = 'points';
+    liveScore = { home: 68, away: 62, isLive: false, period: 'Päättynyt' };
+  } else if (isFloorball) {
+    leagueName = 'Salibandyliitto P11 Kilpasarja (Torneopal)';
+    scoreType = 'goals';
+    liveScore = { home: 5, away: 3, isLive: false, period: 'Päättynyt' };
+  }
 
   const homeRoster: TeamSquadRoster = {
     teamName: homeTeam,
@@ -102,12 +117,9 @@ export function generateOrResolveMatchStats(
   return {
     leagueName,
     round: 'Kierros 8 / 14',
-    liveScore: {
-      home: 2,
-      away: 1,
-      isLive: false,
-      period: 'Päättynyt'
-    },
+    scoreType,
+    setScores,
+    liveScore,
     goalsTimeline: [
       { minute: 14, player: 'Maija Oinonen', team: 'home', assistPlayer: 'Aada K.' },
       { minute: 31, player: 'Ella Virtanen', team: 'away', isPenalty: false },
@@ -281,16 +293,6 @@ export function generateOrResolveMatchStats(
         opponentName: 'FC Honka Musta',
         homeResult: { result: 'win', score: '3 - 1' },
         awayResult: { result: 'loss', score: '1 - 2' }
-      },
-      {
-        opponentName: 'VJS Tytöt',
-        homeResult: { result: 'win', score: '4 - 0' },
-        awayResult: { result: 'win', score: '2 - 1' }
-      },
-      {
-        opponentName: 'PPJ Sininen',
-        homeResult: { result: 'win', score: '5 - 1' },
-        awayResult: { result: 'draw', score: '2 - 2' }
       }
     ],
     squadRosters: {
@@ -298,6 +300,6 @@ export function generateOrResolveMatchStats(
       away: awayRoster
     },
     divisionRosters,
-    scoutAnalysis: `${homeTeam} johtaa sarjaa tappiottomalla tilastolla (7V-1T-0H). ${awayTeam || 'Vastustaja'} on vaarallinen vastaiskujoukkue, jonka ykköshyökkääjä Ella Virtanen on tehnyt 7 maalia tällä kaudella.`
+    scoutAnalysis: `${homeTeam} johtaa sarjaa vahvalla vireellä.`
   };
 }

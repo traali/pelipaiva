@@ -111,9 +111,10 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                   <option value="football">⚽ Jalkapallo</option>
                   <option value="floorball">🏑 Salibandy</option>
                   <option value="basketball">🏀 Koripallo</option>
+                  <option value="volleyball">🏐 Lentopallo</option>
                   <option value="icehockey">🏒 Jääkiekko</option>
                   <option value="futsal">👟 Futsal</option>
-                  <option value="other">🏅 Muu urheilu</option>
+                  <option value="other">🏅 Muu urheilu / Treenit</option>
                 </select>
               </div>
 

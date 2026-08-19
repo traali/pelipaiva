@@ -9,7 +9,8 @@ import {
   Share2,
   BarChart3,
   ChevronRight,
-  Trophy
+  Trophy,
+  Dumbbell
 } from 'lucide-react';
 import { MatchdayEvent } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
@@ -38,7 +39,28 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
     minute: '2-digit'
   });
 
-  const stats = event.stats || generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport);
+  const isTraining = event.isTraining || event.eventType === 'training';
+  const hasStats = !isTraining && (event.stats !== undefined || event.awayTeam.length > 0);
+  const stats = hasStats ? event.stats || generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport) : undefined;
+
+  const getSportBadge = () => {
+    switch (event.sport) {
+      case 'volleyball':
+        return '🏐 Lentopallo';
+      case 'basketball':
+        return '🏀 Koripallo';
+      case 'floorball':
+        return '🏑 Salibandy';
+      case 'football':
+        return '⚽ Jalkapallo';
+      case 'icehockey':
+        return '🏒 Jääkiekko';
+      case 'futsal':
+        return '👟 Futsal';
+      default:
+        return isTraining ? '🏃‍♂️ Harjoitukset' : '🏅 Ottelu';
+    }
+  };
 
   const handleShareWhatsApp = () => {
     if (event.briefing?.postMatchWhatsAppTemplate) {
@@ -77,15 +99,23 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
         {/* Top Badges & Timers */}
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-pitch/15 text-pitch border border-pitch/25">
-              {event.sport === 'football'
-                ? '⚽ Jalkapallo'
-                : event.sport === 'floorball'
-                ? '🏑 Salibandy'
-                : event.sport === 'basketball'
-                ? '🏀 Koripallo'
-                : '🏅 Ottelu'}
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                isTraining
+                  ? 'bg-radar/15 text-radar border-radar/25'
+                  : 'bg-pitch/15 text-pitch border border-pitch/25'
+              }`}
+            >
+              {isTraining ? (
+                <>
+                  <Dumbbell className="w-3.5 h-3.5" />
+                  <span>Harjoitus • {getSportBadge()}</span>
+                </>
+              ) : (
+                getSportBadge()
+              )}
             </span>
+
             {event.volunteerDuty && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-whistle/15 text-whistle border border-whistle/25">
                 {event.volunteerDuty}
@@ -102,18 +132,33 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
           ) : (
             <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
               <Clock className="w-3.5 h-3.5 text-pitch" />
-              <span>Alkulämpö klo {formattedWarmup} • Kickoff klo {formattedKickoff}</span>
+              <span>
+                {isTraining
+                  ? `Kokoontuminen klo ${formattedWarmup} • Treeni klo ${formattedKickoff}`
+                  : `Alkulämpö klo ${formattedWarmup} • Kickoff klo ${formattedKickoff}`}
+              </span>
             </div>
           )}
         </div>
 
-        {/* Matchup Header */}
+        {/* Event Header (Matchup vs Training Title) */}
         <div className="mb-4">
-          <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary flex items-baseline gap-2">
-            <span>{event.homeTeam}</span>
-            <span className="text-text-muted font-normal text-sm">vs</span>
-            <span>{event.awayTeam || 'Vastustaja'}</span>
-          </h2>
+          {isTraining ? (
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary">
+              {event.title}
+            </h2>
+          ) : (
+            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary flex items-baseline gap-2">
+              <span>{event.homeTeam}</span>
+              {event.awayTeam && (
+                <>
+                  <span className="text-text-muted font-normal text-sm">vs</span>
+                  <span>{event.awayTeam}</span>
+                </>
+              )}
+            </h2>
+          )}
+
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />
             <span className="truncate">{event.venue.name}</span>
@@ -123,8 +168,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
           </div>
         </div>
 
-        {/* Modern Football & Sports Stats Preview Strip */}
-        {stats && (
+        {/* Modern Sports Stats Preview Strip (Only for Matches with Stats) */}
+        {!isTraining && stats && (
           <motion.button
             type="button"
             whileTap={{ scale: 0.98 }}
@@ -142,10 +187,14 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
                   <span>
                     {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
                   </span>
-                  <span className="text-text-muted font-normal">vs</span>
-                  <span>
-                    {stats.awayStanding.rank}. {event.awayTeam || 'Vastustaja'} ({stats.awayStanding.points}p)
-                  </span>
+                  {event.awayTeam && (
+                    <>
+                      <span className="text-text-muted font-normal">vs</span>
+                      <span>
+                        {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5">
                   <div className="flex items-center gap-1">
@@ -162,7 +211,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
                     </div>
                   </div>
                   <span>•</span>
-                  <span className="truncate text-pitch font-medium">Avaa tilastot & sarjataulukko</span>
+                  <span className="truncate text-pitch font-medium">Avaa tilastot & kokoonpanot</span>
                 </div>
               </div>
             </div>
@@ -174,7 +223,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
           </motion.button>
         )}
 
-        {/* Weather Rain Curve */}
+        {/* Weather Rain Curve & Live Radar Trigger */}
         {event.weather && (
           <div className="mb-4">
             <RainRadarCurve
@@ -200,7 +249,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
         {/* Packing Advice & Spectator Note */}
         {event.briefing && (
           <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
-            <div className="font-semibold text-text-primary">🎒 Varustesuositus & Katsomo-opas:</div>
+            <div className="font-semibold text-text-primary">
+              {isTraining ? '🎒 Treenivarusteet:' : '🎒 Varustesuositus & Katsomo-opas:'}
+            </div>
             <div>
               {event.briefing.gearAndPackingAdvice.clothing}{' '}
               {event.briefing.gearAndPackingAdvice.spectatorGear}
@@ -212,7 +263,11 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
         <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
             <Shirt className="w-4 h-4 text-pitch" />
-            <span>{event.briefing?.gearAndPackingAdvice.kitRecommendation || 'Ykköspeliasu'}</span>
+            <span>
+              {isTraining
+                ? 'Treenivarusteet & Juomapullo'
+                : event.briefing?.gearAndPackingAdvice.kitRecommendation || 'Ykköspeliasu'}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -241,14 +296,14 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pitch text-text-inverse font-semibold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer"
             >
               <Navigation className="w-3.5 h-3.5" />
-              <span>Navigoi kentälle</span>
+              <span>Navigoi paikalle</span>
             </motion.button>
           </div>
         </div>
       </motion.div>
 
-      {/* Interactive Full Match Stats Modal */}
-      {stats && (
+      {/* Interactive Full Match Stats Modal (if match stats exist) */}
+      {!isTraining && stats && (
         <MatchStatsModal
           isOpen={isStatsModalOpen}
           onClose={() => setIsStatsModalOpen(false)}

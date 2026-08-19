@@ -1,93 +1,142 @@
 import ICAL from 'ical.js';
-import { MatchdayEvent, SportType } from '../../types/matchday';
-import { resolveSportsVenue } from '../geo/sportsGeocoder';
+import { MatchdayEvent, SportType, EventType } from '../../types/matchday';
+import { geocodeSportsVenue } from '../geo/sportsGeocoder';
 
+/**
+ * Checks if an event is a training session, practice, or non-match exercise.
+ */
+export function isTrainingEvent(title: string, description: string = ''): boolean {
+  const text = `${title} ${description}`.toLowerCase();
+  const trainingKeywords = [
+    'harjoitukset',
+    'harjoitus',
+    'treenit',
+    'treeni',
+    'fysiikka',
+    'lajiharjoitus',
+    'lajivuoro',
+    'kuntopiiri',
+    'aamujää',
+    'jäätreenit',
+    'valmennus',
+    'taitotreenit',
+    'pukukoppipalaveri',
+    'fysiikkatreenit'
+  ];
+
+  // If explicit "vs" or " - " with another team, it's a match unless specified as internal drill
+  if (text.includes(' vs ') && !text.includes('sisäinen')) {
+    return false;
+  }
+
+  return trainingKeywords.some((kw) => text.includes(kw));
+}
+
+/**
+ * Parses raw iCalendar (.ics) string feeds from Nimenhuuto, MyClub, Jopox, or Torneopal.
+ * Timezone-safe (RFC 5545) with deterministic volunteer duty detection.
+ */
 export async function parseICSFeed(
   icsContent: string,
   profileId: string,
-  defaultSport: SportType = 'football'
+  sport: SportType = 'football'
 ): Promise<MatchdayEvent[]> {
-  const jcalData = ICAL.parse(icsContent);
-  const comp = new ICAL.Component(jcalData);
-  const vevents = comp.getAllSubcomponents('vevent');
+  const events: MatchdayEvent[] = [];
 
-  const parsedEvents: MatchdayEvent[] = [];
+  try {
+    const jcalData = ICAL.parse(icsContent);
+    const vcalendar = new ICAL.Component(jcalData);
+    const vevents = vcalendar.getAllSubcomponents('vevent');
 
-  for (const veventComp of vevents) {
-    const event = new ICAL.Event(veventComp);
-    const summary = event.summary || '';
-    const description = event.description || '';
-    const location = event.location || '';
+    for (const vevent of vevents) {
+      const event = new ICAL.Event(vevent);
 
-    // Convert to native JS Date for ISO string representation
-    const startJs = event.startDate ? event.startDate.toJSDate() : new Date();
-    const endJs = event.endDate ? event.endDate.toJSDate() : new Date(startJs.getTime() + 90 * 60000);
-    const startIso = startJs.toISOString();
-    const endIso = endJs.toISOString();
+      const title = event.summary || 'Tuntematon tapahtuma';
+      const location = event.location || 'Töölön Pallokenttä';
+      const description = event.description || '';
 
-    const lowerSummary = summary.toLowerCase();
-    const lowerDesc = description.toLowerCase();
+      // Preserve full UTC date / local timezone offset safely
+      const startDate = event.startDate ? event.startDate.toJSDate() : new Date();
+      const endDate = event.endDate
+        ? event.endDate.toJSDate()
+        : new Date(startDate.getTime() + 90 * 60 * 1000);
 
-    // 1. Detect Sport
-    let sport: SportType = defaultSport;
-    if (lowerSummary.includes('salibandy') || lowerSummary.includes('säbä') || lowerSummary.includes('sb')) {
-      sport = 'floorball';
-    } else if (lowerSummary.includes('koripallo') || lowerSummary.includes('basket') || lowerSummary.includes('kb')) {
-      sport = 'basketball';
-    } else if (lowerSummary.includes('jääkiekko') || lowerSummary.includes('hockey')) {
-      sport = 'icehockey';
-    } else if (lowerSummary.includes('futsal')) {
-      sport = 'futsal';
-    } else if (lowerSummary.includes('treenit') || lowerSummary.includes('harjoitukset')) {
-      sport = 'training';
+      // Warmup is typically 45 mins before match, 15 mins before training
+      const isTraining = isTrainingEvent(title, description);
+      const warmupOffsetMinutes = isTraining ? 15 : 45;
+      const warmupDate = new Date(startDate.getTime() - warmupOffsetMinutes * 60 * 1000);
+
+      // Volunteer duty detection (Talkoovahti)
+      let volunteerDuty: string | undefined;
+      const descLower = description.toLowerCase();
+      if (descLower.includes('kahviovuoro') || descLower.includes('kahvio')) {
+        volunteerDuty = '☕ Kahviovuoro';
+      } else if (descLower.includes('toimitsija') || descLower.includes('kirjuri')) {
+        volunteerDuty = '⏱️ Toimitsijavuoro';
+      } else if (descLower.includes('järkkäri') || descLower.includes('järjestyksenvalvoja')) {
+        volunteerDuty = '🛡️ Järjestyksenvalvoja';
+      } else if (descLower.includes('kirjuri') || descLower.includes('kello')) {
+        volunteerDuty = '📝 Kirjuri/Kello';
+      }
+
+      // Extract Opponents & Matchup
+      let homeTeam = title;
+      let awayTeam = '';
+      let isHomeMatch = true;
+
+      if (!isTraining) {
+        // Strip common prefixes like "Peli: ", "Ottelu: ", "Sarjapeli: "
+        const cleanedTitle = title.replace(/^(peli|ottelu|sarjapeli|sarjaottelu|turnauspeli):\s*/i, '');
+        const vsDelimiters = [' vs ', ' - ', ' v ', ' @ '];
+        for (const delim of vsDelimiters) {
+          if (cleanedTitle.includes(delim)) {
+            const parts = cleanedTitle.split(delim);
+            homeTeam = (parts[0] || '').trim();
+            awayTeam = (parts[1] || '').trim();
+            if (delim === ' @ ') {
+              // Away match notation
+              isHomeMatch = false;
+              const temp = homeTeam;
+              homeTeam = awayTeam;
+              awayTeam = temp;
+            }
+            break;
+          }
+        }
+      }
+
+      // Determine EventType
+      let eventType: EventType = 'match';
+      if (isTraining) {
+        eventType = 'training';
+      } else if (descLower.includes('turnaus') || title.toLowerCase().includes('turnaus') || descLower.includes('torneopal')) {
+        eventType = 'tournament';
+      }
+
+      // Geocode venue with LIPAS.fi and Slang aliases
+      const venue = await geocodeSportsVenue(location);
+
+      events.push({
+        id: event.uid || `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        profileId,
+        sport,
+        eventType,
+        isTraining,
+        title,
+        homeTeam,
+        awayTeam,
+        isHomeMatch,
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
+        warmupTime: warmupDate.toISOString(),
+        venue,
+        volunteerDuty
+      });
     }
-
-    // 2. Detect Volunteer Duty
-    let volunteerDuty: string | undefined;
-    if (lowerDesc.includes('kahvio') || lowerDesc.includes('buffet') || lowerSummary.includes('kahvio')) {
-      volunteerDuty = '☕ Kahviovuoro';
-    } else if (lowerDesc.includes('toimitsija') || lowerDesc.includes('kirjuri') || lowerDesc.includes('kello')) {
-      volunteerDuty = '⏱️ Toimitsijavuoro (Kirjuri/Kello)';
-    } else if (lowerDesc.includes('järkkäri') || lowerDesc.includes('järjestyksenvalvoja')) {
-      volunteerDuty = '🦺 Järjestyksenvalvonta';
-    }
-
-    // 3. Extract Home & Away Teams
-    let homeTeam = summary;
-    let awayTeam = '';
-    const isHomeMatch = true;
-
-    if (summary.includes(' vs ') || summary.includes(' - ')) {
-      const parts = summary.split(/\s+(?:vs|-)\s+/i);
-      homeTeam = (parts[0] ?? '').replace(/^(ottelu|peli|sarjapeli):\s*/i, '').trim();
-      awayTeam = parts[1] ? parts[1].replace(/\(.*\)/, '').trim() : '';
-    }
-
-    // 4. Calculate Warmup Time
-    const warmupOffsetMinutes = sport === 'floorball' ? 35 : sport === 'football' ? 45 : 30;
-    const warmupIso = new Date(startJs.getTime() - warmupOffsetMinutes * 60000).toISOString();
-
-    // 5. Geocode Venue
-    const venue = await resolveSportsVenue(location || summary);
-
-    // 6. Stable Unique Hash ID
-    const hashId = `${profileId}_${startIso}_${summary.replace(/\W+/g, '_')}`;
-
-    parsedEvents.push({
-      id: hashId,
-      profileId,
-      sport,
-      title: summary,
-      homeTeam: homeTeam || summary,
-      awayTeam,
-      isHomeMatch,
-      startTime: startIso,
-      endTime: endIso,
-      warmupTime: warmupIso,
-      venue,
-      volunteerDuty
-    });
+  } catch (error) {
+    console.error('Failed to parse ICS feed:', error);
   }
 
-  return parsedEvents;
+  // Return chronological sort
+  return events.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 }

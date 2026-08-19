@@ -173,3 +173,5 @@ export async function resolveSportsVenue(rawVenueString: string): Promise<VenueI
     hasFloodlights: true
   };
 }
+
+export const geocodeSportsVenue = resolveSportsVenue;
