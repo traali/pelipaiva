@@ -14,20 +14,17 @@ describe('Stats Engine', () => {
     expect(stats.headToHeadHistory.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('provides player-level statistics and squad rosters', () => {
+  it('provides player-level statistics and squad rosters for all division teams', () => {
     const stats = generateOrResolveMatchStats('HJK T13', 'EPS Valkoinen', 'football');
-    expect(stats.squadRosters.home.players.length).toBeGreaterThanOrEqual(8);
-    expect(stats.squadRosters.away.players.length).toBeGreaterThanOrEqual(7);
+    expect(stats.divisionRosters).toBeDefined();
+    expect(stats.divisionRosters['HJK T13']?.players.length).toBeGreaterThanOrEqual(8);
+    expect(stats.divisionRosters['FC Honka Musta']?.players.length).toBeGreaterThanOrEqual(5);
+    expect(stats.divisionRosters['VJS Tytöt']?.players.length).toBeGreaterThanOrEqual(4);
 
-    const topScorer = stats.squadRosters.home.players.find((p) => p.jerseyNumber === 10);
-    expect(topScorer?.playerName).toBe('Maija Oinonen');
-    expect(topScorer?.goals).toBe(11);
-    expect(topScorer?.assists).toBe(4);
-    expect(topScorer?.position).toBe('FW');
-
-    const captain = stats.squadRosters.home.players.find((p) => p.isCaptain);
-    expect(captain).toBeDefined();
-    expect(captain?.jerseyNumber).toBe(4);
+    const honkaStar = stats.divisionRosters['FC Honka Musta']?.players.find((p) => p.jerseyNumber === 7);
+    expect(honkaStar?.playerName).toBe('Aada Korhonen');
+    expect(honkaStar?.goals).toBe(9);
+    expect(honkaStar?.isCaptain).toBe(true);
   });
 
   it('generates appropriate league names for floorball', () => {

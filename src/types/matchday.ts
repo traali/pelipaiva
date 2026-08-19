@@ -188,6 +188,7 @@ export interface FullMatchStats {
     home: TeamSquadRoster;
     away: TeamSquadRoster;
   };
+  divisionRosters: Record<string, TeamSquadRoster>;
   scoutAnalysis: string;
 }
 

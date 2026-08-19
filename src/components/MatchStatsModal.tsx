@@ -10,7 +10,8 @@ import {
   Sparkles,
   GitCompare,
   Users,
-  Target
+  Target,
+  ChevronRight
 } from 'lucide-react';
 import { FullMatchStats } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
@@ -33,14 +34,20 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   awayTeam
 }) => {
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
-  const [rosterTeam, setRosterTeam] = useState<'home' | 'away'>('home');
+  const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
 
   if (!stats) return null;
 
   const teamStats = stats.teamStats;
   const homeStats = teamStats?.home;
   const awayStats = teamStats?.away;
-  const currentRoster = rosterTeam === 'home' ? stats.squadRosters?.home : stats.squadRosters?.away;
+  
+  // Resolve current active squad roster across the entire division
+  const currentRoster =
+    stats.divisionRosters?.[selectedTeamName] ||
+    (selectedTeamName === homeTeam
+      ? stats.squadRosters?.home
+      : stats.squadRosters?.away);
 
   // Comparison Bar Helper Component
   const ComparisonBar: React.FC<{
@@ -268,38 +275,51 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               </div>
             )}
 
-            {/* TAB 2: Squad Rosters & Individual Player Stats */}
+            {/* TAB 2: Squad Rosters & Individual Player Stats (ALL TEAMS) */}
             {activeTab === 'roster' && (
               <div className="flex flex-col gap-3">
-                {/* Team Switcher Pills */}
-                <div className="flex items-center gap-2 p-1 rounded-2xl bg-surface-elevated border border-border-subtle">
-                  <button
-                    onClick={() => setRosterTeam('home')}
-                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      rosterTeam === 'home'
-                        ? 'bg-pitch text-text-inverse shadow-sm'
-                        : 'text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    {homeTeam} (Kotijoukkue)
-                  </button>
-                  <button
-                    onClick={() => setRosterTeam('away')}
-                    className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      rosterTeam === 'away'
-                        ? 'bg-radar text-text-inverse shadow-sm'
-                        : 'text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    {awayTeam} (Vierasjoukkue)
-                  </button>
+                {/* Division-Wide Team Selector Bar */}
+                <div>
+                  <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5 px-1">
+                    Valitse sarjan joukkue ({stats.standingsTable.length} joukkuetta):
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+                    {stats.standingsTable.map((team) => {
+                      const isSelected = selectedTeamName === team.teamName;
+                      const isHome = team.teamName === homeTeam;
+                      const isAway = team.teamName === awayTeam;
+                      return (
+                        <button
+                          key={team.teamName}
+                          onClick={() => setSelectedTeamName(team.teamName)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all border ${
+                            isSelected
+                              ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
+                              : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                          }`}
+                        >
+                          {team.teamName}
+                          {isHome ? ' (Koti)' : isAway ? ' (Vieras)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Coach Info */}
-                {currentRoster?.coachName && (
-                  <div className="text-[11px] text-text-muted px-1 flex items-center justify-between">
-                    <span>Valmentaja: <strong>{currentRoster.coachName}</strong></span>
-                    <span>Kokoonpano: {currentRoster.players.length} pelaajaa</span>
+                {/* Coach and Squad Header */}
+                {currentRoster && (
+                  <div className="p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-secondary flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-text-primary text-sm">{currentRoster.teamName}</span>
+                      {currentRoster.coachName && (
+                        <div className="text-[11px] text-text-muted mt-0.5">
+                          Valmentaja: <strong>{currentRoster.coachName}</strong>
+                        </div>
+                      )}
+                    </div>
+                    <span className="px-2.5 py-1 rounded-xl bg-surface-base font-semibold text-text-primary text-xs border border-border-subtle">
+                      {currentRoster.players.length} pelaajaa listalla
+                    </span>
                   </div>
                 )}
 
@@ -374,73 +394,83 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
 
             {/* TAB 3: League Standings Table */}
             {activeTab === 'standings' && (
-              <div className="rounded-2xl border border-border-subtle overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-surface-elevated text-text-muted text-[11px] font-semibold border-b border-border-subtle">
-                      <tr>
-                        <th className="py-2.5 px-3">#</th>
-                        <th className="py-2.5 px-3">Joukkue</th>
-                        <th className="py-2.5 px-2 text-center">O</th>
-                        <th className="py-2.5 px-2 text-center">V</th>
-                        <th className="py-2.5 px-2 text-center">T</th>
-                        <th className="py-2.5 px-2 text-center">H</th>
-                        <th className="py-2.5 px-2 text-center">ME</th>
-                        <th className="py-2.5 px-3 text-right">Pisteet</th>
-                        <th className="py-2.5 px-3 text-center">Kunto</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-subtle/50">
-                      {stats.standingsTable.map((row) => {
-                        const isHome = row.teamName === homeTeam;
-                        const isAway = row.teamName === awayTeam;
-                        return (
-                          <tr
-                            key={row.rank}
-                            className={`transition-colors ${
-                              isHome
-                                ? 'bg-pitch/10 font-bold text-pitch'
-                                : isAway
-                                ? 'bg-radar/10 font-bold text-radar'
-                                : 'hover:bg-surface-elevated/50 text-text-primary'
-                            }`}
-                          >
-                            <td className="py-2.5 px-3 font-bold">{row.rank}.</td>
-                            <td className="py-2.5 px-3 font-semibold truncate max-w-[130px]">
-                              {row.teamName}
-                            </td>
-                            <td className="py-2.5 px-2 text-center font-tabular">{row.played}</td>
-                            <td className="py-2.5 px-2 text-center font-tabular">{row.won}</td>
-                            <td className="py-2.5 px-2 text-center font-tabular">{row.drawn}</td>
-                            <td className="py-2.5 px-2 text-center font-tabular">{row.lost}</td>
-                            <td className="py-2.5 px-2 text-center font-tabular">
-                              {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-black font-tabular text-sm">
-                              {row.points}
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                {row.form.map((f, fIdx) => (
-                                  <span
-                                    key={fIdx}
-                                    className={`h-2 w-2 rounded-full ${
-                                      f === 'W'
-                                        ? 'bg-pitch'
-                                        : f === 'D'
-                                        ? 'bg-whistle'
-                                        : 'bg-stoppage'
-                                    }`}
-                                    title={f === 'W' ? 'Voitto' : f === 'D' ? 'Tasapeli' : 'Tappio'}
-                                  />
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              <div className="flex flex-col gap-2">
+                <div className="text-[11px] text-text-muted px-1">
+                  💡 Klikkaa mitä tahansa joukkuetta nähdäksesi heidän pelaajakokoonpanonsa ja maalitilastonsa.
+                </div>
+                <div className="rounded-2xl border border-border-subtle overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-surface-elevated text-text-muted text-[11px] font-semibold border-b border-border-subtle">
+                        <tr>
+                          <th className="py-2.5 px-3">#</th>
+                          <th className="py-2.5 px-3">Joukkue</th>
+                          <th className="py-2.5 px-2 text-center">O</th>
+                          <th className="py-2.5 px-2 text-center">V</th>
+                          <th className="py-2.5 px-2 text-center">T</th>
+                          <th className="py-2.5 px-2 text-center">H</th>
+                          <th className="py-2.5 px-2 text-center">ME</th>
+                          <th className="py-2.5 px-3 text-right">Pisteet</th>
+                          <th className="py-2.5 px-3 text-center">Kunto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-subtle/50">
+                        {stats.standingsTable.map((row) => {
+                          const isHome = row.teamName === homeTeam;
+                          const isAway = row.teamName === awayTeam;
+                          return (
+                            <tr
+                              key={row.rank}
+                              onClick={() => {
+                                setSelectedTeamName(row.teamName);
+                                setActiveTab('roster');
+                              }}
+                              className={`transition-colors cursor-pointer hover:brightness-110 ${
+                                isHome
+                                  ? 'bg-pitch/10 font-bold text-pitch'
+                                  : isAway
+                                  ? 'bg-radar/10 font-bold text-radar'
+                                  : 'hover:bg-surface-elevated/50 text-text-primary'
+                              }`}
+                            >
+                              <td className="py-2.5 px-3 font-bold">{row.rank}.</td>
+                              <td className="py-2.5 px-3 font-semibold truncate max-w-[130px] flex items-center justify-between gap-1">
+                                <span>{row.teamName}</span>
+                                <ChevronRight className="w-3 h-3 opacity-50 shrink-0" />
+                              </td>
+                              <td className="py-2.5 px-2 text-center font-tabular">{row.played}</td>
+                              <td className="py-2.5 px-2 text-center font-tabular">{row.won}</td>
+                              <td className="py-2.5 px-2 text-center font-tabular">{row.drawn}</td>
+                              <td className="py-2.5 px-2 text-center font-tabular">{row.lost}</td>
+                              <td className="py-2.5 px-2 text-center font-tabular">
+                                {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-black font-tabular text-sm">
+                                {row.points}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {row.form.map((f, fIdx) => (
+                                    <span
+                                      key={fIdx}
+                                      className={`h-2 w-2 rounded-full ${
+                                        f === 'W'
+                                          ? 'bg-pitch'
+                                          : f === 'D'
+                                          ? 'bg-whistle'
+                                          : 'bg-stoppage'
+                                      }`}
+                                      title={f === 'W' ? 'Voitto' : f === 'D' ? 'Tasapeli' : 'Tappio'}
+                                    />
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -451,14 +481,18 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 {stats.topScorers.map((scorer) => (
                   <div
                     key={scorer.rank}
-                    className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated/60 border border-border-subtle"
+                    onClick={() => {
+                      setSelectedTeamName(scorer.teamName);
+                      setActiveTab('roster');
+                    }}
+                    className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated/60 border border-border-subtle cursor-pointer hover:border-pitch/30 transition-all group"
                   >
                     <div className="flex items-center gap-3">
                       <span className="h-6 w-6 rounded-full bg-surface-elevated border border-border-strong flex items-center justify-center font-bold text-xs text-text-primary font-tabular">
                         {scorer.rank}
                       </span>
                       <div>
-                        <div className="text-xs font-bold text-text-primary">
+                        <div className="text-xs font-bold text-text-primary group-hover:text-pitch transition-colors">
                           {scorer.playerName}
                         </div>
                         <div className="text-[11px] text-text-muted">{scorer.teamName}</div>

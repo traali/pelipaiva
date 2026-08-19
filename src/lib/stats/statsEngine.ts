@@ -1,8 +1,8 @@
-import { FullMatchStats, SportType } from '../../types/matchday';
+import { FullMatchStats, SportType, TeamSquadRoster } from '../../types/matchday';
 
 /**
- * Generates or extracts full league and matchday stats for a given fixture.
- * Integrates logic and structures directly aligned with traali/football-stats.
+ * Generates or extracts full league and matchday stats for a given fixture,
+ * including division-wide player rosters for all competing clubs.
  */
 export function generateOrResolveMatchStats(
   homeTeam: string,
@@ -17,6 +17,87 @@ export function generateOrResolveMatchStats(
     : isFloorball
     ? 'Salibandyliitto P11 Kilpasarja'
     : 'Koripalloliitto U14 Aluesarja';
+
+  const homeRoster: TeamSquadRoster = {
+    teamName: homeTeam,
+    coachName: 'Mikael Salo',
+    players: [
+      { jerseyNumber: 1, playerName: 'Emma Korhonen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 4, playerName: 'Venla Mäkelä', position: 'DF', goals: 1, assists: 2, matchesPlayed: 8, yellowCards: 1, redCards: 0, isCaptain: true, isStartingLineup: true },
+      { jerseyNumber: 6, playerName: 'Kerttu Lahtinen', position: 'DF', goals: 0, assists: 1, matchesPlayed: 7, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 8, playerName: 'Aada Koskinen', position: 'MF', goals: 4, assists: 6, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 10, playerName: 'Maija Oinonen', position: 'FW', goals: 11, assists: 4, matchesPlayed: 8, yellowCards: 1, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 11, playerName: 'Sofia Nieminen', position: 'FW', goals: 6, assists: 3, matchesPlayed: 7, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 14, playerName: 'Helmi Järvinen', position: 'MF', goals: 3, assists: 2, matchesPlayed: 6, yellowCards: 0, redCards: 0, isStartingLineup: false },
+      { jerseyNumber: 19, playerName: 'Iida Heikkinen', position: 'DF', goals: 0, assists: 0, matchesPlayed: 5, yellowCards: 0, redCards: 0, isStartingLineup: false }
+    ]
+  };
+
+  const awayRoster: TeamSquadRoster = {
+    teamName: awayTeam || 'EPS Valkoinen',
+    coachName: 'Jari Virtanen',
+    players: [
+      { jerseyNumber: 12, playerName: 'Lotta Rantanen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 3, playerName: 'Alisa Kivi', position: 'DF', goals: 0, assists: 1, matchesPlayed: 8, yellowCards: 2, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 5, playerName: 'Oona Lehto', position: 'DF', goals: 1, assists: 0, matchesPlayed: 7, yellowCards: 1, redCards: 0, isCaptain: true, isStartingLineup: true },
+      { jerseyNumber: 7, playerName: 'Minea Vainio', position: 'MF', goals: 3, assists: 4, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 9, playerName: 'Ella Virtanen', position: 'FW', goals: 7, assists: 2, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 13, playerName: 'Sara Aalto', position: 'MF', goals: 2, assists: 1, matchesPlayed: 6, yellowCards: 1, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 16, playerName: 'Emilia Tuominen', position: 'FW', goals: 1, assists: 0, matchesPlayed: 5, yellowCards: 0, redCards: 0, isStartingLineup: false }
+    ]
+  };
+
+  const honkaRoster: TeamSquadRoster = {
+    teamName: 'FC Honka Musta',
+    coachName: 'Sami Hyypiä',
+    players: [
+      { jerseyNumber: 1, playerName: 'Nea Saarinen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 7, playerName: 'Aada Korhonen', position: 'FW', goals: 9, assists: 5, matchesPlayed: 8, yellowCards: 1, redCards: 0, isCaptain: true, isStartingLineup: true },
+      { jerseyNumber: 10, playerName: 'Inka Lindroos', position: 'MF', goals: 5, assists: 4, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 15, playerName: 'Roosa Laine', position: 'DF', goals: 2, assists: 1, matchesPlayed: 7, yellowCards: 2, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 22, playerName: 'Vilma Jokinen', position: 'MF', goals: 3, assists: 3, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true }
+    ]
+  };
+
+  const vjsRoster: TeamSquadRoster = {
+    teamName: 'VJS Tytöt',
+    coachName: 'Petri Tiainen',
+    players: [
+      { jerseyNumber: 1, playerName: 'Pihla Rantala', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 11, playerName: 'Siiri Lehtonen', position: 'FW', goals: 5, assists: 2, matchesPlayed: 8, yellowCards: 0, redCards: 0, isCaptain: true, isStartingLineup: true },
+      { jerseyNumber: 8, playerName: 'Fanny Ekman', position: 'MF', goals: 3, assists: 3, matchesPlayed: 8, yellowCards: 1, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 4, playerName: 'Alma Vuorela', position: 'DF', goals: 1, assists: 0, matchesPlayed: 7, yellowCards: 1, redCards: 0, isStartingLineup: true }
+    ]
+  };
+
+  const ppjRoster: TeamSquadRoster = {
+    teamName: 'PPJ Sininen',
+    coachName: 'Kari Martonen',
+    players: [
+      { jerseyNumber: 1, playerName: 'Lilli Hämäläinen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 9, playerName: 'Mila Rautiainen', position: 'FW', goals: 4, assists: 1, matchesPlayed: 8, yellowCards: 0, redCards: 0, isCaptain: true, isStartingLineup: true },
+      { jerseyNumber: 14, playerName: 'Nelli Toivonen', position: 'MF', goals: 2, assists: 2, matchesPlayed: 7, yellowCards: 2, redCards: 0, isStartingLineup: true }
+    ]
+  };
+
+  const valttiRoster: TeamSquadRoster = {
+    teamName: 'Valtti/IHK YJ',
+    coachName: 'Antti Muurinen',
+    players: [
+      { jerseyNumber: 1, playerName: 'Lumi Peltonen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
+      { jerseyNumber: 10, playerName: 'Enni Karjalainen', position: 'FW', goals: 2, assists: 1, matchesPlayed: 8, yellowCards: 1, redCards: 0, isCaptain: true, isStartingLineup: true },
+      { jerseyNumber: 5, playerName: 'Hilla Mattila', position: 'DF', goals: 1, assists: 0, matchesPlayed: 8, yellowCards: 1, redCards: 0, isStartingLineup: true }
+    ]
+  };
+
+  const divisionRosters: Record<string, TeamSquadRoster> = {
+    [homeTeam]: homeRoster,
+    [awayTeam || 'EPS Valkoinen']: awayRoster,
+    'FC Honka Musta': honkaRoster,
+    'VJS Tytöt': vjsRoster,
+    'PPJ Sininen': ppjRoster,
+    'Valtti/IHK YJ': valttiRoster
+  };
 
   return {
     leagueName,
@@ -213,34 +294,10 @@ export function generateOrResolveMatchStats(
       }
     ],
     squadRosters: {
-      home: {
-        teamName: homeTeam,
-        coachName: 'Mikael Salo',
-        players: [
-          { jerseyNumber: 1, playerName: 'Emma Korhonen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 4, playerName: 'Venla Mäkelä', position: 'DF', goals: 1, assists: 2, matchesPlayed: 8, yellowCards: 1, redCards: 0, isCaptain: true, isStartingLineup: true },
-          { jerseyNumber: 6, playerName: 'Kerttu Lahtinen', position: 'DF', goals: 0, assists: 1, matchesPlayed: 7, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 8, playerName: 'Aada Koskinen', position: 'MF', goals: 4, assists: 6, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 10, playerName: 'Maija Oinonen', position: 'FW', goals: 11, assists: 4, matchesPlayed: 8, yellowCards: 1, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 11, playerName: 'Sofia Nieminen', position: 'FW', goals: 6, assists: 3, matchesPlayed: 7, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 14, playerName: 'Helmi Järvinen', position: 'MF', goals: 3, assists: 2, matchesPlayed: 6, yellowCards: 0, redCards: 0, isStartingLineup: false },
-          { jerseyNumber: 19, playerName: 'Iida Heikkinen', position: 'DF', goals: 0, assists: 0, matchesPlayed: 5, yellowCards: 0, redCards: 0, isStartingLineup: false }
-        ]
-      },
-      away: {
-        teamName: awayTeam || 'EPS Valkoinen',
-        coachName: 'Jari Virtanen',
-        players: [
-          { jerseyNumber: 12, playerName: 'Lotta Rantanen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 3, playerName: 'Alisa Kivi', position: 'DF', goals: 0, assists: 1, matchesPlayed: 8, yellowCards: 2, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 5, playerName: 'Oona Lehto', position: 'DF', goals: 1, assists: 0, matchesPlayed: 7, yellowCards: 1, redCards: 0, isCaptain: true, isStartingLineup: true },
-          { jerseyNumber: 7, playerName: 'Minea Vainio', position: 'MF', goals: 3, assists: 4, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 9, playerName: 'Ella Virtanen', position: 'FW', goals: 7, assists: 2, matchesPlayed: 8, yellowCards: 0, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 13, playerName: 'Sara Aalto', position: 'MF', goals: 2, assists: 1, matchesPlayed: 6, yellowCards: 1, redCards: 0, isStartingLineup: true },
-          { jerseyNumber: 16, playerName: 'Emilia Tuominen', position: 'FW', goals: 1, assists: 0, matchesPlayed: 5, yellowCards: 0, redCards: 0, isStartingLineup: false }
-        ]
-      }
+      home: homeRoster,
+      away: awayRoster
     },
+    divisionRosters,
     scoutAnalysis: `${homeTeam} johtaa sarjaa tappiottomalla tilastolla (7V-1T-0H). ${awayTeam || 'Vastustaja'} on vaarallinen vastaiskujoukkue, jonka ykköshyökkääjä Ella Virtanen on tehnyt 7 maalia tällä kaudella.`
   };
 }
