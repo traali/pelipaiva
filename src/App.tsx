@@ -37,6 +37,12 @@ export const App: React.FC = () => {
   const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
+  const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pelipaiva_onboarding_done') !== 'true';
+    }
+    return true;
+  });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
@@ -264,6 +270,7 @@ export const App: React.FC = () => {
     await db.profiles.clear();
     await db.events.clear();
     setActiveProfileId('all');
+    setIsOnboardingActive(true);
   };
 
   // Filter events by selected profile or player group
@@ -441,12 +448,21 @@ export const App: React.FC = () => {
     return <AmbientView events={filteredEvents} />;
   }
 
-  // If no profiles exist yet, show the Interactive Onboarding Wizard
-  if (profiles.length === 0) {
+  // If no profiles exist yet or onboarding is explicitly in progress, show the Interactive Onboarding Wizard
+  if (profiles.length === 0 || isOnboardingActive) {
     return (
       <>
         <OnboardingWizard
-          onStartDemo={handleStartDemo}
+          onStartDemo={() => {
+            localStorage.setItem('pelipaiva_onboarding_done', 'true');
+            setIsOnboardingActive(false);
+            handleStartDemo();
+          }}
+          onFinishOnboarding={() => {
+            localStorage.setItem('pelipaiva_onboarding_done', 'true');
+            setIsOnboardingActive(false);
+          }}
+          existingProfilesCount={profiles.length}
           onOpenImportModal={(sport, url, name) => {
             setImportDefaults({ sport, url, name });
             setIsImportModalOpen(true);
