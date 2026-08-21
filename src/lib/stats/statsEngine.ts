@@ -168,17 +168,40 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
     return null;
   }
 
-  // 3. 🏀 Basketball: Basket.fi / Koripalloliitto (basket.fi / www.basket.fi)
-  if (hostname === 'basket.fi' || hostname === 'www.basket.fi') {
+  // 3. 🏀 Basketball: Basket.fi / Koripalloliitto (basket.fi / www.basket.fi / tulospalvelu.basket.fi)
+  if (
+    hostname === 'basket.fi' ||
+    hostname === 'www.basket.fi' ||
+    hostname === 'tulospalvelu.basket.fi' ||
+    hostname === 'www.tulospalvelu.basket.fi'
+  ) {
+    // 3a. Modern tulospalvelu path e.g. /team/5756346 or /team/5756346/info
+    const teamPathMatch = pathname.match(/^\/team\/(\d+)(?:\/([a-zA-Z0-9_-]+))?(?:\/.*)?$/i);
+    if (teamPathMatch && teamPathMatch[1]) {
+      const teamId = teamPathMatch[1]!;
+      const tab = searchParams.get('tab') || (teamPathMatch[2] ? String(teamPathMatch[2]) : undefined);
+      const seasonId = searchParams.get('season') || searchParams.get('season_id') || undefined;
+      const leagueId = searchParams.get('category') || searchParams.get('category_id') || searchParams.get('league') || searchParams.get('league_id') || undefined;
+
+      return {
+        sport: 'basketball',
+        association: 'basket',
+        teamId,
+        tab,
+        seasonId,
+        leagueId,
+        canonicalUrl: `https://tulospalvelu.basket.fi/team/${teamId}`
+      };
+    }
+
+    // 3b. Classic basket.fi path /basket/sarjat/joukkue/?team_id=...
     const isBasketPath = /^\/(?:basket\/)?(?:sarjat\/)?joukkue(?:\/.*)?$/i.test(pathname);
     if (isBasketPath) {
-      // Look for team_id / teamId / joukkue_id parameter
       let teamId: string | null =
         searchParams.get('team_id') ||
         searchParams.get('teamId') ||
         searchParams.get('joukkue_id');
 
-      // Also support path-based teamId e.g. /basket/sarjat/joukkue/4521
       if (!teamId) {
         const pathMatch = pathname.match(/^\/(?:basket\/)?(?:sarjat\/)?joukkue\/(\d+)/i);
         if (pathMatch && pathMatch[1]) {

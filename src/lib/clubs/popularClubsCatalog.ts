@@ -184,6 +184,17 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
 
   // 🏀 Basketball
   {
+    id: 'basket-default',
+    name: 'Koripallojoukkue (Basket.fi)',
+    shortName: 'Koripallo',
+    city: 'Helsinki / Espoo',
+    sport: 'basketball',
+    primaryColor: 'sininen',
+    colorHex: '#1d4ed8',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
+    popularAgeGroups: ['U14 Pojat', 'U13 Tytöt', 'U12 Pojat', 'Edustus']
+  },
+  {
     id: 'hnmky',
     name: 'Helsingin NMKY (Namika)',
     shortName: 'HNMKY',
@@ -191,7 +202,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://www.basket.fi/basket/sarjat/joukkue/?team_id=20100',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
     popularAgeGroups: ['U14 Pojat Stadi', 'U13 Tytöt Pakila', 'U12 Pojat Malmi']
   },
   {
@@ -202,7 +213,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1e40af',
-    sampleTeamUrl: 'https://www.basket.fi/basket/sarjat/joukkue/?team_id=20200',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
     popularAgeGroups: ['U14 Pojat', 'U13 Tytöt Sininen', 'U12 Pojat Valkoinen']
   },
   {
