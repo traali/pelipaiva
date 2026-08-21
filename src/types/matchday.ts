@@ -86,17 +86,6 @@ export interface ParkingInfo {
   mapsNavigationUrl: string;
 }
 
-export interface PlayerProfile {
-  id: string;
-  playerName: string;
-  teamName: string;
-  sport: SportType;
-  primaryColor: string; // e.g., 'punainen'
-  secondaryColor?: string; // e.g., 'valkoinen'
-  calendarUrl: string;
-  colorHex: string;
-}
-
 export interface MatchGoal {
   minute: number;
   player: string;
@@ -219,6 +208,206 @@ export interface MatchdayBriefing {
   postMatchWhatsAppTemplate: string;
 }
 
+// ============================================================================
+// SPORTS ASSOCIATION & OFFICIAL LEAGUE DATA TYPES (Milestone 1 / Dexie v2)
+// ============================================================================
+
+export type AssociationType = 'palloliitto' | 'salibandy' | 'basket' | 'torneopal';
+
+export interface ParsedAssociationUrl {
+  sport: SportType;
+  association: AssociationType;
+  teamId: string;
+  subdomain?: string; // for *.torneopal.fi
+  canonicalUrl: string;
+  seasonId?: string;
+  leagueId?: string;
+  tab?: string;
+}
+
+export interface OfficialLeagueFixture {
+  id: string; // Deterministic: `${association}_${teamId}_${matchId}`
+  teamId: string;
+  association: AssociationType;
+  sport: SportType;
+  leagueName: string;
+  homeTeam: string;
+  awayTeam: string;
+  isHome: boolean;
+  startTime: string; // ISO 8601 string
+  endTime?: string;
+  venueName: string;
+  fieldNumber?: string;
+  status: 'upcoming' | 'played' | 'cancelled' | 'postponed';
+  score?: string;
+  homeScore?: number;
+  awayScore?: number;
+  setScores?: string[];
+  officialMatchUrl?: string;
+  matchId?: string;
+  round?: string;
+  fetchedAt: string; // ISO 8601 string
+}
+
+export interface LeagueStandingsRecord {
+  id: string; // `${teamId}_${leagueName}`
+  teamId: string;
+  leagueName: string;
+  rows: StandingRow[];
+  fetchedAt: string; // ISO 8601 string
+}
+
+export interface TeamRosterRecord extends TeamSquadRoster {
+  id: string; // `${teamId}`
+  teamId: string;
+  fetchedAt: string; // ISO 8601 string
+}
+
+export interface OfficialTeamData {
+  teamId: string;
+  association: AssociationType;
+  sport: SportType;
+  teamName?: string;
+  leagueName?: string;
+  season?: string;
+  fixtures: OfficialLeagueFixture[];
+  standings?: StandingRow[];
+  roster?: TeamSquadRoster;
+  divisionRosters?: Record<string, TeamSquadRoster>;
+  sourceUrl?: string;
+  fetchedAt?: string;
+}
+
+// ============================================================================
+// RECONCILIATION & CONFLICT TYPES (Milestone 1 & 3)
+// ============================================================================
+
+export type ReconciliationStatus =
+  | 'auto_matched'
+  | 'candidate_match'
+  | 'manual_matched'
+  | 'conflict_mismatch'
+  | 'unlinked';
+
+export interface MismatchFlags {
+  timeMismatch?: boolean;
+  timeDiffMinutes?: number;
+  officialStartTime?: string;
+  calendarStartTime?: string;
+  venueMismatch?: boolean;
+  officialVenueName?: string;
+  calendarVenueName?: string;
+  opponentMismatch?: boolean;
+  officialOpponent?: string;
+  calendarOpponent?: string;
+  dateMismatch?: boolean;
+}
+
+export interface UserOverrideDecision {
+  action: 'adopt_official' | 'keep_calendar' | 'unlink' | 'custom';
+  appliedAt: string; // ISO 8601 string
+  notes?: string;
+  overriddenFields?: {
+    startTime?: string;
+    venue?: VenueInfo;
+    homeTeam?: string;
+    awayTeam?: string;
+  };
+}
+
+export interface MismatchDiagnostics {
+  hasKickoffMismatch: boolean;
+  calendarStartTime: string;
+  officialStartTime?: string;
+  timeDiffMinutes?: number;
+  hasVenueMismatch: boolean;
+  calendarVenueName?: string;
+  officialVenueName?: string;
+  hasOpponentMismatch: boolean;
+  calendarOpponent?: string;
+  officialOpponent?: string;
+}
+
+export interface ReconciliationResult {
+  status: 'auto_matched' | 'candidate_match' | 'unlinked';
+  confidenceScore: number; // 0.0 - 1.0
+  officialFixture?: OfficialLeagueFixture;
+  mismatches?: MismatchDiagnostics;
+}
+
+// ============================================================================
+// ARRIVAL & WARMUP RULES (Milestone 1 & 2)
+// ============================================================================
+
+export interface WarmupOffsets {
+  homeMatch: number;      // Default: 45 (minutes before kickoff)
+  awayMatch: number;      // Default: 60 (minutes before kickoff)
+  training: number;       // Default: 15 (minutes before session)
+  tournament?: number;    // Default: 60 (minutes before first match)
+}
+
+export interface ArrivalRules {
+  profileId: string;
+  defaultSport: SportType;
+  warmupOffsetsMinutes: WarmupOffsets;
+  departureBufferMinutes: number; // Default: 15 (extra buffer for parking/traffic)
+  squadAliases?: string[];        // e.g. ["Sininen", "Kilpa", "T13"]
+  excludedSquadKeywords?: string[]; // e.g. ["Valkoinen"]
+  autoSurfaceDuty?: boolean;     // Default: true
+  preferredRoles?: string[];      // e.g. ["kahvio", "kirjuri"]
+  customNotes?: string;
+  updatedAt?: string;             // ISO 8601 string
+
+  // Legacy / convenience fields
+  warmupOffsetHomeMinutes?: number;
+  warmupOffsetAwayMinutes?: number;
+  warmupOffsetTrainingMinutes?: number;
+  warmupOffsetTournamentMinutes?: number;
+  volunteerDutyArrivalBufferMinutes?: number;
+  defaultDrivingEstimateMinutes?: number;
+  defaultDepartureBufferMinutes?: number;
+  squadFilters?: string[];
+}
+
+export interface VolunteerDutyResult {
+  dutyTag: string; // e.g. "☕ Kahviovuoro (klo 14:30 - 16:00)"
+  role: 'kahvio' | 'toimitsija' | 'kello_kirjuri' | 'jarjestysmies' | 'kioski' | 'kyyti' | 'makkara' | 'striimaus' | 'ensiapu';
+  timeWindow?: string;
+}
+
+export interface ParsedTitleResult {
+  eventType: EventType;
+  homeTeam: string;
+  awayTeam: string;
+  isHomeMatch: boolean;
+  embeddedVenueHint?: string;
+  roundInfo?: string;
+  isFriendly?: boolean;
+}
+
+// ============================================================================
+// UPDATED CORE ENTITY INTERFACES
+// ============================================================================
+
+export interface PlayerProfile {
+  id: string;
+  playerName: string;
+  teamName: string;
+  sport: SportType;
+  primaryColor: string; // e.g., 'punainen'
+  secondaryColor?: string; // e.g., 'valkoinen'
+  calendarUrl: string;
+  colorHex: string;
+
+  // Milestone 1 additions:
+  associationUrl?: string;
+  associationType?: AssociationType;
+  teamId?: string;
+  clubId?: string;
+  squadName?: string;
+  lastOfficialSyncAt?: string;
+}
+
 export interface MatchdayEvent {
   id: string;
   profileId: string;
@@ -240,4 +429,13 @@ export interface MatchdayEvent {
   parking?: ParkingInfo;
   stats?: FullMatchStats;
   briefing?: MatchdayBriefing;
+
+  // Milestone 1 & 3 additions:
+  officialFixtureId?: string;
+  reconciliationStatus?: ReconciliationStatus;
+  confidenceScore?: number;
+  mismatchFlags?: MismatchFlags;
+  userOverride?: UserOverrideDecision;
 }
+
+

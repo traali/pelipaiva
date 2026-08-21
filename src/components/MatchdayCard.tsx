@@ -23,9 +23,14 @@ import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 interface MatchdayCardProps {
   event: MatchdayEvent;
   onNavigateToVenue?: () => void;
+  onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
 }
 
-export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToVenue }) => {
+export const MatchdayCard: React.FC<MatchdayCardProps> = ({
+  event,
+  onNavigateToVenue,
+  onResolveMismatch
+}) => {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
 
   const isLive =
@@ -85,6 +90,36 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({ event, onNavigateToV
           <div className="mb-4 flex items-center gap-2 p-2.5 rounded-xl bg-whistle/15 border border-whistle/30 text-whistle text-xs font-semibold">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{event.briefing.conflictWarning}</span>
+          </div>
+        )}
+
+        {/* Schedule / Venue Mismatch Warning & 1-Tap Resolution Banner */}
+        {event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-whistle/15 border border-whistle/30 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-whistle text-xs font-bold">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                {event.mismatchFlags.timeMismatch
+                  ? `Aikataulumuutos: Kalenteri ${event.mismatchFlags.calendarStartTime || ''} ➔ Liitto ${event.mismatchFlags.officialStartTime || ''} (${event.mismatchFlags.timeDiffMinutes || 0} min ero)`
+                  : `Kenttämuutos: Kalenteri ${event.mismatchFlags.calendarVenueName || ''} ➔ Liitto ${event.mismatchFlags.officialVenueName || ''}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onResolveMismatch?.(event.id, 'use_official')}
+                className="px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[11px] font-bold shadow-sm shadow-pitch/20 hover:brightness-110 cursor-pointer"
+              >
+                Päivitä liiton tietoon
+              </button>
+              <button
+                type="button"
+                onClick={() => onResolveMismatch?.(event.id, 'keep_calendar')}
+                className="px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer"
+              >
+                Säilytä oma merkintä
+              </button>
+            </div>
           </div>
         )}
 

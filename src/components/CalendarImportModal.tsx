@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Calendar, Plus, ShieldCheck, HelpCircle } from 'lucide-react';
+import { X, Calendar, Plus, ShieldCheck, HelpCircle, Trophy } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
+import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
 
 interface CalendarImportModalProps {
   isOpen: boolean;
@@ -21,6 +22,19 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   const [icsUrl, setIcsUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  // Auto-detect sports association URL and auto-update sport
+  const handleUrlChange = (val: string) => {
+    setIcsUrl(val);
+    const parsed = parseAssociationUrl(val);
+    if (parsed) {
+      if (parsed.sport && parsed.sport !== 'other') {
+        setSport(parsed.sport);
+      }
+    }
+  };
+
+  const detectedAssoc = parseAssociationUrl(icsUrl);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +76,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-text-primary">Lisää ottelukalenteri</h3>
-                  <p className="text-xs text-text-muted">Nimenhuuto, MyClub, Jopox tai Torneopal</p>
+                  <p className="text-xs text-text-muted">Nimenhuuto, MyClub, Jopox tai Palloliitto / Torneopal</p>
                 </div>
               </div>
               <button
@@ -121,7 +135,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-text-secondary">
-                    iCal-syötteen URL-osoite (.ics) *
+                    iCal-syötteen tai liiton joukkuesivun URL *
                   </label>
                   <button
                     type="button"
@@ -129,18 +143,25 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                     className="text-[11px] text-pitch hover:underline flex items-center gap-0.5 cursor-pointer"
                   >
                     <HelpCircle className="w-3 h-3" />
-                    <span>Mistä löydän tämän?</span>
+                    <span>Tuetut lähteet</span>
                   </button>
                 </div>
 
                 <input
                   type="url"
                   required
-                  placeholder="https://nimenhuuto.com/calendar/ical/..."
+                  placeholder="https://tulospalvelu.palloliitto.fi/team/... tai .ics"
                   value={icsUrl}
-                  onChange={(e) => setIcsUrl(e.target.value)}
+                  onChange={(e) => handleUrlChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-sm focus:outline-none focus:border-pitch font-mono text-xs"
                 />
+
+                {detectedAssoc && (
+                  <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-pitch/10 text-pitch text-xs flex items-center gap-1.5 font-medium">
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>Tunnistettu: {getAssociationName(detectedAssoc.association)} (Joukkue ID: {detectedAssoc.teamId})</span>
+                  </div>
+                )}
 
                 {/* Collapsible In-Modal Helper Guide */}
                 {showGuide && (
@@ -150,15 +171,17 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                     exit={{ opacity: 0, height: 0 }}
                     className="mt-2 p-3 rounded-xl bg-surface-elevated text-[11px] text-text-secondary border border-border-subtle flex flex-col gap-1.5"
                   >
-                    <div><strong>🔵 Nimenhuuto:</strong> Joukkueen sivu ➔ Kalenteri ➔ Tilaa kalenteri (.ics).</div>
-                    <div><strong>🟢 MyClub:</strong> Omat tiedot ➔ Kalenterisynkronointi ➔ Kopioi iCal-osoite.</div>
-                    <div><strong>🟠 Jopox:</strong> Pukukoppi ➔ Oma kalenteri ➔ Tilaa kalenteri (.ics).</div>
+                    <div><strong>⚽ Palloliitto:</strong> tulospalvelu.palloliitto.fi/team/{'{id}'}</div>
+                    <div><strong>🏑 Salibandy:</strong> tulospalvelu.salibandy.fi/team/{'{id}'}</div>
+                    <div><strong>🏀 Basket.fi:</strong> basket.fi/basket/sarjat/joukkue/?team_id={'{id}'}</div>
+                    <div><strong>🏐 Torneopal:</strong> *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
+                    <div><strong>📅 Kalenterit:</strong> Nimenhuuto, MyClub, Jopox (.ics)</div>
                   </motion.div>
                 )}
 
                 <p className="text-[11px] text-text-muted mt-1.5 flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-pitch" />
-                  100% Yksityinen: tallentuu vain puhelimesi muistiin.
+                  100% Yksityinen: tallentuu vain puhelimesi selaimeen (Dexie IndexedDB).
                 </p>
               </div>
 
@@ -193,3 +216,4 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
     </AnimatePresence>
   );
 };
+

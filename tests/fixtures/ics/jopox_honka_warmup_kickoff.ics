@@ -1,0 +1,52 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Jopox Oy//Tapiolan Honka Koripallo U14//FI
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Tapiolan Honka U14 - Jopox
+X-WR-TIMEZONE:Europe/Helsinki
+BEGIN:VEVENT
+UID:jopox-honka-20260425-001@jopox.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260425T111500Z
+DTEND:20260425T133000Z
+SUMMARY:Honka Green vs PuHu Juniorit
+LOCATION:Honkahalli kenttä 1, Urheilupuistontie 2, 02200 Espoo
+DESCRIPTION:U14 SM-sarjan ottelu. Ottelu alkaa klo 15:00. Kokoontuminen klo 14:15 pukuhuoneessa verryttelyyn.\nPeliasu: Vihreä kotipeliasu.\nToimitsijapöytä: Kirjuri ja 24s kello (klo 15:00 - 16:30): Virtanen / Salo
+CATEGORIES:Ottelu,Sarjapeli
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:jopox-honka-20260425-002@jopox.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260425T140000Z
+DTEND:20260425T161500Z
+SUMMARY:Tapiolan Honka - HNMKY
+LOCATION:Tapiolan Urheiluhalli, Urheilupuistontie 3, Espoo
+DESCRIPTION:Kakkosjoukkueen ottelu. Peli alkaa 17:45. Paikalle 17:00 verryttelyyn.\nPeliasu: Valkoinen vierasasuasu.
+CATEGORIES:Ottelu
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:jopox-honka-20260428-003@jopox.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260428T150000Z
+DTEND:20260428T163000Z
+SUMMARY:Vanhempainilta / Kausipalaveri
+LOCATION:Honkahalli VIP-tila, Espoo
+DESCRIPTION:Kauden 2026-2027 suunnittelu, budjetti ja turnauskalenteri. Kaikkien vanhempien läsnäolo toivottavaa.
+CATEGORIES:Palaveri,Kokous,Meeting
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:jopox-honka-20260430-004@jopox.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260430T141500Z
+DTEND:20260430T154500Z
+SUMMARY:Lajiharjoitukset & heittotreeni
+LOCATION:Honkahalli, Urheilupuistontie 2, Espoo
+DESCRIPTION:Treenit klo 17:15 - 18:45. Kokoontuminen 15 min ennen. Koripallokengät, pallo ja juomapullo mukaan.
+CATEGORIES:Harjoitukset
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

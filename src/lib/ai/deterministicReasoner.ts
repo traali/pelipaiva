@@ -1,4 +1,6 @@
 import {
+  ArrivalRules,
+  Coordinates,
   FootwearRecommendation,
   MatchdayBriefing,
   MatchdayEvent,
@@ -57,11 +59,62 @@ export function determineFootwear(
   };
 }
 
+/**
+ * Calculates dynamic departure time and countdown based on user-configured arrival rules.
+ */
+export function calculateDepartureCountdown(
+  event: MatchdayEvent,
+  arrivalRules?: ArrivalRules,
+  _userCoordinates?: Coordinates
+): { departureTime: string; countdownMinutes: number; leaveHomeDate: Date } {
+  const isTraining = event.isTraining || event.eventType === 'training';
+  const isTournament = event.eventType === 'tournament';
+  const isHome = event.isHomeMatch;
+
+  // Resolve warmup offset
+  let warmupOffset = isTraining ? 15 : (isHome ? 45 : 60);
+  if (arrivalRules) {
+    if (isTraining) {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.training ?? arrivalRules.warmupOffsetTrainingMinutes ?? 15;
+    } else if (isTournament) {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.tournament ?? arrivalRules.warmupOffsetTournamentMinutes ?? 30;
+    } else if (isHome) {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.homeMatch ?? arrivalRules.warmupOffsetHomeMinutes ?? 45;
+    } else {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.awayMatch ?? arrivalRules.warmupOffsetAwayMinutes ?? 60;
+    }
+  }
+
+  const drivingEstimateMins = arrivalRules?.defaultDrivingEstimateMinutes ?? 20;
+  const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? 10;
+  const walkingMins = event.parking?.walkingTimeMinutes || 3;
+  const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
+
+  // Kickoff time
+  const kickoffDate = new Date(event.startTime);
+  const totalOffsetMins = warmupOffset + drivingEstimateMins + departureBufferMins + walkingMins + dutyBufferMins;
+  const leaveHomeDate = new Date(kickoffDate.getTime() - totalOffsetMins * 60 * 1000);
+
+  const departureTime = leaveHomeDate.toLocaleTimeString('fi-FI', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - Date.now()) / 60000));
+
+  return {
+    departureTime,
+    countdownMinutes,
+    leaveHomeDate
+  };
+}
+
 export function generateMatchdayBriefing(
   event: MatchdayEvent,
-  allDayEvents: MatchdayEvent[] = []
+  allDayEvents: MatchdayEvent[] = [],
+  arrivalRules?: ArrivalRules
 ): MatchdayBriefing {
-  const { weather, parking, venue, warmupTime, volunteerDuty } = event;
+  const { weather, venue, volunteerDuty } = event;
   const isOutdoor = !venue.isIndoor;
   const temp = weather?.temperatureC ?? 15;
   const rain = weather?.precipitationMmh ?? 0;
@@ -115,18 +168,8 @@ export function generateMatchdayBriefing(
     spectatorGear += ` 📌 Sinulla on ${volunteerDuty}!`;
   }
 
-  // 3. Departure Timing
-  const warmupDate = new Date(warmupTime);
-  const walkingMins = parking?.walkingTimeMinutes || 3;
-  const bufferMins = 10;
-  const drivingEstimateMins = 20;
-  const leaveHomeDate = new Date(
-    warmupDate.getTime() - (walkingMins + bufferMins + drivingEstimateMins) * 60000
-  );
-  const departureStr = leaveHomeDate.toLocaleTimeString('fi-FI', {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  // 3. Departure Timing using dynamic rules
+  const { departureTime, countdownMinutes } = calculateDepartureCountdown(event, arrivalRules);
 
   // 4. WhatsApp Template
   const postMatchWhatsApp = `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}. Seuraava peli: [PVM].`;
@@ -142,11 +185,8 @@ export function generateMatchdayBriefing(
         : 'Vieraspeliasu + varapaita kassiin',
       spectatorGear
     },
-    recommendedDepartureTime: departureStr,
-    departureCountdownMinutes: Math.max(
-      0,
-      Math.round((leaveHomeDate.getTime() - Date.now()) / 60000)
-    ),
+    recommendedDepartureTime: departureTime,
+    departureCountdownMinutes: countdownMinutes,
     conflictWarning,
     postMatchWhatsAppTemplate: postMatchWhatsApp
   };

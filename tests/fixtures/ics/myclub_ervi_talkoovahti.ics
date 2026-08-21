@@ -1,0 +1,52 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//myClub.fi//EräViikingit P12 Salibandy//FI
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:EräViikingit P12 - myClub
+X-WR-TIMEZONE:Europe/Helsinki
+BEGIN:VEVENT
+UID:mc-ervi-20260411-001@myclub.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260411T110000Z
+DTEND:20260411T130000Z
+SUMMARY:ErVi P12 Musta vs Oilers
+LOCATION:Mosahalli kenttä 1, Erätie 3, 00730 Helsinki
+DESCRIPTION:Salibandyliiton aluesarja P12 Kilpa.\nOttelu alkaa klo 14:00. Kokoontuminen klo 13:15.\nVarustus: Musta pelipaita, mustat shortsit, suojalasit ja sisäpelikengät.\nToimitsijavuoro: Kirjuri (klo 14:00 - 15:30): Niemisen vanhempi\nKello & tulospalvelu (klo 14:00 - 15:30): Lehtosen vanhempi\n🦺 Järkkäri / Liivimies (klo 13:30 - 16:00): Aaltosen vanhempi\n☕ Kioskivuoro (klo 13:30 - 16:30): Laaksosen perhe
+CATEGORIES:Ottelu,Musta,Kilpa
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:mc-ervi-20260411-002@myclub.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260411T130000Z
+DTEND:20260411T150000Z
+SUMMARY:ErVi P12 Sininen vs TPS
+LOCATION:Mosahalli kenttä 2, Erätie 3, Helsinki
+DESCRIPTION:P12 Haastesarjan ottelu. Kickoff klo 16:00. Kokoontuminen 15:15.\nPeliasu: Sininen peliasu.\nToimitsijavuoro: Kirjuri (klo 15:30 - 17:00): Korhonen\nKello & tulospalvelu (klo 15:30 - 17:00): Mäkelä
+CATEGORIES:Ottelu,Sininen,Haaste
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:mc-ervi-20260414-003@myclub.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260414T143000Z
+DTEND:20260414T160000Z
+SUMMARY:Lajiharjoitukset Mosahallilla
+LOCATION:Mosahalli, Erätie 3, Helsinki
+DESCRIPTION:Salibandytreenit ja fysiikkaosuus. Paikalle 15 min ennen vuoron alkua.\nMukaan: Maila, suojalasit, sisäpelikengät ja juomapullo.
+CATEGORIES:Harjoitukset
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:mc-ervi-20260418-004@myclub.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260418T090000Z
+DTEND:20260418T113000Z
+SUMMARY:Ottelu: ErVi - Classic (Kierros 6)
+LOCATION:Arena Center Myllypuro, Alakiventie 2, Helsinki
+DESCRIPTION:Ylialueellinen sarjaturnaus. Ottelu alkaa klo 12:00, kokoontuminen klo 11:15.\nToimitsijavuoro: Kirjuri ja Kello (klo 12:00 - 13:30)
+CATEGORIES:Ottelu,Turnaus
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

@@ -1,0 +1,41 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Torneopal Finland//PuMa Volley N2 Lentopallo//FI
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:PuMa Volley N2 - Torneopal
+X-WR-TIMEZONE:Europe/Helsinki
+BEGIN:VEVENT
+UID:tp-puma-20260502-001@torneopal.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260502T080000Z
+DTEND:20260502T100000Z
+SUMMARY:PuMa N2 vs Kuortane (Erät 3-1, 25-22, 23-25, 25-18, 25-20)
+LOCATION:Lehto Areena kenttä 1, Henrik Forsiuksen tie 2, 00720 Helsinki
+DESCRIPTION:Naisten 2-sarja lopputurnaus. Ottelu 1.\nErätulos: 3 - 1 (25-22, 23-25, 25-18, 25-20).\nTuomarivuoro / Kirjurivuoro otteluun 2: PuMa N2 vanhemmat (klo 13:30 - 15:00).
+CATEGORIES:Turnaus,Ottelu
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:tp-puma-20260502-002@torneopal.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260502T130000Z
+DTEND:20260502T153000Z
+SUMMARY:PuMa N2 vs LP Viesti Akatemia (Erät 3-2, 25-21, 22-25, 25-19, 19-25, 15-12)
+LOCATION:Lehto Areena kenttä 1, Henrik Forsiuksen tie 2, Helsinki
+DESCRIPTION:Naisten 2-sarja mitaliottelu. Ottelu 2.\nErätulos: 3 - 2 (25-21, 22-25, 25-19, 19-25, 15-12).\nPallotytöt ja pöytäkirjanpito järjestetty.
+CATEGORIES:Turnaus,Ottelu
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:tp-puma-20260503-003@torneopal.fi
+DTSTAMP:20260401T080000Z
+DTSTART:20260503T090000Z
+DTEND:20260503T103000Z
+SUMMARY:PuMa B1 vs Salpis (Erät 2-0, 25-14, 25-17)
+LOCATION:Puistolan peruskoulu, Koudantie 2, Helsinki
+DESCRIPTION:B-tyttöjen aluemestaruusturnaus. Erät: 2 - 0 (25-14, 25-17).
+CATEGORIES:Turnaus
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

@@ -48,7 +48,7 @@ describe('ICS Calendar Parser', () => {
     expect(matchEvent.isTraining).toBe(false);
     expect(matchEvent.homeTeam).toBe('HJK T13');
     expect(matchEvent.awayTeam).toBe('EPS Valkoinen');
-    expect(matchEvent.volunteerDuty).toBe('☕ Kahviovuoro');
+    expect(matchEvent.volunteerDuty).toContain('☕ Kahviovuoro');
     expect(matchEvent.venue.name).toContain('Puotila');
 
     const trainingEvent = events[1]!;

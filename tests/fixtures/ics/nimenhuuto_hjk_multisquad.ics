@@ -1,0 +1,74 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Nimenhuuto.com//HJK T13 (2013)//FI
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:HJK T13 Sininen ja Valkoinen - Nimenhuuto
+X-WR-TIMEZONE:Europe/Helsinki
+BEGIN:VEVENT
+UID:nh-hjk-20260516-001@nimenhuuto.com
+DTSTAMP:20260501T080000Z
+DTSTART:20260516T111500Z
+DTEND:20260516T133000Z
+SUMMARY:HJK T13 Sininen vs EPS
+LOCATION:Bubu tekonurmi (Bollis 6), Urheilukatu 5, Helsinki
+DESCRIPTION:T13 Ykkönen sarjapeli. Ottelu alkaa klo 15:00. Kokoontuminen klo 14:15 pukukopilla.\nPeliasu: Sininen pelipaita, siniset shortsit ja sukat.\n☕ Kahviovuoro (klo 14:30 - 16:30): Mäkisen perhe\nMuista säärisuojat ja juomapullo.
+CATEGORIES:Peli,Match,Sininen
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:nh-hjk-20260516-002@nimenhuuto.com
+DTSTAMP:20260501T080000Z
+DTSTART:20260516T131500Z
+DTEND:20260516T153000Z
+DESCRIPTION:T13 Kakkonen sarjaottelu. Kickoff klo 17:00. Kokoontuminen 16:15.\nPeliasu: Valkoinen vieraspaita.\n☕ Kahviovuoro (klo 16:30 - 18:30): Virtasen perhe\nKenttä: Väiski tekonurmi.
+SUMMARY:HJK T13 Valkoinen vs FC Espoo
+LOCATION:Väiski tn (Väinämöisen kenttä), Väinämöisenkatu 4, Helsinki
+CATEGORIES:Peli,Match,Valkoinen
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:nh-hjk-20260519-003@nimenhuuto.com
+DTSTAMP:20260501T080000Z
+DTSTART:20260519T143000Z
+DTEND:20260519T160000Z
+SUMMARY:Harjoitukset / Treenit (Sininen & Valkoinen)
+LOCATION:Töölö PK 6 tn, Urheilukatu 5, Helsinki
+DESCRIPTION:Koko joukkueen yhteiset lajitreenit. Kokoontuminen 15 min ennen kentälle menoa.\nVarustus: Harjoituspaita, nappikset (AG/FG) tai TF, juomapullo ja säärisuojat.
+CATEGORIES:Harjoitukset,Training
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:nh-hjk-20260521-004@nimenhuuto.com
+DTSTAMP:20260501T080000Z
+DTSTART:20260521T150000Z
+DTEND:20260521T163000Z
+SUMMARY:Lajivuoro & fysiikkatreeni
+LOCATION:Sahara tn, Helsinki
+DESCRIPTION:Fysiikka ja pienpelit. Treenit alkaa klo 18:00. Kokoontuminen klo 17:45.
+CATEGORIES:Treenit,Fysiikka
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:nh-hjk-20260523-005@nimenhuuto.com
+DTSTAMP:20260501T080000Z
+DTSTART:20260523T080000Z
+DTEND:20260523T101500Z
+SUMMARY:HJK T13 Sininen - KäPa peli
+LOCATION:Sahara tekonurmi, Urheilukatu, Helsinki
+DESCRIPTION:Harjoitusottelu / Friendly match. Alkaa klo 11:00, kokoontuminen 10:15. Sininen peliasu.
+CATEGORIES:Peli,Sininen
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:nh-hjk-20260524-006@nimenhuuto.com
+DTSTAMP:20260501T080000Z
+DTSTART:20260524T103000Z
+DTEND:20260524T124500Z
+SUMMARY:Peli @ Bubu vs Honka
+LOCATION:Bollis 6, Helsinki
+DESCRIPTION:Sarjapeli vs Honka. Alkaa klo 13:30, paikalle klo 12:45. Valkoinen pelipaita.
+CATEGORIES:Peli,Valkoinen
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

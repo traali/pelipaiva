@@ -168,6 +168,45 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleResolveMismatch = async (
+    eventId: string,
+    decision: 'use_official' | 'keep_calendar' | 'unlink'
+  ) => {
+    const ev = rawEvents.find((e) => e.id === eventId);
+    if (!ev) return;
+
+    if (decision === 'use_official' && ev.mismatchFlags) {
+      const updated: MatchdayEvent = {
+        ...ev,
+        startTime: ev.mismatchFlags.officialStartTime || ev.startTime,
+        venue: {
+          ...ev.venue,
+          name: ev.mismatchFlags.officialVenueName || ev.venue.name
+        },
+        mismatchFlags: undefined,
+        reconciliationStatus: 'manual_matched',
+        userOverride: {
+          action: 'adopt_official',
+          appliedAt: new Date().toISOString(),
+          notes: 'Päivitetty liiton tietoon'
+        }
+      };
+      await db.events.put(updated);
+    } else if (decision === 'keep_calendar') {
+      const updated: MatchdayEvent = {
+        ...ev,
+        mismatchFlags: undefined,
+        reconciliationStatus: 'manual_matched',
+        userOverride: {
+          action: 'keep_calendar',
+          appliedAt: new Date().toISOString(),
+          notes: 'Säilytetty omat kalenteritiedot'
+        }
+      };
+      await db.events.put(updated);
+    }
+  };
+
   if (isAmbientMode) {
     return <AmbientView events={filteredEvents} />;
   }
@@ -278,7 +317,11 @@ export const App: React.FC = () => {
         {filteredEvents.length > 0 ? (
           <div className="flex flex-col gap-4">
             {filteredEvents.map((event) => (
-              <MatchdayCard key={event.id} event={event} />
+              <MatchdayCard 
+                key={event.id} 
+                event={event} 
+                onResolveMismatch={handleResolveMismatch}
+              />
             ))}
           </div>
         ) : (

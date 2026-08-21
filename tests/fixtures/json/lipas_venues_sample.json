@@ -1,0 +1,250 @@
+[
+  {
+    "sportsPlaceId": 504101,
+    "name": "Töölön pallokenttä 6 (Bubu)",
+    "type": {
+      "typeCode": 1180,
+      "name": "Tekonurmikenttä"
+    },
+    "location": {
+      "address": "Urheilukatu 5",
+      "postalCode": "00250",
+      "city": {
+        "cityCode": 91,
+        "cityName": "Helsinki"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 24.9288,
+          "lat": 60.1874
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "artificial_turf_3g",
+      "surfaceMaterialInfo": "Kolmannen sukupolven kumirouhetekonurmi",
+      "fieldLengthM": 105,
+      "fieldWidthM": 68,
+      "lightBool": true,
+      "indoor": false,
+      "spectatorCapacity": 500
+    }
+  },
+  {
+    "sportsPlaceId": 504102,
+    "name": "Väinämöisen kenttä (Väiski)",
+    "type": {
+      "typeCode": 1180,
+      "name": "Tekonurmikenttä"
+    },
+    "location": {
+      "address": "Väinämöisenkatu 4",
+      "postalCode": "00100",
+      "city": {
+        "cityCode": 91,
+        "cityName": "Helsinki"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 24.9189,
+          "lat": 60.1738
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "artificial_turf_3g",
+      "surfaceMaterialInfo": "Tekonurmi, uusittu 2022",
+      "fieldLengthM": 95,
+      "fieldWidthM": 60,
+      "lightBool": true,
+      "indoor": false,
+      "spectatorCapacity": 200
+    }
+  },
+  {
+    "sportsPlaceId": 504103,
+    "name": "Töölön pallokenttä 1 (Sahara)",
+    "type": {
+      "typeCode": 1180,
+      "name": "Tekonurmikenttä"
+    },
+    "location": {
+      "address": "Urheilukatu 1-5",
+      "postalCode": "00250",
+      "city": {
+        "cityCode": 91,
+        "cityName": "Helsinki"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 24.9265,
+          "lat": 60.1868
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "sand_artificial_turf",
+      "surfaceMaterialInfo": "Hiekkatekonurmi / Lämmitettävä",
+      "fieldLengthM": 100,
+      "fieldWidthM": 64,
+      "lightBool": true,
+      "indoor": false,
+      "spectatorCapacity": 300
+    }
+  },
+  {
+    "sportsPlaceId": 504104,
+    "name": "Mosahalli (Tapanilan Urheilukeskus)",
+    "type": {
+      "typeCode": 2210,
+      "name": "Salibandyhalli"
+    },
+    "location": {
+      "address": "Erätie 3",
+      "postalCode": "00730",
+      "city": {
+        "cityCode": 91,
+        "cityName": "Helsinki"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 25.0289,
+          "lat": 60.2588
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "indoor_synthetic",
+      "surfaceMaterialInfo": "Taraflex-matto",
+      "fieldLengthM": 40,
+      "fieldWidthM": 20,
+      "lightBool": true,
+      "indoor": true,
+      "spectatorCapacity": 800
+    }
+  },
+  {
+    "sportsPlaceId": 504105,
+    "name": "Honkahalli",
+    "type": {
+      "typeCode": 2220,
+      "name": "Palloiluhalli"
+    },
+    "location": {
+      "address": "Urheilupuistontie 2",
+      "postalCode": "02200",
+      "city": {
+        "cityCode": 49,
+        "cityName": "Espoo"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 24.7831,
+          "lat": 60.1783
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "indoor_parquet",
+      "surfaceMaterialInfo": "Joustava puuparketti",
+      "fieldLengthM": 28,
+      "fieldWidthM": 15,
+      "lightBool": true,
+      "indoor": true,
+      "spectatorCapacity": 600
+    }
+  },
+  {
+    "sportsPlaceId": 504106,
+    "name": "Lehto Areena",
+    "type": {
+      "typeCode": 2220,
+      "name": "Lentopallohalli"
+    },
+    "location": {
+      "address": "Henrik Forsiuksen tie 2",
+      "postalCode": "00720",
+      "city": {
+        "cityCode": 91,
+        "cityName": "Helsinki"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 24.9982,
+          "lat": 60.2451
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "indoor_synthetic",
+      "surfaceMaterialInfo": "Synteettinen joustopinnoite",
+      "fieldLengthM": 36,
+      "fieldWidthM": 18,
+      "lightBool": true,
+      "indoor": true,
+      "spectatorCapacity": 500
+    }
+  },
+  {
+    "sportsPlaceId": 504107,
+    "name": "Kaupin urheilupuisto tn",
+    "type": {
+      "typeCode": 1180,
+      "name": "Tekonurmikenttä"
+    },
+    "location": {
+      "address": "Kuntokatu 5",
+      "postalCode": "33520",
+      "city": {
+        "cityCode": 837,
+        "cityName": "Tampere"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 23.8114,
+          "lat": 61.5032
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "artificial_turf_3g",
+      "surfaceMaterialInfo": "Tekonurmi 1",
+      "fieldLengthM": 105,
+      "fieldWidthM": 68,
+      "lightBool": true,
+      "indoor": false,
+      "spectatorCapacity": 1000
+    }
+  },
+  {
+    "sportsPlaceId": 504108,
+    "name": "Kupittaan kenttä 5",
+    "type": {
+      "typeCode": 1180,
+      "name": "Tekonurmikenttä"
+    },
+    "location": {
+      "address": "Kupittaankatu 10",
+      "postalCode": "20520",
+      "city": {
+        "cityCode": 853,
+        "cityName": "Turku"
+      },
+      "coordinates": {
+        "wgs84": {
+          "lon": 22.2891,
+          "lat": 60.4438
+        }
+      }
+    },
+    "properties": {
+      "surfaceMaterial": "artificial_turf_3g",
+      "surfaceMaterialInfo": "Lämmitettävä tekonurmi",
+      "fieldLengthM": 105,
+      "fieldWidthM": 68,
+      "lightBool": true,
+      "indoor": false,
+      "spectatorCapacity": 1200
+    }
+  }
+]
