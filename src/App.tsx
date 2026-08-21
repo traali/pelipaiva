@@ -18,6 +18,12 @@ import { motion } from 'motion/react';
 import { springTactile } from './lib/motion/springs';
 import { FamilyShareModal } from './components/FamilyShareModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
+import {
+  parseAssociationUrl,
+  extractOfficialTeamData,
+  generateOrResolveMatchStats
+} from './lib/stats/statsEngine';
+import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 
 const SAMPLE_INITIAL_ICS = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -155,7 +161,7 @@ export const App: React.FC = () => {
     playerName: string,
     teamName: string,
     sport: SportType,
-    icsUrl: string
+    url: string
   ) => {
     // If we're currently on demo data, clean demo data first
     if (isDemoActive) {
@@ -170,26 +176,90 @@ export const App: React.FC = () => {
       teamName,
       sport,
       primaryColor: 'punainen',
-      calendarUrl: icsUrl,
+      calendarUrl: url,
       colorHex: '#10b981'
     });
 
     try {
-      // Use Cloudflare Worker streaming proxy to bypass CORS
-      const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
-      const target = `${proxyUrl}?url=${encodeURIComponent(icsUrl)}`;
-      const res = await fetch(target);
-      const text = await res.text();
-      const parsed = await parseICSFeed(text, profileId, sport);
-      for (const ev of parsed) {
-        const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-        const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-        const fullEv: MatchdayEvent = { ...ev, weather, parking };
-        fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
-        await db.events.put(fullEv);
+      const parsedAssoc = parseAssociationUrl(url);
+
+      if (parsedAssoc) {
+        // Fetch fixtures directly from Torneopal / Palloliitto / Salibandy / Basket.fi
+        const officialData = await extractOfficialTeamData(parsedAssoc);
+
+        // Store official fixtures in Dexie
+        for (const fix of officialData.fixtures) {
+          await db.officialFixtures.put(fix);
+        }
+
+        const eventsToInsert: MatchdayEvent[] = [];
+        for (const fixture of officialData.fixtures) {
+          const venue = await resolveSportsVenue(fixture.venueName);
+          const startTime = fixture.startTime || new Date().toISOString();
+          const endTime =
+            fixture.endTime || new Date(new Date(startTime).getTime() + 90 * 60 * 1000).toISOString();
+          const warmupTime = new Date(new Date(startTime).getTime() - 45 * 60 * 1000).toISOString();
+
+          const isHome =
+            fixture.isHome ??
+            (fixture.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
+              fixture.homeTeam.toLowerCase().includes(playerName.toLowerCase()));
+
+          const matchStats = generateOrResolveMatchStats(
+            fixture.homeTeam,
+            fixture.awayTeam,
+            parsedAssoc.sport
+          );
+
+          const matchEvent: MatchdayEvent = {
+            id: `fixture-${fixture.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            profileId,
+            title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
+            eventType: 'match',
+            isTraining: false,
+            sport: parsedAssoc.sport,
+            homeTeam: fixture.homeTeam,
+            awayTeam: fixture.awayTeam,
+            isHomeMatch: isHome,
+            startTime,
+            endTime,
+            warmupTime,
+            tournamentName: fixture.leagueName,
+            venue,
+            officialFixtureId: fixture.id,
+            reconciliationStatus: 'auto_matched',
+            confidenceScore: 1.0,
+            stats: matchStats
+          };
+
+          const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
+          const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
+          matchEvent.weather = weather;
+          matchEvent.parking = parking;
+          matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
+          eventsToInsert.push(matchEvent);
+        }
+
+        for (const ev of eventsToInsert) {
+          await db.events.put(ev);
+        }
+      } else {
+        // Standard iCal feed from Nimenhuuto, MyClub, Jopox
+        const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
+        const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;
+        const res = await fetch(target);
+        const text = await res.text();
+        const parsed = await parseICSFeed(text, profileId, sport);
+        for (const ev of parsed) {
+          const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
+          const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
+          const fullEv: MatchdayEvent = { ...ev, weather, parking };
+          fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
+          await db.events.put(fullEv);
+        }
       }
     } catch (err) {
-      console.warn('Calendar fetch error:', err);
+      console.warn('Team / Calendar fetch error:', err);
     }
   };
 
