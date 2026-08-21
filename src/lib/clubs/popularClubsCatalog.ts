@@ -15,6 +15,39 @@ export interface ClubPreset {
 export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
   // ⚽ Football
   {
+    id: 'football-default-185085',
+    name: 'Jalkapallojoukkue (Palloliitto 185085)',
+    shortName: 'Jalkapallo 1',
+    city: 'Helsinki / Uusimaa',
+    sport: 'football',
+    primaryColor: 'sininen',
+    colorHex: '#003580',
+    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
+    popularAgeGroups: ['T13 Sininen', 'P12 Sininen', 'Kilpa', 'Edustus']
+  },
+  {
+    id: 'football-default-185083',
+    name: 'Jalkapallojoukkue (Palloliitto 185083)',
+    shortName: 'Jalkapallo 2',
+    city: 'Helsinki / Uusimaa',
+    sport: 'football',
+    primaryColor: 'valkoinen',
+    colorHex: '#059669',
+    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
+    popularAgeGroups: ['T13 Valkoinen', 'P12 Valkoinen', 'Haaste']
+  },
+  {
+    id: 'football-default-185086',
+    name: 'Jalkapallojoukkue (Palloliitto 185086)',
+    shortName: 'Jalkapallo 3',
+    city: 'Helsinki / Uusimaa',
+    sport: 'football',
+    primaryColor: 'musta',
+    colorHex: '#18181b',
+    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
+    popularAgeGroups: ['P11 Musta', 'T12 Musta', 'Akatemia']
+  },
+  {
     id: 'hjk',
     name: 'Helsingin Jalkapalloklubi (HJK)',
     shortName: 'HJK',
@@ -22,7 +55,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'football',
     primaryColor: 'sininen',
     colorHex: '#003580',
-    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/60341',
+    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
     popularAgeGroups: ['T13 Sininen', 'T13 Valkoinen', 'P12 Sininen', 'P11 Akatemia', 'Edustus']
   },
   {
