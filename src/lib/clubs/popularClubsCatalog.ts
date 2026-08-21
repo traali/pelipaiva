@@ -127,6 +127,17 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
 
   // 🏑 Floorball
   {
+    id: 'floorball-default',
+    name: 'Salibandyjoukkue (Salibandyliitto)',
+    shortName: 'Salibandy',
+    city: 'Helsinki / Espoo / Vantaa',
+    sport: 'floorball',
+    primaryColor: 'sininen',
+    colorHex: '#2563eb',
+    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
+    popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'P11 Itä', 'P14 Sininen']
+  },
+  {
     id: 'ervi',
     name: 'EräViikingit (ErVi)',
     shortName: 'ErVi',
@@ -134,7 +145,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'sininen',
     colorHex: '#2563eb',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/10100',
+    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
     popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'P11 Itä', 'P14 Sininen']
   },
   {

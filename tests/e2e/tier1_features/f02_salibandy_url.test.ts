@@ -45,6 +45,18 @@ describe('Feature 2: Salibandyliitto Team URL Parser', () => {
     expect(parseAssociationUrl('https://salibandy.fi/fi/uutiset/')).toBeNull();
   });
 
+  it('should parse modern Salibandyliitto team info URL (e.g. team 25301)', () => {
+    const url = 'https://tulospalvelu.salibandy.fi/team/25301/info';
+    const parsed = parseAssociationUrl(url);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.association).toBe('salibandy');
+    expect(parsed?.sport).toBe('floorball');
+    expect(parsed?.teamId).toBe('25301');
+    expect(parsed?.tab).toBe('info');
+    expect(parsed?.canonicalUrl).toBe('https://tulospalvelu.salibandy.fi/team/25301');
+  });
+
   it('should detect association type and normalize URL correctly for Salibandy', () => {
     const url = 'https://tulospalvelu.salibandy.fi/team/45210';
     expect(detectAssociationType(url)).toBe('salibandy');
