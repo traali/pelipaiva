@@ -6,7 +6,10 @@ import {
   ArrowRight,
   UserPlus,
   Sparkles,
-  Link
+  Link,
+  Plus,
+  User,
+  Users
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import type { SportType } from '../types/matchday';
@@ -18,13 +21,12 @@ interface AddedSource {
   name: string;
   sport: SportType;
   url?: string;
-  rawText?: string;
 }
 
 interface OnboardingWizardProps {
   onStartDemo: () => void;
-  onOpenImportModal: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
-  onOpenFamilyShare: () => void;
+  onOpenImportModal?: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
+  onOpenFamilyShare?: () => void;
   onOpenSmartImport?: () => void;
   onQuickAddTeam: (playerName: string, teamName: string, sport: SportType, url: string) => Promise<void>;
   onFinishOnboarding?: () => void;
@@ -82,8 +84,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onFinishOnboarding,
   existingProfilesCount = 0
 }) => {
-  const [playerNameInput, setPlayerNameInput] = useState('Maija');
+  // Wizard state: active player being configured
+  const [activePlayerName, setActivePlayerName] = useState<string>('');
+  const [nameInputDraft, setNameInputDraft] = useState<string>('');
+  const [isNamingStep, setIsNamingStep] = useState<boolean>(true);
+
+  // All added sources across family
   const [addedSources, setAddedSources] = useState<AddedSource[]>([]);
+
+  // Custom .ics state
   const [customIcsUrl, setCustomIcsUrl] = useState('');
   const [customSport, setCustomSport] = useState<SportType>('football');
   const [showCustomIcsInput, setShowCustomIcsInput] = useState(false);
@@ -100,19 +109,27 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   }, [addedSources]);
 
   const currentPlayerSources = addedSources.filter(
-    (s) => s.playerName.toLowerCase() === playerNameInput.trim().toLowerCase()
+    (s) => s.playerName.toLowerCase() === activePlayerName.trim().toLowerCase()
   );
 
+  const handleConfirmPlayerName = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = nameInputDraft.trim();
+    if (!trimmed) return;
+    setActivePlayerName(trimmed);
+    setIsNamingStep(false);
+  };
+
   const handleAddPresetTorneopal = async (team: (typeof PRESET_TORNEOPAL_TEAMS)[0]) => {
-    const activeName = playerNameInput.trim() || 'Pelaaja';
+    if (!activePlayerName) return;
     setIsLoading(true);
     try {
-      await onQuickAddTeam(activeName, team.name, team.sport, team.url);
+      await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
       setAddedSources((prev) => [
         ...prev,
         {
           id: `${Date.now()}-${Math.random()}`,
-          playerName: activeName,
+          playerName: activePlayerName,
           sourceType: 'torneopal',
           name: team.name,
           sport: team.sport,
@@ -125,20 +142,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   const handleAddCustomIcs = async () => {
-    const activeName = playerNameInput.trim() || 'Pelaaja';
+    if (!activePlayerName) return;
     const trimmedUrl = customIcsUrl.trim();
     if (!trimmedUrl) return;
 
     setIsLoading(true);
     try {
-      await onQuickAddTeam(activeName, `${activeName}:n joukkue`, customSport, trimmedUrl);
+      await onQuickAddTeam(activePlayerName, `${activePlayerName}:n joukkue`, customSport, trimmedUrl);
       setAddedSources((prev) => [
         ...prev,
         {
           id: `${Date.now()}-${Math.random()}`,
-          playerName: activeName,
+          playerName: activePlayerName,
           sourceType: 'ics',
-          name: `${activeName}:n iCal / MyClub`,
+          name: `${activePlayerName}:n iCal / MyClub`,
           sport: customSport,
           url: trimmedUrl
         }
@@ -154,8 +171,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setAddedSources((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const handleStartNextPlayer = (name: string) => {
-    setPlayerNameInput(name);
+  const handleAddNewPlayer = () => {
+    setNameInputDraft('');
+    setActivePlayerName('');
+    setIsNamingStep(true);
+    setShowCustomIcsInput(false);
+  };
+
+  const handleSwitchToExistingPlayer = (playerName: string) => {
+    setActivePlayerName(playerName);
+    setNameInputDraft(playerName);
+    setIsNamingStep(false);
     setShowCustomIcsInput(false);
   };
 
@@ -164,7 +190,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   return (
     <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 md:py-10 flex flex-col justify-between">
       <div className="max-w-xl mx-auto w-full space-y-4">
-        {/* Title */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-xl bg-pitch text-text-inverse flex items-center justify-center font-black text-sm">
@@ -175,7 +201,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 Perheen kalenteriasetus
               </h1>
               <p className="text-[11px] text-text-muted">
-                Lisää perheenjäsen kerrallaan ja liitä hänen joukkueensa
+                Lisää pelaajat ja heidän joukkueensa
               </p>
             </div>
           </div>
@@ -189,227 +215,268 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           </button>
         </div>
 
-        {/* Existing Configured Players Badges */}
+        {/* FAMILY ROSTER SUMMARY (if players already added) */}
         {playerGroups.length > 0 && (
-          <div className="p-3 rounded-2xl bg-surface-elevated/90 border border-pitch/30 space-y-2">
+          <div className="p-3.5 rounded-2xl bg-surface-elevated/90 border border-pitch/30 space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-pitch">
-              <span>Perheen kokoonpano ({totalSourcesCount} lähdettä lisätty):</span>
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                <span>Perheen kokoonpano ({totalSourcesCount} joukkuetta):</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleAddNewPlayer}
+                className="text-[11px] text-pitch hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>+ Lisää pelaaja</span>
+              </button>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {playerGroups.map(([name, sources]) => (
-                <div
-                  key={name}
-                  className="px-2.5 py-1 rounded-xl bg-surface border border-border-strong text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <span className="text-text-primary font-bold">👤 {name}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-pitch/15 text-pitch font-extrabold">
-                    {sources.length}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* ACTIVE PLAYER SETUP CARD */}
-        <div className="liquid-glass rounded-3xl p-5 border border-border-strong shadow-xl space-y-4">
-          {/* 1. Player Name */}
-          <div>
-            <label className="text-xs font-bold text-text-primary block mb-1.5">
-              1. Pelaajan / lapsen nimi:
-            </label>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={playerNameInput}
-                onChange={(e) => setPlayerNameInput(e.target.value)}
-                placeholder="esim. Maija, Eemil, Ville..."
-                className="flex-1 px-3.5 py-2 rounded-xl bg-surface border border-border-strong text-text-primary text-xs font-bold focus:outline-none focus:border-pitch"
-              />
-              <div className="flex items-center gap-1">
-                {['Maija', 'Eemil', 'Ville'].map((quickName) => (
-                  <button
-                    key={quickName}
-                    type="button"
-                    onClick={() => handleStartNextPlayer(quickName)}
-                    className={`px-2.5 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
-                      playerNameInput.toLowerCase() === quickName.toLowerCase()
-                        ? 'bg-pitch text-text-inverse border-pitch'
-                        : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
-                    }`}
-                  >
-                    {quickName}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Add Data Sources for this Player */}
-          <div>
-            <label className="text-xs font-bold text-text-primary block mb-2">
-              2. Valitse tai tuo kalenterit <span className="text-pitch">{playerNameInput || 'pelaajalle'}</span>:
-            </label>
-
-            {/* Ready Torneopal / Association Teams */}
-            <div className="space-y-1.5 mb-3">
-              <div className="text-[11px] font-bold text-text-muted">Valmiit joukkueet:</div>
-              {PRESET_TORNEOPAL_TEAMS.map((team) => {
-                const isAdded = currentPlayerSources.some((s) => s.name === team.name);
+            <div className="flex flex-wrap gap-2">
+              {playerGroups.map(([name, sources]) => {
+                const isActive = !isNamingStep && activePlayerName.toLowerCase() === name.toLowerCase();
                 return (
                   <button
-                    key={team.name}
+                    key={name}
                     type="button"
-                    disabled={isLoading}
-                    onClick={() => handleAddPresetTorneopal(team)}
-                    className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between text-xs transition-all cursor-pointer ${
-                      isAdded
-                        ? 'bg-pitch/15 border-pitch text-pitch font-bold'
-                        : 'bg-surface-elevated text-text-primary border-border-subtle hover:border-pitch'
+                    onClick={() => handleSwitchToExistingPlayer(name)}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                      isActive
+                        ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
+                        : 'bg-surface text-text-secondary border-border-strong hover:text-text-primary'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span>{team.icon}</span>
-                      <span>{team.name}</span>
-                    </div>
-
-                    <div className="text-[11px] flex items-center gap-1 shrink-0">
-                      {isAdded ? (
-                        <span className="flex items-center gap-1 text-pitch font-bold">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Lisätty</span>
-                        </span>
-                      ) : (
-                        <span className="text-text-muted hover:text-pitch font-semibold">
-                          + Valitse
-                        </span>
-                      )}
-                    </div>
+                    <span>👤 {name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                      isActive ? 'bg-white/25 text-white' : 'bg-pitch/15 text-pitch'
+                    }`}>
+                      {sources.length} {sources.length === 1 ? 'lähde' : 'lähdettä'}
+                    </span>
                   </button>
                 );
               })}
             </div>
+          </div>
+        )}
 
-            {/* Custom URL / Nimenhuuto / MyClub / WhatsApp Options */}
-            <div className="space-y-2 pt-2 border-t border-border-subtle">
-              <div className="text-[11px] font-bold text-text-muted">Muu kalenteri tai viesti:</div>
+        {/* MAIN STEP CARD */}
+        <div className="liquid-glass rounded-3xl p-5 border border-border-strong shadow-xl space-y-5">
+          {/* STEP 1: ADD / NAME PLAYER */}
+          {isNamingStep ? (
+            <form onSubmit={handleConfirmPlayerName} className="space-y-4">
+              <div>
+                <label className="text-xs font-black uppercase tracking-wider text-text-primary flex items-center gap-1.5 mb-2">
+                  <UserPlus className="w-4 h-4 text-pitch" />
+                  <span>1. Lisää pelaaja / lapsi:</span>
+                </label>
+                <p className="text-xs text-text-muted mb-3">
+                  Kirjoita lapsen tai pelaajan etunimi aloittaaksesi:
+                </p>
 
-              {!showCustomIcsInput ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={nameInputDraft}
+                    onChange={(e) => setNameInputDraft(e.target.value)}
+                    placeholder="esim. Otso, Sofia, Matias..."
+                    className="flex-1 px-4 py-3 rounded-2xl bg-surface border border-border-strong text-text-primary text-sm font-bold focus:outline-none focus:border-pitch"
+                  />
                   <button
-                    type="button"
-                    onClick={() => setShowCustomIcsInput(true)}
-                    className="p-2 rounded-xl bg-surface border border-border-strong hover:border-pitch text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                    type="submit"
+                    disabled={!nameInputDraft.trim()}
+                    className="py-3 px-5 rounded-2xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-40 transition-all shrink-0 flex items-center gap-1.5 shadow-md shadow-pitch/20"
                   >
-                    <Link className="w-3.5 h-3.5 text-pitch" />
-                    <span>MyClub / iCal linkki</span>
+                    <span>Jatka</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
-
-                  {onOpenSmartImport && (
-                    <button
-                      type="button"
-                      onClick={onOpenSmartImport}
-                      className="p-2 rounded-xl bg-pitch/15 border border-pitch/30 hover:bg-pitch hover:text-text-inverse text-pitch text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>WhatsApp / Excel</span>
-                    </button>
-                  )}
                 </div>
-              ) : (
-                <div className="p-3 rounded-2xl bg-surface border border-pitch/40 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-text-primary">
-                    <span>Liitä MyClub / Nimenhuuto .ics-osoite:</span>
-                    <select
-                      value={customSport}
-                      onChange={(e) => setCustomSport(e.target.value as SportType)}
-                      className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-strong text-text-primary text-[11px]"
-                    >
-                      <option value="football">⚽ Futis</option>
-                      <option value="floorball">🏑 Säbä</option>
-                      <option value="basketball">🏀 Koris</option>
-                      <option value="volleyball">🏐 Lentis</option>
-                    </select>
+              </div>
+            </form>
+          ) : (
+            /* STEP 2: ATTACH SOURCES TO ACTIVE PLAYER */
+            <div className="space-y-4">
+              {/* Active Player Banner */}
+              <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-pitch/20 text-pitch flex items-center justify-center font-bold text-xs">
+                    <User className="w-4 h-4" />
                   </div>
+                  <div>
+                    <div className="text-xs font-black text-text-primary">
+                      Pelaaja: <span className="text-pitch">{activePlayerName}</span>
+                    </div>
+                    <div className="text-[11px] text-text-muted">
+                      Valitse tai liitä joukkueet tälle pelaajalle (1 tai useampi):
+                    </div>
+                  </div>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="url"
-                      value={customIcsUrl}
-                      onChange={(e) => setCustomIcsUrl(e.target.value)}
-                      placeholder="https://... tai webcal://..."
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch"
-                    />
+                <button
+                  type="button"
+                  onClick={handleAddNewPlayer}
+                  className="text-xs font-bold text-pitch hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Vaihda / Uusi</span>
+                </button>
+              </div>
+
+              {/* Ready Torneopal Teams */}
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-bold text-text-muted">Valmiit joukkueet:</div>
+                {PRESET_TORNEOPAL_TEAMS.map((team) => {
+                  const isAdded = currentPlayerSources.some((s) => s.name === team.name);
+                  return (
+                    <button
+                      key={team.name}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => handleAddPresetTorneopal(team)}
+                      className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between text-xs transition-all cursor-pointer ${
+                        isAdded
+                          ? 'bg-pitch/15 border-pitch text-pitch font-bold'
+                          : 'bg-surface-elevated text-text-primary border-border-subtle hover:border-pitch'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{team.icon}</span>
+                        <span>{team.name}</span>
+                      </div>
+
+                      <div className="text-[11px] flex items-center gap-1 shrink-0">
+                        {isAdded ? (
+                          <span className="flex items-center gap-1 text-pitch font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Lisätty</span>
+                          </span>
+                        ) : (
+                          <span className="text-text-muted hover:text-pitch font-semibold">
+                            + Lisää
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom .ics / MyClub / WhatsApp */}
+              <div className="space-y-2 pt-2 border-t border-border-subtle">
+                <div className="text-[11px] font-bold text-text-muted">Muu kalenteri tai viesti:</div>
+
+                {!showCustomIcsInput ? (
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={handleAddCustomIcs}
-                      disabled={!customIcsUrl.trim() || isLoading}
-                      className="py-1.5 px-3 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50"
+                      onClick={() => setShowCustomIcsInput(true)}
+                      className="p-2 rounded-xl bg-surface border border-border-strong hover:border-pitch text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      Lisää
+                      <Link className="w-3.5 h-3.5 text-pitch" />
+                      <span>MyClub / iCal linkki</span>
                     </button>
+
+                    {onOpenSmartImport && (
+                      <button
+                        type="button"
+                        onClick={onOpenSmartImport}
+                        className="p-2 rounded-xl bg-pitch/15 border border-pitch/30 hover:bg-pitch hover:text-text-inverse text-pitch text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>WhatsApp / Excel</span>
+                      </button>
+                    )}
                   </div>
+                ) : (
+                  <div className="p-3 rounded-2xl bg-surface border border-pitch/40 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-text-primary">
+                      <span>Liitä MyClub / Nimenhuuto .ics-osoite:</span>
+                      <select
+                        value={customSport}
+                        onChange={(e) => setCustomSport(e.target.value as SportType)}
+                        className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-strong text-text-primary text-[11px]"
+                      >
+                        <option value="football">⚽ Futis</option>
+                        <option value="floorball">🏑 Säbä</option>
+                        <option value="basketball">🏀 Koris</option>
+                        <option value="volleyball">🏐 Lentis</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={customIcsUrl}
+                        onChange={(e) => setCustomIcsUrl(e.target.value)}
+                        placeholder="https://... tai webcal://..."
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomIcs}
+                        disabled={!customIcsUrl.trim() || isLoading}
+                        className="py-1.5 px-3 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50"
+                      >
+                        Lisää
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Added Sources List for Active Player */}
+              {currentPlayerSources.length > 0 && (
+                <div className="mt-3 p-3 rounded-2xl bg-surface border border-pitch/30 space-y-1.5">
+                  <div className="text-xs font-bold text-pitch flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{activePlayerName}:lle lisätyt lähteet ({currentPlayerSources.length}):</span>
+                  </div>
+                  {currentPlayerSources.map((src) => (
+                    <div
+                      key={src.id}
+                      className="p-2 rounded-xl bg-surface-elevated text-xs flex items-center justify-between"
+                    >
+                      <span className="font-semibold text-text-primary">{src.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSource(src.id)}
+                        className="text-text-muted hover:text-radar p-1 cursor-pointer"
+                        title="Poista lähde"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
 
-            {/* Currently Added Sources for this Player */}
-            {currentPlayerSources.length > 0 && (
-              <div className="mt-3 p-3 rounded-2xl bg-surface border border-pitch/30 space-y-1.5">
-                <div className="text-xs font-bold text-pitch flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{playerNameInput}:lle valitut lähteet ({currentPlayerSources.length}):</span>
-                </div>
-                {currentPlayerSources.map((src) => (
-                  <div
-                    key={src.id}
-                    className="p-2 rounded-xl bg-surface-elevated text-xs flex items-center justify-between"
-                  >
-                    <span className="font-semibold text-text-primary">{src.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSource(src.id)}
-                      className="text-text-muted hover:text-radar p-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+              {/* Loop to Next Player OR Finish */}
+              <div className="pt-3 border-t border-border-subtle flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleAddNewPlayer}
+                  className="w-full py-2.5 px-4 rounded-xl bg-surface border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Plus className="w-4 h-4 text-pitch" />
+                  <span>+ Tallenna ja lisää seuraava pelaaja</span>
+                </button>
 
-          {/* 3. Action Buttons: Next Player OR Finish */}
-          <div className="pt-2 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              {['Maija', 'Eemil', 'Ville']
-                .filter((n) => n.toLowerCase() !== playerNameInput.toLowerCase())
-                .map((nextKid) => (
-                  <button
-                    key={nextKid}
+                {onFinishOnboarding && totalSourcesCount > 0 && (
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    transition={springTactile.snappy}
                     type="button"
-                    onClick={() => handleStartNextPlayer(nextKid)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-surface border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center justify-center gap-1 cursor-pointer"
+                    onClick={onFinishOnboarding}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-pitch text-text-inverse font-black text-sm flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-pitch/20 cursor-pointer"
                   >
-                    <UserPlus className="w-3.5 h-3.5 text-pitch" />
-                    <span>+ Lisää {nextKid}</span>
-                  </button>
-                ))}
+                    <span>🚀 Valmis! Avaa Pelipäivä ({totalSourcesCount} joukkuetta)</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </motion.button>
+                )}
+              </div>
             </div>
-
-            {onFinishOnboarding && totalSourcesCount > 0 && (
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                transition={springTactile.snappy}
-                type="button"
-                onClick={onFinishOnboarding}
-                className="w-full py-3.5 px-4 rounded-2xl bg-pitch text-text-inverse font-black text-sm flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-pitch/20 cursor-pointer"
-              >
-                <span>🚀 Valmis! Avaa kalenteri ({totalSourcesCount} joukkuetta)</span>
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>
