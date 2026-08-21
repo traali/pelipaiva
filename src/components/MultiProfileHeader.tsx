@@ -9,13 +9,15 @@ interface MultiProfileHeaderProps {
   activeProfileId: string;
   onSelectProfile: (id: string) => void;
   onAddProfile: () => void;
+  onOpenFamilyManage?: () => void;
 }
 
 export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   profiles,
   activeProfileId,
   onSelectProfile,
-  onAddProfile
+  onAddProfile,
+  onOpenFamilyManage
 }) => {
   // Group profiles by playerName
   const playerGroups = React.useMemo(() => {
@@ -30,18 +32,30 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      {onOpenFamilyManage && (
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          transition={springTactile.snappy}
+          onClick={onOpenFamilyManage}
+          title="Hallitse perheen pelaajia ja joukkueita"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-pitch text-text-inverse shadow-sm shadow-pitch/20 cursor-pointer shrink-0 transition-all"
+        >
+          <span>👨‍👩‍👧‍👦</span>
+          <span>Perhe</span>
+        </motion.button>
+      )}
+
       <motion.button
         whileTap={{ scale: 0.95 }}
         transition={springTactile.snappy}
         onClick={() => onSelectProfile('all')}
-        className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5 ${
+        className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5 shrink-0 ${
           activeProfileId === 'all'
-            ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
+            ? 'bg-surface-elevated text-pitch border-pitch shadow-sm'
             : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
         }`}
       >
-        <span>👨‍👩‍👧‍👦</span>
-        <span>Koko perhe ({profiles.length} {profiles.length === 1 ? 'joukkue' : 'joukkuetta'})</span>
+        <span>Kaikki ottelut ({profiles.length})</span>
       </motion.button>
 
       {playerGroups.map(([playerName, playerProfiles]) => {
@@ -97,7 +111,7 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-elevated/70 border border-border-strong text-text-muted hover:text-text-primary cursor-pointer shrink-0"
       >
         <Plus className="w-3 h-3" />
-        <span>Lisää joukkue</span>
+        <span>+ Joukkue</span>
       </motion.button>
     </div>
   );

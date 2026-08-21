@@ -20,6 +20,7 @@ import { FamilyShareModal } from './components/FamilyShareModal';
 import { SmartImportModal } from './components/SmartImportModal';
 import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
 import { AskCopilotModal } from './components/AskCopilotModal';
+import { FamilyManageModal } from './components/FamilyManageModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import {
@@ -36,6 +37,7 @@ export const App: React.FC = () => {
   const [isLogisticsOpen, setIsLogisticsOpen] = useState<boolean>(false);
   const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
+  const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -586,6 +588,7 @@ export const App: React.FC = () => {
             activeProfileId={activeProfileId}
             onSelectProfile={(id) => setActiveProfileId(id)}
             onAddProfile={() => setIsImportModalOpen(true)}
+            onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
           />
         </div>
 
@@ -724,6 +727,27 @@ export const App: React.FC = () => {
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportCalendar}
         existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+      />
+
+      {/* Family Management & Child Roster Modal */}
+      <FamilyManageModal
+        isOpen={isFamilyManageOpen}
+        onClose={() => setIsFamilyManageOpen(false)}
+        profiles={profiles}
+        onOpenImportForPlayer={(playerName) => {
+          setIsFamilyManageOpen(false);
+          setImportDefaults({ name: `${playerName}:n joukkue` });
+          setIsImportModalOpen(true);
+        }}
+        onOpenFamilyShare={() => {
+          setIsFamilyManageOpen(false);
+          setIsFamilyShareOpen(true);
+        }}
+        onOpenOnboardingWizard={() => {
+          localStorage.removeItem('pelipaiva_onboarding_done');
+          setIsOnboardingActive(true);
+          setIsFamilyManageOpen(false);
+        }}
       />
 
       {/* Zero-Auth Family Share & Backup Modal */}
