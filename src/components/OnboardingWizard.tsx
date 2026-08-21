@@ -7,23 +7,39 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  ArrowRight,
-  Tv
+  QrCode,
+  Tv,
+  PlusCircle
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
+import type { SportType } from '../types/matchday';
 
 interface OnboardingWizardProps {
   onStartDemo: () => void;
-  onOpenImportModal: () => void;
+  onOpenImportModal: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
+  onOpenFamilyShare: () => void;
+  onQuickAddTeam: (playerName: string, teamName: string, sport: SportType, url: string) => Promise<void>;
 }
 
 type GuidePlatform = 'nimenhuuto' | 'myclub' | 'jopox' | 'torneopal';
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onStartDemo,
-  onOpenImportModal
+  onOpenImportModal,
+  onOpenFamilyShare,
+  onQuickAddTeam
 }) => {
   const [activeGuide, setActiveGuide] = useState<GuidePlatform>('nimenhuuto');
+  const [isAddingQuick, setIsAddingQuick] = useState(false);
+
+  const handleQuickAdd = async (name: string, team: string, sport: SportType, url: string) => {
+    setIsAddingQuick(true);
+    try {
+      await onQuickAddTeam(name, team, sport, url);
+    } finally {
+      setIsAddingQuick(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-canvas text-text-primary px-4 py-8 md:py-12 flex flex-col justify-between">
@@ -50,9 +66,163 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           </motion.h1>
 
           <p className="text-sm md:text-base text-text-secondary max-w-xl mx-auto">
-            Kaikki ottelusi, reaaliaikainen kenttäsää, FMI-salamavahti, pysäköintivyöhykkeet ja
-            Nappisvahti-varustesuositus yhdessä selkeässä näkymässä.
+            Ei käyttäjätilejä, ei pilvipalveluita. Kaikki ottelut, kenttäsää, FMI-salamavahti, pysäköinti ja varustesuositus yhdessä paikassa.
           </p>
+        </div>
+
+        {/* PRIMARY ACTION: Choose Sport / Quick Start */}
+        <div className="liquid-glass rounded-3xl p-6 md:p-8 mb-8 border border-pitch/30 shadow-xl shadow-pitch/5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-lg md:text-xl font-black text-text-primary flex items-center gap-2">
+                <span>1. Aloita lisäämällä ensimmäinen joukkueesi</span>
+              </h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Valitse lajisi pika-asetuksella tai syötä oma kalenterilinkkisi:
+              </p>
+            </div>
+            <div className="px-2.5 py-1 rounded-full bg-pitch/10 text-pitch font-bold text-xs">
+              100% Yksityinen
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            {/* Football Option */}
+            <div className="p-4 rounded-2xl bg-surface-elevated/90 border border-border-subtle hover:border-pitch transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 font-bold text-sm text-text-primary mb-1">
+                  <span className="text-lg">⚽</span>
+                  <span>Jalkapallo</span>
+                </div>
+                <p className="text-[11px] text-text-muted mb-3">
+                  Palloliitto Tulospalvelu & iCal
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <button
+                  disabled={isAddingQuick}
+                  onClick={() =>
+                    handleQuickAdd(
+                      'Pelaaja',
+                      'Palloliitto 185085',
+                      'football',
+                      'https://tulospalvelu.palloliitto.fi/team/185085/info'
+                    )
+                  }
+                  className="w-full py-2 px-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer disabled:opacity-50"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Valitse tiimi (185085)</span>
+                </button>
+                <button
+                  onClick={() =>
+                    onOpenImportModal('football', 'https://tulospalvelu.palloliitto.fi/team/185085/info', 'Jalkapallojoukkue')
+                  }
+                  className="w-full py-1.5 px-2 rounded-lg bg-surface text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer text-center"
+                >
+                  Muu Palloliitto / iCal...
+                </button>
+              </div>
+            </div>
+
+            {/* Floorball Option */}
+            <div className="p-4 rounded-2xl bg-surface-elevated/90 border border-border-subtle hover:border-pitch transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 font-bold text-sm text-text-primary mb-1">
+                  <span className="text-lg">🏑</span>
+                  <span>Salibandy</span>
+                </div>
+                <p className="text-[11px] text-text-muted mb-3">
+                  Salibandyliitto Tulospalvelu
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <button
+                  disabled={isAddingQuick}
+                  onClick={() =>
+                    handleQuickAdd(
+                      'Pelaaja',
+                      'Salibandy 25301',
+                      'floorball',
+                      'https://tulospalvelu.salibandy.fi/team/25301/info'
+                    )
+                  }
+                  className="w-full py-2 px-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer disabled:opacity-50"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Valitse tiimi (25301)</span>
+                </button>
+                <button
+                  onClick={() =>
+                    onOpenImportModal('floorball', 'https://tulospalvelu.salibandy.fi/team/25301/info', 'Salibandyjoukkue')
+                  }
+                  className="w-full py-1.5 px-2 rounded-lg bg-surface text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer text-center"
+                >
+                  Muu Salibandyliitto...
+                </button>
+              </div>
+            </div>
+
+            {/* Basketball Option */}
+            <div className="p-4 rounded-2xl bg-surface-elevated/90 border border-border-subtle hover:border-pitch transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 font-bold text-sm text-text-primary mb-1">
+                  <span className="text-lg">🏀</span>
+                  <span>Koripallo</span>
+                </div>
+                <p className="text-[11px] text-text-muted mb-3">
+                  Basket.fi Tulospalvelu
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <button
+                  disabled={isAddingQuick}
+                  onClick={() =>
+                    handleQuickAdd(
+                      'Pelaaja',
+                      'Basket.fi 5756346',
+                      'basketball',
+                      'https://tulospalvelu.basket.fi/team/5756346/info'
+                    )
+                  }
+                  className="w-full py-2 px-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer disabled:opacity-50"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Valitse tiimi (5756346)</span>
+                </button>
+                <button
+                  onClick={() =>
+                    onOpenImportModal('basketball', 'https://tulospalvelu.basket.fi/team/5756346/info', 'Koripallojoukkue')
+                  }
+                  className="w-full py-1.5 px-2 rounded-lg bg-surface text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer text-center"
+                >
+                  Muu Basket.fi...
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Secondary Actions: Custom .ics or QR Family Share */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-border-subtle">
+            <button
+              onClick={() => onOpenImportModal()}
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs hover:border-pitch flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Calendar className="w-4 h-4 text-pitch" />
+              <span>Syötä Nimenhuuto / MyClub / Jopox -linkki</span>
+            </button>
+
+            <button
+              onClick={onOpenFamilyShare}
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs hover:border-pitch flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <QrCode className="w-4 h-4 text-whistle" />
+              <span>Skannaa toisen vanhemman QR-koodi</span>
+            </button>
+          </div>
         </div>
 
         {/* 3 Core Value Pillars */}
@@ -149,13 +319,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="flex flex-col gap-2.5">
                 <div className="font-bold text-text-primary text-sm flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-pitch" />
-                  <span>MyClub kalenterisynkronointi:</span>
+                  <span>MyClub iCal-linkin kopiointi:</span>
                 </div>
                 <ol className="list-decimal list-inside space-y-1.5 ml-1">
-                  <li>Kirjaudu MyClub-tilillesi selaimessa.</li>
-                  <li>Avaa yläkulman valikosta <strong>"Omat tiedot"</strong> tai <strong>"Asetukset"</strong>.</li>
-                  <li>Etsi kohta <strong>"Kalenterisynkronointi"</strong>.</li>
-                  <li>Kopioi henkilökohtainen <strong>iCal-tilausosoite</strong>.</li>
+                  <li>Avaa MyClub selaimessa tai sovelluksessa ja mene <strong>Omat tapahtumat / Kalenteri</strong>.</li>
+                  <li>Klikkaa <strong>"Synkronoi kalenteri"</strong> tai kalenterikuvaketta.</li>
+                  <li>Valitse <strong>"Tilaa henkilökohtainen iCal-syöte"</strong> ja kopioi osoite.</li>
                 </ol>
               </div>
             )}
@@ -164,13 +333,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="flex flex-col gap-2.5">
                 <div className="font-bold text-text-primary text-sm flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-pitch" />
-                  <span>Jopox Pukukoppi iCal-syöte:</span>
+                  <span>Jopox iCal-linkin kopiointi:</span>
                 </div>
                 <ol className="list-decimal list-inside space-y-1.5 ml-1">
-                  <li>Avaa Jopox Pukukoppi -sivusto.</li>
-                  <li>Siirry kohtaan <strong>"Kalenteri"</strong>.</li>
-                  <li>Klikkaa <strong>"Tilaa kalenteri"</strong> tai iCal-kuvaketta.</li>
-                  <li>Kopioi generoitu <code>.ics</code>-osoite.</li>
+                  <li>Mene seuran Jopox Pukukoppi -näkymään.</li>
+                  <li>Valitse kalenterisivulta <strong>"Vie tapahtumat kalenteriin"</strong>.</li>
+                  <li>Kopioi generoitu <code>.ics</code> URL-linkki.</li>
                 </ol>
               </div>
             )}
@@ -179,40 +347,30 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div className="flex flex-col gap-2.5">
                 <div className="font-bold text-text-primary text-sm flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-pitch" />
-                  <span>Torneopal / Turnaus-kalenteri:</span>
+                  <span>Palloliitto / Salibandy / Torneopal joukkuesivu:</span>
                 </div>
                 <ol className="list-decimal list-inside space-y-1.5 ml-1">
-                  <li>Etsi turnauksen viralliselta tulossivulta joukkueesi otteluohjelma.</li>
-                  <li>Klikkaa <strong>"Tilaa otteluohjelma kalenteriin (iCal)"</strong>.</li>
-                  <li>Kopioi suora linkki.</li>
+                  <li>Avaa lajiliittosi tulospalvelu (esim. tulospalvelu.palloliitto.fi tai tulospalvelu.salibandy.fi).</li>
+                  <li>Hae lapsesi tai joukkueesi nimellä ja avaa <strong>joukkuesivu</strong>.</li>
+                  <li>Kopioi selaimen osoitepalkin URL (esim. <code>https://tulospalvelu.palloliitto.fi/team/185085/info</code>).</li>
                 </ol>
               </div>
             )}
           </div>
         </div>
 
-        {/* Action Choice Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.96 }}
-            transition={springTactile.snappy}
-            onClick={onOpenImportModal}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-pitch text-text-inverse font-bold text-sm shadow-xl shadow-pitch/25 hover:brightness-110 active:brightness-95 cursor-pointer"
-          >
-            <span>Syötä oma kalenteri</span>
-            <ArrowRight className="w-4 h-4" />
-          </motion.button>
-
+        {/* Demo Fallback Option */}
+        <div className="text-center mb-6">
+          <p className="text-xs text-text-muted mb-2">Haluatko vain tutustua sovellukseen ennen tietojen syöttämistä?</p>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
             transition={springTactile.snappy}
             onClick={onStartDemo}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-sm hover:border-pitch cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-text-secondary hover:text-text-primary font-medium text-xs hover:border-border-strong cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-whistle" />
-            <span>Kokeile esimerkkidatalla (1-klikkaus)</span>
+            <Sparkles className="w-3.5 h-3.5 text-whistle" />
+            <span>Kokeile esimerkkidatalla (HJK T13 Demo)</span>
           </motion.button>
         </div>
       </div>

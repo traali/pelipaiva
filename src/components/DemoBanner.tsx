@@ -29,13 +29,16 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({ onOpenImport, onClearDem
           <ArrowRight className="w-3.5 h-3.5" />
         </motion.button>
 
-        <button
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          transition={springTactile.snappy}
           onClick={onClearDemo}
-          title="Tyhjennä esimerkkidata"
-          className="p-1.5 rounded-xl text-text-muted hover:text-stoppage hover:bg-surface-elevated cursor-pointer"
+          title="Tyhjennä esimerkkidata ja aloita alusta"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-elevated border border-border-subtle hover:border-stoppage/50 text-text-muted hover:text-stoppage text-xs font-semibold cursor-pointer transition-colors"
         >
-          <Trash2 className="w-4 h-4" />
-        </button>
+          <Trash2 className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Poista demo</span>
+        </motion.button>
       </div>
     </div>
   );

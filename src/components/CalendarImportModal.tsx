@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, Plus, ShieldCheck, HelpCircle, Trophy } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
@@ -10,19 +10,33 @@ interface CalendarImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImport: (playerName: string, teamName: string, sport: SportType, icsUrl: string) => Promise<void>;
+  initialSport?: SportType;
+  initialTeamUrl?: string;
+  initialTeamName?: string;
 }
 
 export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   isOpen,
   onClose,
-  onImport
+  onImport,
+  initialSport,
+  initialTeamUrl,
+  initialTeamName
 }) => {
   const [playerName, setPlayerName] = useState('');
-  const [teamName, setTeamName] = useState('');
-  const [sport, setSport] = useState<SportType>('football');
-  const [icsUrl, setIcsUrl] = useState('');
+  const [teamName, setTeamName] = useState(initialTeamName || '');
+  const [sport, setSport] = useState<SportType>(initialSport || 'football');
+  const [icsUrl, setIcsUrl] = useState(initialTeamUrl || '');
   const [isLoading, setIsLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialTeamName) setTeamName(initialTeamName);
+      if (initialSport) setSport(initialSport);
+      if (initialTeamUrl) setIcsUrl(initialTeamUrl);
+    }
+  }, [isOpen, initialTeamName, initialSport, initialTeamUrl]);
 
   // Auto-detect sports association URL and auto-update sport
   const handleUrlChange = (val: string) => {

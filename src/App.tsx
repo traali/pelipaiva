@@ -13,7 +13,7 @@ import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
-import { CalendarPlus, RefreshCw, Smartphone, Tv, Share2, AlertTriangle } from 'lucide-react';
+import { CalendarPlus, RefreshCw, Smartphone, Tv, Share2, AlertTriangle, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { springTactile } from './lib/motion/springs';
 import { FamilyShareModal } from './components/FamilyShareModal';
@@ -38,7 +38,7 @@ DTSTART:20260820T173000Z
 DTEND:20260820T190000Z
 SUMMARY:ErVi P11 vs Oilers Black
 LOCATION:Tapanilan Mosahalli
-DESCRIPTION:Toimitsijavuoro (Kirjuri/Kello).
+DESCRIPTION:Kirjuri/kello. Sisäpelivarustus.
 END:VEVENT
 END:VCALENDAR`;
 
@@ -48,6 +48,11 @@ export const App: React.FC = () => {
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [importDefaults, setImportDefaults] = useState<{
+    sport?: SportType;
+    url?: string;
+    name?: string;
+  }>({});
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
@@ -252,12 +257,28 @@ export const App: React.FC = () => {
       <>
         <OnboardingWizard
           onStartDemo={handleStartDemo}
-          onOpenImportModal={() => setIsImportModalOpen(true)}
+          onOpenImportModal={(sport, url, name) => {
+            setImportDefaults({ sport, url, name });
+            setIsImportModalOpen(true);
+          }}
+          onOpenFamilyShare={() => setIsFamilyShareOpen(true)}
+          onQuickAddTeam={async (playerName, teamName, sport, url) => {
+            await handleImportCalendar(playerName, teamName, sport, url);
+          }}
         />
         <CalendarImportModal
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
           onImport={handleImportCalendar}
+          initialSport={importDefaults.sport}
+          initialTeamUrl={importDefaults.url}
+          initialTeamName={importDefaults.name}
+        />
+        <FamilyShareModal
+          isOpen={isFamilyShareOpen}
+          onClose={() => setIsFamilyShareOpen(false)}
+          profiles={profiles}
+          onDataImported={() => setActiveProfileId('all')}
         />
       </>
     );
@@ -310,6 +331,16 @@ export const App: React.FC = () => {
               className="p-2 rounded-full bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle cursor-pointer"
             >
               <Tv className="w-4 h-4" />
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              transition={springTactile.snappy}
+              onClick={handleClearData}
+              title="Tyhjennä tiedot & Aloita alusta"
+              className="p-2 rounded-full bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
             </motion.button>
 
             <ThemeToggle />
