@@ -29,29 +29,6 @@ import {
 } from './lib/stats/statsEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 
-const SAMPLE_INITIAL_ICS = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Nimenhuuto.com//NONSGML Calendar//EN
-BEGIN:VEVENT
-UID:match-1@nimenhuuto.com
-DTSTAMP:20260819T100000Z
-DTSTART:20260820T150000Z
-DTEND:20260820T163000Z
-SUMMARY:HJK T13 vs EPS Valkoinen
-LOCATION:Puotilan tekonurmi (Bubu)
-DESCRIPTION:Kahviovuoro klo 14:30 - 16:00. Pelaajille mukaan ykköspeliasu.
-END:VEVENT
-BEGIN:VEVENT
-UID:match-2@nimenhuuto.com
-DTSTAMP:20260819T100000Z
-DTSTART:20260820T173000Z
-DTEND:20260820T190000Z
-SUMMARY:ErVi P11 vs Oilers Black
-LOCATION:Tapanilan Mosahalli
-DESCRIPTION:Kirjuri/kello. Sisäpelivarustus.
-END:VEVENT
-END:VCALENDAR`;
-
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -118,37 +95,168 @@ export const App: React.FC = () => {
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
   const rawEvents = useLiveQuery(() => db.events.toArray(), []) || [];
 
-  const isDemoActive = profiles.some((p) => p.id === 'profile-hjk-demo');
+  const isDemoActive = profiles.some((p) => p.id.startsWith('profile-ppj-') || p.id === 'profile-hjk-demo');
 
-  // Seed sample demo data
+  // Seed user default teams (PPJ 185085, 185083, 185086, Salibandy 25301, Basket 5756346)
   const handleStartDemo = async () => {
     await db.profiles.clear();
     await db.events.clear();
 
-    const defaultProfile = {
-      id: 'profile-hjk-demo',
-      playerName: 'Maija',
-      teamName: 'HJK T13',
-      sport: 'football' as SportType,
-      primaryColor: 'sininen',
-      secondaryColor: 'valkoinen',
-      calendarUrl: 'https://nimenhuuto.com/demo',
-      colorHex: '#059669'
-    };
-    await db.profiles.add(defaultProfile);
+    const defaultProfiles = [
+      {
+        id: 'profile-ppj-185085',
+        playerName: 'Maija',
+        teamName: 'PPJ Laru Sininen (185085)',
+        sport: 'football' as SportType,
+        primaryColor: 'sininen',
+        secondaryColor: 'valkoinen',
+        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
+        colorHex: '#3b82f6'
+      },
+      {
+        id: 'profile-salibandy-25301',
+        playerName: 'Maija',
+        teamName: 'Salibandy (25301)',
+        sport: 'floorball' as SportType,
+        primaryColor: 'keltainen',
+        secondaryColor: 'musta',
+        calendarUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
+        colorHex: '#eab308'
+      },
+      {
+        id: 'profile-ppj-185083',
+        playerName: 'Eemil',
+        teamName: 'PPJ Laru Valkoinen (185083)',
+        sport: 'football' as SportType,
+        primaryColor: 'valkoinen',
+        secondaryColor: 'sininen',
+        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
+        colorHex: '#10b981'
+      },
+      {
+        id: 'profile-basket-5756346',
+        playerName: 'Eemil',
+        teamName: 'Basket.fi (5756346)',
+        sport: 'basketball' as SportType,
+        primaryColor: 'punainen',
+        secondaryColor: 'valkoinen',
+        calendarUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
+        colorHex: '#ef4444'
+      },
+      {
+        id: 'profile-ppj-185086',
+        playerName: 'Ville',
+        teamName: 'PPJ Laru Oranssi (185086)',
+        sport: 'football' as SportType,
+        primaryColor: 'oranssi',
+        secondaryColor: 'musta',
+        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
+        colorHex: '#f97316'
+      }
+    ];
 
-    const parsed = await parseICSFeed(SAMPLE_INITIAL_ICS, defaultProfile.id, 'football');
+    for (const p of defaultProfiles) {
+      await db.profiles.add(p);
+    }
 
-    for (const ev of parsed) {
-      const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-      const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-      const withData: MatchdayEvent = {
-        ...ev,
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0] || '2026-08-21';
+    const tmrw = new Date(now.getTime() + 86400000);
+    const tmrwStr = tmrw.toISOString().split('T')[0] || '2026-08-22';
+    const dayAfter = new Date(now.getTime() + 172800000);
+    const dayAfterStr = dayAfter.toISOString().split('T')[0] || '2026-08-23';
+
+    const demoEventsConfig = [
+      {
+        profileId: 'profile-ppj-185085',
+        title: 'PPJ Laru Sin vs KäPa Barca',
+        homeTeam: 'PPJ Laru Sin',
+        awayTeam: 'KäPa Barca',
+        sport: 'football' as SportType,
+        venueName: 'Väinämöisen kenttä (Väiski)',
+        startTime: `${todayStr}T16:30:00+03:00`,
+        endTime: `${todayStr}T18:00:00+03:00`,
+        warmupTime: `${todayStr}T15:45:00+03:00`,
+        duty: '☕ Kahviovuoro klo 16:00 - 18:00 (Maija)'
+      },
+      {
+        profileId: 'profile-salibandy-25301',
+        title: 'ErVi vs Oilers Black',
+        homeTeam: 'ErVi',
+        awayTeam: 'Oilers Black',
+        sport: 'floorball' as SportType,
+        venueName: 'Tapanilan Mosahalli',
+        startTime: `${todayStr}T18:00:00+03:00`,
+        endTime: `${todayStr}T19:30:00+03:00`,
+        warmupTime: `${todayStr}T17:15:00+03:00`,
+        duty: '⏱️ Toimitsijavuoro (Kirjuri)'
+      },
+      {
+        profileId: 'profile-ppj-185083',
+        title: 'PPJ Laru Valk vs FC Honka',
+        homeTeam: 'PPJ Laru Valk',
+        awayTeam: 'FC Honka',
+        sport: 'football' as SportType,
+        venueName: 'Tapiolan Urheilupuisto TN 2',
+        startTime: `${tmrwStr}T14:30:00+03:00`,
+        endTime: `${tmrwStr}T16:00:00+03:00`,
+        warmupTime: `${tmrwStr}T13:45:00+03:00`
+      },
+      {
+        profileId: 'profile-basket-5756346',
+        title: 'ToPo vs HNMKY',
+        homeTeam: 'ToPo',
+        awayTeam: 'HNMKY',
+        sport: 'basketball' as SportType,
+        venueName: 'Töölön Kisahalli (Kisis)',
+        startTime: `${tmrwStr}T12:00:00+03:00`,
+        endTime: `${tmrwStr}T13:30:00+03:00`,
+        warmupTime: `${tmrwStr}T11:15:00+03:00`,
+        duty: '⏱️ Kellomies'
+      },
+      {
+        profileId: 'profile-ppj-185086',
+        title: 'PPJ Laru Oranssi vs VJS',
+        homeTeam: 'PPJ Laru Oranssi',
+        awayTeam: 'VJS',
+        sport: 'football' as SportType,
+        venueName: 'Puotilan Tekonurmi (Bubu)',
+        startTime: `${dayAfterStr}T15:00:00+03:00`,
+        endTime: `${dayAfterStr}T16:30:00+03:00`,
+        warmupTime: `${dayAfterStr}T14:15:00+03:00`
+      }
+    ];
+
+    for (let i = 0; i < demoEventsConfig.length; i++) {
+      const cfg = demoEventsConfig[i]!;
+      const venue = await resolveSportsVenue(cfg.venueName);
+      const weather = await fetchFmiMatchWeather(venue.coordinates, cfg.startTime, cfg.endTime);
+      const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(cfg.startTime));
+      const stats = generateOrResolveMatchStats(cfg.homeTeam, cfg.awayTeam, cfg.sport);
+
+      const ev: MatchdayEvent = {
+        id: `demo-event-${i + 1}`,
+        profileId: cfg.profileId,
+        sport: cfg.sport,
+        eventType: 'match',
+        isTraining: false,
+        title: cfg.title,
+        homeTeam: cfg.homeTeam,
+        awayTeam: cfg.awayTeam,
+        isHomeMatch: true,
+        startTime: cfg.startTime,
+        endTime: cfg.endTime,
+        warmupTime: cfg.warmupTime,
+        venue,
+        volunteerDuty: cfg.duty,
         weather,
-        parking
+        parking,
+        stats,
+        reconciliationStatus: 'auto_matched',
+        confidenceScore: 0.95
       };
-      withData.briefing = generateMatchdayBriefing(withData, parsed);
-      await db.events.put(withData);
+      ev.briefing = generateMatchdayBriefing(ev, [ev]);
+      await db.events.put(ev);
     }
   };
 

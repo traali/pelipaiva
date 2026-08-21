@@ -132,10 +132,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               <div>
                 <div className="flex items-center gap-2 font-bold text-sm text-text-primary mb-1">
                   <span className="text-lg">⚽</span>
-                  <span>Jalkapallo</span>
+                  <span>Jalkapallo (Palloliitto)</span>
                 </div>
                 <p className="text-[11px] text-text-muted mb-3">
-                  Palloliitto Tulospalvelu & iCal
+                  Valitse jokin oletusjoukkueista:
                 </p>
               </div>
 
@@ -145,21 +145,54 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   onClick={() =>
                     handleQuickAdd(
                       selectedPlayerName,
-                      'Palloliitto 185085',
+                      'PPJ Laru Sininen',
                       'football',
                       'https://tulospalvelu.palloliitto.fi/team/185085/info'
                     )
                   }
-                  className="w-full py-2 px-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer disabled:opacity-50"
+                  className="w-full py-1.5 px-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1 hover:brightness-110 cursor-pointer disabled:opacity-50 text-left"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Valitse tiimi (185085)</span>
+                  <PlusCircle className="w-3 h-3 shrink-0" />
+                  <span>PPJ Laru Sininen (185085)</span>
                 </button>
+
+                <button
+                  disabled={isAddingQuick}
+                  onClick={() =>
+                    handleQuickAdd(
+                      selectedPlayerName,
+                      'PPJ Laru Valkoinen',
+                      'football',
+                      'https://tulospalvelu.palloliitto.fi/team/185083/info'
+                    )
+                  }
+                  className="w-full py-1.5 px-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1 hover:brightness-110 cursor-pointer disabled:opacity-50 text-left"
+                >
+                  <PlusCircle className="w-3 h-3 shrink-0" />
+                  <span>PPJ Laru Valkoinen (185083)</span>
+                </button>
+
+                <button
+                  disabled={isAddingQuick}
+                  onClick={() =>
+                    handleQuickAdd(
+                      selectedPlayerName,
+                      'PPJ Laru Oranssi',
+                      'football',
+                      'https://tulospalvelu.palloliitto.fi/team/185086/info'
+                    )
+                  }
+                  className="w-full py-1.5 px-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1 hover:brightness-110 cursor-pointer disabled:opacity-50 text-left"
+                >
+                  <PlusCircle className="w-3 h-3 shrink-0" />
+                  <span>PPJ Laru Oranssi (185086)</span>
+                </button>
+
                 <button
                   onClick={() =>
                     onOpenImportModal('football', 'https://tulospalvelu.palloliitto.fi/team/185085/info', 'Jalkapallojoukkue')
                   }
-                  className="w-full py-1.5 px-2 rounded-lg bg-surface text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer text-center"
+                  className="w-full py-1 px-2 rounded-lg bg-surface text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer text-center mt-1"
                 >
                   Muu Palloliitto / iCal...
                 </button>
@@ -192,7 +225,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   className="w-full py-2 px-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer disabled:opacity-50"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Valitse tiimi (25301)</span>
+                  <span>Salibandy (25301)</span>
                 </button>
                 <button
                   onClick={() =>
@@ -231,7 +264,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   className="w-full py-2 px-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer disabled:opacity-50"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Valitse tiimi (5756346)</span>
+                  <span>Basket.fi (5756346)</span>
                 </button>
                 <button
                   onClick={() =>
