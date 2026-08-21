@@ -151,9 +151,14 @@ export const App: React.FC = () => {
     setActiveProfileId('all');
   };
 
-  // Filter events by selected profile
+  // Filter events by selected profile or player group
   const filteredEvents = rawEvents.filter((e) => {
     if (activeProfileId === 'all') return true;
+    if (activeProfileId.startsWith('player:')) {
+      const pName = activeProfileId.replace('player:', '').toLowerCase();
+      const profile = profiles.find((p) => p.id === e.profileId);
+      return (profile?.playerName || '').toLowerCase() === pName;
+    }
     return e.profileId === activeProfileId;
   });
 
@@ -481,13 +486,17 @@ export const App: React.FC = () => {
         {/* Bento Grid Match Cards */}
         {filteredEvents.length > 0 ? (
           <div className="flex flex-col gap-4">
-            {filteredEvents.map((event) => (
-              <MatchdayCard 
-                key={event.id} 
-                event={event} 
-                onResolveMismatch={handleResolveMismatch}
-              />
-            ))}
+            {filteredEvents.map((event) => {
+              const profile = profiles.find((p) => p.id === event.profileId);
+              return (
+                <MatchdayCard
+                  key={event.id}
+                  event={event}
+                  playerName={profile?.playerName}
+                  onResolveMismatch={handleResolveMismatch}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-16 px-4 rounded-3xl bg-surface-elevated/40 border border-border-subtle">

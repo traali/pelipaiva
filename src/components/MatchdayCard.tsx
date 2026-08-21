@@ -24,12 +24,14 @@ import { Edit3 } from 'lucide-react';
 
 interface MatchdayCardProps {
   event: MatchdayEvent;
+  playerName?: string;
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
 }
 
 export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   event,
+  playerName,
   onNavigateToVenue,
   onResolveMismatch
 }) => {
@@ -138,6 +140,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         {/* Top Badges & Timers */}
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2 flex-wrap">
+            {playerName && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-pitch/20 text-pitch border border-pitch/30">
+                <span>👤</span>
+                <span>{playerName}</span>
+              </span>
+            )}
+
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
                 isTraining
