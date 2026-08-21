@@ -110,14 +110,14 @@ Yhdistää puhekieliset nimitykset virallisiin LIPAS.fi-paikkatietoihin:
 
 ---
 
-## 5. Konservatiivinen Fuzzy Join & Ristiriitamoottori
+## 5. Konservatiivinen Heuristinen Yhdistäjä & Ristiriitamoottori
 
 ### 5.1 Liittämisalgoritmi (`reconciliationEngine.ts`)
 Ottelut yhdistetään kalenterin ja liigan välillä seuraavin säännöin:
 1. **Päivämäärätarkistus:** Tapahtuman ja virallisen ottelun on oltava samana päivänä ($\pm 24\text{h}$).
 2. **Aikaikkuna:** Kalenterin ja ottelun aikaero saa olla enintään $\pm 180\text{ min}$ (3 tuntia).
-3. **Vastustajan Samankaltaisuus (Dice-Sørensen bigram-kerroin):**
-   - Verrataan kalenterin vastustajatokeneita liigan vastustajatietoon hyödyntäen seuranimien alias-sanakirjaa (`HJK`, `KäPa`, `GrIFK`, `ErVi`, `TiPS`, `VJS`, `Honka`, `Ilves`, `TPS`, `EPS`, `PPJ`, `PK-35`, `ÅIFK` jne.).
+3. **Vastustajan Samankaltaisuus (Dice-Sørensen bigram-kerroin & Oppimisaliakset):**
+   - Verrataan kalenterin vastustajatokeneita liigan vastustajatietoon hyödyntäen seuranimien alias-sanakirjaa (`HJK`, `KäPa`, `GrIFK`, `ErVi`, `TiPS`, `VJS`, `Honka`, `Ilves`, `TPS`, `EPS`, `PPJ`, `PK-35`, `ÅIFK` jne.) sekä laitteen oppimia `customAliases`-merkintöjä.
    - Jos vastustajan samankaltaisuus on $< 0.40$, ottelua **ei yhdistetä** (`unlinked`).
 4. **Luottamuspisteytys ($S$):**
    $$S = 0.7 \times \text{OpponentSimilarity} + 0.3 \times \max\left(0, 1 - \frac{\Delta t_{\text{min}}}{180}\right)$$
@@ -126,12 +126,15 @@ Ottelut yhdistetään kalenterin ja liigan välillä seuraavin säännöin:
    - $0.60 \le S < 0.85 \to$ `candidate_match`
    - $S < 0.60 \to$ `unlinked`
 
-### 5.2 Ristiriitatunnistus (Mismatch Diagnostics)
+### 5.2 Paikallinen Oppimismuisti (`customAliases`)
+Kun käyttäjä manuaalisesti vahvistaa ehdokasottelun tai ratkaisee ristiriidan, luotu joukkuealiaspari tallennetaan paikalliseen `customAliases`-tauluun. Tulevissa kalenterilatauksissa sama epävirallinen lempinimi tunnistetaan automaattisesti 1.0 luottamustasolla.
+
+### 5.3 Ristiriitatunnistus (Mismatch Diagnostics)
 Jos ottelu on yhdistetty, tarkistetaan:
 * **Aikatauluero:** $|\text{kalenteriaika} - \text{virallinen aloitusaika}| > 5\text{ min}$.
 * **Kenttäero:** Kalenterin kenttä poikkeaa virallisesta kentästä.
 
-### 5.3 1-Napin Ristiriidan Ratkaisu (Resolution Actions)
+### 5.4 1-Napin Ristiriidan Ratkaisu (Resolution Actions)
 * **`use_official` (Päivitä liiton tietoon):** Korvaa kalenteriajan virallisella otteluajalla, laskee alkulämmön automaattisesti (-45 min) ja asettaa virallisen kentän.
 * **`keep_calendar` (Säilytä oma merkintä):** Säilyttää omat ajat ja kuittaa varoituksen.
 * **`unlink` (Pura linkitys):** Irrottaa ottelut toisistaan.

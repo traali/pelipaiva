@@ -13,9 +13,11 @@ import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
-import { CalendarPlus, RefreshCw, Smartphone, Tv } from 'lucide-react';
+import { CalendarPlus, RefreshCw, Smartphone, Tv, Share2, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { springTactile } from './lib/motion/springs';
+import { FamilyShareModal } from './components/FamilyShareModal';
+import { unpackSharePayload } from './lib/sync/familyShare';
 
 const SAMPLE_INITIAL_ICS = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -43,15 +45,48 @@ END:VCALENDAR`;
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
 
-  // Check URL params for ?ambient=true
+  // Listen to network status changes
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Check URL params for ?share= or ?ambient=true
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('ambient') === 'true' || window.location.pathname === '/ambient') {
         setIsAmbientMode(true);
+      }
+
+      // Handle family share link payload
+      const shareData = params.get('share');
+      if (shareData) {
+        const unpacked = unpackSharePayload(shareData);
+        if (unpacked.length > 0) {
+          (async () => {
+            for (const profile of unpacked) {
+              await db.profiles.put(profile);
+            }
+            // Clean up URL query param
+            window.history.replaceState({}, document.title, window.location.pathname);
+          })();
+        }
       }
     }
   }, []);
@@ -260,6 +295,16 @@ export const App: React.FC = () => {
             <motion.button
               whileTap={{ scale: 0.92 }}
               transition={springTactile.snappy}
+              onClick={() => setIsFamilyShareOpen(true)}
+              title="Perhejako & Varmuuskopio"
+              className="p-2 rounded-full bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 text-pitch" />
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              transition={springTactile.snappy}
               onClick={() => setIsAmbientMode(!isAmbientMode)}
               title="Google Nest Ambient -näkymä"
               className="p-2 rounded-full bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle cursor-pointer"
@@ -271,6 +316,14 @@ export const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Offline / Degraded Mode Alert Banner */}
+      {isOffline && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-500 text-xs py-1.5 px-4 text-center font-semibold flex items-center justify-center gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          <span>Offline-tila: Näytetään viimeisimmät tallennetut ottelutiedot laitteelta.</span>
+        </div>
+      )}
 
       {/* Main Container */}
       <main className="max-w-4xl mx-auto px-4 pt-4">
@@ -302,15 +355,26 @@ export const App: React.FC = () => {
               Reaaliaikainen sää, pysäköinti ja Nappisvahti
             </p>
           </div>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            transition={springTactile.snappy}
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
-          >
-            <CalendarPlus className="w-3.5 h-3.5 text-pitch" />
-            <span className="hidden sm:inline">Tuo .ics-syöte</span>
-          </motion.button>
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={() => setIsFamilyShareOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
+            >
+              <Share2 className="w-3.5 h-3.5 text-pitch" />
+              <span className="hidden sm:inline">Jaa perheelle</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
+            >
+              <CalendarPlus className="w-3.5 h-3.5 text-pitch" />
+              <span className="hidden sm:inline">Tuo .ics-syöte</span>
+            </motion.button>
+          </div>
         </div>
 
         {/* Bento Grid Match Cards */}
@@ -346,6 +410,14 @@ export const App: React.FC = () => {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportCalendar}
+      />
+
+      {/* Zero-Auth Family Share & Backup Modal */}
+      <FamilyShareModal
+        isOpen={isFamilyShareOpen}
+        onClose={() => setIsFamilyShareOpen(false)}
+        profiles={profiles}
+        onDataImported={() => {}}
       />
     </div>
   );

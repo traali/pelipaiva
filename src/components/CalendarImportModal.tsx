@@ -4,6 +4,7 @@ import { X, Calendar, Plus, ShieldCheck, HelpCircle, Trophy } from 'lucide-react
 import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
 import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
+import { searchPopularClubs } from '../lib/clubs/popularClubsCatalog';
 
 interface CalendarImportModalProps {
   isOpen: boolean;
@@ -85,6 +86,30 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Quick Club Preset Search */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-text-secondary mb-1">
+                ⚡ Pikahaku suomalaisista seuroista (valinnainen)
+              </label>
+              <input
+                type="text"
+                placeholder="Kirjoita seura, esim. HJK, Honka, ErVi, Classic, ToPo..."
+                onChange={(e) => {
+                  const q = e.target.value;
+                  if (q.trim().length > 1) {
+                    const found = searchPopularClubs(q);
+                    if (found.length > 0) {
+                      const top = found[0]!;
+                      setTeamName(top.name);
+                      setSport(top.sport);
+                      setIcsUrl(top.sampleTeamUrl);
+                    }
+                  }
+                }}
+                className="w-full px-3.5 py-2 rounded-xl bg-pitch/10 border border-pitch/30 text-text-primary text-xs focus:outline-none focus:border-pitch placeholder:text-text-muted"
+              />
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">

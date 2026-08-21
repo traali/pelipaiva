@@ -58,7 +58,8 @@ export function computeMismatchDiagnostics(
  */
 export function reconcileCalendarWithOfficial(
   calendarEvents: MatchdayEvent[],
-  officialFixtures: OfficialLeagueFixture[]
+  officialFixtures: OfficialLeagueFixture[],
+  customAliasesMap?: Map<string, string>
 ): Map<string, ReconciliationResult> {
   const resultMap = new Map<string, ReconciliationResult>();
 
@@ -89,8 +90,21 @@ export function reconcileCalendarWithOfficial(
 
       // Opponent comparison
       const offOpponent = fixture.isHome ? fixture.awayTeam : fixture.homeTeam;
-      const simAway = calculateTeamSimilarity(event.awayTeam, offOpponent);
-      const simHome = calculateTeamSimilarity(event.homeTeam, offOpponent);
+      let simAway = calculateTeamSimilarity(event.awayTeam, offOpponent);
+      let simHome = calculateTeamSimilarity(event.homeTeam, offOpponent);
+
+      // Check learned custom aliases
+      if (customAliasesMap) {
+        const learnedAway = customAliasesMap.get(event.awayTeam.toLowerCase().trim());
+        const learnedHome = customAliasesMap.get(event.homeTeam.toLowerCase().trim());
+        if (learnedAway && offOpponent.toLowerCase().includes(learnedAway.toLowerCase())) {
+          simAway = 1.0;
+        }
+        if (learnedHome && offOpponent.toLowerCase().includes(learnedHome.toLowerCase())) {
+          simHome = 1.0;
+        }
+      }
+
       const bestOppSim = Math.max(simAway, simHome);
 
       // Must have at least basic opponent similarity (>= 0.40) to be a valid candidate

@@ -132,13 +132,30 @@ export default {
         });
       }
 
-      const feedRes = await fetch(targetUrl);
+      const feedRes = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Pelipaiva-MatchdayHub/2.1 (+https://pelipaiva.pages.dev)'
+        }
+      });
       const icsText = await feedRes.text();
+
+      // For public association pages, enable 5-minute edge cache; private iCal feeds stay short
+      const isPublicAssociation =
+        targetUrl.includes('tulospalvelu.palloliitto.fi') ||
+        targetUrl.includes('tulospalvelu.salibandy.fi') ||
+        targetUrl.includes('basket.fi') ||
+        targetUrl.includes('torneopal.fi');
+
+      const cacheControlHeader = isPublicAssociation
+        ? 'public, s-maxage=300, stale-while-revalidate=600'
+        : 'private, max-age=60';
+
       return new Response(icsText, {
+        status: feedRes.status,
         headers: {
           ...corsHeaders,
           'Content-Type': feedRes.headers.get('Content-Type') || 'text/calendar; charset=utf-8',
-          'Cache-Control': 'no-store' // 100% Privacy: zero edge caching of private feeds
+          'Cache-Control': cacheControlHeader
         }
       });
     }

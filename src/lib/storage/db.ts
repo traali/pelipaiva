@@ -25,6 +25,12 @@ export interface CustomVenuePin {
   savedAt: string;
 }
 
+export interface CustomAliasRecord {
+  pattern: string;
+  canonicalClub: string;
+  createdAt: string;
+}
+
 export interface SyncStateRecord {
   key: string;
   syncKey: string;
@@ -40,6 +46,7 @@ export class PelipaivaDB extends Dexie {
   teamRosters!: Table<TeamRosterRecord | any, string>;
   arrivalRules!: Table<ArrivalRules, string>;
   venuePins!: Table<CustomVenuePin, string>;
+  customAliases!: Table<CustomAliasRecord, string>;
   syncState!: Table<SyncStateRecord, string>;
 
   constructor(databaseName = 'PelipaivaDB', options?: DexieOptions) {
@@ -53,7 +60,7 @@ export class PelipaivaDB extends Dexie {
       syncState: 'key, syncKey'
     });
 
-    // Schema Version 2 (Multi-sport official fixtures, standings, rosters, arrival rules, compound indexes)
+    // Schema Version 2 (Multi-sport official fixtures, standings, rosters, arrival rules, customAliases, compound indexes)
     this.version(2).stores({
       profiles: 'id, teamName, sport, associationUrl, teamId, associationType',
       events: 'id, profileId, sport, startTime, officialFixtureId, reconciliationStatus, [profileId+startTime]',
@@ -62,6 +69,7 @@ export class PelipaivaDB extends Dexie {
       teamRosters: 'id, teamId, teamName, fetchedAt',
       arrivalRules: 'profileId, defaultSport',
       venuePins: 'normalizedQuery, venueName',
+      customAliases: 'pattern, canonicalClub, createdAt',
       syncState: 'key, syncKey'
     }).upgrade(async (tx) => {
       await tx.table('events').toCollection().modify((event: MatchdayEvent) => {

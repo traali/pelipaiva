@@ -18,7 +18,9 @@ import { NappisvahtiPill } from './NappisvahtiPill';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { RainRadarCurve } from './RainRadarCurve';
 import { MatchStatsModal } from './MatchStatsModal';
+import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
+import { Edit3 } from 'lucide-react';
 
 interface MatchdayCardProps {
   event: MatchdayEvent;
@@ -32,6 +34,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   onResolveMismatch
 }) => {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
+  const [localVenue, setLocalVenue] = useState(event.venue);
 
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
@@ -194,12 +198,20 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </h2>
           )}
 
-          <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary">
+          <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />
-            <span className="truncate">{event.venue.name}</span>
+            <span className="truncate">{localVenue.name}</span>
             <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
-              {event.venue.isIndoor ? 'Sisähalli' : event.venue.surface.replace(/_/g, ' ')}
+              {localVenue.isIndoor ? 'Sisähalli' : localVenue.surface.replace(/_/g, ' ')}
             </span>
+            <button
+              type="button"
+              onClick={() => setIsVenueModalOpen(true)}
+              title="Korjaa kentän nimeä tai sijaintia"
+              className="p-1 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors"
+            >
+              <Edit3 className="w-3 h-3" />
+            </button>
           </div>
         </div>
 
@@ -347,6 +359,14 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           awayTeam={event.awayTeam || 'Vastustaja'}
         />
       )}
+
+      {/* 1-Tap Venue Pin & Correction Modal */}
+      <VenueCorrectionModal
+        isOpen={isVenueModalOpen}
+        onClose={() => setIsVenueModalOpen(false)}
+        currentVenue={localVenue}
+        onSaved={(updated) => setLocalVenue(updated)}
+      />
     </>
   );
 };
