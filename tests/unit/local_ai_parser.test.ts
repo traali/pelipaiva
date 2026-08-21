@@ -52,6 +52,33 @@ describe('🤖 Finnish Sports NLP & Local AI Engine', () => {
       expect(result.endTime).toBe('19:30');
       expect(result.venueHint).toContain('Pallokenttä 2');
     });
+
+    it('parses typical MyClub event description block', () => {
+      const myClubText = `Tapahtuma: Sarjapeli PPJ Laru vs KäPa Barca
+Päivämäärä: 24.8.2026
+Aika: 16.30 - 18.00 (Kokoontuminen 15.45)
+Paikka: Väinämöisen kenttä (Väiski)
+Lisätiedot: Peliasuna sininen pelipaita. Kahviovuoro: Maijan vanhemmat.`;
+
+      const result = parseFreeformSportsMessage(myClubText, 'Maija');
+
+      expect(result.homeTeam).toContain('PPJ Laru');
+      expect(result.awayTeam).toContain('KäPa Barca');
+      expect(result.kickoffTime).toBe('16:30');
+      expect(result.warmupTime).toBe('15:45');
+      expect(result.venueHint).toContain('Väinämöisen');
+      expect(result.kitColor).toContain('Sininen');
+      expect(result.volunteerDuties.some((d) => d.includes('Kahviovuoro'))).toBe(true);
+    });
+
+    it('parses casual quick note typed by parent', () => {
+      const note = `Lauantaina Maijalla peli Tapiola 2 kentällä klo 14.30`;
+      const result = parseFreeformSportsMessage(note, 'Maija');
+
+      expect(result.kickoffTime).toBe('14:30');
+      expect(result.warmupTime).toBe('13:45');
+      expect(result.venueHint).toContain('Tapiola');
+    });
   });
 
   describe('2. Excel & Google Sheets Table Ingestion', () => {

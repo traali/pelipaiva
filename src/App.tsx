@@ -20,6 +20,7 @@ import { FamilyShareModal } from './components/FamilyShareModal';
 import { SmartImportModal } from './components/SmartImportModal';
 import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
 import { AskCopilotModal } from './components/AskCopilotModal';
+import { QuickDropInBar } from './components/QuickDropInBar';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import {
   parseAssociationUrl,
@@ -522,6 +523,17 @@ export const App: React.FC = () => {
             </motion.button>
           </div>
         </div>
+
+        {/* General Drop-in Bar for WhatsApp, MyClub & freeform text */}
+        <QuickDropInBar
+          existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+          activeProfilePlayerName={
+            activeProfileId.startsWith('player:')
+              ? activeProfileId.replace('player:', '')
+              : profiles.find((p) => p.id === activeProfileId)?.playerName
+          }
+          onEventCreated={() => {}}
+        />
 
         {/* Bento Grid Match Cards */}
         {filteredEvents.length > 0 ? (
