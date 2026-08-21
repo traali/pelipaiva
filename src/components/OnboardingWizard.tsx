@@ -31,11 +31,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 }) => {
   const [activeGuide, setActiveGuide] = useState<GuidePlatform>('nimenhuuto');
   const [isAddingQuick, setIsAddingQuick] = useState(false);
+  const [selectedPlayerName, setSelectedPlayerName] = useState('Maija');
 
   const handleQuickAdd = async (name: string, team: string, sport: SportType, url: string) => {
     setIsAddingQuick(true);
     try {
-      await onQuickAddTeam(name, team, sport, url);
+      await onQuickAddTeam(name.trim() || 'Maija', team, sport, url);
     } finally {
       setIsAddingQuick(false);
     }
@@ -72,7 +73,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
         {/* PRIMARY ACTION: Choose Sport / Quick Start */}
         <div className="liquid-glass rounded-3xl p-6 md:p-8 mb-8 border border-pitch/30 shadow-xl shadow-pitch/5">
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg md:text-xl font-black text-text-primary flex items-center gap-2">
                 <span>1. Aloita lisäämällä ensimmäinen joukkueesi</span>
@@ -83,6 +84,43 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
             <div className="px-2.5 py-1 rounded-full bg-pitch/10 text-pitch font-bold text-xs">
               100% Yksityinen
+            </div>
+          </div>
+
+          {/* Player Assignment Bar */}
+          <div className="mb-5 p-3.5 rounded-2xl bg-surface-elevated/80 border border-border-strong flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <span>👤 Kenelle lapselle / pelaajalle joukkue liitetään?</span>
+              </label>
+              <p className="text-[11px] text-text-muted">
+                Voit lisätä useita eri joukkueita ja lajeja samalle lapselle.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={selectedPlayerName}
+                onChange={(e) => setSelectedPlayerName(e.target.value)}
+                placeholder="Pelaajan nimi"
+                className="px-3 py-1.5 rounded-xl bg-surface border border-border-strong text-text-primary text-xs font-bold focus:outline-none focus:border-pitch w-32"
+              />
+              <div className="flex items-center gap-1">
+                {['Maija', 'Eemil', 'Ville'].map((quickName) => (
+                  <button
+                    key={quickName}
+                    type="button"
+                    onClick={() => setSelectedPlayerName(quickName)}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer transition-all ${
+                      selectedPlayerName === quickName
+                        ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
+                        : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
+                    }`}
+                  >
+                    {quickName}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -104,7 +142,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   disabled={isAddingQuick}
                   onClick={() =>
                     handleQuickAdd(
-                      'Pelaaja',
+                      selectedPlayerName,
                       'Palloliitto 185085',
                       'football',
                       'https://tulospalvelu.palloliitto.fi/team/185085/info'
@@ -143,7 +181,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   disabled={isAddingQuick}
                   onClick={() =>
                     handleQuickAdd(
-                      'Pelaaja',
+                      selectedPlayerName,
                       'Salibandy 25301',
                       'floorball',
                       'https://tulospalvelu.salibandy.fi/team/25301/info'
@@ -182,7 +220,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   disabled={isAddingQuick}
                   onClick={() =>
                     handleQuickAdd(
-                      'Pelaaja',
+                      selectedPlayerName,
                       'Basket.fi 5756346',
                       'basketball',
                       'https://tulospalvelu.basket.fi/team/5756346/info'

@@ -520,6 +520,7 @@ export const App: React.FC = () => {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportCalendar}
+        existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
       />
 
       {/* Zero-Auth Family Share & Backup Modal */}

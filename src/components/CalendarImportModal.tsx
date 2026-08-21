@@ -13,6 +13,7 @@ interface CalendarImportModalProps {
   initialSport?: SportType;
   initialTeamUrl?: string;
   initialTeamName?: string;
+  existingPlayers?: string[];
 }
 
 export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
@@ -21,7 +22,8 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   onImport,
   initialSport,
   initialTeamUrl,
-  initialTeamName
+  initialTeamName,
+  existingPlayers = []
 }) => {
   const [playerName, setPlayerName] = useState('');
   const [teamName, setTeamName] = useState(initialTeamName || '');
@@ -128,11 +130,42 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Pelaajan nimi (valinnainen)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-text-secondary">
+                    👤 Kenelle pelaajalle / lapselle liitetään? *
+                  </label>
+                  <span className="text-[11px] text-pitch font-medium">Perhenäkymä</span>
+                </div>
+
+                {existingPlayers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {existingPlayers.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPlayerName(p)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer transition-all ${
+                          playerName === p
+                            ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
+                            : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
+                        }`}
+                      >
+                        👤 {p}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setPlayerName('')}
+                      className="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface text-text-muted border border-border-subtle hover:text-text-primary cursor-pointer"
+                    >
+                      + Uusi lapsi
+                    </button>
+                  </div>
+                )}
+
                 <input
                   type="text"
+                  required
                   placeholder="esim. Maija"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
