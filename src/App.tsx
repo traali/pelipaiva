@@ -13,10 +13,13 @@ import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
-import { CalendarPlus, RefreshCw, Smartphone, Tv, Share2, AlertTriangle, Trash2 } from 'lucide-react';
+import { CalendarPlus, RefreshCw, Smartphone, Tv, Share2, AlertTriangle, Trash2, Sparkles, Car, MessageSquarePlus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { springTactile } from './lib/motion/springs';
 import { FamilyShareModal } from './components/FamilyShareModal';
+import { SmartImportModal } from './components/SmartImportModal';
+import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
+import { AskCopilotModal } from './components/AskCopilotModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import {
   parseAssociationUrl,
@@ -51,6 +54,9 @@ END:VCALENDAR`;
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isSmartImportOpen, setIsSmartImportOpen] = useState<boolean>(false);
+  const [isLogisticsOpen, setIsLogisticsOpen] = useState<boolean>(false);
+  const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -337,9 +343,16 @@ export const App: React.FC = () => {
             setIsImportModalOpen(true);
           }}
           onOpenFamilyShare={() => setIsFamilyShareOpen(true)}
+          onOpenSmartImport={() => setIsSmartImportOpen(true)}
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
             await handleImportCalendar(playerName, teamName, sport, url);
           }}
+        />
+        <SmartImportModal
+          isOpen={isSmartImportOpen}
+          onClose={() => setIsSmartImportOpen(false)}
+          existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+          onImportClassic={handleImportCalendar}
         />
         <CalendarImportModal
           isOpen={isImportModalOpen}
@@ -461,7 +474,34 @@ export const App: React.FC = () => {
               Reaaliaikainen sää, pysäköinti ja Nappisvahti
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={() => setIsSmartImportOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pitch/15 border border-pitch/30 text-pitch text-xs font-bold cursor-pointer hover:bg-pitch hover:text-text-inverse transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Äly-tuonti</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={() => setIsLogisticsOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
+            >
+              <Car className="w-3.5 h-3.5 text-pitch" />
+              <span className="hidden sm:inline">Kyytiapuri</span>
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={() => setIsAskCopilotOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
+            >
+              <MessageSquarePlus className="w-3.5 h-3.5 text-pitch" />
+              <span className="hidden sm:inline">Kysy Älyltä</span>
+            </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               transition={springTactile.snappy}
@@ -478,7 +518,7 @@ export const App: React.FC = () => {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
             >
               <CalendarPlus className="w-3.5 h-3.5 text-pitch" />
-              <span className="hidden sm:inline">Tuo .ics-syöte</span>
+              <span className="hidden sm:inline">Tuo .ics</span>
             </motion.button>
           </div>
         </div>
@@ -503,17 +543,44 @@ export const App: React.FC = () => {
             <Smartphone className="w-10 h-10 text-text-muted mx-auto mb-3" />
             <h3 className="text-base font-bold text-text-primary">Ei otteluita kalenterissa</h3>
             <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1 mb-4">
-              Tuo joukkueesi Nimenhuuto-, MyClub- tai Jopox-kalenterin .ics-osoite nähdäksesi ottelut.
+              Tuo joukkueesi kalenteri tai liitä valmentajan WhatsApp-viesti / Excel-taulukko.
             </p>
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 cursor-pointer"
-            >
-              Lisää ensimmäinen kalenteri
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setIsSmartImportOpen(true)}
+                className="px-4 py-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 cursor-pointer flex items-center gap-1.5"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Äly-tuonti (WhatsApp / Excel / Kuva)</span>
+              </button>
+            </div>
           </div>
         )}
       </main>
+
+      {/* Smart Multi-Tab AI Importer (WhatsApp, Excel, Sheets, OCR) */}
+      <SmartImportModal
+        isOpen={isSmartImportOpen}
+        onClose={() => setIsSmartImportOpen(false)}
+        existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+        onImportClassic={handleImportCalendar}
+      />
+
+      {/* Family Logistics & Carpooling Modal */}
+      <FamilyLogisticsModal
+        isOpen={isLogisticsOpen}
+        onClose={() => setIsLogisticsOpen(false)}
+        events={rawEvents}
+        profiles={profiles}
+      />
+
+      {/* Natural Language Q&A Modal */}
+      <AskCopilotModal
+        isOpen={isAskCopilotOpen}
+        onClose={() => setIsAskCopilotOpen(false)}
+        events={rawEvents}
+        profiles={profiles}
+      />
 
       {/* Calendar Import Modal */}
       <CalendarImportModal

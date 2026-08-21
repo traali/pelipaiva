@@ -44,7 +44,9 @@ export default defineConfig({
           'vendor-motion': ['motion'],
           'vendor-calendar': ['ical.js'],
           'vendor-db': ['dexie', 'dexie-react-hooks'],
-          'vendor-geo': ['@turf/distance', 'fast-xml-parser']
+          'vendor-geo': ['@turf/distance', 'fast-xml-parser'],
+          'vendor-xlsx': ['xlsx'],
+          'vendor-ocr': ['tesseract.js']
         }
       }
     }

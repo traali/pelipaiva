@@ -18,6 +18,7 @@ interface OnboardingWizardProps {
   onStartDemo: () => void;
   onOpenImportModal: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
   onOpenFamilyShare: () => void;
+  onOpenSmartImport?: () => void;
   onQuickAddTeam: (playerName: string, teamName: string, sport: SportType, url: string) => Promise<void>;
 }
 
@@ -27,6 +28,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onStartDemo,
   onOpenImportModal,
   onOpenFamilyShare,
+  onOpenSmartImport,
   onQuickAddTeam
 }) => {
   const [activeGuide, setActiveGuide] = useState<GuidePlatform>('nimenhuuto');
@@ -243,23 +245,36 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
           </div>
 
-          {/* Secondary Actions: Custom .ics or QR Family Share */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-border-subtle">
-            <button
-              onClick={() => onOpenImportModal()}
-              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs hover:border-pitch flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Calendar className="w-4 h-4 text-pitch" />
-              <span>Syötä Nimenhuuto / MyClub / Jopox -linkki</span>
-            </button>
+          {/* Secondary Actions: Smart Import, Custom .ics or QR Family Share */}
+          <div className="flex flex-col gap-2.5 pt-4 border-t border-border-subtle">
+            {onOpenSmartImport && (
+              <button
+                type="button"
+                onClick={onOpenSmartImport}
+                className="w-full py-3 px-4 rounded-xl bg-pitch/15 border border-pitch/30 text-pitch font-bold text-xs hover:bg-pitch hover:text-text-inverse flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>✨ Äly-tuonti: Liitä WhatsApp-viesti, Excel tai kuvakaappaus</span>
+              </button>
+            )}
 
-            <button
-              onClick={onOpenFamilyShare}
-              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs hover:border-pitch flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <QrCode className="w-4 h-4 text-whistle" />
-              <span>Skannaa toisen vanhemman QR-koodi</span>
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-2.5">
+              <button
+                onClick={() => onOpenImportModal()}
+                className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs hover:border-pitch flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-pitch" />
+                <span>Syötä Nimenhuuto / MyClub / Jopox -linkki</span>
+              </button>
+
+              <button
+                onClick={onOpenFamilyShare}
+                className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs hover:border-pitch flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4 text-whistle" />
+                <span>Skannaa toisen vanhemman QR-koodi</span>
+              </button>
+            </div>
           </div>
         </div>
 
