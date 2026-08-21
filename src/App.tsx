@@ -314,7 +314,9 @@ export const App: React.FC = () => {
 
       if (parsedAssoc) {
         // Fetch fixtures directly from Torneopal / Palloliitto / Salibandy / Basket.fi
-        const officialData = await extractOfficialTeamData(parsedAssoc);
+        const officialData = await extractOfficialTeamData(parsedAssoc, {
+          customTeamName: teamName
+        });
 
         // Store official fixtures in Dexie
         for (const fix of officialData.fixtures) {
