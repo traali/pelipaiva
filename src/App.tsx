@@ -21,6 +21,7 @@ import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { MatchStatsModal } from './components/MatchStatsModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
+import { DifficultDayAlert } from './components/DifficultDayAlert';
 import { WeekendStrip } from './components/WeekendStrip';
 import { HeroMatchCard } from './components/HeroMatchCard';
 import { TalkooBoard } from './components/TalkooBoard';
@@ -718,6 +719,13 @@ export const App: React.FC = () => {
 
         {viewMode === 'cards' ? (
           <>
+            {snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
+              <DifficultDayAlert
+                warnings={snapshot.difficultDays}
+                onOpenLogistics={() => setIsLogisticsOpen(true)}
+              />
+            )}
+
             {/* Collapsible Weekend Overview & Volunteer Duties */}
             {(snapshot.days.some((d) => d.events.length > 0) ||
               snapshot.talkoo.shifts.length > 0 ||

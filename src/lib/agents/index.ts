@@ -13,5 +13,6 @@ export type {
   TalkooBalance,
   TournamentBlock,
   CarpoolLeg,
-  WeekendDayStrip
+  WeekendDayStrip,
+  DifficultDayWarning
 } from './types';

@@ -117,6 +117,17 @@ export interface WeekendDayStrip {
   }>;
 }
 
+export interface DifficultDayWarning {
+  date: string;
+  weekday: string;
+  label: string;
+  severity: 'critical' | 'warn' | 'info';
+  headline: string;
+  reasons: string[];
+  suggestedAction: string;
+  eventCount: number;
+}
+
 export interface MissionControlSnapshot {
   generatedAt: string;
   weekendLabel: string;
@@ -129,6 +140,7 @@ export interface MissionControlSnapshot {
   talkoo: TalkooBalance;
   tournaments: TournamentBlock[];
   days: WeekendDayStrip[];
+  difficultDays: DifficultDayWarning[];
   kitByEventId: Record<string, SportKitPlan>;
   ambientLine: string;
   whatsAppShareText: string;

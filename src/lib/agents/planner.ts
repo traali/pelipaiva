@@ -71,7 +71,88 @@ function buildDayStrips(
   });
 }
 
-function byStart(a: MatchdayEvent, b: MatchdayEvent): number {
+export function detectDifficultDays(
+  events: MatchdayEvent[],
+  _profiles: PlayerProfile[],
+  conflicts: ReturnType<typeof conflictAgent>,
+  now: Date = new Date()
+) {
+  const todayISO = helsinkiDateISO(now);
+  const lookaheadDays = 14;
+  const warnings: import('./types').DifficultDayWarning[] = [];
+
+  const eventsByDate = new Map<string, MatchdayEvent[]>();
+  for (const ev of events) {
+    const d = helsinkiDateISO(new Date(ev.startTime));
+    if (d >= todayISO && d <= addHelsinkiDays(todayISO, lookaheadDays)) {
+      const list = eventsByDate.get(d) || [];
+      list.push(ev);
+      eventsByDate.set(d, list);
+    }
+  }
+
+  for (const [date, dayEvents] of eventsByDate.entries()) {
+    const weekday = formatFiWeekday(date);
+    const label = new Date(`${date}T12:00:00+03:00`).toLocaleDateString('fi-FI', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'numeric'
+    });
+
+    const dayConflicts = conflicts.filter((c) => {
+      return dayEvents.some((e) => e.id === c.eventAId || e.id === c.eventBId);
+    });
+
+    const distinctKids = new Set(dayEvents.map((e) => e.profileId));
+    const hasTalkoo = dayEvents.some((e) => Boolean(e.volunteerDuty));
+    const tournamentMatches = dayEvents.filter((e) => e.eventType === 'tournament');
+    const reasons: string[] = [];
+
+    let severity: import('./types').DifficultDayWarning['severity'] | null = null;
+    let headline = '';
+    let suggestedAction = '';
+
+    if (dayConflicts.length > 0) {
+      severity = 'critical';
+      headline = '🔴 Päällekkäiset ottelut — tarvitaan 2 kuskia / autoa';
+      reasons.push(...dayConflicts.map((c) => c.message));
+      suggestedAction = 'Järjestä toiselle lapselle kyyti joukkuekaverilta tai varaa perheen molemmat autot.';
+    } else if (dayEvents.length >= 3 && distinctKids.size >= 2) {
+      severity = 'warn';
+      headline = `🟠 Ruuhkapäivä: ${dayEvents.length} ottelua eri lapsilla`;
+      reasons.push(`${distinctKids.size} eri lapsella pelejä eri kentillä pitkin päivää.`);
+      if (hasTalkoo) reasons.push('Lisäksi vanhemmalla talkoo-/toimitsijavuoro.');
+      suggestedAction = 'Tarkista lähtöajat ajoissa ja pakkaa eväät ja varusteet valmiiksi edellisenä iltana.';
+    } else if (tournamentMatches.length >= 3) {
+      severity = 'warn';
+      headline = `🟠 Pitkä turnauspäivä (${tournamentMatches.length} ottelua)`;
+      reasons.push(`Turnauskentällä menee useita tunteja (${tournamentMatches.length} peliä).`);
+      suggestedAction = 'Muista riittävät välipalat, 2× juomapulloa, istuinalusta ja kuiva vaihtopaita.';
+    } else if (hasTalkoo && dayEvents.length >= 2) {
+      severity = 'info';
+      headline = 'ℹ️ Ottelut + vanhemman talkoovuoro';
+      reasons.push('Pelin lisäksi olet sidottuna kahvioon tai toimitsijapöytään.');
+      suggestedAction = 'Varaa saapumiseen 15 minuutin lisäaika vuoron perehdytykseen.';
+    }
+
+    if (severity) {
+      warnings.push({
+        date,
+        weekday,
+        label,
+        severity,
+        headline,
+        reasons,
+        suggestedAction,
+        eventCount: dayEvents.length
+      });
+    }
+  }
+
+  return warnings.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function byStart(a: MatchdayEvent, b: MatchdayEvent): number {
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 
@@ -109,6 +190,7 @@ export function runMissionControlGraph(
   const talkoo = volunteerAgent(specialistEvents, profiles);
   const tournaments = tournamentAgent(events, profiles);
   const kitByEventId = kitAgent(specialistEvents, profiles);
+  const difficultDays = detectDifficultDays(events, profiles, conflicts, now);
 
   const fridayISO = helsinkiDateISO(weekend.start);
   const days = buildDayStrips(windowEvents, profiles, fridayISO, now);
@@ -156,6 +238,7 @@ export function runMissionControlGraph(
     talkoo,
     tournaments,
     days,
+    difficultDays,
     kitByEventId,
     ambientLine,
     whatsAppShareText,
