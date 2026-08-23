@@ -93,6 +93,7 @@ export interface TournamentBlock {
   lastEnd: string;
   recoveryMinutes: number;
   eventIds: string[];
+  matches?: MatchdayEvent[];
   leaveBy: string;
   packingNote: string;
 }
@@ -101,6 +102,8 @@ export interface WeekendDayStrip {
   date: string;
   weekday: string;
   label: string;
+  isPast?: boolean;
+  isToday?: boolean;
   events: Array<{
     eventId: string;
     time: string;
@@ -110,6 +113,7 @@ export interface WeekendDayStrip {
     title: string;
     venueName: string;
     isTalkoo: boolean;
+    isPast?: boolean;
   }>;
 }
 

@@ -11,7 +11,7 @@ import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
-import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties } from 'lucide-react';
+import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
 import { FamilyShareModal } from './components/FamilyShareModal';
 import { SmartImportModal } from './components/SmartImportModal';
 import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
@@ -57,6 +57,7 @@ export const App: React.FC = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
+  const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
     url?: string;
@@ -317,8 +318,9 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!needsDemoRefresh || isSeeding) return;
-    void handleStartDemo();
+    if (needsDemoRefresh && !isSeeding) {
+      void handleStartDemo();
+    }
   }, [needsDemoRefresh, isSeeding]);
 
   const handleClearData = async () => {
@@ -329,26 +331,36 @@ export const App: React.FC = () => {
   };
 
   // Filter events by selected profile or player group
-  const filteredEvents = [...rawEvents]
-    .filter((e) => {
-      if (activeProfileId === 'all') return true;
-      if (activeProfileId.startsWith('player:')) {
-        const pName = activeProfileId.replace('player:', '').toLowerCase();
-        const profile = profiles.find((p) => p.id === e.profileId);
-        return (profile?.playerName || '').toLowerCase() === pName;
-      }
-      return e.profileId === activeProfileId;
-    })
-    .sort((a, b) => {
-      const now = Date.now() - 2 * 3600 * 1000;
-      const aT = new Date(a.startTime).getTime();
-      const bT = new Date(b.startTime).getTime();
-      const aUp = aT >= now;
-      const bUp = bT >= now;
-      if (aUp && !bUp) return -1;
-      if (!aUp && bUp) return 1;
-      return aUp ? aT - bT : bT - aT;
-    });
+  const filteredEvents = useMemo(() => {
+    return [...rawEvents]
+      .filter((e) => {
+        if (activeProfileId === 'all') return true;
+        if (activeProfileId.startsWith('player:')) {
+          const pName = activeProfileId.replace('player:', '').toLowerCase();
+          const profile = profiles.find((p) => p.id === e.profileId);
+          return (profile?.playerName || '').toLowerCase() === pName;
+        }
+        return e.profileId === activeProfileId;
+      })
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }, [rawEvents, activeProfileId, profiles]);
+
+  const nowMs = Date.now();
+  // Events are active/upcoming until 30 minutes after end time
+  const upcomingEvents = useMemo(
+    () => filteredEvents.filter((e) => new Date(e.endTime).getTime() >= nowMs - 30 * 60 * 1000),
+    [filteredEvents, nowMs]
+  );
+  const pastEvents = useMemo(
+    () => filteredEvents.filter((e) => new Date(e.endTime).getTime() < nowMs - 30 * 60 * 1000),
+    [filteredEvents, nowMs]
+  );
+
+  // By default, only show upcoming events unless user explicitly asks for history/past
+  const displayEvents = useMemo(
+    () => (showPastEvents ? filteredEvents : upcomingEvents),
+    [showPastEvents, filteredEvents, upcomingEvents]
+  );
 
   const snapshot = useMemo(
     () => runMissionControlGraph(rawEvents, profiles, new Date()),
@@ -356,8 +368,8 @@ export const App: React.FC = () => {
   );
 
   const otherEvents = useMemo(
-    () => filteredEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
-    [filteredEvents, snapshot.nextEvent?.id]
+    () => displayEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
+    [displayEvents, snapshot.nextEvent?.id]
   );
 
   const eventsGroupedByDay = useMemo(() => {
@@ -804,59 +816,95 @@ export const App: React.FC = () => {
         />
 
         {filteredEvents.length > 0 ? (
-          viewMode === 'cards' ? (
-            /* Cards Feed with Sticky Day Dividers */
-            <div className="flex flex-col gap-6 pb-8">
-              {eventsGroupedByDay.map((dayGroup) => (
-                <div key={dayGroup.dateStr} className="flex flex-col gap-3">
-                  {/* Sticky Day Section Header */}
-                  <div className="sticky top-14 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded-md bg-pitch/15 text-pitch">
-                        <CalendarIcon className="w-3.5 h-3.5" />
+          <>
+            {otherEvents.length === 0 && !snapshot.nextEvent ? (
+              <div className="rounded-2xl border border-border-subtle bg-surface p-8 text-center my-4">
+                <CalendarIcon className="mx-auto mb-2.5 h-8 w-8 text-text-muted" />
+                <h3 className="text-sm font-bold text-text-primary">Kaikki tämän päivän ottelut on pelattu</h3>
+                <p className="mt-1 text-xs text-text-muted">
+                  Ei tulevia otteluita tälle päivälle. Voit tarkastella aiemmin pelattuja otteluita alta.
+                </p>
+              </div>
+            ) : viewMode === 'cards' ? (
+              /* Cards Feed with Sticky Day Dividers */
+              <div className="flex flex-col gap-6 pb-4">
+                {eventsGroupedByDay.map((dayGroup) => (
+                  <div key={dayGroup.dateStr} className="flex flex-col gap-3">
+                    {/* Sticky Day Section Header */}
+                    <div className="sticky top-14 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 rounded-md bg-pitch/15 text-pitch">
+                          <CalendarIcon className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-black tracking-wide text-text-primary">
+                          {dayGroup.label}
+                        </span>
                       </div>
-                      <span className="text-xs font-black tracking-wide text-text-primary">
-                        {dayGroup.label}
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
+                        {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
                       </span>
                     </div>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
-                      {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
-                    </span>
-                  </div>
 
-                  {/* Day's Match Cards */}
-                  <div className="flex flex-col gap-3">
-                    {dayGroup.events.map((event) => {
-                      const profile = profiles.find((p) => p.id === event.profileId);
-                      return (
-                        <MatchdayCard
-                          key={event.id}
-                          event={event}
-                          playerName={profile?.playerName}
-                          colorHex={profile?.colorHex}
-                          compact
-                          onResolveMismatch={handleResolveMismatch}
-                        />
-                      );
-                    })}
+                    {/* Day's Match Cards */}
+                    <div className="flex flex-col gap-3">
+                      {dayGroup.events.map((event) => {
+                        const profile = profiles.find((p) => p.id === event.profileId);
+                        return (
+                          <MatchdayCard
+                            key={event.id}
+                            event={event}
+                            playerName={profile?.playerName}
+                            colorHex={profile?.colorHex}
+                            compact
+                            onResolveMismatch={handleResolveMismatch}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* Compact Timeline or Calendar Grid View */
-            <TimelineCalendarView
-              events={otherEvents}
-              profiles={profiles}
-              viewMode={viewMode}
-              onNavigate={(ev) =>
-                window.open(
-                  `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
-                  '_blank'
-                )
-              }
-            />
-          )
+                ))}
+              </div>
+            ) : (
+              /* Compact Timeline or Calendar Grid View */
+              <div className="pb-4">
+                <TimelineCalendarView
+                  events={otherEvents}
+                  profiles={profiles}
+                  viewMode={viewMode}
+                  onNavigate={(ev) =>
+                    window.open(
+                      `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                      '_blank'
+                    )
+                  }
+                />
+              </div>
+            )}
+
+            {/* Past Events Collapsible Toggle */}
+            {pastEvents.length > 0 && (
+              <div className="pt-2 pb-10 flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPastEvents((v) => !v)}
+                  aria-expanded={showPastEvents}
+                  className="inline-flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-2xl border border-border-strong bg-surface-elevated text-xs font-bold text-text-secondary hover:text-text-primary hover:border-pitch transition-all cursor-pointer shadow-xs focus-visible:ring-2 focus-visible:ring-pitch"
+                >
+                  <HistoryIcon className="w-4 h-4 text-text-muted" />
+                  <span>
+                    {showPastEvents
+                      ? `Piilota aiemmat / menneet ottelut (${pastEvents.length})`
+                      : `Näytä aiemmat / menneet ottelut (${pastEvents.length})`}
+                  </span>
+                </button>
+                {!showPastEvents && (
+                  <span className="text-[11px] text-text-muted">
+                    {pastEvents.length} aiempaa ottelua piilotettu selkeyden vuoksi
+                  </span>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           <div className="rounded-2xl border border-border-subtle bg-surface px-4 py-16 text-center">
             <Smartphone className="mx-auto mb-3 h-10 w-10 text-text-muted" />

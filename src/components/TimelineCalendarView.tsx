@@ -63,13 +63,21 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return Array.from(map.values());
   }, [events]);
 
+  const todayISO = new Date().toISOString().split('T')[0] || '';
   const [selectedDayKey, setSelectedDayKey] = useState<string>(() => {
-    return groupedByDay[0]?.dateStr || (new Date().toISOString().split('T')[0] || '');
+    const hasToday = groupedByDay.some((g) => g.dateStr === todayISO);
+    if (hasToday) return todayISO;
+    const upcoming = groupedByDay.find((g) => g.dateStr >= todayISO);
+    return upcoming?.dateStr || groupedByDay[0]?.dateStr || todayISO;
   });
 
   const activeDayData = useMemo(() => {
-    return groupedByDay.find((g) => g.dateStr === selectedDayKey) || groupedByDay[0];
-  }, [groupedByDay, selectedDayKey]);
+    const found = groupedByDay.find((g) => g.dateStr === selectedDayKey);
+    if (found) return found;
+    const hasToday = groupedByDay.find((g) => g.dateStr === todayISO);
+    if (hasToday) return hasToday;
+    return groupedByDay[0];
+  }, [groupedByDay, selectedDayKey, todayISO]);
 
   if (events.length === 0) {
     return (

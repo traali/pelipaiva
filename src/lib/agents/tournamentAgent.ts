@@ -51,6 +51,7 @@ export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile
       lastEnd: last.endTime,
       recoveryMinutes: Math.max(0, recovery),
       eventIds: sorted.map((e) => e.id),
+      matches: sorted,
       leaveBy: departureTime,
       packingNote:
         sorted.length >= 3

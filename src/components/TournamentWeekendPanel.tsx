@@ -1,45 +1,188 @@
-import React from 'react';
-import { Trophy } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, ChevronDown, ChevronUp, Navigation } from 'lucide-react';
 import type { TournamentBlock } from '../lib/agents';
 import { formatFiTime } from '../lib/agents';
+import { getContrastTextColor } from '../lib/sport/teamColors';
 
 interface TournamentWeekendPanelProps {
   blocks: TournamentBlock[];
+  onNavigate?: (coordinates: { lat: number; lng: number }) => void;
 }
 
-export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ blocks }) => {
+export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ blocks, onNavigate }) => {
+  const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>(() => {
+    // Expand by default so user sees all games going forward
+    const init: Record<string, boolean> = {};
+    for (const b of blocks) {
+      init[b.id] = true;
+    }
+    return init;
+  });
+
   if (blocks.length === 0) return null;
 
+  const toggleExpand = (id: string) => {
+    setExpandedBlocks((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
-    <section className="mb-4 rounded-lg border border-border-subtle bg-surface-elevated p-3.5">
-      <div className="mb-2 flex items-center gap-2">
-        <Trophy className="h-4 w-4 text-floodlight" />
-        <h2 className="text-sm font-semibold text-text-primary">Turnauspäivä</h2>
+    <section aria-label="Turnauspäivät ja -aikataulut" className="mb-4 rounded-2xl border border-border-subtle bg-surface-elevated p-4 shadow-card">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-pitch/15 text-pitch">
+            <Trophy className="h-4 w-4" />
+          </div>
+          <h2 className="text-sm font-bold text-text-primary">Turnaukset & otteluohjelma</h2>
+        </div>
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface text-text-secondary border border-border-subtle">
+          {blocks.length} {blocks.length === 1 ? 'turnaus' : 'turnausta'}
+        </span>
       </div>
-      <ul className="flex flex-col gap-3">
-        {blocks.map((b) => (
-          <li key={b.id} className="flex gap-2">
-            <span
-              className="mt-0.5 h-10 w-1.5 shrink-0 rounded-full"
-              style={{ background: b.colorHex }}
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-text-primary">
-                {b.childName} · {b.name}
+
+      <div className="flex flex-col gap-4">
+        {blocks.map((b) => {
+          const isExpanded = expandedBlocks[b.id] ?? true;
+          const matches = b.matches || [];
+
+          return (
+            <div
+              key={b.id}
+              className="rounded-xl border border-border-strong bg-surface p-3.5 flex flex-col gap-3 relative overflow-hidden"
+            >
+              {/* Left Color Bar */}
+              <div
+                className="absolute left-0 top-0 bottom-0 w-1.5"
+                style={{ background: b.colorHex }}
+                aria-hidden
+              />
+
+              {/* Tournament Summary Header */}
+              <div className="pl-1.5 flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs"
+                      style={{
+                        backgroundColor: b.colorHex,
+                        color: getContrastTextColor(b.colorHex)
+                      }}
+                    >
+                      {b.childName}
+                    </span>
+                    <h3 className="text-sm font-bold text-text-primary truncate">
+                      {b.name}
+                    </h3>
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary flex-wrap">
+                    <span className="font-semibold text-text-primary">
+                      {b.matchCount} peliä ({formatFiTime(b.firstKickoff)}–{formatFiTime(b.lastEnd)})
+                    </span>
+                    <span>• {b.venueName}</span>
+                  </div>
+
+                  <div className="mt-1.5 flex items-center gap-2 text-xs">
+                    <span className="text-[11px] font-bold text-floodlight flex items-center gap-1">
+                      🚗 Lähde klo {b.leaveBy}
+                    </span>
+                    <span className="text-[11px] text-text-muted">
+                      ({b.packingNote})
+                    </span>
+                  </div>
+                </div>
+
+                {matches.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(b.id)}
+                    aria-label={isExpanded ? 'Piilota ottelut' : 'Näytä kaikki turnauksen ottelut'}
+                    className="p-1.5 rounded-lg bg-surface-elevated border border-border-subtle text-text-secondary hover:text-text-primary cursor-pointer transition-all shrink-0"
+                  >
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </div>
-              <div className="mt-0.5 text-xs text-text-secondary">
-                {b.matchCount} peliä · {formatFiTime(b.firstKickoff)}–{formatFiTime(b.lastEnd)} ·{' '}
-                {b.venueName}
-              </div>
-              <div className="mt-1 font-tabular text-sm font-semibold text-floodlight">
-                Lähde klo {b.leaveBy}
-              </div>
-              <p className="mt-1 text-xs text-text-muted">{b.packingNote}</p>
+
+              {/* ALL TOURNAMENT MATCHES LIST */}
+              {isExpanded && matches.length > 0 && (
+                <div className="pl-1.5 pt-2 border-t border-border-subtle flex flex-col gap-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
+                    <span>Turnauksen kaikki ottelut:</span>
+                    <span>{matches.length} kpl</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    {matches.map((m, idx) => {
+                      const start = new Date(m.startTime);
+                      const end = new Date(m.endTime);
+                      const timeStr = `${start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}–${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                      const isPast = end.getTime() < Date.now();
+                      const isCurrent = start.getTime() <= Date.now() && Date.now() <= end.getTime();
+
+                      return (
+                        <div
+                          key={m.id || idx}
+                          className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
+                            isCurrent
+                              ? 'border-pitch bg-pitch/10 text-text-primary font-bold shadow-xs'
+                              : isPast
+                                ? 'border-border-subtle bg-surface-elevated/40 text-text-muted opacity-75'
+                                : 'border-border-subtle bg-surface-elevated text-text-primary'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-[11px] font-bold text-pitch shrink-0">
+                              {timeStr}
+                            </span>
+                            <span className="font-semibold truncate">
+                              {m.title}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isCurrent && (
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-stoppage text-text-inverse animate-pulse">
+                                Nyt
+                              </span>
+                            )}
+                            {isPast && (
+                              <span className="text-[9px] font-medium text-text-muted">
+                                Päättynyt
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              aria-label={`Navigoi kohteeseen ${m.venue.name}`}
+                              onClick={() => {
+                                if (onNavigate) {
+                                  onNavigate(m.venue.coordinates);
+                                } else {
+                                  const coords = m.parking?.coordinates || m.venue.coordinates;
+                                  window.open(
+                                    `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                                    '_blank'
+                                  );
+                                }
+                              }}
+                              className="p-1 rounded-md bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer"
+                            >
+                              <Navigation className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
     </section>
   );
 };

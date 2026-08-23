@@ -26,9 +26,13 @@ function colorOf(event: MatchdayEvent, profiles: PlayerProfile[]): string {
 function buildDayStrips(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  fridayISO: string
+  fridayISO: string,
+  now = new Date()
 ): WeekendDayStrip[] {
   const days = [0, 1, 2].map((offset) => addHelsinkiDays(fridayISO, offset));
+  const todayISO = helsinkiDateISO(now);
+  const nowMs = now.getTime();
+
   return days.map((date) => {
     const dayEvents = events
       .filter((e) => helsinkiDateISO(new Date(e.startTime)) === date)
@@ -39,10 +43,15 @@ function buildDayStrips(
       day: 'numeric',
       month: 'numeric'
     });
+    const isPastDay = date < todayISO;
+    const isToday = date === todayISO;
+
     return {
       date,
       weekday,
       label,
+      isPast: isPastDay,
+      isToday,
       events: dayEvents.map((e) => ({
         eventId: e.id,
         time: formatFiTime(e.startTime),
@@ -51,7 +60,8 @@ function buildDayStrips(
         sport: e.sport,
         title: e.isTraining ? e.title : `${e.homeTeam} vs ${e.awayTeam || '—'}`,
         venueName: e.venue.name,
-        isTalkoo: Boolean(e.volunteerDuty)
+        isTalkoo: Boolean(e.volunteerDuty),
+        isPast: new Date(e.endTime).getTime() < nowMs
       }))
     };
   });
@@ -93,11 +103,11 @@ export function runMissionControlGraph(
   const conflicts = conflictAgent(specialistEvents, profiles);
   const carpool = carpoolAgent(specialistEvents, profiles, conflicts);
   const talkoo = volunteerAgent(specialistEvents, profiles);
-  const tournaments = tournamentAgent(specialistEvents, profiles);
+  const tournaments = tournamentAgent(events, profiles);
   const kitByEventId = kitAgent(specialistEvents, profiles);
 
   const fridayISO = helsinkiDateISO(weekend.start);
-  const days = buildDayStrips(windowEvents, profiles, fridayISO);
+  const days = buildDayStrips(windowEvents, profiles, fridayISO, now);
 
   const conflictLine =
     conflicts.length === 0
