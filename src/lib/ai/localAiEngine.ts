@@ -7,6 +7,7 @@ import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
 import { generateOrResolveMatchStats } from '../stats/statsEngine';
+import { runMissionControlGraph } from '../agents';
 
 export interface FamilyLogisticsPlan {
   date: string;
@@ -85,87 +86,34 @@ export function planFamilyLogistics(
   profiles: PlayerProfile[],
   targetDate?: string
 ): FamilyLogisticsPlan {
-  const target: string =
-    targetDate ||
-    (events[0]?.startTime ? events[0].startTime.split('T')[0] || '' : '') ||
-    new Date().toISOString().split('T')[0] ||
-    '2026-08-24';
-  const daysEvents = events.filter((e) => e.startTime.startsWith(target));
+  const now = targetDate ? new Date(`${targetDate}T12:00:00+03:00`) : new Date();
+  const snap = runMissionControlGraph(events, profiles, now);
+  const date = targetDate || snap.weekendLabel;
 
-  if (daysEvents.length === 0) {
+  if (!snap.nextEvent && snap.days.every((d) => d.events.length === 0)) {
     return {
-      date: target,
+      date,
       hasConflicts: false,
       conflictDetails: [],
       departureSchedule: [],
-      summaryNarrative: 'Ei merkittyjä otteluita tai harjoituksia tälle päivälle.',
-      whatsAppShareText: 'Ei otteluita tänään.'
+      summaryNarrative: 'Ei merkittyjä otteluita tai harjoituksia tälle viikonlopulle.',
+      whatsAppShareText: 'Ei otteluita tänä viikonloppuna.'
     };
   }
 
-  // Sort events chronologically by warmup arrival
-  const sorted = [...daysEvents].sort(
-    (a, b) => new Date(a.warmupTime).getTime() - new Date(b.warmupTime).getTime()
-  );
-
-  const conflictDetails: string[] = [];
-  const scheduleItems: FamilyLogisticsPlan['departureSchedule'] = [];
-
-  for (let i = 0; i < sorted.length; i++) {
-    const curr = sorted[i]!;
-    const profile = profiles.find((p) => p.id === curr.profileId);
-    const childName = profile?.playerName || 'Lapsi';
-
-    const warmupFormatted = new Date(curr.warmupTime).toLocaleTimeString('fi-FI', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    const kickoffFormatted = new Date(curr.startTime).toLocaleTimeString('fi-FI', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    // Check overlap with next event
-    if (i < sorted.length - 1) {
-      const next = sorted[i + 1]!;
-      const nextProfile = profiles.find((p) => p.id === next.profileId);
-      const nextChild = nextProfile?.playerName || 'Toinen lapsi';
-
-      const currEnd = new Date(curr.endTime).getTime();
-      const nextStart = new Date(next.startTime).getTime();
-
-      if (currEnd > nextStart && curr.venue.name !== next.venue.name) {
-        conflictDetails.push(
-          `⚠️ Päällekkäisyys: ${childName} (${curr.venue.name}) ja ${nextChild} (${next.venue.name}) pelaavat samaan aikaan eri kentillä!`
-        );
-      }
-    }
-
-    scheduleItems.push({
-      time: warmupFormatted,
-      action: `Saapuminen alkulämpöön: ${curr.title} (Kickoff ${kickoffFormatted})`,
-      childName,
-      venueName: curr.venue.name,
-      driverRole: i === 0 ? 'Vanhempi 1' : 'Vanhempi 2'
-    });
-  }
-
-  const hasConflicts = conflictDetails.length > 0;
-  const summaryNarrative = hasConflicts
-    ? `Tälle päivälle osuu ${sorted.length} tapahtumaa. Havaitut päällekkäisyydet vaativat kahden kuskin jakoa: ${conflictDetails.join(' ')}`
-    : `Päivän ohjelmassa on ${sorted.length} tapahtumaa ilman logistiikkaristiriitoja. Yksi kuski ehtii hoitaa kuljetukset.`;
-
-  const whatsAppShareText = `🚗 Pelipäivän Kyytisuunnitelma (${target}):\n` +
-    scheduleItems.map((s) => `• klo ${s.time}: ${s.childName} ➔ ${s.venueName} (${s.action})`).join('\n') +
-    (hasConflicts ? `\n\nHuom: ${conflictDetails.join('\n')}` : '\n\nKaikki aikataulut sujuvat!');
-
   return {
-    date: target,
-    hasConflicts,
-    conflictDetails,
-    departureSchedule: scheduleItems,
-    summaryNarrative,
-    whatsAppShareText
+    date,
+    hasConflicts: snap.conflicts.length > 0,
+    conflictDetails: snap.conflicts.map((c) => c.message),
+    departureSchedule: snap.carpool.map((step) => ({
+      time: step.leaveBy,
+      action: step.action,
+      childName: step.childName,
+      venueName: step.venueName,
+      driverRole: step.driverSlot
+    })),
+    summaryNarrative: snap.summary,
+    whatsAppShareText: snap.whatsAppShareText
   };
 }
 
