@@ -110,7 +110,7 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         whileTap={{ scale: 0.95 }}
         transition={springTactile.snappy}
         onClick={onAddProfile}
-        title="Lisää pelaaja tai joukkue"
+        title="Lisää joukkue tai turnaus valitulle pelaajalle"
         className="touch-target inline-flex shrink-0 items-center gap-1 rounded-md border border-border-strong bg-surface-elevated px-3 text-xs font-medium text-text-muted"
       >
         <Plus className="w-3 h-3" />

@@ -86,7 +86,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                   Perheen pelaajat & joukkueet
                 </h2>
                 <p className="text-xs text-text-muted">
-                  Hallitse perheenjäsenten harrastuksia ja kalentereita
+                  Hallitse perheenjäsenten harrastuksia. Samalle lapselle voi lisätä sarjan ja cupit.
                 </p>
               </div>
             </div>
@@ -121,7 +121,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     className="py-1 px-2.5 rounded-lg bg-surface border border-border-strong text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
                   >
                     <Plus className="w-3 h-3" />
-                    <span>Lisää joukkue</span>
+                    <span>Lisää joukkue / turnaus</span>
                   </button>
                 </div>
 

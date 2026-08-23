@@ -35,6 +35,7 @@ import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedW
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl, isCupName } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
+import { findExistingTeamProfile } from './lib/clubs/attachTeam';
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
@@ -57,6 +58,7 @@ export const App: React.FC = () => {
     sport?: SportType;
     url?: string;
     name?: string;
+    playerName?: string;
   }>({});
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -344,12 +346,6 @@ export const App: React.FC = () => {
     url: string,
     colorHex?: string
   ) => {
-    // If we're currently on demo data, clean demo data first
-    if (isDemoActive) {
-      await db.profiles.clear();
-      await db.events.clear();
-    }
-
     const existing = await db.profiles.toArray();
     const cup = exampleTournamentFromUrl(url);
     const club = searchPopularClubs(teamName).find((c) => c.sport === sport);
@@ -363,16 +359,28 @@ export const App: React.FC = () => {
             ? { hex: club.colorHex, label: club.primaryColor }
             : pickNextTeamColor(existing.map((p) => p.colorHex)));
 
-    const profileId = `profile-${Date.now()}`;
-    await db.profiles.add({
-      id: profileId,
-      playerName,
-      teamName,
-      sport,
-      primaryColor: swatch.label,
-      calendarUrl: url,
-      colorHex: swatch.hex
-    });
+    const reused = findExistingTeamProfile(existing, playerName, url);
+    const profileId = reused?.id || `profile-${Date.now()}`;
+
+    if (reused) {
+      await db.profiles.update(profileId, {
+        teamName: teamName || reused.teamName,
+        sport,
+        primaryColor: swatch.label,
+        calendarUrl: url,
+        colorHex: swatch.hex
+      });
+    } else {
+      await db.profiles.add({
+        id: profileId,
+        playerName,
+        teamName,
+        sport,
+        primaryColor: swatch.label,
+        calendarUrl: url,
+        colorHex: swatch.hex
+      });
+    }
 
     try {
       const parsedAssoc = parseAssociationUrl(url);
@@ -387,6 +395,13 @@ export const App: React.FC = () => {
         for (const fix of officialData.fixtures) {
           await db.officialFixtures.put(fix);
         }
+
+        await db.profiles.update(profileId, {
+          teamName: officialData.teamName || teamName,
+          teamId: parsedAssoc.teamId,
+          associationType: parsedAssoc.association,
+          associationUrl: url
+        });
 
         const eventsToInsert: MatchdayEvent[] = [];
         for (const fixture of officialData.fixtures) {
@@ -458,6 +473,22 @@ export const App: React.FC = () => {
       console.warn('Team / Calendar fetch error:', err);
     }
   };
+
+  const playerNames = Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)));
+
+  const closeImport = () => {
+    setIsImportModalOpen(false);
+    setImportDefaults({});
+  };
+
+  const openAddTeam = (playerName?: string) => {
+    setImportDefaults({ playerName });
+    setIsImportModalOpen(true);
+  };
+
+  const activePlayerName = activeProfileId.startsWith('player:')
+    ? activeProfileId.replace('player:', '')
+    : profiles.find((p) => p.id === activeProfileId)?.playerName;
 
   const handleRefreshAll = async () => {
     setIsSyncing(true);
@@ -550,11 +581,13 @@ export const App: React.FC = () => {
         />
         <CalendarImportModal
           isOpen={isImportModalOpen}
-          onClose={() => setIsImportModalOpen(false)}
+          onClose={closeImport}
           onImport={handleImportCalendar}
           initialSport={importDefaults.sport}
           initialTeamUrl={importDefaults.url}
           initialTeamName={importDefaults.name}
+          initialPlayerName={importDefaults.playerName}
+          existingPlayers={playerNames}
         />
         <FamilyShareModal
           isOpen={isFamilyShareOpen}
@@ -588,7 +621,7 @@ export const App: React.FC = () => {
             profiles={profiles}
             activeProfileId={activeProfileId}
             onSelectProfile={(id) => setActiveProfileId(id)}
-            onAddProfile={() => setIsImportModalOpen(true)}
+            onAddProfile={() => openAddTeam(activePlayerName)}
             onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
           />
         </div>
@@ -706,9 +739,13 @@ export const App: React.FC = () => {
       {/* Calendar Import Modal */}
       <CalendarImportModal
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={closeImport}
         onImport={handleImportCalendar}
-        existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+        existingPlayers={playerNames}
+        initialSport={importDefaults.sport}
+        initialTeamUrl={importDefaults.url}
+        initialTeamName={importDefaults.name}
+        initialPlayerName={importDefaults.playerName}
       />
 
       {/* Family Management & Child Roster Modal */}
@@ -718,8 +755,7 @@ export const App: React.FC = () => {
         profiles={profiles}
         onOpenImportForPlayer={(playerName) => {
           setIsFamilyManageOpen(false);
-          setImportDefaults({ name: `${playerName}:n joukkue` });
-          setIsImportModalOpen(true);
+          openAddTeam(playerName);
         }}
         onOpenFamilyShare={() => {
           setIsFamilyManageOpen(false);
