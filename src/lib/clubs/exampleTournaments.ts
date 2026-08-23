@@ -126,8 +126,19 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
         status: 'played',
-        homeScore: 21,
+        homeScore: 28,
         awayScore: 14
+      },
+      {
+        id: 'elt4',
+        home: 'LINKKI',
+        away: 'TOPOLA',
+        start: '2026-08-23T14:00:00+03:00',
+        venueName: 'Esport Center 2',
+        venueCity: 'Espoo',
+        status: 'played',
+        homeScore: 9,
+        awayScore: 45
       }
     ]
   },

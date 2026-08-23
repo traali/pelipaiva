@@ -116,7 +116,7 @@ function ev(opts: {
 export const EXTRA_PROFILES: PlayerProfile[] = [
   {
     id: 'profile-topola-aada',
-    playerName: 'Aada',
+    playerName: 'Lilli',
     teamName: 'TOPOLA',
     sport: 'basketball',
     primaryColor: 'syaani',
@@ -150,6 +150,7 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
   const eltSat945 = new Date('2026-08-22T09:45:00+03:00');
   const eltSat15 = new Date('2026-08-22T15:00:00+03:00');
   const eltSun1030 = new Date('2026-08-23T10:30:00+03:00');
+  const eltSun1400 = new Date('2026-08-23T14:00:00+03:00');
 
   return [
     ev({
@@ -196,7 +197,10 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       start: eltSat945,
       venue: ESPORT,
       eventType: 'tournament',
-      tournamentName: 'Espoo Liikkuu Tournament 2026'
+      tournamentName: 'Espoo Liikkuu Tournament 2026',
+      stage: 'Girls 2015 Fun / B',
+      matchNumber: '234',
+      score: '6–52'
     }),
     ev({
       id: 'demo-elt-aada-2',
@@ -208,7 +212,10 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       start: eltSat15,
       venue: ESPORT,
       eventType: 'tournament',
-      tournamentName: 'Espoo Liikkuu Tournament 2026'
+      tournamentName: 'Espoo Liikkuu Tournament 2026',
+      stage: 'Girls 2015 Fun / B',
+      matchNumber: '474',
+      score: '55–6'
     }),
     ev({
       id: 'demo-elt-aada-3',
@@ -220,7 +227,25 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       start: eltSun1030,
       venue: ESPORT,
       eventType: 'tournament',
-      tournamentName: 'Espoo Liikkuu Tournament 2026'
+      tournamentName: 'Espoo Liikkuu Tournament 2026',
+      stage: 'Girls 2015 Fun / 1-4',
+      matchNumber: '780',
+      score: '28–14'
+    }),
+    ev({
+      id: 'demo-elt-aada-4',
+      profileId: 'profile-topola-aada',
+      sport: 'basketball',
+      title: 'LINKKI vs TOPOLA',
+      home: 'LINKKI',
+      away: 'TOPOLA',
+      start: eltSun1400,
+      venue: ESPORT,
+      eventType: 'tournament',
+      tournamentName: 'Espoo Liikkuu Tournament 2026',
+      stage: 'Girls 2015 Fun / 1-4',
+      matchNumber: '1055',
+      score: '9–45'
     }),
     ev({
       id: 'demo-kw-indians-1',

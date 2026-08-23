@@ -875,10 +875,128 @@ export function generateSyntheticOfficialTeamData(
     teamName = 'PPJ Laru Oranssi';
     leagueName = 'Palloliitto P11 Kolmonen';
     defaultVenue = 'Hernesaaren kupla';
-  } else if (teamId === '203621') {
+  } else if (teamId === '203621' || subdomain?.includes('espooliikkuu') || canonicalUrl.includes('espooliikkuu')) {
     teamName = customTeamName && !/basket\.fi/i.test(customTeamName) ? customTeamName : 'TOPOLA';
-    leagueName = 'Espoo Liikkuu Tournament 2026';
+    leagueName = 'Espoo Liikkuu Tournament 2026 (Girls 2015 Fun)';
     defaultVenue = 'Esport Center 2';
+
+    const fixtures: OfficialLeagueFixture[] = [
+      {
+        id: `${association}_${teamId}_234`,
+        matchId: '234',
+        teamId,
+        association,
+        sport: 'basketball',
+        leagueName,
+        homeTeam: 'EBT',
+        awayTeam: 'TOPOLA',
+        isHome: false,
+        startTime: '2026-08-22T09:45:00+03:00',
+        venueName: 'Esport Center 2',
+        fieldNumber: 'Kenttä 2',
+        status: 'played',
+        homeScore: 6,
+        awayScore: 52,
+        score: '6–52',
+        round: 'Girls 2015 Fun / B',
+        fetchedAt: now
+      },
+      {
+        id: `${association}_${teamId}_474`,
+        matchId: '474',
+        teamId,
+        association,
+        sport: 'basketball',
+        leagueName,
+        homeTeam: 'TOPOLA',
+        awayTeam: 'Jymy',
+        isHome: true,
+        startTime: '2026-08-22T15:00:00+03:00',
+        venueName: 'Esport Center 2',
+        fieldNumber: 'Kenttä 2',
+        status: 'played',
+        homeScore: 55,
+        awayScore: 6,
+        score: '55–6',
+        round: 'Girls 2015 Fun / B',
+        fetchedAt: now
+      },
+      {
+        id: `${association}_${teamId}_780`,
+        matchId: '780',
+        teamId,
+        association,
+        sport: 'basketball',
+        leagueName,
+        homeTeam: 'TOPOLA',
+        awayTeam: 'Helmi Basket/Valkoinen',
+        isHome: true,
+        startTime: '2026-08-23T10:30:00+03:00',
+        venueName: 'Esport Center 2',
+        fieldNumber: 'Kenttä 2',
+        status: 'played',
+        homeScore: 28,
+        awayScore: 14,
+        score: '28–14',
+        round: 'Girls 2015 Fun / 1-4',
+        fetchedAt: now
+      },
+      {
+        id: `${association}_${teamId}_1055`,
+        matchId: '1055',
+        teamId,
+        association,
+        sport: 'basketball',
+        leagueName,
+        homeTeam: 'LINKKI',
+        awayTeam: 'TOPOLA',
+        isHome: false,
+        startTime: '2026-08-23T14:00:00+03:00',
+        venueName: 'Esport Center 2',
+        fieldNumber: 'Kenttä 2',
+        status: 'played',
+        homeScore: 9,
+        awayScore: 45,
+        score: '9–45',
+        round: 'Girls 2015 Fun / 1-4',
+        fetchedAt: now
+      }
+    ];
+
+    const standings: StandingRow[] = [
+      { rank: 1, teamName: 'TOPOLA', played: 2, won: 2, drawn: 0, lost: 0, goalsFor: 107, goalsAgainst: 12, goalDifference: 95, points: 4, form: ['W', 'W'] },
+      { rank: 2, teamName: 'EBT', played: 2, won: 1, drawn: 0, lost: 1, goalsFor: 48, goalsAgainst: 70, goalDifference: -22, points: 2, form: ['L', 'W'] },
+      { rank: 3, teamName: 'Jymy', played: 2, won: 0, drawn: 0, lost: 2, goalsFor: 24, goalsAgainst: 97, goalDifference: -73, points: 0, form: ['L', 'L'] }
+    ];
+
+    const roster: TeamSquadRoster = {
+      teamName: 'TOPOLA',
+      coachName: 'Kati Vellinki (Jojo)',
+      players: [
+        { jerseyNumber: 2, playerName: 'Silvia Villareal', position: 'MF', goals: 12, assists: 4, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 3, playerName: 'Venla Siniharju', position: 'FW', goals: 16, assists: 6, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 5, playerName: 'Jelda Vellinki', position: 'MF', goals: 20, assists: 8, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 8, playerName: 'Lilli Oinonen', position: 'FW', goals: 45, assists: 12, matchesPlayed: 4, yellowCards: 0, redCards: 0, isCaptain: true, isStartingLineup: true },
+        { jerseyNumber: 10, playerName: 'Ella Korhonen', position: 'DF', goals: 22, assists: 2, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 12, playerName: 'Fiona Koskinen', position: 'FW', goals: 14, assists: 3, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 15, playerName: 'Aino Niemi', position: 'MF', goals: 8, assists: 5, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 18, playerName: 'Minea Virtanen', position: 'DF', goals: 18, assists: 1, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
+      ]
+    };
+
+    return {
+      teamId,
+      teamName,
+      association,
+      sport: 'basketball',
+      leagueName,
+      fixtures,
+      standings,
+      roster,
+      divisionRosters: { [teamName]: roster },
+      sourceUrl: canonicalUrl,
+      fetchedAt: now
+    };
   } else if (teamId === '34013' || subdomain?.includes('kwmemorial')) {
     teamName = customTeamName && !/salibandy|joukkue/i.test(customTeamName) ? customTeamName : 'Indians';
     leagueName = 'KW Memorial Cup 2026 (P14 Haastaja)';
