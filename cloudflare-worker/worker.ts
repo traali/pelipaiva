@@ -338,45 +338,95 @@ export default {
       );
     }
 
-    // 3. Privacy-Preserving Streaming CORS Proxy for .ics & FMI Feeds
+    // 3. Privacy-Preserving Streaming CORS Proxy for Association JSON, .ics & FMI Feeds
     if (url.pathname === '/api/proxy/ics') {
       const targetUrl = url.searchParams.get('url');
-      if (
-        !targetUrl ||
-        (!targetUrl.startsWith('https://nimenhuuto.com') &&
-          !targetUrl.startsWith('https://myclub.fi') &&
-          !targetUrl.startsWith('https://opendata.fmi.fi') &&
-          !targetUrl.startsWith('https://'))
-      ) {
-        return new Response(JSON.stringify({ error: 'Disallowed or missing URL parameter' }), {
+      if (!targetUrl) {
+        return new Response(JSON.stringify({ error: 'Missing url parameter' }), {
           status: 400,
           headers: corsHeaders
         });
       }
 
+      let targetParsed: URL;
+      try {
+        targetParsed = new URL(targetUrl);
+      } catch {
+        return new Response(JSON.stringify({ error: 'Invalid url parameter' }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      const host = targetParsed.hostname.toLowerCase();
+      const isAllowed =
+        host === 'nimenhuuto.com' ||
+        host.endsWith('.nimenhuuto.com') ||
+        host === 'myclub.fi' ||
+        host.endsWith('.myclub.fi') ||
+        host === 'opendata.fmi.fi' ||
+        host === 'tulospalvelu.palloliitto.fi' ||
+        host === 'spl.torneopal.fi' ||
+        host === 'tulospalvelu.salibandy.fi' ||
+        host === 'salibandy-api.torneopal.net' ||
+        host === 'basket.fi' ||
+        host === 'www.basket.fi' ||
+        host === 'tulospalvelu.basket.fi' ||
+        host === 'espooliikkuutournament.fi' ||
+        host === 'www.espooliikkuutournament.fi' ||
+        host === 'tupa.api.torneopal.com' ||
+        host.endsWith('.torneopal.fi') ||
+        host.endsWith('.torneopal.net') ||
+        host === 'api.lipas.fi' ||
+        host === 'api.hel.fi';
+
+      if (!isAllowed) {
+        return new Response(JSON.stringify({ error: 'Host not allowed by proxy allowlist' }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      const outboundHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept': request.headers.get('Accept') || 'application/json, text/html, text/calendar, */*',
+        'Referer': targetParsed.origin + '/'
+      };
+
       const feedRes = await fetch(targetUrl, {
-        headers: {
-          'User-Agent': 'Pelipaiva-MatchdayHub/2.1 (+https://pelipaiva.pages.dev)'
-        }
+        headers: outboundHeaders
       });
-      const icsText = await feedRes.text();
+      const responseBody = await feedRes.text();
 
       // For public association pages, enable 5-minute edge cache; private iCal feeds stay short
       const isPublicAssociation =
-        targetUrl.includes('tulospalvelu.palloliitto.fi') ||
-        targetUrl.includes('tulospalvelu.salibandy.fi') ||
-        targetUrl.includes('basket.fi') ||
-        targetUrl.includes('torneopal.fi');
+        host.includes('torneopal') ||
+        host.includes('palloliitto') ||
+        host.includes('salibandy') ||
+        host.includes('basket') ||
+        host.includes('espooliikkuu') ||
+        host.includes('lipas') ||
+        host.includes('hel.fi');
 
-      const cacheControlHeader = isPublicAssociation
-        ? 'public, s-maxage=300, stale-while-revalidate=600'
-        : 'private, max-age=60';
+      const cacheControlHeader =
+        feedRes.status === 200 && isPublicAssociation
+          ? 'public, s-maxage=300, stale-while-revalidate=600'
+          : feedRes.status === 200
+            ? 'private, max-age=60'
+            : 'no-store, no-cache, must-revalidate';
 
-      return new Response(icsText, {
+      const contentType =
+        feedRes.headers.get('Content-Type') ||
+        (targetUrl.endsWith('.json') || targetUrl.includes('/rest/') || targetUrl.includes('api.')
+          ? 'application/json; charset=utf-8'
+          : 'text/calendar; charset=utf-8');
+
+      return new Response(responseBody, {
         status: feedRes.status,
         headers: {
           ...corsHeaders,
-          'Content-Type': feedRes.headers.get('Content-Type') || 'text/calendar; charset=utf-8',
+          'Content-Type': contentType,
           'Cache-Control': cacheControlHeader
         }
       });

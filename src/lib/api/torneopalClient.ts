@@ -96,9 +96,7 @@ async function torneopalGet<T>(
       apiKey: TUPA_KEY,
     });
   }
-  const dedicatedHost =
-    Boolean(subdomain) && /memorial|kwmemorial|cup|turnaus/i.test(subdomain!);
-  if (endpoint && !dedicatedHost) attempts.push(endpoint);
+  if (endpoint) attempts.push(endpoint);
 
   for (const ep of attempts) {
     const search = new URLSearchParams({
@@ -254,6 +252,8 @@ function mapFixture(
     awayScore,
     officialMatchUrl: parsed.canonicalUrl,
     matchId,
+    matchNumber: str(match.match_number) || undefined,
+    stage: str(match.stage) || str(match.group_name) || str(match.category_name) || undefined,
     round: str(match.round_name) || undefined,
     fetchedAt: new Date().toISOString(),
   };
@@ -326,17 +326,31 @@ export async function fetchTorneopalTeamData(
   const groups = Array.isArray(team.groups) ? (team.groups as Record<string, unknown>[]) : [];
   const currentGroup = pickCurrentGroup(groups);
 
-  const today = new Date();
-  const start = new Date(today.getTime() - 21 * 86400000).toISOString().slice(0, 10);
-  const end = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
+  const isCup =
+    Boolean(parsed.seasonId && /cup|turnaus|memorial|tournament|hc2026|esli/i.test(parsed.seasonId)) ||
+    Boolean(parsed.subdomain && /cup|turnaus|memorial|tournament|espooliikkuu/i.test(parsed.subdomain)) ||
+    Boolean(parsed.canonicalUrl && /cup|turnaus|memorial|tournament|espooliikkuu/i.test(parsed.canonicalUrl));
 
   const matchParams: Record<string, string> = {
     team_id: parsed.teamId,
-    start_date: start,
-    end_date: end,
   };
-  if (parsed.seasonId) matchParams.competition_id = parsed.seasonId;
-  if (parsed.leagueId) matchParams.category_id = parsed.leagueId;
+
+  if (!isCup) {
+    const today = new Date();
+    const start = new Date(today.getTime() - 21 * 86400000).toISOString().slice(0, 10);
+    const end = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
+    matchParams.start_date = start;
+    matchParams.end_date = end;
+  }
+
+  // Pass competition_id only if clean alphanumeric id (not display slug like EräViikingit_0005)
+  if (parsed.seasonId && /^[a-z0-9]+$/i.test(parsed.seasonId) && !parsed.seasonId.includes('_')) {
+    matchParams.competition_id = parsed.seasonId;
+  }
+  // Pass category_id if numeric (e.g. sarja=2546)
+  if (parsed.leagueId && /^\d+$/i.test(parsed.leagueId)) {
+    matchParams.category_id = parsed.leagueId;
+  }
 
   const [matchesJson, groupJson] = await Promise.all([
     torneopalGet<TorneopalMatchesPayload>(parsed.association, "getMatches", matchParams, parsed.subdomain),

@@ -28,13 +28,13 @@ import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import {
   parseAssociationUrl,
-  extractOfficialTeamData,
   generateOrResolveMatchStats
 } from './lib/stats/statsEngine';
+import { ingestOfficialForProfile } from './lib/clubs/ingestOfficial';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
-import { exampleTournamentFromUrl, isCupName, mergeOfficialWithCupFallback, isUglyTeamName } from './lib/clubs/exampleTournaments';
+import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
@@ -434,95 +434,20 @@ export const App: React.FC = () => {
 
     try {
       const parsedAssoc = parseAssociationUrl(url);
-      let officialData: Awaited<ReturnType<typeof extractOfficialTeamData>> | null = null;
-      if (parsedAssoc) {
-        try {
-          officialData = await extractOfficialTeamData(parsedAssoc, {
-            customTeamName: cup?.teamName || teamName,
-            fallbackToSynthetic: false
-          });
-        } catch (err) {
-          console.warn('Official fetch failed, using cup fallback if any', err);
-        }
-      }
-
-      officialData = mergeOfficialWithCupFallback(cup, officialData);
-
+      const cup = exampleTournamentFromUrl(url);
       let importedCount = 0;
 
-      if (officialData && officialData.fixtures.length > 0) {
-        for (const fix of officialData.fixtures) {
-          await db.officialFixtures.put(fix);
-        }
-
-        const resolvedName =
-          officialData.teamName && !isUglyTeamName(officialData.teamName)
-            ? officialData.teamName
-            : cup?.teamName || teamName;
-
-        await db.profiles.update(profileId, {
-          teamName: resolvedName,
-          teamId: parsedAssoc?.teamId || cup?.teamId,
-          associationType: parsedAssoc?.association,
-          associationUrl: url
+      if (parsedAssoc || cup) {
+        const result = await ingestOfficialForProfile({
+          profileId,
+          url,
+          playerName,
+          teamName,
+          sport,
+          dbInstance: db
         });
-
-        const eventsToInsert: MatchdayEvent[] = [];
-        const cupish = Boolean(cup) || isCupName(officialData.leagueName);
-        const fixtures = cupish
-          ? officialData.fixtures.filter((f) => f.status !== 'cancelled')
-          : officialData.fixtures;
-        for (const fixture of fixtures) {
-          const venue = await resolveSportsVenue(fixture.venueName, {
-            lat: fixture.venueLat,
-            lng: fixture.venueLng,
-            city: fixture.venueCity
-          });
-          const startTime = fixture.startTime || new Date().toISOString();
-          const endTime =
-            fixture.endTime || new Date(new Date(startTime).getTime() + 90 * 60 * 1000).toISOString();
-          const warmupTime = new Date(new Date(startTime).getTime() - 45 * 60 * 1000).toISOString();
-
-          const isHome =
-            fixture.isHome ??
-            (fixture.homeTeam.toLowerCase().includes((resolvedName || teamName).toLowerCase()) ||
-              fixture.homeTeam.toLowerCase().includes(playerName.toLowerCase()));
-
-          const thisCup = cupish || isCupName(fixture.leagueName);
-          const matchEvent: MatchdayEvent = {
-            id: `fixture-${profileId}-${fixture.id}`,
-            profileId,
-            title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
-            eventType: thisCup ? 'tournament' : 'match',
-            isTraining: false,
-            sport: officialData.sport || parsedAssoc?.sport || sport,
-            homeTeam: fixture.homeTeam,
-            awayTeam: fixture.awayTeam,
-            isHomeMatch: isHome,
-            startTime,
-            endTime,
-            warmupTime,
-            tournamentName: thisCup ? fixture.leagueName || officialData.leagueName : undefined,
-            venue,
-            officialFixtureId: fixture.id,
-            reconciliationStatus: 'auto_matched',
-            confidenceScore: 1.0,
-            stats: thisCup ? undefined : generateOrResolveMatchStats(fixture.homeTeam, fixture.awayTeam, officialData.sport)
-          };
-
-          const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
-          const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
-          matchEvent.weather = weather;
-          matchEvent.parking = parking;
-          matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
-          eventsToInsert.push(matchEvent);
-        }
-
-        for (const ev of eventsToInsert) {
-          await db.events.put(ev);
-        }
-        importedCount = eventsToInsert.length;
-      } else if (!parsedAssoc) {
+        importedCount = result.importedCount;
+      } else {
         // Standard iCal feed from Nimenhuuto, MyClub, Jopox
         const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
         const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;

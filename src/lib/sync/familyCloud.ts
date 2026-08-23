@@ -1,11 +1,8 @@
 import { db, PelipaivaDB } from '../storage/db';
-import { PlayerProfile, MatchdayEvent, SportType } from '../../types/matchday';
+import { PlayerProfile, SportType } from '../../types/matchday';
 import { generateStableProfileId } from '../clubs/attachTeam';
-import { parseAssociationUrl } from '../api/associationUrlParser';
-import { extractOfficialTeamData } from '../api/associationExtractor';
-import { exampleTournamentFromUrl, mergeOfficialWithCupFallback, isCupName } from '../clubs/exampleTournaments';
-import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
+import { ingestOfficialForProfile } from '../clubs/ingestOfficial';
 
 export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
@@ -256,71 +253,13 @@ export async function hydrateRosterProfiles(
         try {
           const url = profile.associationUrl || profile.calendarUrl;
           if (!url) return;
-          const parsedAssoc = parseAssociationUrl(url);
-          if (!parsedAssoc) return;
-
-          let officialData = await extractOfficialTeamData(parsedAssoc, {
-            customTeamName: profile.teamName,
-            fallbackToSynthetic: false
-          }).catch(() => null);
-
-          const cup = exampleTournamentFromUrl(url);
-          officialData = mergeOfficialWithCupFallback(cup, officialData);
-
-          if (officialData && officialData.fixtures.length > 0) {
-            for (const fix of officialData.fixtures) {
-              await databaseInstance.officialFixtures.put(fix);
-            }
-
-            const eventsToInsert: MatchdayEvent[] = [];
-            const cupish = Boolean(cup) || isCupName(officialData.leagueName);
-            const fixtures = cupish
-              ? officialData.fixtures.filter((f) => f.status !== 'cancelled')
-              : officialData.fixtures;
-
-            for (const fix of fixtures) {
-              const venue = await resolveSportsVenue(fix.venueName, {
-                lat: fix.venueLat,
-                lng: fix.venueLng,
-                city: fix.venueCity
-              });
-              const startTime = fix.startTime || new Date().toISOString();
-              const endTime =
-                fix.endTime || new Date(new Date(startTime).getTime() + 90 * 60000).toISOString();
-              const warmupTime = new Date(new Date(startTime).getTime() - 45 * 60000).toISOString();
-
-              const thisCup = cupish || isCupName(fix.leagueName);
-              const event: MatchdayEvent = {
-                id: `fixture-${profile.id}-${fix.id}`,
-                profileId: profile.id,
-                title: `${fix.homeTeam} vs ${fix.awayTeam}`,
-                eventType: thisCup ? 'tournament' : 'match',
-                isTraining: false,
-                sport: officialData.sport || profile.sport,
-                homeTeam: fix.homeTeam,
-                awayTeam: fix.awayTeam,
-                isHomeMatch: fix.isHome ?? true,
-                startTime,
-                endTime,
-                warmupTime,
-                tournamentName: thisCup ? fix.leagueName || officialData.leagueName : undefined,
-                venue,
-                officialFixtureId: fix.id,
-                reconciliationStatus: 'auto_matched',
-                confidenceScore: 1.0,
-                stats: undefined
-              };
-              eventsToInsert.push(event);
-            }
-
-            for (const ev of eventsToInsert) {
-              await databaseInstance.events.put(ev);
-            }
-          }
-
-          await databaseInstance.profiles.put({
-            ...profile,
-            lastOfficialSyncAt: new Date().toISOString()
+          await ingestOfficialForProfile({
+            profileId: profile.id,
+            url,
+            playerName: profile.playerName,
+            teamName: profile.teamName,
+            sport: profile.sport,
+            dbInstance: databaseInstance as typeof db
           });
         } catch (err) {
           console.warn(`[FAMILY_CLOUD] Hydration failed for ${profile.playerName}:`, err);

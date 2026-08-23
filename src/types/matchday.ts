@@ -254,6 +254,8 @@ export interface OfficialLeagueFixture {
   setScores?: string[];
   officialMatchUrl?: string;
   matchId?: string;
+  matchNumber?: string;
+  stage?: string;
   round?: string;
   fetchedAt: string; // ISO 8601 string
 }
