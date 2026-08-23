@@ -189,8 +189,8 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                   <Share2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-text-primary">Perhejako (Live Sync)</h3>
-                  <p className="text-xs text-text-muted">Zero-Auth • 7 pv synkronointi</p>
+                  <h3 className="text-lg font-bold text-text-primary">Perhejako</h3>
+                  <p className="text-xs text-text-muted">Valinnainen • ilman koodia vain tämä puhelin</p>
                 </div>
               </div>
               <button
@@ -307,7 +307,8 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                     <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5">
                       <div className="text-xs font-bold text-text-primary">Liity perhe-koodilla</div>
                       <p className="text-xs text-text-muted">
-                        Koodit jaetaan perheen kesken. Sovellus ei luo uusia koodeja.
+                        Valinnainen avain. Ilman koodia Pelipäivä toimii tällä puhelimella.
+                        Koodin saa perheeltä — sovellus ei luo uusia.
                       </p>
                       <div className="flex items-center gap-2">
                         <input

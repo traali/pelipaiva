@@ -22,7 +22,7 @@ Tulospalvelu = when and against whom.
 
 | Layer | Mechanism | Role |
 | --- | --- | --- |
-| Bus | Family code `PERHE-2` on existing `MATCHDAY_KV` | Other phone sees new roster row in ~30s |
+| Bus | Up to 10 **issued** codes in Worker secret `FAMILY_CODES` on `MATCHDAY_KV` | Other phone sees new roster row in ~30s. Optional for users. |
 | Engine | Existing ingest (`extractOfficialTeamData` + cup fallback) | Each phone hydrates Espoo Liikkuu / KW / Helsinki Cup itself |
 | Airgap | JSON backup v2 + short `?perhe=` link | Works if Worker is down |
 | Human transport | WhatsApp synthetics (copy/paste, no LLM) | Join + delta + talkoo |

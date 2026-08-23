@@ -18,6 +18,7 @@ Start here:
 2. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
 3. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
 4. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
-5. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — **implement this** (family code + WhatsApp, v2.0)
-6. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
-7. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2
+5. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — family bus (WhatsApp + KV roster)
+6. [FAMILY_CODES_OPS.md](./FAMILY_CODES_OPS.md) — **operators: issued codes, Cloudflare secret, rotate**
+7. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
+8. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2

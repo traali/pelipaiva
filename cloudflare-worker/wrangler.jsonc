@@ -3,6 +3,8 @@
   "name": "pelipaiva-edge",
   "main": "worker.ts",
   "compatibility_date": "2026-08-19",
+  // FAMILY_CODES is a Worker secret (dashboard or `wrangler secret put`).
+  // Never add it under vars — this file is public. See docs/FAMILY_CODES_OPS.md
   "kv_namespaces": [
     {
       "binding": "MATCHDAY_KV",
