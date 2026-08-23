@@ -155,6 +155,18 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
         canonicalUrl: `https://espooliikkuutournament.fi/team/${teamId}`
       };
     }
+    const matchMatch = pathname.match(/^\/match\/(\d+)(?:\/.*)?$/i);
+    if (matchMatch && matchMatch[1]) {
+      const matchId = matchMatch[1]!;
+      return {
+        sport: 'basketball',
+        association: 'basket',
+        teamId: '203621',
+        matchId,
+        seasonId: 'esli2026',
+        canonicalUrl: `https://espooliikkuutournament.fi/match/${matchId}`
+      };
+    }
     return null;
   }
 
@@ -990,14 +1002,32 @@ export function generateSyntheticOfficialTeamData(
       teamName: 'TOPOLA',
       coachName: 'Kati Vellinki (Jojo)',
       players: [
-        { jerseyNumber: 2, playerName: 'Silvia Villareal', position: 'MF', goals: 12, assists: 4, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 3, playerName: 'Venla Siniharju', position: 'FW', goals: 16, assists: 6, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 5, playerName: 'Jelda Vellinki', position: 'MF', goals: 20, assists: 8, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 8, playerName: 'Lilli Oinonen', position: 'FW', goals: 45, assists: 12, matchesPlayed: 4, yellowCards: 0, redCards: 0, isCaptain: true, isStartingLineup: true },
-        { jerseyNumber: 10, playerName: 'Ella Korhonen', position: 'DF', goals: 22, assists: 2, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 12, playerName: 'Fiona Koskinen', position: 'FW', goals: 14, assists: 3, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 15, playerName: 'Aino Niemi', position: 'MF', goals: 8, assists: 5, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 18, playerName: 'Minea Virtanen', position: 'DF', goals: 18, assists: 1, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
+        { jerseyNumber: 2, playerName: 'Silvia Villareal', position: 'MF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 3, playerName: 'Venla Siniharju', position: 'FW', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 5, playerName: 'Jelda Vellinki', position: 'MF', goals: 4, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 8, playerName: 'Lilli Oinonen', position: 'FW', goals: 12, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isCaptain: true, isStartingLineup: true },
+        { jerseyNumber: 12, playerName: 'Rauha Rapila', position: 'DF', goals: 3, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 13, playerName: 'Cecilia Isaksson', position: 'DF', goals: 4, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 20, playerName: 'Isabelle Lytz', position: 'FW', goals: 8, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 22, playerName: 'Saga Eze', position: 'FW', goals: 14, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
+      ]
+    };
+
+    const linkkiRoster: TeamSquadRoster = {
+      teamName: 'LINKKI',
+      coachName: 'Mika Eskelinen',
+      players: [
+        { jerseyNumber: 0, playerName: 'Elma Eskelinen', position: 'GK', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 5, playerName: 'Eeva Kuosmanen', position: 'DF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 6, playerName: 'Janni Nyyssönen', position: 'MF', goals: 2, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 8, playerName: 'Vilma Reinikainen', position: 'FW', goals: 2, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 22, playerName: 'Venla Hannonen', position: 'FW', goals: 2, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 23, playerName: 'Orianna Aholainen', position: 'MF', goals: 1, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 31, playerName: 'Elsa Burakowski', position: 'DF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 36, playerName: 'Vilma Rinkinen', position: 'DF', goals: 2, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 39, playerName: 'Olivia Heiskanen', position: 'MF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 54, playerName: 'Jade Väisänen', position: 'FW', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 55, playerName: 'Minja Kari', position: 'GK', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
       ]
     };
 
@@ -1010,7 +1040,10 @@ export function generateSyntheticOfficialTeamData(
       fixtures,
       standings,
       roster,
-      divisionRosters: { [teamName]: roster },
+      divisionRosters: {
+        [teamName]: roster,
+        LINKKI: linkkiRoster
+      },
       sourceUrl: canonicalUrl,
       fetchedAt: now
     };

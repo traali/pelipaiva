@@ -756,7 +756,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
 
                     <div className="text-right">
                       <div className="text-base font-black text-pitch font-tabular">
-                        {scorer.goals} maalia
+                        {scorer.goals} {sport === 'basketball' ? 'pistettä' : 'maalia'}
                       </div>
                       <div className="text-[10px] text-text-muted">
                         {scorer.matchesPlayed} ottelussa
