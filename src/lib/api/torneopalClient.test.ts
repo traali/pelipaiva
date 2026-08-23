@@ -54,7 +54,7 @@ describe('torneopal match params', () => {
 
     const kwParams = buildGetMatchesParams(kw);
     expect(kwParams.start_date).toBeUndefined();
-    expect(kwParams.competition_id).toBeUndefined();
+    expect(kwParams.competition_id).toBe('EräViikingit_0005');
     expect(kwParams.category_id).toBe('2546');
 
     const leagueParams = buildGetMatchesParams(league);
