@@ -432,6 +432,9 @@ export interface MatchdayEvent {
   endTime: string;
   warmupTime: string; // ISO 8601
   tournamentName?: string;
+  stage?: string; // e.g. "P14 Haastaja Lohko B" or "Jatko-ottelut"
+  matchNumber?: string; // e.g. "227"
+  score?: string; // e.g. "2–12", "4–9", "7–3"
   venue: VenueInfo;
   volunteerDuty?: string; // e.g. "☕ Kahviovuoro (klo 11:30 - 13:00)"
   weather?: WeatherCondition;

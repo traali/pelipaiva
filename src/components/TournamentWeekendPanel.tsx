@@ -115,7 +115,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                     <span>{matches.length} kpl</span>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     {matches.map((m, idx) => {
                       const start = new Date(m.startTime);
                       const end = new Date(m.endTime);
@@ -126,37 +126,57 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                       return (
                         <div
                           key={m.id || idx}
-                          className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
+                          className={`p-2.5 rounded-xl border text-xs flex flex-col gap-1.5 transition-all ${
                             isCurrent
-                              ? 'border-pitch bg-pitch/10 text-text-primary font-bold shadow-xs'
+                              ? 'border-pitch bg-pitch/10 text-text-primary font-bold shadow-xs ring-1 ring-pitch/30'
                               : isPast
-                                ? 'border-border-subtle bg-surface-elevated/40 text-text-muted opacity-75'
+                                ? 'border-border-subtle bg-surface-elevated/40 text-text-muted opacity-80'
                                 : 'border-border-subtle bg-surface-elevated text-text-primary'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono text-[11px] font-bold text-pitch shrink-0">
-                              {timeStr}
-                            </span>
-                            <span className="font-semibold truncate">
-                              {m.title}
-                            </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {m.matchNumber && (
+                                <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-surface border border-border-subtle text-text-muted">
+                                  #{m.matchNumber}
+                                </span>
+                              )}
+                              {m.stage && (
+                                <span className="text-[10px] font-bold text-pitch">
+                                  {m.stage}
+                                </span>
+                              )}
+                              <span className="font-mono text-[11px] font-bold text-text-primary">
+                                {timeStr}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isCurrent && (
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-stoppage text-text-inverse animate-pulse">
+                                  Nyt
+                                </span>
+                              )}
+                              {m.score ? (
+                                <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-pitch/15 text-pitch border border-pitch/25">
+                                  {m.score}
+                                </span>
+                              ) : isPast ? (
+                                <span className="text-[9px] font-medium text-text-muted">
+                                  Päättynyt
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {isCurrent && (
-                              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-stoppage text-text-inverse animate-pulse">
-                                Nyt
-                              </span>
-                            )}
-                            {isPast && (
-                              <span className="text-[9px] font-medium text-text-muted">
-                                Päättynyt
-                              </span>
-                            )}
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <span className="font-bold text-text-primary text-[13px] truncate">
+                              {m.title}
+                            </span>
+
                             <button
                               type="button"
-                              aria-label={`Navigoi kohteeseen ${m.venue.name}`}
+                              aria-label={`Navigoi kentälle ${m.venue.name}`}
                               onClick={() => {
                                 if (onNavigate) {
                                   onNavigate(m.venue.coordinates);
@@ -168,9 +188,10 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                                   );
                                 }
                               }}
-                              className="p-1 rounded-md bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer text-[11px] font-bold shrink-0"
                             >
                               <Navigation className="w-3 h-3" />
+                              <span>{m.venue.name.includes('Kenttä') ? m.venue.name.split('(')[1]?.replace(')', '') || 'Kenttä' : 'Reitti'}</span>
                             </button>
                           </div>
                         </div>

@@ -1,16 +1,6 @@
 import type { MatchdayEvent, PlayerProfile, SportType, VenueInfo } from '../../types/matchday';
 import { generateMatchdayBriefing } from '../ai/deterministicReasoner';
 
-const MOSA: VenueInfo = {
-  name: 'Tapanilan Mosahalli',
-  normalizedName: 'mosahalli',
-  city: 'Helsinki',
-  coordinates: { lat: 60.2612, lng: 25.0234 },
-  isIndoor: true,
-  surface: 'indoor_synthetic',
-  hasFloodlights: true
-};
-
 const LAUTTASAARI: VenueInfo = {
   name: 'Lauttasaari TN B',
   normalizedName: 'lauttasaari tn b',
@@ -38,6 +28,16 @@ const ESPORT: VenueInfo = {
   coordinates: { lat: 60.1756, lng: 24.8054 },
   isIndoor: true,
   surface: 'indoor_parquet',
+  hasFloodlights: true
+};
+
+const ARENA_CENTER: VenueInfo = {
+  name: 'Arena Center Myllypuro (Kenttä 6)',
+  normalizedName: 'arena center kenttä 6',
+  city: 'Helsinki',
+  coordinates: { lat: 60.2245, lng: 25.0435 },
+  isIndoor: true,
+  surface: 'indoor_synthetic',
   hasFloodlights: true
 };
 
@@ -69,6 +69,9 @@ function ev(opts: {
   isTraining?: boolean;
   volunteerDuty?: string;
   tournamentName?: string;
+  stage?: string;
+  matchNumber?: string;
+  score?: string;
   eventType?: MatchdayEvent['eventType'];
 }): MatchdayEvent {
   const mins = opts.eventType === 'tournament' ? 50 : 90;
@@ -88,6 +91,9 @@ function ev(opts: {
     endTime: iso(end),
     warmupTime: iso(warmup),
     tournamentName: opts.tournamentName,
+    stage: opts.stage,
+    matchNumber: opts.matchNumber,
+    score: opts.score,
     venue: opts.venue,
     volunteerDuty: opts.volunteerDuty,
     weather: opts.venue.isIndoor
@@ -146,7 +152,6 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
   const eltSun1030 = new Date('2026-08-23T10:30:00+03:00');
   const kwSun9 = atWeekend(0, 9, 0);
   const kwSun1115 = atWeekend(0, 11, 15);
-  const kwSun1430 = atWeekend(0, 14, 30);
 
   return [
     ev({
@@ -223,37 +228,60 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       id: 'demo-kw-eemil-1',
       profileId: 'profile-kw-eemil',
       sport: 'floorball',
-      title: 'EräViikingit vs Oilers',
-      home: 'EräViikingit',
-      away: 'Oilers',
+      title: 'Indians vs Oilers NG White',
+      home: 'Indians',
+      away: 'Oilers NG White',
       start: kwSun9,
-      venue: MOSA,
+      venue: ARENA_CENTER,
       eventType: 'tournament',
-      tournamentName: 'KW Memorial Cup 2026'
+      tournamentName: 'KW Memorial Cup 2026',
+      stage: 'P14 Haastaja Lohko B',
+      matchNumber: '222',
+      score: '2–12'
     }),
     ev({
       id: 'demo-kw-eemil-2',
       profileId: 'profile-kw-eemil',
       sport: 'floorball',
-      title: 'EräViikingit vs Classic',
-      home: 'EräViikingit',
-      away: 'Classic',
+      title: 'RSS Panthers vs Indians',
+      home: 'RSS Panthers',
+      away: 'Indians',
       start: kwSun1115,
-      venue: MOSA,
+      venue: ARENA_CENTER,
       eventType: 'tournament',
-      tournamentName: 'KW Memorial Cup 2026'
+      tournamentName: 'KW Memorial Cup 2026',
+      stage: 'P14 Haastaja Lohko B',
+      matchNumber: '221',
+      score: '4–9'
     }),
     ev({
       id: 'demo-kw-eemil-3',
       profileId: 'profile-kw-eemil',
       sport: 'floorball',
-      title: 'EräViikingit vs Indians',
-      home: 'EräViikingit',
+      title: 'FBC Turku vs Indians',
+      home: 'FBC Turku',
       away: 'Indians',
-      start: kwSun1430,
-      venue: MOSA,
+      start: atWeekend(0, 13, 0),
+      venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
+      stage: 'Jatko-ottelut',
+      matchNumber: '224',
+      score: '7–3'
+    }),
+    ev({
+      id: 'demo-kw-eemil-4',
+      profileId: 'profile-kw-eemil',
+      sport: 'floorball',
+      title: 'Indians vs EräViikingit',
+      home: 'Indians',
+      away: 'EräViikingit',
+      start: atWeekend(0, 14, 50),
+      venue: ARENA_CENTER,
+      eventType: 'tournament',
+      tournamentName: 'KW Memorial Cup 2026',
+      stage: 'Jatko-ottelut',
+      matchNumber: '227',
       volunteerDuty: 'Kahviovuoro (klo 14:00 - 16:00)'
     })
   ];

@@ -230,6 +230,27 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
         {/* Event Header (Matchup vs Training Title) */}
         <div className="mb-4">
+          {(event.tournamentName || event.stage || event.matchNumber) && (
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              {event.tournamentName && (
+                <span className="text-[11px] font-bold text-pitch flex items-center gap-1">
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>{event.tournamentName}</span>
+                </span>
+              )}
+              {event.stage && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-pitch/10 text-pitch border border-pitch/20">
+                  {event.stage}
+                </span>
+              )}
+              {event.matchNumber && (
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-surface-elevated text-text-muted border border-border-subtle">
+                  #{event.matchNumber}
+                </span>
+              )}
+            </div>
+          )}
+
           {isTraining ? (
             <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary break-words">
               {event.title}
@@ -242,6 +263,11 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                   <span className="text-text-muted font-normal text-sm select-none" aria-label="vastaan">vs</span>
                   <span className="break-words">{event.awayTeam}</span>
                 </>
+              )}
+              {event.score && (
+                <span className="ml-1 font-mono text-sm font-black px-2 py-0.5 rounded-md bg-pitch/15 text-pitch border border-pitch/25">
+                  {event.score}
+                </span>
               )}
             </h2>
           )}
