@@ -21,6 +21,7 @@ import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { Edit3 } from 'lucide-react';
 import type { PitchSurface } from '../types/matchday';
+import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
@@ -48,6 +49,7 @@ interface MatchdayCardProps {
   playerName?: string;
   colorHex?: string;
   compact?: boolean;
+  conflicts?: FamilyConflict[];
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
 }
@@ -57,12 +59,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   playerName,
   colorHex,
   compact = false,
+  conflicts,
   onNavigateToVenue,
   onResolveMismatch
 }) => {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
   const [localVenue, setLocalVenue] = useState(event.venue);
+
+  const relatedConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
 
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
@@ -288,6 +293,43 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Overlap & Driving Buffer Conflict Warning Banner */}
+        {relatedConflicts.length > 0 && (
+          <div className="mb-4 flex flex-col gap-2">
+            {relatedConflicts.map((c) => (
+              <div
+                key={c.id}
+                role="alert"
+                className={`p-3 rounded-2xl border flex items-start gap-2.5 text-xs ${
+                  c.severity === 'critical'
+                    ? 'bg-stoppage/15 border-stoppage/35 text-stoppage'
+                    : 'bg-whistle/15 border-whistle/35 text-whistle'
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-extrabold flex items-center justify-between gap-1">
+                    <span>
+                      {c.overlapMinutes > 0
+                        ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
+                        : '🚗 Tiukka siirtymä / Ajoaika'}
+                    </span>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
+                      ~{c.travelMinutesEstimate} min ajo
+                    </span>
+                  </div>
+                  <p className="mt-1 leading-snug font-medium text-text-primary dark:text-text-primary">
+                    {c.message}
+                  </p>
+                  <p className="mt-1 text-[11px] font-bold opacity-90">
+                    💡 {c.suggestedFix}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Modern Sports Stats Preview Strip (Only for Matches with Stats) */}
         {!isTraining && stats && (

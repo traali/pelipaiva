@@ -68,10 +68,13 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
         b.endTime
       );
       if (travelOverlap > 0) {
-        const gapToB = (new Date(b.warmupTime).getTime() - new Date(a.endTime).getTime()) / 60000;
+        const gapWarmup = (new Date(b.warmupTime).getTime() - new Date(a.endTime).getTime()) / 60000;
+        const gapKickoff = (new Date(b.startTime).getTime() - new Date(a.endTime).getTime()) / 60000;
+        const isDriveImpossible = gapKickoff < drive;
+
         conflicts.push({
           id: `c-${a.id}-${b.id}-tight`,
-          severity: 'warn',
+          severity: isDriveImpossible ? 'critical' : 'warn',
           childA: nameA,
           childB: nameB,
           eventAId: a.id,
@@ -80,8 +83,12 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
           venueB: b.venue.name,
           overlapMinutes: 0,
           travelMinutesEstimate: drive,
-          message: `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.round(gapToB)} min, ajo ~${drive} min.`,
-          suggestedFix: 'Lähde suoraan kentältä. Pakkaa kakkosen kassi autoon valmiiksi.'
+          message: isDriveImpossible
+            ? `Ajoaika ei riitä: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min, ajo ~${drive} min.`
+            : `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.max(0, Math.round(gapWarmup))} min, ajo ~${drive} min.`,
+          suggestedFix: isDriveImpossible
+            ? 'Kaksi kuskia tarvitaan. Yksi auto ei ehdi siirtymää pelien välillä.'
+            : 'Lähde suoraan kentältä. Pakkaa kakkosen kassi autoon valmiiksi.'
         });
       }
     }

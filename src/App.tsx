@@ -914,6 +914,7 @@ export const App: React.FC = () => {
                             playerName={profile?.playerName}
                             colorHex={profile?.colorHex}
                             compact
+                            conflicts={snapshot.conflicts}
                             onResolveMismatch={handleResolveMismatch}
                           />
                         );
@@ -929,6 +930,7 @@ export const App: React.FC = () => {
                   events={otherEvents}
                   profiles={profiles}
                   viewMode={viewMode}
+                  conflicts={snapshot.conflicts}
                   onClearFilter={() => setActiveProfileId('all')}
                   onNavigate={(ev) =>
                     window.open(

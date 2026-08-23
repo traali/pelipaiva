@@ -5,9 +5,11 @@ import {
   Clock,
   MapPin,
   Navigation,
-  Trophy
+  Trophy,
+  AlertTriangle
 } from 'lucide-react';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
+import type { FamilyConflict } from '../lib/agents';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 
@@ -15,6 +17,7 @@ interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
   viewMode: 'timeline' | 'calendar';
+  conflicts?: FamilyConflict[];
   onNavigate?: (event: MatchdayEvent) => void;
   onSelectEvent?: (event: MatchdayEvent) => void;
   onClearFilter?: () => void;
@@ -24,6 +27,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   events,
   profiles,
   viewMode,
+  conflicts,
   onNavigate,
   onSelectEvent,
   onClearFilter
@@ -190,6 +194,39 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       )}
                     </div>
 
+                    {/* Overlap & Driving Transition Warning */}
+                    {(() => {
+                      const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
+                      if (related.length === 0) return null;
+                      return (
+                        <div className="pl-1.5 flex flex-col gap-1.5">
+                          {related.map((c) => (
+                            <div
+                              key={c.id}
+                              role="alert"
+                              className={`p-2 rounded-xl text-[11px] font-bold border flex items-start gap-1.5 ${
+                                c.severity === 'critical'
+                                  ? 'bg-stoppage/15 border-stoppage/30 text-stoppage'
+                                  : 'bg-whistle/15 border-whistle/30 text-whistle'
+                              }`}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <div>
+                                  {c.overlapMinutes > 0
+                                    ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
+                                    : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                </div>
+                                <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
+                                  {c.message}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
                     {/* Bottom Row: Venue, Nappisvahti & Navigation */}
                     <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2">
                       <div className="flex items-center gap-1.5 truncate min-w-0">
@@ -325,6 +362,38 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                   <div className="pl-2 text-sm font-bold text-text-primary line-clamp-2 break-words">
                     {ev.title}
                   </div>
+
+                  {(() => {
+                    const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
+                    if (related.length === 0) return null;
+                    return (
+                      <div className="pl-2 flex flex-col gap-1.5">
+                        {related.map((c) => (
+                          <div
+                            key={c.id}
+                            role="alert"
+                            className={`p-2 rounded-xl text-[11px] font-bold border flex items-start gap-1.5 ${
+                              c.severity === 'critical'
+                                ? 'bg-stoppage/15 border-stoppage/30 text-stoppage'
+                                : 'bg-whistle/15 border-whistle/30 text-whistle'
+                            }`}
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div>
+                                {c.overlapMinutes > 0
+                                  ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
+                                  : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                              </div>
+                              <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
+                                {c.message}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   <div className="pl-2 flex items-center justify-between text-xs text-text-secondary pt-1 border-t border-border-subtle">
                     <div className="flex items-center gap-1.5 truncate">
