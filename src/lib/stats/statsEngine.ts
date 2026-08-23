@@ -719,7 +719,7 @@ export function parseTorneopalHtml(
             goalsAgainst,
             goalDifference: goalDiff,
             points,
-            form: ['W', 'W', 'D', 'W', 'L']
+            form: []
           });
         }
       }

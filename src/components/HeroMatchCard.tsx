@@ -31,17 +31,23 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   
   const kickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Europe/Helsinki'
   });
   
   const warmup = event.warmupTime
-    ? new Date(event.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })
+    ? new Date(event.warmupTime).toLocaleTimeString('fi-FI', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Helsinki'
+      })
     : kickoff;
 
   const dateLabel = new Date(event.startTime).toLocaleDateString('fi-FI', {
     weekday: 'short',
     day: 'numeric',
-    month: 'numeric'
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
   });
   
   const related = conflicts.filter((c) => c.eventAId === event.id || c.eventBId === event.id);
@@ -99,6 +105,18 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         <h2 className="text-xl font-bold tracking-tight text-text-primary md:text-2xl break-words">
           {event.isTraining ? event.title : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
         </h2>
+        {(event.tournamentName || event.stage || event.matchNumber || event.score) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-text-secondary">
+            {event.tournamentName && (
+              <span className="rounded-md bg-surface-elevated px-1.5 py-0.5">{event.tournamentName}</span>
+            )}
+            {event.stage && <span>{event.stage}</span>}
+            {event.matchNumber && <span>#{event.matchNumber}</span>}
+            {event.score && (
+              <span className="font-tabular font-black text-text-primary">{event.score}</span>
+            )}
+          </div>
+        )}
         
         {/* Venue Info */}
         <div className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">

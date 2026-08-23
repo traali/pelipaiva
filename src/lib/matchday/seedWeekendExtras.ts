@@ -73,6 +73,7 @@ function ev(opts: {
   matchNumber?: string;
   score?: string;
   eventType?: MatchdayEvent['eventType'];
+  isHomeMatch?: boolean;
 }): MatchdayEvent {
   const mins = opts.eventType === 'tournament' ? 50 : 90;
   const end = new Date(opts.start.getTime() + mins * 60000);
@@ -86,7 +87,7 @@ function ev(opts: {
     title: opts.title,
     homeTeam: opts.home,
     awayTeam: opts.away,
-    isHomeMatch: true,
+    isHomeMatch: opts.isHomeMatch !== false,
     startTime: iso(opts.start),
     endTime: iso(end),
     warmupTime: iso(warmup),
@@ -150,8 +151,10 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
   const eltSat945 = new Date('2026-08-22T09:45:00+03:00');
   const eltSat15 = new Date('2026-08-22T15:00:00+03:00');
   const eltSun1030 = new Date('2026-08-23T10:30:00+03:00');
-  const kwSun9 = atWeekend(0, 9, 0);
-  const kwSun1115 = atWeekend(0, 11, 15);
+  const kwSat1235 = new Date('2026-08-22T12:35:00+03:00');
+  const kwSat1655 = new Date('2026-08-22T16:55:00+03:00');
+  const kwSun1100 = new Date('2026-08-23T11:00:00+03:00');
+  const kwSun1450 = new Date('2026-08-23T14:50:00+03:00');
 
   return [
     ev({
@@ -231,7 +234,7 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       title: 'Indians vs Oilers NG White',
       home: 'Indians',
       away: 'Oilers NG White',
-      start: kwSun9,
+      start: kwSat1235,
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
@@ -246,13 +249,14 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       title: 'RSS Panthers vs Indians',
       home: 'RSS Panthers',
       away: 'Indians',
-      start: kwSun1115,
+      start: kwSat1655,
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
       stage: 'P14 Haastaja Lohko B',
       matchNumber: '221',
-      score: '4–9'
+      score: '4–9',
+      isHomeMatch: false
     }),
     ev({
       id: 'demo-kw-eemil-3',
@@ -261,13 +265,14 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       title: 'FBC Turku vs Indians',
       home: 'FBC Turku',
       away: 'Indians',
-      start: atWeekend(0, 13, 0),
+      start: kwSun1100,
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
       stage: 'Jatko-ottelut',
       matchNumber: '224',
-      score: '7–3'
+      score: '7–3',
+      isHomeMatch: false
     }),
     ev({
       id: 'demo-kw-eemil-4',
@@ -276,13 +281,13 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       title: 'Indians vs EräViikingit',
       home: 'Indians',
       away: 'EräViikingit',
-      start: atWeekend(0, 14, 50),
+      start: kwSun1450,
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
       stage: 'Jatko-ottelut',
       matchNumber: '227',
-      volunteerDuty: 'Kahviovuoro (klo 14:00 - 16:00)'
+      score: '12–8'
     })
   ];
 }

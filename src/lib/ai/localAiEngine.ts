@@ -166,7 +166,17 @@ export function queryFamilySchedule(
     };
   }
 
-  // 2. Next game query
+  // Surface / Footwear before "milloin" so AG chips are not stolen by next-game.
+  if (norm.includes('kengät') || norm.includes('nappikset') || norm.includes('tekonurmi') || norm.includes('alusta')) {
+    const turfEvents = scopedEvents.filter((e) => e.venue.surface === 'artificial_turf_3g');
+    return {
+      answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
+      relevantEvents: turfEvents,
+      confidence: 0.9
+    };
+  }
+
+  // Next game query
   if (norm.includes('seuraava') || norm.includes('milloin') || norm.includes('huomenna') || norm.includes('tuleva')) {
     const upcoming = scopedEvents
       .filter((e) => new Date(e.startTime) >= new Date())
@@ -191,16 +201,6 @@ export function queryFamilySchedule(
       answer: `Seuraava ottelu on ${childName}:lla ${dateStr} klo ${timeStr} (alkulämpö klo ${warmupStr}) kentällä ${next.venue.name}. Vastassa on ${next.awayTeam}.`,
       relevantEvents: [next],
       confidence: 0.95
-    };
-  }
-
-  // 3. Surface / Footwear query
-  if (norm.includes('kengät') || norm.includes('nappikset') || norm.includes('tekonurmi') || norm.includes('alusta')) {
-    const turfEvents = scopedEvents.filter((e) => e.venue.surface === 'artificial_turf_3g');
-    return {
-      answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
-      relevantEvents: turfEvents,
-      confidence: 0.9
     };
   }
 

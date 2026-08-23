@@ -51,7 +51,7 @@ describe('example tournaments', () => {
     expect(isUglyTeamName('TOPOLA')).toBe(false);
   });
 
-  it('replaces leaked league fixtures with canned cup matches', () => {
+  it('keeps live league fixtures instead of injecting canned cup matches', () => {
     const cup = EXAMPLE_TOURNAMENTS.find((t) => t.id === 'esli2026-topola')!;
     const merged = mergeOfficialWithCupFallback(cup, {
       teamId: '203621',
@@ -61,7 +61,7 @@ describe('example tournaments', () => {
       leagueName: 'Koripalloliitto U14 Aluesarja',
       fixtures: [
         {
-          id: 'fake',
+          id: 'live-league',
           teamId: '5756346',
           association: 'basket',
           sport: 'basketball',
@@ -76,8 +76,15 @@ describe('example tournaments', () => {
         }
       ]
     });
-    expect(merged?.leagueName).toBe('Espoo Liikkuu Tournament 2026');
-    expect(merged?.teamName).toBe('TOPOLA');
-    expect(merged?.fixtures.some((f) => f.homeTeam === 'TOPOLA' || f.awayTeam === 'TOPOLA')).toBe(true);
+    expect(merged?.fixtures[0]?.id).toBe('live-league');
+    expect(merged?.fixtures.some((f) => f.homeTeam === 'TOPOLA')).toBe(false);
+  });
+
+  it('does not treat a random KW team as Indians 34013', () => {
+    expect(
+      exampleTournamentFromUrl(
+        'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=99999&turnaus=EräViikingit_0005'
+      )
+    ).toBeUndefined();
   });
 });

@@ -14,7 +14,7 @@ export const DemoBanner: React.FC<DemoBannerProps> = ({ onOpenImport, onClearDem
       <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
         <Sparkles className="w-4 h-4 text-whistle shrink-0" />
         <span>
-          <strong>Kokeilutila aktiivinen:</strong> Näytetään esimerkkijoukkueet (HJK & ErVi). Korvaa omalla kalenterillasi koska tahansa!
+          <strong>Kokeilutila:</strong> PPJ, TOPOLA ja Indians — ei sinun perheesi otteluita.
         </span>
       </div>
 

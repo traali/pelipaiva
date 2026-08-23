@@ -206,10 +206,16 @@ export function exampleTournamentFromUrl(url: string): ExampleTournament | undef
   if (raw.includes('espooliikkuutournament.fi') && /\/team\/203621(?:\/|$|\?)/.test(raw)) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'esli2026-topola');
   }
-  if (raw.includes('kwmemorial') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) {
+  if (
+    (raw.includes('kwmemorial') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) &&
+    /joukkue=34013(?:&|$)/.test(raw)
+  ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'kwm2026-ervi');
   }
-  if (raw.includes('hc2026') || raw.includes('b13-8') || raw.includes('helsinki cup')) {
+  if (
+    /\/team\/185085(?:\/|$|\?)/.test(raw) &&
+    (raw.includes('hc2026') || raw.includes('helsinki cup'))
+  ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'hc2026-ppj-sin');
   }
   return undefined;
@@ -268,7 +274,7 @@ export function officialFromExampleCup(cup: ExampleTournament): OfficialTeamData
   };
 }
 
-/** Prefer live cup matches; never mix in P13 Kolmonen / synthetic ToPo league. */
+/** Prefer live cup matches. Never replace real league rows with canned HJK/KäPa. */
 export function mergeOfficialWithCupFallback(
   cup: ExampleTournament | undefined,
   official: OfficialTeamData | null | undefined
@@ -287,5 +293,6 @@ export function mergeOfficialWithCupFallback(
       categoryId: official?.categoryId || cup.categoryId
     };
   }
-  return officialFromExampleCup(cup);
+  if ((official?.fixtures || []).length > 0) return official ?? null;
+  return null;
 }

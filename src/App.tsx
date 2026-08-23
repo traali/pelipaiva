@@ -16,6 +16,7 @@ import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
+import { DemoBanner } from './components/DemoBanner';
 import { WeekendStrip } from './components/WeekendStrip';
 import { HeroMatchCard } from './components/HeroMatchCard';
 import { TalkooBoard } from './components/TalkooBoard';
@@ -178,13 +179,15 @@ export const App: React.FC = () => {
   const rawEvents = eventsQuery || [];
   const arrivalRules = useLiveQuery(() => db.arrivalRules.toArray(), []) || [];
 
-  const isDemoActive = profiles.some(
-    (p) =>
-      p.id.startsWith('profile-ppj-') ||
-      p.id.startsWith('profile-topola-') ||
-      p.id.startsWith('profile-kw-') ||
-      p.id === 'profile-hjk-demo'
-  );
+  const isDemoActive =
+    profiles.length > 0 &&
+    profiles.every(
+      (p) =>
+        p.id.startsWith('profile-ppj-') ||
+        p.id.startsWith('profile-topola-') ||
+        p.id.startsWith('profile-kw-') ||
+        p.id === 'profile-hjk-demo'
+    );
   const needsDemoRefresh =
     isDemoActive &&
     !isSeeding &&
@@ -660,6 +663,12 @@ export const App: React.FC = () => {
       />
 
       <main className="mx-auto max-w-5xl px-4 pt-2">
+        {isDemoActive && (
+          <DemoBanner
+            onOpenImport={() => setIsSmartImportOpen(true)}
+            onClearDemo={handleClearData}
+          />
+        )}
         {/* Sticky Profile Filter & View Mode Switcher Header */}
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-xs">
           <div className="flex-1 min-w-0">

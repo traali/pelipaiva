@@ -55,7 +55,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'football',
     primaryColor: 'sininen',
     colorHex: '#003580',
-    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
+    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/',
     popularAgeGroups: ['T13 Sininen', 'T13 Valkoinen', 'P12 Sininen', 'P11 Akatemia', 'Edustus']
   },
   {
@@ -167,8 +167,8 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'sininen',
     colorHex: '#2563eb',
-    sampleTeamUrl: 'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
-    popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'P11 Itä', 'P14 Sininen']
+    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/',
+    popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'KW Memorial']
   },
   {
     id: 'ervi',
@@ -178,7 +178,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'sininen',
     colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
+    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/',
     popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'KW Memorial']
   },
   {
@@ -211,7 +211,8 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'keltainen',
     colorHex: '#ca8a04',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/10400',
+    sampleTeamUrl:
+      'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
     popularAgeGroups: ['P13 Heimo', 'P12 Keltaiset', 'T12 Mustat']
   },
   {

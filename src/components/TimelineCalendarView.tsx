@@ -8,6 +8,7 @@ import {
   Trophy
 } from 'lucide-react';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
+import { helsinkiDateISO } from '../lib/agents/time';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 
@@ -43,12 +44,13 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
     for (const ev of sorted) {
       const d = new Date(ev.startTime);
-      const key = d.toISOString().split('T')[0] || '';
+      const key = helsinkiDateISO(d);
       if (!map.has(key)) {
         const fiLabel = d.toLocaleDateString('fi-FI', {
           weekday: 'long',
           day: 'numeric',
-          month: 'numeric'
+          month: 'numeric',
+          timeZone: 'Europe/Helsinki'
         });
         const capitalized = fiLabel.charAt(0).toUpperCase() + fiLabel.slice(1);
         map.set(key, {

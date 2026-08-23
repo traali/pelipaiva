@@ -65,7 +65,7 @@ function detectColumnMapping(headers: string[]): {
 export function parseTableRows(
   rows: string[][],
   defaultSport: SportType = 'football',
-  _defaultPlayer = 'Maija'
+  defaultPlayer = 'Maija'
 ): ParsedTableResult {
   if (!rows || rows.length === 0) {
     return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
@@ -106,7 +106,7 @@ export function parseTableRows(
     const times = extractTimesFromFinnishText(timeRaw || '15:00');
     const venueHint = extractVenueFromFinnishText(venueRaw);
 
-    let homeTeam = 'HJK T13';
+    let homeTeam = defaultPlayer;
     let awayTeam = eventRaw.trim() || 'Vastustaja';
     let isHomeMatch = true;
 

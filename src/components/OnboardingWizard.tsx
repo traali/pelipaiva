@@ -37,6 +37,7 @@ interface OnboardingWizardProps {
 
 const PRESET_TORNEOPAL_TEAMS: Array<{
   name: string;
+  teamName: string;
   sport: SportType;
   url: string;
   association: string;
@@ -44,6 +45,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
 }> = [
   {
     name: 'PPJ/Laru sin · P13 Kolmonen',
+    teamName: 'PPJ/Laru sin',
     sport: 'football',
     url: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
     association: 'Palloliitto',
@@ -51,6 +53,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
   },
   {
     name: 'PPJ/Laru mus · P13 Vitonen',
+    teamName: 'PPJ/Laru mus',
     sport: 'football',
     url: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
     association: 'Palloliitto',
@@ -58,6 +61,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
   },
   {
     name: 'PPJ/Laru oran · P13 Vitonen',
+    teamName: 'PPJ/Laru oran',
     sport: 'football',
     url: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
     association: 'Palloliitto',
@@ -65,6 +69,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
   },
   ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
+    teamName: cup.teamName,
     sport: cup.sport,
     url: cup.url,
     association: cup.name,
@@ -123,7 +128,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setIsLoading(true);
     setAddError(null);
     try {
-      await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
+      await onQuickAddTeam(activePlayerName, team.teamName, team.sport, team.url);
       setAddedSources((prev) => [
         ...prev,
         {
@@ -340,7 +345,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     className="mt-1 p-2.5 rounded-xl bg-pitch/10 text-pitch border border-pitch/25 text-xs font-bold flex items-center justify-center gap-2 hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4" />
-                    <span>Kokeile esimerkkidatalla (HJK, PPJ, Honka, TOPOLA)</span>
+                    <span>Kokeile esimerkkidatalla (PPJ, TOPOLA, Indians)</span>
                   </button>
                 </div>
               </div>
