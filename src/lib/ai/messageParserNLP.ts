@@ -282,9 +282,120 @@ export function extractKitColorFromText(text: string): string | undefined {
 }
 
 /**
- * Primary Parser: Extracts matchday event from raw message.
+ * Primary Parser: Extracts single primary matchday event from raw message.
  */
 export function parseFreeformSportsMessage(
+  rawText: string,
+  defaultPlayer = 'Maija'
+): ExtractedSportsEvent {
+  const all = parseMultipleSportsMessages(rawText, defaultPlayer);
+  return all[0] || parseSingleFreeformBlock(rawText, defaultPlayer);
+}
+
+/**
+ * Extracts a match kickoff time from a line, ensuring dates like 24.8.2026 are not confused with times.
+ */
+function extractMatchTimeInLine(line: string): string | null {
+  // Explicit klo 16:30 or klo 16.30
+  const kloMatch = line.match(/\b(?:klo|kello)\s*([012]?\d)[:.]([0-5]\d)\b/i);
+  if (kloMatch && kloMatch[1] && kloMatch[2]) {
+    const hh = kloMatch[1].padStart(2, '0');
+    return `${hh}:${kloMatch[2]}`;
+  }
+
+  // Colon time 16:30
+  const colonMatch = line.match(/\b([012]?\d):([0-5]\d)\b/);
+  if (colonMatch && colonMatch[1] && colonMatch[2]) {
+    const hh = colonMatch[1].padStart(2, '0');
+    return `${hh}:${colonMatch[2]}`;
+  }
+
+  // Dot time 16.30 (must be 06.00-23.59 and not part of a date like 24.8.2026)
+  const dotMatch = line.match(/\b([012]?\d)\.([0-5]\d)(?!\.\d)\b/);
+  if (dotMatch && dotMatch[1] && dotMatch[2]) {
+    const hNum = parseInt(dotMatch[1], 10);
+    if (hNum >= 6 && hNum <= 23 && !line.includes(`${dotMatch[1]}.${dotMatch[2]}.`)) {
+      const hh = dotMatch[1].padStart(2, '0');
+      return `${hh}:${dotMatch[2]}`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Multi-Match Parser: Extracts multiple matchday events from weekend / tournament messages.
+ */
+export function parseMultipleSportsMessages(
+  rawText: string,
+  defaultPlayer = 'Maija'
+): ExtractedSportsEvent[] {
+  const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length <= 1) {
+    return [parseSingleFreeformBlock(rawText, defaultPlayer)];
+  }
+
+  // Extract global context from whole text
+  const globalDateHint = extractDateFromFinnishText(rawText);
+  const globalVenueHint = extractVenueFromFinnishText(rawText);
+  const globalVolunteerDuties = extractVolunteerDutiesFromText(rawText);
+  const globalKitColor = extractKitColorFromText(rawText);
+
+  // Find lines that represent individual matches
+  const matchBlocks: Array<{ line: string; time: string; opponent?: string }> = [];
+
+  for (const line of lines) {
+    const isDutyOnly =
+      /^(?:kahvio|toimitsija|kirjuri|järkkäri|kioski|grilli|makkara)/i.test(line) ||
+      (/\b(?:kahviovuoro|toimitsijavuoro|kioskivuoro)\b/i.test(line) && !/\b(?:vs\.?|vastaan)\b/i.test(line));
+
+    if (isDutyOnly) continue;
+
+    const timeStr = extractMatchTimeInLine(line);
+    const hasVs = /\b(?:vs\.?|vastaan)\s+([a-zA-ZäöåÄÖÅ0-9\s-]+)/i.exec(line);
+
+    if (timeStr) {
+      const isHeaderGreeting =
+        /^(?:moi|hei|terve|muistutus|turnaus|lauantaina|sunnuntaina)/i.test(line) &&
+        !hasVs &&
+        line.length > 50;
+
+      if (!isHeaderGreeting && (hasVs || /^(?:klo|\d{1,2}[:.]\d{2})/i.test(line))) {
+        matchBlocks.push({
+          line,
+          time: timeStr,
+          opponent: hasVs ? hasVs[1]?.trim() : undefined
+        });
+      }
+    }
+  }
+
+  if (matchBlocks.length > 1) {
+    const results: ExtractedSportsEvent[] = [];
+    for (const match of matchBlocks) {
+      const syntheticText = `${match.line}\n@ ${globalVenueHint}\n${globalDateHint}`;
+      const parsed = parseSingleFreeformBlock(syntheticText, defaultPlayer);
+      if (globalDateHint && parsed.dateStr === '2026-08-24') {
+        parsed.dateStr = globalDateHint;
+      }
+      if (globalVenueHint && parsed.venueHint === 'Töölön Pallokenttä 1 (Bollis)') {
+        parsed.venueHint = globalVenueHint;
+      }
+      if (globalKitColor && !parsed.kitColor) {
+        parsed.kitColor = globalKitColor;
+      }
+      if (globalVolunteerDuties.length > 0 && parsed.volunteerDuties.length === 0) {
+        parsed.volunteerDuties = globalVolunteerDuties;
+      }
+      results.push(parsed);
+    }
+    return results;
+  }
+
+  return [parseSingleFreeformBlock(rawText, defaultPlayer)];
+}
+
+function parseSingleFreeformBlock(
   rawText: string,
   _defaultPlayer = 'Maija'
 ): ExtractedSportsEvent {
@@ -319,13 +430,26 @@ export function parseFreeformSportsMessage(
   let awayTeam = 'Vastustaja';
   let isHomeMatch = true;
 
-  const vsMatch = rawText.match(/\b([a-zA-ZäöåÄÖÅ]{2,}[a-zA-Z0-9äöåÄÖÅ\s-]*?)\s+(?:vs\.?|vastaan)\s+([a-zA-ZäöåÄÖÅ]{2,}[a-zA-Z0-9äöåÄÖÅ\s-]*)/i);
-  if (vsMatch && vsMatch[1] && vsMatch[2]) {
-    const candHome = vsMatch[1].trim();
-    const candAway = vsMatch[2].trim();
-    if (!candHome.toLowerCase().includes('klo') && !candAway.toLowerCase().includes('klo')) {
-      homeTeam = candHome;
-      awayTeam = candAway;
+  const vsLine = rawText.split(/\r?\n/).find((l) => /\b(?:vs\.?|vastaan)\b/i.test(l));
+  if (vsLine) {
+    const parts = vsLine.split(/\b(?:vs\.?|vastaan)\b/i);
+    if (parts[0] && parts[1]) {
+      let candHome = parts[0].trim();
+      for (let i = 0; i < 3; i++) {
+        candHome = candHome
+          .replace(/^(?:tapahtuma|sarjapeli|ottelu|peli|matsi|harjoituspeli|harkkapeli|turnaus|\b(?:la|su|pe|ma|ti|ke|to)\b|klo|kello)[:\s-]+/i, '')
+          .trim();
+      }
+      let candAway = parts[1]
+        .replace(/\s+(?:klo|alkaa|kentällä|@|paikalla|kokoontuminen).*$/i, '')
+        .trim();
+
+      if (candHome && !candHome.toLowerCase().includes('klo') && !/^\d{1,2}[:.]\d{2}$/.test(candHome) && candHome.length >= 2) {
+        homeTeam = candHome;
+      }
+      if (candAway && !candAway.toLowerCase().includes('klo') && candAway.length >= 2) {
+        awayTeam = candAway;
+      }
     }
   } else if (norm.includes('harkkapeli') || norm.includes('harjoitusottelu') || norm.includes('harjoituspeli')) {
     homeTeam = 'Oma joukkue';

@@ -43,10 +43,16 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
     }
   }, [activeProfilePlayerName]);
 
-  // Live parse text as user types or pastes
+  // Live parse text with 250ms debounce as user types or pastes
   useEffect(() => {
     const trimmed = text.trim();
-    if (trimmed.length > 5) {
+    if (trimmed.length <= 5) {
+      setPreviewEvent(null);
+      setFamilyJoinCode(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
       // Check for family code / whatsapp invite join
       const waParse = parseFamilyWhatsAppMessage(trimmed);
       if (waParse.type === 'join' && waParse.familyCode) {
@@ -56,22 +62,23 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setFamilyJoinCode(null);
       }
 
-      // Check if text mentions an existing child name
-      const mentionedChild = existingPlayers.find((p) =>
-        new RegExp(`\\b${p}\\b`, 'i').test(trimmed)
-      );
+      // Check if text mentions an existing child name (or inflection)
+      const mentionedChild = existingPlayers.find((p) => {
+        const root = p.trim().toLowerCase();
+        return new RegExp(`\\b${root}(?:lla|llä|lle|n|ta|tä)?\\b`, 'i').test(trimmed);
+      });
+      const resolvedPlayer = mentionedChild || selectedPlayer;
       if (mentionedChild && mentionedChild !== selectedPlayer) {
         setSelectedPlayer(mentionedChild);
       }
 
-      const parsed = parseFreeformSportsMessage(trimmed, selectedPlayer);
+      const parsed = parseFreeformSportsMessage(trimmed, resolvedPlayer);
       setPreviewEvent(parsed);
       setSelectedSport(parsed.sport);
-    } else {
-      setPreviewEvent(null);
-      setFamilyJoinCode(null);
-    }
-  }, [text, existingPlayers]);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [text, existingPlayers, selectedPlayer]);
 
   const handleJoinFamily = async (code: string) => {
     setIsSaving(true);

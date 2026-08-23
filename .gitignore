@@ -51,5 +51,10 @@ dist-ssr/
 .env.test.local
 .env.production.local
 
-# Vitest cache
+# Vitest and Playwright test output
 .vitest
+test-results/
+playwright-report/
+
+# Scratch scripts
+scratch/

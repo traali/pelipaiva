@@ -17,6 +17,7 @@ interface TimelineCalendarViewProps {
   viewMode: 'timeline' | 'calendar';
   onNavigate?: (event: MatchdayEvent) => void;
   onSelectEvent?: (event: MatchdayEvent) => void;
+  onClearFilter?: () => void;
 }
 
 export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
@@ -24,7 +25,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   profiles,
   viewMode,
   onNavigate,
-  onSelectEvent
+  onSelectEvent,
+  onClearFilter
 }) => {
   const profileMap = useMemo(() => {
     const map = new Map<string, PlayerProfile>();
@@ -81,8 +83,17 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
   if (events.length === 0) {
     return (
-      <div className="p-8 text-center text-text-muted text-xs bg-surface-elevated/50 rounded-2xl border border-border-subtle">
-        Ei merkittyjä tapahtumia valitulla suodatuksella.
+      <div className="p-8 text-center text-text-muted text-xs bg-surface-elevated/50 rounded-2xl border border-border-subtle flex flex-col items-center gap-3 my-4">
+        <div>Ei merkittyjä tapahtumia valitulla suodatuksella.</div>
+        {onClearFilter && (
+          <button
+            type="button"
+            onClick={onClearFilter}
+            className="px-4 py-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer shadow-sm"
+          >
+            Näytä koko perheen ottelut
+          </button>
+        )}
       </div>
     );
   }

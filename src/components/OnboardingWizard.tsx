@@ -29,7 +29,12 @@ interface OnboardingWizardProps {
   onOpenImportModal?: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
   onOpenFamilyShare?: () => void;
   onOpenSmartImport?: () => void;
-  onQuickAddTeam: (playerName: string, teamName: string, sport: SportType, url: string) => Promise<void>;
+  onQuickAddTeam: (
+    playerName: string,
+    teamName: string,
+    sport: SportType,
+    url: string
+  ) => Promise<{ success: boolean; error?: string } | void>;
   onFinishOnboarding?: () => void;
   existingProfilesCount?: number;
 }
@@ -92,6 +97,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [customSport, setCustomSport] = useState<SportType>('football');
   const [showCustomIcsInput, setShowCustomIcsInput] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Group added sources by player name
   const playerGroups = React.useMemo(() => {
@@ -111,6 +117,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     if (e) e.preventDefault();
     const trimmed = nameInputDraft.trim();
     if (!trimmed) return;
+    setErrorMessage('');
     setActivePlayerName(trimmed);
     setIsNamingStep(false);
   };
@@ -118,8 +125,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleAddPresetTorneopal = async (team: (typeof PRESET_TORNEOPAL_TEAMS)[0]) => {
     if (!activePlayerName) return;
     setIsLoading(true);
+    setErrorMessage('');
     try {
-      await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
+      const res = await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
+      if (res && res.success === false) {
+        setErrorMessage(res.error || 'Otteluiden haku epäonnistui. Tarkista verkko.');
+        return;
+      }
       setAddedSources((prev) => [
         ...prev,
         {
@@ -131,6 +143,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           url: team.url
         }
       ]);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Lisäys epäonnistui');
     } finally {
       setIsLoading(false);
     }
@@ -142,8 +156,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     if (!trimmedUrl) return;
 
     setIsLoading(true);
+    setErrorMessage('');
     try {
-      await onQuickAddTeam(activePlayerName, `${activePlayerName}:n joukkue`, customSport, trimmedUrl);
+      const res = await onQuickAddTeam(activePlayerName, `${activePlayerName}:n joukkue`, customSport, trimmedUrl);
+      if (res && res.success === false) {
+        setErrorMessage(res.error || 'Kalenterin nouto epäonnistui. Tarkista linkki.');
+        return;
+      }
       setAddedSources((prev) => [
         ...prev,
         {
@@ -157,6 +176,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       ]);
       setCustomIcsUrl('');
       setShowCustomIcsInput(false);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Lisäys epäonnistui');
     } finally {
       setIsLoading(false);
     }
@@ -167,6 +188,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   const handleAddNewPlayer = () => {
+    setErrorMessage('');
     setNameInputDraft('');
     setActivePlayerName('');
     setIsNamingStep(true);
@@ -338,6 +360,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           ) : (
             /* STEP 2: ATTACH SOURCES TO ACTIVE PLAYER */
             <div className="space-y-4">
+              {/* Error Message Alert */}
+              {errorMessage && (
+                <div
+                  role="alert"
+                  className="p-3 rounded-2xl bg-stoppage/15 border border-stoppage/30 text-stoppage text-xs font-bold flex items-center gap-2 animate-shake"
+                >
+                  <span>⚠️ {errorMessage}</span>
+                </div>
+              )}
+
               {/* Active Player Banner */}
               <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
                 <div className="flex items-center gap-2">
@@ -450,7 +482,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
                     <div className="flex items-center gap-2">
                       <input
-                        type="url"
+                        type="text"
                         value={customIcsUrl}
                         onChange={(e) => setCustomIcsUrl(e.target.value)}
                         placeholder="https://... tai webcal://..."

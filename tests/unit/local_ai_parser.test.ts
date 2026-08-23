@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseFreeformSportsMessage,
+  parseMultipleSportsMessages,
   extractDateFromFinnishText,
   extractTimesFromFinnishText,
   extractVenueFromFinnishText,
@@ -78,6 +79,29 @@ Lisätiedot: Peliasuna sininen pelipaita. Kahviovuoro: Maijan vanhemmat.`;
       expect(result.kickoffTime).toBe('14:30');
       expect(result.warmupTime).toBe('13:45');
       expect(result.venueHint).toContain('Tapiola');
+    });
+
+    it('parses multi-match tournament schedule message into multiple distinct events', () => {
+      const tournamentMsg = `Moi! Lauantaina 24.8. turnaus Väiskillä:
+klo 10:00 vs KäPa
+klo 13:00 vs FC Honka
+klo 15:30 vs VJS
+Mustat paidat päälle. Kahviovuoro klo 12-14.`;
+
+      const results = parseMultipleSportsMessages(tournamentMsg, 'Maija');
+
+      expect(results.length).toBe(3);
+      expect(results[0]?.kickoffTime).toBe('10:00');
+      expect(results[0]?.awayTeam).toContain('KäPa');
+      expect(results[0]?.venueHint).toContain('Väinämöisen');
+
+      expect(results[1]?.kickoffTime).toBe('13:00');
+      expect(results[1]?.awayTeam).toContain('Honka');
+      expect(results[1]?.venueHint).toContain('Väinämöisen');
+
+      expect(results[2]?.kickoffTime).toBe('15:30');
+      expect(results[2]?.awayTeam).toContain('VJS');
+      expect(results[2]?.venueHint).toContain('Väinämöisen');
     });
   });
 

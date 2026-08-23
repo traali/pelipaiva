@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, Send, Search } from 'lucide-react';
+import { X, Sparkles, Send, Search, Loader2 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
-import { queryFamilySchedule, CopilotQueryResult } from '../lib/ai/localAiEngine';
+import { queryFamilyScheduleWithLLM, CopilotQueryResult } from '../lib/ai/localAiEngine';
 
 interface AskCopilotModalProps {
   isOpen: boolean;
@@ -19,7 +19,18 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
   profiles
 }) => {
   const [query, setQuery] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
   const [result, setResult] = useState<CopilotQueryResult | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const sampleQuestions = [
     '☕ Onko minulla kahviovuoroa tällä viikolla?',
@@ -28,18 +39,29 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
     '🚗 Miten viikonlopun kyydit hoidetaan?'
   ];
 
-  const handleAsk = (textToAsk?: string) => {
+  const handleAsk = async (textToAsk?: string) => {
     const q = textToAsk || query;
-    if (!q.trim()) return;
-    const res = queryFamilySchedule(q, events, profiles);
-    setResult(res);
+    if (!q.trim() || isThinking) return;
     if (textToAsk) setQuery(textToAsk);
+
+    setIsThinking(true);
+    try {
+      const res = await queryFamilyScheduleWithLLM(q, events, profiles);
+      setResult(res);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ask-copilot-title"
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -62,14 +84,19 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-text-primary">Kysy Pelipäivältä</h3>
-                  <p className="text-xs text-text-muted">
-                    100% Paikallinen tekoälyvastaaja perheen aikatauluista
+                  <h3 id="ask-copilot-title" className="text-lg font-black text-text-primary">
+                    Kysy Pelipäivältä
+                  </h3>
+                  <p className="text-xs text-text-muted flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-pitch animate-pulse" />
+                    100% Laitekohtainen tekoäly & aikataulujärki
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Sulje kyselyikkuna"
                 className="p-2 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-elevated cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -115,10 +142,15 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
               </div>
               <button
                 type="submit"
-                disabled={!query.trim()}
-                className="p-2.5 rounded-xl bg-pitch text-text-inverse hover:brightness-110 cursor-pointer disabled:opacity-50"
+                disabled={!query.trim() || isThinking}
+                aria-label="Lähetä kysymys"
+                className="p-2.5 rounded-xl bg-pitch text-text-inverse hover:brightness-110 cursor-pointer disabled:opacity-50 flex items-center justify-center min-w-[40px]"
               >
-                <Send className="w-4 h-4" />
+                {isThinking ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </button>
             </form>
 
@@ -128,6 +160,7 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="p-4 rounded-2xl bg-surface border border-pitch/30 flex flex-col gap-2.5"
+                aria-live="polite"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-pitch flex items-center gap-1.5">

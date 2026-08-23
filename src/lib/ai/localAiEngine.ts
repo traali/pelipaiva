@@ -1,5 +1,5 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
-import { ExtractedSportsEvent, parseFreeformSportsMessage } from './messageParserNLP';
+import { ExtractedSportsEvent, parseFreeformSportsMessage, parseMultipleSportsMessages } from './messageParserNLP';
 import { parseExcelFileBuffer, parsePastedSpreadsheetText } from './tableAndExcelParser';
 import { parseScheduleImage } from './ocrImageParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
@@ -188,6 +188,36 @@ export function queryFamilySchedule(
     };
   }
 
+  // 4. Logistics & Carpooling query
+  if (
+    norm.includes('kyyti') ||
+    norm.includes('kuski') ||
+    norm.includes('aja') ||
+    norm.includes('kuljetus') ||
+    norm.includes('ristiriita') ||
+    norm.includes('auto')
+  ) {
+    const plan = planFamilyLogistics(events, profiles);
+    if (plan.departureSchedule.length === 0) {
+      return {
+        answer: 'Ei aktiivisia kyytitarpeita tai siirtymiä tulevalle viikonlopulle.',
+        relevantEvents: [],
+        confidence: 0.95
+      };
+    }
+    const schedule = plan.departureSchedule
+      .map((s) => `• Klo ${s.time}: Lähtö kohteeseen ${s.venueName} (${s.childName})`)
+      .join('\n');
+    const conflictNote = plan.hasConflicts
+      ? `\n\n⚠️ Huomio: ${plan.conflictDetails.join(' ')}`
+      : '\n\n✅ Ei logistiikkaristiriitoja kyydeissä.';
+    return {
+      answer: `Viikonlopun kuskisuunnitelma:\n${schedule}${conflictNote}`,
+      relevantEvents: events.slice(0, 3),
+      confidence: 0.95
+    };
+  }
+
   // Generic fallback
   return {
     answer: `Perheen kalenterissa on yhteensä ${events.length} merkittyä ottelua ja harjoitusta ${profiles.length} joukkueelle. Voit kysyä esimerkiksi seuraavasta pelistä, kahviovuoroista tai kyytisuunnitelmasta!`,
@@ -196,8 +226,54 @@ export function queryFamilySchedule(
   };
 }
 
+/**
+ * Enhanced query with On-Device LLM (Chrome Built-in Prompt API / window.ai)
+ * with instant fallback to deterministic Finnish sports reasoner.
+ */
+export async function queryFamilyScheduleWithLLM(
+  query: string,
+  events: MatchdayEvent[],
+  profiles: PlayerProfile[]
+): Promise<CopilotQueryResult> {
+  const fallback = queryFamilySchedule(query, events, profiles);
+
+  // Check if browser has on-device Gemini Nano / window.ai available
+  if (typeof window !== 'undefined' && (window as any).ai?.languageModel) {
+    try {
+      const capabilities = await (window as any).ai.languageModel.capabilities();
+      if (capabilities.available === 'readily') {
+        const session = await (window as any).ai.languageModel.create({
+          systemPrompt:
+            'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta.'
+        });
+        const context = `Kalenterin tiedot: ${JSON.stringify(
+          events.slice(0, 5).map((e) => ({
+            peli: e.title,
+            aika: e.startTime,
+            paikka: e.venue.name,
+            talkoot: e.volunteerDuty
+          }))
+        )}`;
+        const response = await session.prompt(`${context}\nKysymys: ${query}`);
+        if (response && response.trim().length > 0) {
+          return {
+            answer: response.trim(),
+            relevantEvents: fallback.relevantEvents,
+            confidence: 0.98
+          };
+        }
+      }
+    } catch {
+      // Fallback silently to deterministic reasoning
+    }
+  }
+
+  return fallback;
+}
+
 export {
   parseFreeformSportsMessage,
+  parseMultipleSportsMessages,
   parsePastedSpreadsheetText,
   parseExcelFileBuffer,
   parseScheduleImage

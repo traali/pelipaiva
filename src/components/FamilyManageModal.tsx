@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -47,6 +47,11 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
 
   if (!isOpen) return null;
 
+  const [undoState, setUndoState] = useState<{
+    message: string;
+    undoAction: () => Promise<void>;
+  } | null>(null);
+
   const recordTombstones = async (deletedIds: string[]) => {
     const sync = await db.syncState.get('family');
     if (sync && sync.syncKey) {
@@ -62,28 +67,64 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   };
 
   const handleDeleteProfile = async (profileId: string) => {
-    if (window.confirm('Haluatko varmasti poistaa tämän joukkueen?')) {
-      await db.profiles.delete(profileId);
-      const eventsToDelete = await db.events.where('profileId').equals(profileId).toArray();
-      for (const ev of eventsToDelete) {
-        await db.events.delete(ev.id);
-      }
-      await recordTombstones([profileId]);
+    const targetProfile = profiles.find((p) => p.id === profileId);
+    if (!targetProfile) return;
+    const eventsToDelete = await db.events.where('profileId').equals(profileId).toArray();
+
+    // Remove from DB
+    await db.profiles.delete(profileId);
+    for (const ev of eventsToDelete) {
+      await db.events.delete(ev.id);
     }
+
+    const timer = setTimeout(() => {
+      recordTombstones([profileId]);
+      setUndoState(null);
+    }, 5000);
+
+    setUndoState({
+      message: `Joukkue ${targetProfile.teamName} poistettu.`,
+      undoAction: async () => {
+        clearTimeout(timer);
+        await db.profiles.put(targetProfile);
+        for (const ev of eventsToDelete) {
+          await db.events.put(ev);
+        }
+        setUndoState(null);
+      }
+    });
   };
 
   const handleDeleteChild = async (name: string, childProfiles: PlayerProfile[]) => {
-    if (window.confirm(`Haluatko varmasti poistaa pelaajan ${name} ja kaikki hänen joukkueensa?`)) {
-      const ids = childProfiles.map((p) => p.id);
-      for (const p of childProfiles) {
-        await db.profiles.delete(p.id);
-        const events = await db.events.where('profileId').equals(p.id).toArray();
-        for (const ev of events) {
-          await db.events.delete(ev.id);
-        }
+    const ids = childProfiles.map((p) => p.id);
+    const allEvents: any[] = [];
+    for (const p of childProfiles) {
+      const evs = await db.events.where('profileId').equals(p.id).toArray();
+      allEvents.push(...evs);
+      await db.profiles.delete(p.id);
+      for (const ev of evs) {
+        await db.events.delete(ev.id);
       }
-      await recordTombstones(ids);
     }
+
+    const timer = setTimeout(() => {
+      recordTombstones(ids);
+      setUndoState(null);
+    }, 5000);
+
+    setUndoState({
+      message: `Pelaaja ${name} ja kaikki joukkueet poistettu.`,
+      undoAction: async () => {
+        clearTimeout(timer);
+        for (const p of childProfiles) {
+          await db.profiles.put(p);
+        }
+        for (const ev of allEvents) {
+          await db.events.put(ev);
+        }
+        setUndoState(null);
+      }
+    });
   };
 
   const handleAddNewPlayer = () => {
@@ -94,10 +135,23 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
     setIsAddingPlayer(false);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="family-manage-title"
           initial={{ scale: 0.95, opacity: 0, y: 15 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 15 }}
@@ -111,7 +165,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-black text-text-primary">
+                <h2 id="family-manage-title" className="text-base font-black text-text-primary">
                   Perheen pelaajat & joukkueet
                 </h2>
                 <p className="text-xs text-text-muted">
@@ -249,6 +303,23 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
               </button>
             )}
           </div>
+
+          {/* Floating Undo Snackbar */}
+          {undoState && (
+            <div
+              role="alert"
+              className="my-2 p-3 rounded-2xl bg-stoppage/20 border border-stoppage/40 text-text-primary text-xs font-semibold flex items-center justify-between shadow-lg animate-in fade-in"
+            >
+              <span>{undoState.message}</span>
+              <button
+                type="button"
+                onClick={undoState.undoAction}
+                className="px-3 py-1 rounded-xl bg-stoppage text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer shadow-sm"
+              >
+                Kumoa
+              </button>
+            </div>
+          )}
 
           {/* Footer: Family Sharing & Wizard */}
           <div className="pt-3 border-t border-border-subtle shrink-0 flex flex-col gap-2">

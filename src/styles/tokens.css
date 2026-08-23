@@ -50,9 +50,9 @@
   .dark {
     --nv-bg-canvas: #000000;
     --nv-bg-surface-base: #0a0a0a;
-    --nv-bg-surface-card: rgba(14, 16, 20, 0.88);
+    --nv-bg-surface-card: rgba(14, 16, 20, 0.96);
     --nv-bg-surface-elevated: #111111;
-    --nv-bg-surface-glass: rgba(17, 17, 17, 0.72);
+    --nv-bg-surface-glass: rgba(17, 17, 17, 0.85);
     --nv-bg-surface: #111111;
 
     --nv-border-subtle: rgba(255, 255, 255, 0.09);
@@ -74,7 +74,7 @@
     --nv-floodlight: #faff69;
     --nv-floodlight-fg: #0a0a0a;
 
-    --nv-glass-blur: blur(18px);
+    --nv-glass-blur: blur(20px);
     --nv-shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
 }

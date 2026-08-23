@@ -3,7 +3,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, ensureStoragePersistence } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
 import { MultiProfileHeader } from './components/MultiProfileHeader';
-import { CalendarImportModal } from './components/CalendarImportModal';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { parseICSFeed } from './lib/calendar/icsParser';
@@ -41,13 +40,13 @@ import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyC
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
-  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [isSmartImportOpen, setIsSmartImportOpen] = useState<boolean>(false);
   const [isLogisticsOpen, setIsLogisticsOpen] = useState<boolean>(false);
   const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
+  const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('pelipaiva_onboarding_done') !== 'true';
@@ -362,9 +361,30 @@ export const App: React.FC = () => {
     [showPastEvents, filteredEvents, upcomingEvents]
   );
 
+  // Scoped profiles and events for Mission Control HUD & Hero Match Card
+  const activeProfiles = useMemo(() => {
+    if (activeProfileId === 'all') return profiles;
+    if (activeProfileId.startsWith('player:')) {
+      const pName = activeProfileId.replace('player:', '').toLowerCase();
+      return profiles.filter((p) => (p.playerName || '').toLowerCase() === pName);
+    }
+    return profiles.filter((p) => p.id === activeProfileId);
+  }, [profiles, activeProfileId]);
+
+  const scopedEvents = useMemo(() => {
+    if (activeProfileId === 'all') return rawEvents;
+    const allowedIds = new Set(activeProfiles.map((p) => p.id));
+    return rawEvents.filter((e) => allowedIds.has(e.profileId));
+  }, [rawEvents, activeProfiles, activeProfileId]);
+
   const snapshot = useMemo(
-    () => runMissionControlGraph(rawEvents, profiles, new Date()),
-    [rawEvents, profiles]
+    () =>
+      runMissionControlGraph(
+        scopedEvents.length > 0 ? scopedEvents : rawEvents,
+        activeProfiles.length > 0 ? activeProfiles : profiles,
+        new Date()
+      ),
+    [scopedEvents, activeProfiles, rawEvents, profiles]
   );
 
   const otherEvents = useMemo(
@@ -397,7 +417,7 @@ export const App: React.FC = () => {
     sport: SportType,
     url: string,
     colorHex?: string
-  ) => {
+  ): Promise<{ success: boolean; count: number; error?: string }> => {
     const existing = await db.profiles.toArray();
     const cup = exampleTournamentFromUrl(url);
     const club = searchPopularClubs(teamName).find((c) => c.sport === sport);
@@ -449,6 +469,8 @@ export const App: React.FC = () => {
       }
 
       officialData = mergeOfficialWithCupFallback(cup, officialData);
+
+      let importedCount = 0;
 
       if (officialData && officialData.fixtures.length > 0) {
         for (const fix of officialData.fixtures) {
@@ -521,11 +543,15 @@ export const App: React.FC = () => {
         for (const ev of eventsToInsert) {
           await db.events.put(ev);
         }
+        importedCount = eventsToInsert.length;
       } else if (!parsedAssoc) {
         // Standard iCal feed from Nimenhuuto, MyClub, Jopox
         const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
         const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;
         const res = await fetch(target);
+        if (!res.ok) {
+          throw new Error(`Kalenterin haku epäonnistui (HTTP ${res.status})`);
+        }
         const text = await res.text();
         const parsed = await parseICSFeed(text, profileId, sport);
         for (const ev of parsed) {
@@ -535,6 +561,7 @@ export const App: React.FC = () => {
           fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
           await db.events.put(fullEv);
         }
+        importedCount = parsed.length;
       }
 
       // Background Family Cloud Sync if active
@@ -545,21 +572,31 @@ export const App: React.FC = () => {
           console.warn('[FAMILY_CLOUD] Background sync after add failed:', e)
         );
       }
-    } catch (err) {
+
+      if (importedCount === 0 && !cup) {
+        return {
+          success: false,
+          count: 0,
+          error: 'Otteluita ei löytynyt annetusta linkistä. Tarkista osoite tai kokeile toista tuontitapaa.'
+        };
+      }
+
+      return { success: true, count: importedCount };
+    } catch (err: any) {
       console.warn('Team / Calendar fetch error:', err);
+      return {
+        success: false,
+        count: 0,
+        error: err?.message || 'Kalenterin nouto epäonnistui. Tarkista verkko tai linkki.'
+      };
     }
   };
 
   const playerNames = Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)));
 
-  const closeImport = () => {
-    setIsImportModalOpen(false);
-    setImportDefaults({});
-  };
-
   const openAddTeam = (playerName?: string) => {
     setImportDefaults({ playerName });
-    setIsImportModalOpen(true);
+    setIsSmartImportOpen(true);
   };
 
   const activePlayerName = activeProfileId.startsWith('player:')
@@ -641,29 +678,26 @@ export const App: React.FC = () => {
           existingProfilesCount={profiles.length}
           onOpenImportModal={(sport, url, name) => {
             setImportDefaults({ sport, url, name });
-            setIsImportModalOpen(true);
+            setIsSmartImportOpen(true);
           }}
           onOpenFamilyShare={() => setIsFamilyShareOpen(true)}
           onOpenSmartImport={() => setIsSmartImportOpen(true)}
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
-            await handleImportCalendar(playerName, teamName, sport, url);
+            return await handleImportCalendar(playerName, teamName, sport, url);
           }}
         />
         <SmartImportModal
           isOpen={isSmartImportOpen}
-          onClose={() => setIsSmartImportOpen(false)}
-          existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
-          onImportClassic={handleImportCalendar}
-        />
-        <CalendarImportModal
-          isOpen={isImportModalOpen}
-          onClose={closeImport}
-          onImport={handleImportCalendar}
+          onClose={() => {
+            setIsSmartImportOpen(false);
+            setImportDefaults({});
+          }}
+          existingPlayers={playerNames}
           initialSport={importDefaults.sport}
           initialTeamUrl={importDefaults.url}
           initialTeamName={importDefaults.name}
           initialPlayerName={importDefaults.playerName}
-          existingPlayers={playerNames}
+          onImportClassic={handleImportCalendar}
         />
         <FamilyShareModal
           isOpen={isFamilyShareOpen}
@@ -758,10 +792,6 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {snapshot.days.length > 0 && (
-          <WeekendStrip days={snapshot.days} weekendLabel={snapshot.weekendLabel} />
-        )}
-
         {snapshot.conflicts.length > 0 && (
           <button
             type="button"
@@ -783,8 +813,42 @@ export const App: React.FC = () => {
           </button>
         )}
 
-        <TalkooBoard talkoo={snapshot.talkoo} />
-        <TournamentWeekendPanel blocks={snapshot.tournaments} />
+        {/* Collapsible Weekend Overview & Volunteer Duties */}
+        {(snapshot.days.some((d) => d.events.length > 0) ||
+          snapshot.talkoo.shifts.length > 0 ||
+          snapshot.tournaments.length > 0) && (
+          <div className="mb-4 rounded-2xl border border-border-subtle bg-surface-elevated/40 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsOverviewExpanded((v) => !v)}
+              aria-expanded={isOverviewExpanded}
+              className="w-full px-4 py-2.5 flex items-center justify-between text-xs font-bold text-text-secondary hover:text-text-primary hover:bg-surface-elevated/70 transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-3.5 h-3.5 text-pitch" />
+                <span>Viikonlopun tilannekuva & talkoot</span>
+                {snapshot.talkoo.shifts.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-whistle/20 text-whistle text-[10px] font-black">
+                    ☕ Talkoovuoro
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] font-semibold text-pitch">
+                {isOverviewExpanded ? 'Piilota ▲' : 'Avaa viikonloppuraportti ▼'}
+              </span>
+            </button>
+
+            {isOverviewExpanded && (
+              <div className="p-3 pt-1 border-t border-border-subtle/50 flex flex-col gap-3">
+                {snapshot.days.length > 0 && (
+                  <WeekendStrip days={snapshot.days} weekendLabel={snapshot.weekendLabel} />
+                )}
+                <TalkooBoard talkoo={snapshot.talkoo} />
+                <TournamentWeekendPanel blocks={snapshot.tournaments} />
+              </div>
+            )}
+          </div>
+        )}
 
         {snapshot.nextEvent && (
           <div className="mb-4">
@@ -871,6 +935,7 @@ export const App: React.FC = () => {
                   events={otherEvents}
                   profiles={profiles}
                   viewMode={viewMode}
+                  onClearFilter={() => setActiveProfileId('all')}
                   onNavigate={(ev) =>
                     window.open(
                       `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
@@ -924,11 +989,18 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Smart Multi-Tab AI Importer (WhatsApp, Excel, Sheets, OCR) */}
+      {/* Unified Smart Multi-Tab Importer (Federation URL, Cups, WhatsApp, Excel, OCR) */}
       <SmartImportModal
         isOpen={isSmartImportOpen}
-        onClose={() => setIsSmartImportOpen(false)}
-        existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+        onClose={() => {
+          setIsSmartImportOpen(false);
+          setImportDefaults({});
+        }}
+        existingPlayers={playerNames}
+        initialSport={importDefaults.sport}
+        initialTeamUrl={importDefaults.url}
+        initialTeamName={importDefaults.name}
+        initialPlayerName={importDefaults.playerName}
         onImportClassic={handleImportCalendar}
       />
 
@@ -946,18 +1018,6 @@ export const App: React.FC = () => {
         onClose={() => setIsAskCopilotOpen(false)}
         events={rawEvents}
         profiles={profiles}
-      />
-
-      {/* Calendar Import Modal */}
-      <CalendarImportModal
-        isOpen={isImportModalOpen}
-        onClose={closeImport}
-        onImport={handleImportCalendar}
-        existingPlayers={playerNames}
-        initialSport={importDefaults.sport}
-        initialTeamUrl={importDefaults.url}
-        initialTeamName={importDefaults.name}
-        initialPlayerName={importDefaults.playerName}
       />
 
       {/* Family Management & Child Roster Modal */}
