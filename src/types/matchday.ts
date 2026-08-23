@@ -238,6 +238,12 @@ export interface OfficialLeagueFixture {
   endTime?: string;
   venueName: string;
   fieldNumber?: string;
+  venueLat?: number;
+  venueLng?: number;
+  venueCity?: string;
+  competitionId?: string;
+  categoryId?: string;
+  groupId?: string;
   status: 'upcoming' | 'played' | 'cancelled' | 'postponed';
   score?: string;
   homeScore?: number;
@@ -274,6 +280,10 @@ export interface OfficialTeamData {
   standings?: StandingRow[];
   roster?: TeamSquadRoster;
   divisionRosters?: Record<string, TeamSquadRoster>;
+  topScorers?: TopScorer[];
+  competitionId?: string;
+  categoryId?: string;
+  groupId?: string;
   sourceUrl?: string;
   fetchedAt?: string;
 }

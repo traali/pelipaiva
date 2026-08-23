@@ -1,66 +1,80 @@
 /* =========================================================================
-   PELIPÄIVÄ NOVA DESIGN SYSTEM TOKENS
-   Dual Theme: Daylight Matchday (Light) & Floodlight / Night Captain (Dark OLED)
+   PELIPÄIVÄ DESIGN SYSTEM
+   Floodlight (daylight, pitch-side) + Night Captain OLED (kitchen / Nest Hub)
+   DNA: Navikka cyan HUD + football-stats surface ladder + pitch green CTA
    ========================================================================= */
 
 @layer base {
-  /* ☀️ LIGHT THEME — Daylight Matchday */
+  /* FLOODLIGHT — outdoor match-morning, no glass, max contrast */
   :root {
-    --nv-bg-canvas: #f8fafc;
-    --nv-bg-surface-base: #ffffff;
-    --nv-bg-surface-card: rgba(255, 255, 255, 0.9);
-    --nv-bg-surface-elevated: #f1f5f9;
-    --nv-bg-surface-glass: rgba(255, 255, 255, 0.7);
+    --nv-bg-canvas: #f4f1e8;
+    --nv-bg-surface-base: #fffdf6;
+    --nv-bg-surface-card: #fffdf6;
+    --nv-bg-surface-elevated: #ebe6d8;
+    --nv-bg-surface-glass: #fffdf6;
+    --nv-bg-surface: #ebe6d8;
 
-    --nv-border-subtle: rgba(15, 23, 42, 0.08);
-    --nv-border-strong: rgba(15, 23, 42, 0.16);
-    --nv-border-focus: #059669;
+    --nv-border-subtle: rgba(10, 10, 10, 0.1);
+    --nv-border-strong: rgba(10, 10, 10, 0.22);
+    --nv-border-focus: #047857;
 
-    --nv-text-primary: #0f172a;
-    --nv-text-secondary: #475569;
-    --nv-text-muted: #94a3b8;
-    --nv-text-inverse: #ffffff;
+    --nv-text-primary: #0a0a0a;
+    --nv-text-secondary: #3f3f38;
+    --nv-text-muted: #5c5c54;
+    --nv-text-inverse: #f4f1e8;
 
-    --nv-pitch-primary: #059669;
-    --nv-pitch-glow: rgba(5, 150, 105, 0.18);
-    --nv-whistle-amber: #d97706;
-    --nv-whistle-glow: rgba(217, 119, 6, 0.16);
-    --nv-stoppage-red: #dc2626;
-    --nv-stoppage-glow: rgba(220, 38, 38, 0.16);
-    --nv-radar-cyan: #0284c7;
-    --nv-lightning-purple: #7c3aed;
+    --nv-pitch-primary: #047857;
+    --nv-pitch-glow: rgba(4, 120, 87, 0.16);
+    --nv-whistle-amber: #b45309;
+    --nv-whistle-glow: rgba(180, 83, 9, 0.16);
+    --nv-stoppage-red: #b91c1c;
+    --nv-stoppage-glow: rgba(185, 28, 28, 0.16);
+    --nv-radar-cyan: #0e7490;
+    --nv-floodlight: #8a8000;
+    --nv-floodlight-fg: #0a0a0a;
 
-    --nv-glass-blur: blur(16px);
-    --nv-shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    --nv-glass-blur: none;
+    --nv-shadow-card: 0 1px 0 rgba(10, 10, 10, 0.06);
+
+    --nv-radius-sm: 8px;
+    --nv-radius-md: 12px;
+    --nv-radius-lg: 16px;
+    --nv-radius-xl: 24px;
+    --nv-touch: 44px;
+
+    --nv-motion-quick: 150ms;
+    --nv-motion-fast: 250ms;
   }
 
-  /* 🌙 DARK THEME — Floodlight / Night Captain (OLED) */
+  /* NIGHT CAPTAIN — true OLED, disciplined glass, HUD yellow leave-by */
   .dark {
     --nv-bg-canvas: #000000;
-    --nv-bg-surface-base: #06080b;
-    --nv-bg-surface-card: rgba(12, 16, 23, 0.82);
-    --nv-bg-surface-elevated: #151a24;
-    --nv-bg-surface-glass: rgba(18, 24, 38, 0.6);
+    --nv-bg-surface-base: #0a0a0a;
+    --nv-bg-surface-card: rgba(14, 16, 20, 0.88);
+    --nv-bg-surface-elevated: #111111;
+    --nv-bg-surface-glass: rgba(17, 17, 17, 0.72);
+    --nv-bg-surface: #111111;
 
-    --nv-border-subtle: rgba(255, 255, 255, 0.08);
-    --nv-border-strong: rgba(255, 255, 255, 0.18);
+    --nv-border-subtle: rgba(250, 255, 105, 0.08);
+    --nv-border-strong: rgba(255, 255, 255, 0.16);
     --nv-border-focus: #10b981;
 
-    --nv-text-primary: #f8fafc;
-    --nv-text-secondary: #94a3b8;
-    --nv-text-muted: #64748b;
+    --nv-text-primary: #f4f4f0;
+    --nv-text-secondary: #c4c4b8;
+    --nv-text-muted: #9a9a90;
     --nv-text-inverse: #000000;
 
     --nv-pitch-primary: #10b981;
     --nv-pitch-glow: rgba(16, 185, 129, 0.28);
     --nv-whistle-amber: #fbbf24;
-    --nv-whistle-glow: rgba(251, 191, 36, 0.25);
-    --nv-stoppage-red: #ef4444;
-    --nv-stoppage-glow: rgba(239, 68, 68, 0.28);
-    --nv-radar-cyan: #38bdf8;
-    --nv-lightning-purple: #a855f7;
+    --nv-whistle-glow: rgba(251, 191, 36, 0.22);
+    --nv-stoppage-red: #f87171;
+    --nv-stoppage-glow: rgba(248, 113, 113, 0.28);
+    --nv-radar-cyan: #00f2fe;
+    --nv-floodlight: #faff69;
+    --nv-floodlight-fg: #0a0a0a;
 
-    --nv-glass-blur: blur(20px);
-    --nv-shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    --nv-glass-blur: blur(18px);
+    --nv-shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
 }

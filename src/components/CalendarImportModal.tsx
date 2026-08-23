@@ -5,14 +5,24 @@ import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
 import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
 import { searchPopularClubs } from '../lib/clubs/popularClubsCatalog';
+import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
+import { TeamColorPicker } from './TeamColorPicker';
+import { pickNextTeamColor } from '../lib/sport/teamColors';
 
 interface CalendarImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (playerName: string, teamName: string, sport: SportType, icsUrl: string) => Promise<void>;
+  onImport: (
+    playerName: string,
+    teamName: string,
+    sport: SportType,
+    icsUrl: string,
+    colorHex?: string
+  ) => Promise<void>;
   initialSport?: SportType;
   initialTeamUrl?: string;
   initialTeamName?: string;
+  initialPlayerName?: string;
   existingPlayers?: string[];
 }
 
@@ -23,48 +33,80 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   initialSport,
   initialTeamUrl,
   initialTeamName,
+  initialPlayerName,
   existingPlayers = []
 }) => {
   const [playerName, setPlayerName] = useState('');
-  const [teamName, setTeamName] = useState(initialTeamName || '');
-  const [sport, setSport] = useState<SportType>(initialSport || 'football');
-  const [icsUrl, setIcsUrl] = useState(initialTeamUrl || '');
+  const [teamName, setTeamName] = useState('');
+  const [sport, setSport] = useState<SportType>('football');
+  const [icsUrl, setIcsUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
+  const [playerHint, setPlayerHint] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      if (initialTeamName) setTeamName(initialTeamName);
-      if (initialSport) setSport(initialSport);
-      if (initialTeamUrl) setIcsUrl(initialTeamUrl);
-    }
-  }, [isOpen, initialTeamName, initialSport, initialTeamUrl]);
+    if (!isOpen) return;
+    setPlayerName(initialPlayerName || '');
+    setTeamName(initialTeamName || '');
+    setSport(initialSport || 'football');
+    setIcsUrl(initialTeamUrl || '');
+    setColorHex(pickNextTeamColor([]).hex);
+    setShowGuide(false);
+    setPlayerHint('');
+    setIsLoading(false);
+  }, [isOpen, initialPlayerName, initialTeamName, initialSport, initialTeamUrl]);
 
-  // Auto-detect sports association URL and auto-update sport
   const handleUrlChange = (val: string) => {
     setIcsUrl(val);
     const parsed = parseAssociationUrl(val);
-    if (parsed) {
-      if (parsed.sport && parsed.sport !== 'other') {
-        setSport(parsed.sport);
-      }
+    if (parsed?.sport && parsed.sport !== 'other') {
+      setSport(parsed.sport);
     }
   };
 
   const detectedAssoc = parseAssociationUrl(icsUrl);
+  const who = playerName.trim();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!teamName || !icsUrl) return;
+  const runImport = async (
+    name: string,
+    team: string,
+    nextSport: SportType,
+    url: string,
+    hex?: string
+  ) => {
+    if (!name.trim() || !url.trim()) return;
     setIsLoading(true);
     try {
-      await onImport(playerName || teamName, teamName, sport, icsUrl);
+      await onImport(name.trim(), team, nextSport, url, hex);
       onClose();
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!who) {
+      setPlayerHint('Valitse ensin kenelle joukkue lisätään.');
+      return;
+    }
+    if (!teamName || !icsUrl) return;
+    await runImport(who, teamName, sport, icsUrl, colorHex);
+  };
+
+  const handleCup = async (cup: (typeof EXAMPLE_TOURNAMENTS)[number]) => {
+    setTeamName(cup.teamName);
+    setSport(cup.sport);
+    setIcsUrl(cup.url);
+    setColorHex(cup.colorHex);
+    if (!who) {
+      setPlayerHint('Valitse pelaaja, sitten napauta turnausta uudestaan.');
+      return;
+    }
+    await runImport(who, cup.teamName, cup.sport, cup.url, cup.colorHex);
   };
 
   return (
@@ -84,34 +126,117 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}
             transition={springTactile.gentle}
-            className="liquid-glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
+            className="liquid-glass relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl p-6 shadow-2xl"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-pitch/15 text-pitch">
-                  <Calendar className="w-5 h-5" />
+                <div className="rounded-xl bg-pitch/15 p-2 text-pitch">
+                  <Calendar className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-text-primary">Lisää ottelukalenteri</h3>
-                  <p className="text-xs text-text-muted">Nimenhuuto, MyClub, Jopox tai Palloliitto / Torneopal</p>
+                  <h3 className="text-lg font-bold text-text-primary">
+                    {who ? `Lisää joukkue — ${who}` : 'Lisää joukkue tai turnaus'}
+                  </h3>
+                  <p className="text-xs text-text-muted">
+                    Sama lapsi voi olla sarjassa ja useassa cupissa
+                  </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-2 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-elevated cursor-pointer"
+                className="cursor-pointer rounded-full p-2 text-text-muted hover:bg-surface-elevated hover:text-text-primary"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Quick Club Preset Search */}
             <div className="mb-4">
-              <label className="block text-xs font-semibold text-text-secondary mb-1">
-                ⚡ Pikahaku suomalaisista seuroista (valinnainen)
+              <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+                Kenelle?
+              </label>
+              {existingPlayers.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {existingPlayers.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => {
+                        setPlayerName(p);
+                        setPlayerHint('');
+                      }}
+                      className={`min-h-11 cursor-pointer rounded-lg border px-3 text-xs font-semibold transition-all ${
+                        playerName === p
+                          ? 'border-pitch bg-pitch text-text-inverse shadow-sm shadow-pitch/20'
+                          : 'border-border-subtle bg-surface text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPlayerName('')}
+                    className="min-h-11 cursor-pointer rounded-lg border border-border-subtle bg-surface px-3 text-[11px] font-medium text-text-muted hover:text-text-primary"
+                  >
+                    + Uusi lapsi
+                  </button>
+                </div>
+              )}
+              <input
+                type="text"
+                required
+                placeholder="esim. Simo"
+                value={playerName}
+                onChange={(e) => {
+                  setPlayerName(e.target.value);
+                  setPlayerHint('');
+                }}
+                className="w-full rounded-xl border border-border-strong bg-surface-elevated px-3.5 py-2.5 text-sm text-text-primary focus:border-pitch focus:outline-none"
+              />
+              {playerHint ? (
+                <p className="mt-1.5 text-xs font-medium text-whistle">{playerHint}</p>
+              ) : null}
+            </div>
+
+            <div className="mb-4">
+              <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+                Esimerkkiturnaukset — napauta, niin se liitetään valittuun lapseen
+              </label>
+              <div className="flex flex-col gap-1.5">
+                {EXAMPLE_TOURNAMENTS.map((cup) => (
+                  <button
+                    key={cup.id}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => void handleCup(cup)}
+                    className="flex min-h-11 items-center gap-2 rounded-xl border border-border-subtle bg-surface-elevated px-3 py-2 text-left disabled:opacity-50"
+                  >
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ background: cup.colorHex }}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-semibold text-text-primary">
+                        {cup.name}
+                      </span>
+                      <span className="block truncate text-[11px] text-text-muted">
+                        {cup.teamName}
+                      </span>
+                    </span>
+                    <Plus className="ml-auto h-4 w-4 shrink-0 text-pitch" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-semibold text-text-secondary">
+                Pikahaku seuroista
               </label>
               <input
                 type="text"
-                placeholder="Kirjoita seura, esim. HJK, Honka, ErVi, Classic, ToPo..."
+                placeholder="HJK, Honka, ErVi, TOPOLA..."
                 onChange={(e) => {
                   const q = e.target.value;
                   if (q.trim().length > 1) {
@@ -121,100 +246,57 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                       setTeamName(top.name);
                       setSport(top.sport);
                       setIcsUrl(top.sampleTeamUrl);
+                      setColorHex(top.colorHex);
                     }
                   }
                 }}
-                className="w-full px-3.5 py-2 rounded-xl bg-pitch/10 border border-pitch/30 text-text-primary text-xs focus:outline-none focus:border-pitch placeholder:text-text-muted"
+                className="w-full rounded-xl border border-pitch/30 bg-pitch/10 px-3.5 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-pitch focus:outline-none"
               />
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-text-secondary">
-                    👤 Kenelle pelaajalle / lapselle liitetään? *
-                  </label>
-                  <span className="text-[11px] text-pitch font-medium">Perhenäkymä</span>
-                </div>
-
-                {existingPlayers.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {existingPlayers.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPlayerName(p)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer transition-all ${
-                          playerName === p
-                            ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
-                            : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
-                        }`}
-                      >
-                        👤 {p}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setPlayerName('')}
-                      className="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface text-text-muted border border-border-subtle hover:text-text-primary cursor-pointer"
-                    >
-                      + Uusi lapsi
-                    </button>
-                  </div>
-                )}
-
-                <input
-                  type="text"
-                  required
-                  placeholder="esim. Maija"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-sm focus:outline-none focus:border-pitch"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">
-                  Joukkue / Ryhmä *
+                <label className="mb-1 block text-xs font-semibold text-text-secondary">
+                  Joukkue / turnaus
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="esim. HJK T13 Sininen"
+                  placeholder="esim. PPJ/Laru sin · Helsinki Cup"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-sm focus:outline-none focus:border-pitch"
+                  className="w-full rounded-xl border border-border-strong bg-surface-elevated px-3.5 py-2.5 text-sm text-text-primary focus:border-pitch focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-secondary mb-1">Laji</label>
+                <label className="mb-1 block text-xs font-semibold text-text-secondary">Laji</label>
                 <select
                   value={sport}
                   onChange={(e) => setSport(e.target.value as SportType)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-sm focus:outline-none focus:border-pitch"
+                  className="w-full rounded-xl border border-border-strong bg-surface-elevated px-3.5 py-2.5 text-sm text-text-primary focus:border-pitch focus:outline-none"
                 >
-                  <option value="football">⚽ Jalkapallo</option>
-                  <option value="floorball">🏑 Salibandy</option>
-                  <option value="basketball">🏀 Koripallo</option>
-                  <option value="volleyball">🏐 Lentopallo</option>
-                  <option value="icehockey">🏒 Jääkiekko</option>
-                  <option value="futsal">👟 Futsal</option>
-                  <option value="other">🏅 Muu urheilu / Treenit</option>
+                  <option value="football">Jalkapallo</option>
+                  <option value="floorball">Salibandy</option>
+                  <option value="basketball">Koripallo</option>
+                  <option value="volleyball">Lentopallo</option>
+                  <option value="icehockey">Jääkiekko</option>
+                  <option value="futsal">Futsal</option>
+                  <option value="other">Muu / treenit</option>
                 </select>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="mb-1 flex items-center justify-between">
                   <label className="text-xs font-semibold text-text-secondary">
-                    iCal-syötteen tai liiton joukkuesivun URL *
+                    Liiton joukkuesivu tai .ics
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowGuide(!showGuide)}
-                    className="text-[11px] text-pitch hover:underline flex items-center gap-0.5 cursor-pointer"
+                    className="flex cursor-pointer items-center gap-0.5 text-[11px] text-pitch hover:underline"
                   >
-                    <HelpCircle className="w-3 h-3" />
+                    <HelpCircle className="h-3 w-3" />
                     <span>Tuetut lähteet</span>
                   </button>
                 </div>
@@ -222,46 +304,53 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                 <input
                   type="url"
                   required
-                  placeholder="https://tulospalvelu.palloliitto.fi/team/... tai .ics"
+                  placeholder="https://tulospalvelu.palloliitto.fi/team/..."
                   value={icsUrl}
                   onChange={(e) => handleUrlChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-sm focus:outline-none focus:border-pitch font-mono text-xs"
+                  className="w-full rounded-xl border border-border-strong bg-surface-elevated px-3.5 py-2.5 font-mono text-xs text-text-primary focus:border-pitch focus:outline-none"
                 />
 
                 {detectedAssoc && (
-                  <div className="mt-1.5 px-3 py-1.5 rounded-lg bg-pitch/10 text-pitch text-xs flex items-center gap-1.5 font-medium">
-                    <Trophy className="w-3.5 h-3.5" />
-                    <span>Tunnistettu: {getAssociationName(detectedAssoc.association)} (Joukkue ID: {detectedAssoc.teamId})</span>
+                  <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-pitch/10 px-3 py-1.5 text-xs font-medium text-pitch">
+                    <Trophy className="h-3.5 w-3.5" />
+                    <span>
+                      {getAssociationName(detectedAssoc.association)} · {detectedAssoc.teamId}
+                    </span>
                   </div>
                 )}
 
-                {/* Collapsible In-Modal Helper Guide */}
                 {showGuide && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-2 p-3 rounded-xl bg-surface-elevated text-[11px] text-text-secondary border border-border-subtle flex flex-col gap-1.5"
+                    className="mt-2 flex flex-col gap-1.5 rounded-xl border border-border-subtle bg-surface-elevated p-3 text-[11px] text-text-secondary"
                   >
-                    <div><strong>⚽ Palloliitto:</strong> tulospalvelu.palloliitto.fi/team/{'{id}'}</div>
-                    <div><strong>🏑 Salibandy:</strong> tulospalvelu.salibandy.fi/team/{'{id}'}</div>
-                    <div><strong>🏀 Basket.fi:</strong> basket.fi/basket/sarjat/joukkue/?team_id={'{id}'}</div>
-                    <div><strong>🏐 Torneopal:</strong> *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
-                    <div><strong>📅 Kalenterit:</strong> Nimenhuuto, MyClub, Jopox (.ics)</div>
+                    <div>Palloliitto: tulospalvelu.palloliitto.fi/team/id</div>
+                    <div>Salibandy: tulospalvelu.salibandy.fi/team/id</div>
+                    <div>Basket.fi / Espoo Liikkuu: …/team/id</div>
+                    <div>Torneopal / KW Memorial: *.torneopal.fi/taso/joukkue.php</div>
+                    <div>Kalenterit: Nimenhuuto, MyClub, Jopox (.ics)</div>
                   </motion.div>
                 )}
 
-                <p className="text-[11px] text-text-muted mt-1.5 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-pitch" />
-                  100% Yksityinen: tallentuu vain puhelimesi selaimeen (Dexie IndexedDB).
+                <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted">
+                  <ShieldCheck className="h-3.5 w-3.5 text-pitch" />
+                  Tallentuu vain tähän selaimeen.
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-border-subtle flex items-center justify-end gap-2">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-text-secondary">
+                  Joukkueen väri
+                </label>
+                <TeamColorPicker value={colorHex} onChange={(hex) => setColorHex(hex)} />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-border-subtle pt-3">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary cursor-pointer"
+                  className="cursor-pointer rounded-xl px-4 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary"
                 >
                   Peruuta
                 </button>
@@ -269,14 +358,14 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                   whileTap={{ scale: 0.96 }}
                   type="submit"
                   disabled={isLoading}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold shadow-md shadow-pitch/25 hover:brightness-110 active:brightness-95 cursor-pointer disabled:opacity-50"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-pitch px-5 py-2.5 text-xs font-bold text-text-inverse shadow-md shadow-pitch/25 hover:brightness-110 disabled:opacity-50"
                 >
                   {isLoading ? (
-                    'Haetaan...'
+                    'Haetaan otteluita…'
                   ) : (
                     <>
-                      <Plus className="w-4 h-4" />
-                      <span>Tallenna kalenteri</span>
+                      <Plus className="h-4 w-4" />
+                      <span>{who ? `Lisää joukkue · ${who}` : 'Lisää joukkue'}</span>
                     </>
                   )}
                 </motion.button>
@@ -288,4 +377,3 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
     </AnimatePresence>
   );
 };
-

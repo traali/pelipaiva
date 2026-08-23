@@ -177,9 +177,9 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     city: 'Helsinki/Vantaa',
     sport: 'floorball',
     primaryColor: 'sininen',
-    colorHex: '#2563eb',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
-    popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'P11 Itä', 'P14 Sininen']
+    colorHex: '#1d4ed8',
+    sampleTeamUrl: 'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
+    popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'KW Memorial']
   },
   {
     id: 'classic',
@@ -237,6 +237,17 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     colorHex: '#1d4ed8',
     sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
     popularAgeGroups: ['U14 Pojat', 'U13 Tytöt', 'U12 Pojat', 'Edustus']
+  },
+  {
+    id: 'topola',
+    name: 'Touhun Pojat Lauttasaari (TOPOLA)',
+    shortName: 'TOPOLA',
+    city: 'Helsinki',
+    sport: 'basketball',
+    primaryColor: 'syaani',
+    colorHex: '#21C3F7',
+    sampleTeamUrl: 'https://espooliikkuutournament.fi/team/203621',
+    popularAgeGroups: ['Girls 2015 Fun', 'U12', 'U13']
   },
   {
     id: 'hnmky',

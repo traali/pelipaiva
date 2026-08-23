@@ -9,6 +9,12 @@ import {
   StandingRow,
   PlayerDetailedStats
 } from '../../types/matchday';
+import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
+import {
+  fetchTorneopalTeamData,
+} from '../api/torneopalClient';
+
+export { DEFAULT_PROXY_URL };
 
 // ============================================================================
 // SPORTS ASSOCIATION URL PARSER (Palloliitto, Salibandyliitto, Basket.fi, Torneopal)
@@ -89,10 +95,21 @@ export function inferSportFromSubdomain(subdomain: string): SportType {
   if (normalized.includes('futsal')) {
     return 'futsal';
   }
-  if (normalized.includes('salibandy') || normalized.includes('floorball') || normalized.startsWith('sb')) {
+  if (
+    normalized.includes('salibandy') ||
+    normalized.includes('floorball') ||
+    normalized.startsWith('sb') ||
+    normalized.includes('memorial') ||
+    normalized.includes('kwmemorial')
+  ) {
     return 'floorball';
   }
-  if (normalized.includes('kori') || normalized.includes('basket')) {
+  if (
+    normalized.includes('kori') ||
+    normalized.includes('basket') ||
+    normalized.includes('espooliikkuu') ||
+    normalized.includes('esli')
+  ) {
     return 'basketball';
   }
   if (normalized.includes('kiekko') || normalized.includes('hockey') || normalized.includes('jaakiekko')) {
@@ -123,6 +140,23 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
   const hostname = parsedUrl.hostname.toLowerCase();
   const pathname = parsedUrl.pathname;
   const searchParams = parsedUrl.searchParams;
+
+  // 0. Custom tournament SPAs (Torneopal-backed)
+  if (hostname === 'espooliikkuutournament.fi' || hostname === 'www.espooliikkuutournament.fi') {
+    const teamMatch = pathname.match(/^\/team\/(\d+)(?:\/.*)?$/i);
+    if (teamMatch && teamMatch[1]) {
+      const teamId = teamMatch[1]!;
+      return {
+        sport: 'basketball',
+        association: 'basket',
+        teamId,
+        seasonId: searchParams.get('turnaus') || 'esli2026',
+        leagueId: searchParams.get('sarja') || searchParams.get('category') || undefined,
+        canonicalUrl: `https://espooliikkuutournament.fi/team/${teamId}`
+      };
+    }
+    return null;
+  }
 
   // 1. ⚽ Football: Palloliitto Tulospalvelu (tulospalvelu.palloliitto.fi)
   if (hostname === 'tulospalvelu.palloliitto.fi' || hostname === 'www.tulospalvelu.palloliitto.fi') {
@@ -248,8 +282,11 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
 
       if (teamId && /^\d+$/.test(teamId)) {
         const leagueId = searchParams.get('sarja') || searchParams.get('sarja_id') || undefined;
-        const seasonId = searchParams.get('kausi') || searchParams.get('season') || searchParams.get('turnaus') || undefined;
+        const seasonId = searchParams.get('turnaus') || searchParams.get('kausi') || searchParams.get('season') || undefined;
         const sport = inferSportFromSubdomain(subdomain);
+        const qs = new URLSearchParams({ joukkue: teamId });
+        if (seasonId) qs.set('turnaus', seasonId);
+        if (leagueId) qs.set('sarja', leagueId);
 
         return {
           sport,
@@ -258,7 +295,7 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
           subdomain,
           leagueId,
           seasonId,
-          canonicalUrl: `https://${subdomain}.torneopal.fi/taso/joukkue.php?joukkue=${teamId}`
+          canonicalUrl: `https://${subdomain}.torneopal.fi/taso/joukkue.php?${qs.toString()}`
         };
       }
     }
@@ -388,7 +425,6 @@ export interface ExtractorOptions {
   customTeamName?: string;
 }
 
-export const DEFAULT_PROXY_URL = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
 
 /**
  * Calculates Finnish timezone offset (+02:00 EET / +03:00 EEST) for a given Date.
@@ -927,7 +963,8 @@ export function generateSyntheticOfficialTeamData(
 }
 
 /**
- * Extracts official team data via Cloudflare Worker streaming proxy or synthetic fallback.
+ * Extracts official team data from Torneopal JSON first, then HTML.
+ * Does not invent fixtures, standings, or rosters.
  */
 export async function extractOfficialTeamData(
   parsedUrl: ParsedAssociationUrl,
@@ -937,9 +974,15 @@ export async function extractOfficialTeamData(
     proxyUrl = DEFAULT_PROXY_URL,
     bypassProxy = false,
     timeoutMs = 8000,
-    fallbackToSynthetic = true,
+    fallbackToSynthetic = false,
     customTeamName
   } = options;
+
+  const jsonData = await fetchTorneopalTeamData(parsedUrl);
+  if (jsonData && (jsonData.fixtures.length > 0 || jsonData.roster || jsonData.standings)) {
+    if (customTeamName && !jsonData.teamName) jsonData.teamName = customTeamName;
+    return jsonData;
+  }
 
   const targetUrl = parsedUrl.canonicalUrl;
   const fetchUrl = bypassProxy ? targetUrl : `${proxyUrl}?url=${encodeURIComponent(targetUrl)}`;
@@ -966,16 +1009,28 @@ export async function extractOfficialTeamData(
     }
 
     const extracted = parseTorneopalHtml(html, parsedUrl);
+    if (extracted.fixtures.length === 0 && jsonData) {
+      return jsonData;
+    }
     if (extracted.fixtures.length === 0 && fallbackToSynthetic) {
       return generateSyntheticOfficialTeamData(parsedUrl, customTeamName);
     }
     return extracted;
   } catch (err) {
     clearTimeout(timeoutId);
+    if (jsonData) return jsonData;
     if (fallbackToSynthetic) {
       return generateSyntheticOfficialTeamData(parsedUrl, customTeamName);
     }
-    throw err;
+    return {
+      teamId: parsedUrl.teamId,
+      association: parsedUrl.association,
+      sport: parsedUrl.sport,
+      teamName: customTeamName,
+      fixtures: [],
+      sourceUrl: parsedUrl.canonicalUrl,
+      fetchedAt: new Date().toISOString()
+    };
   }
 }
 

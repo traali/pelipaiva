@@ -1,21 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, ensureStoragePersistence } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
 import { MultiProfileHeader } from './components/MultiProfileHeader';
-import { ThemeToggle } from './components/ThemeToggle';
 import { CalendarImportModal } from './components/CalendarImportModal';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { DemoBanner } from './components/DemoBanner';
 import { parseICSFeed } from './lib/calendar/icsParser';
 import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
-import { CalendarPlus, RefreshCw, Smartphone, Tv, Share2, AlertTriangle, Trash2, Sparkles, Car, MessageSquarePlus } from 'lucide-react';
-import { motion } from 'motion/react';
-import { springTactile } from './lib/motion/springs';
+import { Sparkles, Smartphone } from 'lucide-react';
 import { FamilyShareModal } from './components/FamilyShareModal';
 import { SmartImportModal } from './components/SmartImportModal';
 import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
@@ -23,12 +19,23 @@ import { AskCopilotModal } from './components/AskCopilotModal';
 import { FamilyManageModal } from './components/FamilyManageModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { unpackSharePayload } from './lib/sync/familyShare';
+import { MissionControlHUD } from './components/MissionControlHUD';
+import { WeekendStrip } from './components/WeekendStrip';
+import { HeroMatchCard } from './components/HeroMatchCard';
+import { TalkooBoard } from './components/TalkooBoard';
+import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
+import { runMissionControlGraph } from './lib/agents';
 import {
   parseAssociationUrl,
   extractOfficialTeamData,
   generateOrResolveMatchStats
 } from './lib/stats/statsEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
+import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
+import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
+import { exampleTournamentFromUrl, isCupName } from './lib/clubs/exampleTournaments';
+import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
+import { findExistingTeamProfile } from './lib/clubs/attachTeam';
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
@@ -45,11 +52,13 @@ export const App: React.FC = () => {
     }
     return true;
   });
+  const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
     url?: string;
     name?: string;
+    playerName?: string;
   }>({});
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -101,12 +110,26 @@ export const App: React.FC = () => {
 
   // Dexie Reactive Live Queries
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
-  const rawEvents = useLiveQuery(() => db.events.toArray(), []) || [];
+  const eventsQuery = useLiveQuery(() => db.events.toArray(), []);
+  const rawEvents = eventsQuery || [];
 
-  const isDemoActive = profiles.some((p) => p.id.startsWith('profile-ppj-') || p.id === 'profile-hjk-demo');
+  const isDemoActive = profiles.some(
+    (p) =>
+      p.id.startsWith('profile-ppj-') ||
+      p.id.startsWith('profile-topola-') ||
+      p.id.startsWith('profile-kw-') ||
+      p.id === 'profile-hjk-demo'
+  );
+  const needsDemoRefresh =
+    isDemoActive &&
+    !isSeeding &&
+    eventsQuery !== undefined &&
+    !rawEvents.some((e) => e.id === 'demo-elt-aada-1');
 
   // Seed user default teams (PPJ 185085, 185083, 185086, Salibandy 25301, Basket 5756346)
   const handleStartDemo = async () => {
+    setIsSeeding(true);
+    try {
     await db.profiles.clear();
     await db.events.clear();
 
@@ -139,7 +162,7 @@ export const App: React.FC = () => {
         primaryColor: 'valkoinen',
         secondaryColor: 'sininen',
         calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-        colorHex: '#10b981'
+        colorHex: '#64748b'
       },
       {
         id: 'profile-basket-5756346',
@@ -164,6 +187,9 @@ export const App: React.FC = () => {
     ];
 
     for (const p of defaultProfiles) {
+      await db.profiles.add(p);
+    }
+    for (const p of EXTRA_PROFILES) {
       await db.profiles.add(p);
     }
 
@@ -266,7 +292,18 @@ export const App: React.FC = () => {
       ev.briefing = generateMatchdayBriefing(ev, [ev]);
       await db.events.put(ev);
     }
+    for (const extra of buildWeekendShowcaseEvents()) {
+      await db.events.put(extra);
+    }
+    } finally {
+      setIsSeeding(false);
+    }
   };
+
+  useEffect(() => {
+    if (!needsDemoRefresh || isSeeding) return;
+    void handleStartDemo();
+  }, [needsDemoRefresh, isSeeding]);
 
   const handleClearData = async () => {
     await db.profiles.clear();
@@ -276,38 +313,74 @@ export const App: React.FC = () => {
   };
 
   // Filter events by selected profile or player group
-  const filteredEvents = rawEvents.filter((e) => {
-    if (activeProfileId === 'all') return true;
-    if (activeProfileId.startsWith('player:')) {
-      const pName = activeProfileId.replace('player:', '').toLowerCase();
-      const profile = profiles.find((p) => p.id === e.profileId);
-      return (profile?.playerName || '').toLowerCase() === pName;
-    }
-    return e.profileId === activeProfileId;
-  });
+  const filteredEvents = [...rawEvents]
+    .filter((e) => {
+      if (activeProfileId === 'all') return true;
+      if (activeProfileId.startsWith('player:')) {
+        const pName = activeProfileId.replace('player:', '').toLowerCase();
+        const profile = profiles.find((p) => p.id === e.profileId);
+        return (profile?.playerName || '').toLowerCase() === pName;
+      }
+      return e.profileId === activeProfileId;
+    })
+    .sort((a, b) => {
+      const now = Date.now() - 2 * 3600 * 1000;
+      const aT = new Date(a.startTime).getTime();
+      const bT = new Date(b.startTime).getTime();
+      const aUp = aT >= now;
+      const bUp = bT >= now;
+      if (aUp && !bUp) return -1;
+      if (!aUp && bUp) return 1;
+      return aUp ? aT - bT : bT - aT;
+    });
+
+  const snapshot = useMemo(
+    () => runMissionControlGraph(rawEvents, profiles, new Date()),
+    [rawEvents, profiles]
+  );
 
   const handleImportCalendar = async (
     playerName: string,
     teamName: string,
     sport: SportType,
-    url: string
+    url: string,
+    colorHex?: string
   ) => {
-    // If we're currently on demo data, clean demo data first
-    if (isDemoActive) {
-      await db.profiles.clear();
-      await db.events.clear();
-    }
+    const existing = await db.profiles.toArray();
+    const cup = exampleTournamentFromUrl(url);
+    const club = searchPopularClubs(teamName).find((c) => c.sport === sport);
+    const named = colorFromNameHint(`${teamName} ${url}`);
+    const swatch = colorHex
+      ? swatchForHex(colorHex)
+      : cup
+        ? { hex: cup.colorHex, label: cup.primaryColor }
+        : named ||
+          (club
+            ? { hex: club.colorHex, label: club.primaryColor }
+            : pickNextTeamColor(existing.map((p) => p.colorHex)));
 
-    const profileId = `profile-${Date.now()}`;
-    await db.profiles.add({
-      id: profileId,
-      playerName,
-      teamName,
-      sport,
-      primaryColor: 'punainen',
-      calendarUrl: url,
-      colorHex: '#10b981'
-    });
+    const reused = findExistingTeamProfile(existing, playerName, url);
+    const profileId = reused?.id || `profile-${Date.now()}`;
+
+    if (reused) {
+      await db.profiles.update(profileId, {
+        teamName: teamName || reused.teamName,
+        sport,
+        primaryColor: swatch.label,
+        calendarUrl: url,
+        colorHex: swatch.hex
+      });
+    } else {
+      await db.profiles.add({
+        id: profileId,
+        playerName,
+        teamName,
+        sport,
+        primaryColor: swatch.label,
+        calendarUrl: url,
+        colorHex: swatch.hex
+      });
+    }
 
     try {
       const parsedAssoc = parseAssociationUrl(url);
@@ -322,6 +395,13 @@ export const App: React.FC = () => {
         for (const fix of officialData.fixtures) {
           await db.officialFixtures.put(fix);
         }
+
+        await db.profiles.update(profileId, {
+          teamName: officialData.teamName || teamName,
+          teamId: parsedAssoc.teamId,
+          associationType: parsedAssoc.association,
+          associationUrl: url
+        });
 
         const eventsToInsert: MatchdayEvent[] = [];
         for (const fixture of officialData.fixtures) {
@@ -346,7 +426,7 @@ export const App: React.FC = () => {
             id: `fixture-${fixture.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             profileId,
             title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
-            eventType: 'match',
+            eventType: isCupName(fixture.leagueName) ? 'tournament' : 'match',
             isTraining: false,
             sport: parsedAssoc.sport,
             homeTeam: fixture.homeTeam,
@@ -393,6 +473,22 @@ export const App: React.FC = () => {
       console.warn('Team / Calendar fetch error:', err);
     }
   };
+
+  const playerNames = Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)));
+
+  const closeImport = () => {
+    setIsImportModalOpen(false);
+    setImportDefaults({});
+  };
+
+  const openAddTeam = (playerName?: string) => {
+    setImportDefaults({ playerName });
+    setIsImportModalOpen(true);
+  };
+
+  const activePlayerName = activeProfileId.startsWith('player:')
+    ? activeProfileId.replace('player:', '')
+    : profiles.find((p) => p.id === activeProfileId)?.playerName;
 
   const handleRefreshAll = async () => {
     setIsSyncing(true);
@@ -449,7 +545,7 @@ export const App: React.FC = () => {
   };
 
   if (isAmbientMode) {
-    return <AmbientView events={filteredEvents} />;
+    return <AmbientView events={filteredEvents} profiles={profiles} />;
   }
 
   // If no profiles exist yet or onboarding is explicitly in progress, show the Interactive Onboarding Wizard
@@ -485,11 +581,13 @@ export const App: React.FC = () => {
         />
         <CalendarImportModal
           isOpen={isImportModalOpen}
-          onClose={() => setIsImportModalOpen(false)}
+          onClose={closeImport}
           onImport={handleImportCalendar}
           initialSport={importDefaults.sport}
           initialTeamUrl={importDefaults.url}
           initialTeamName={importDefaults.name}
+          initialPlayerName={importDefaults.playerName}
+          existingPlayers={playerNames}
         />
         <FamilyShareModal
           isOpen={isFamilyShareOpen}
@@ -502,158 +600,71 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-canvas text-text-primary transition-colors pb-16">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-30 bg-canvas/85 backdrop-blur-md border-b border-border-subtle">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-pitch text-text-inverse flex items-center justify-center font-black text-sm shadow-md shadow-pitch/20">
-              P
-            </div>
-            <div>
-              <h1 className="text-base font-bold tracking-tight text-text-primary leading-tight">
-                PELIPÄIVÄ
-              </h1>
-              <p className="text-[10px] text-text-muted font-medium">Matchday Hub • 100% Local</p>
-            </div>
-          </div>
+    <div className="min-h-dvh bg-canvas pb-[max(2rem,env(safe-area-inset-bottom))] text-text-primary">
+      <MissionControlHUD
+        snapshot={snapshot}
+        isOffline={isOffline}
+        isSyncing={isSyncing}
+        isDemo={isDemoActive}
+        onRefresh={handleRefreshAll}
+        onShare={() => setIsFamilyShareOpen(true)}
+        onAmbient={() => setIsAmbientMode(true)}
+        onLogistics={() => setIsLogisticsOpen(true)}
+        onImport={() => setIsSmartImportOpen(true)}
+        onAsk={() => setIsAskCopilotOpen(true)}
+        onClear={handleClearData}
+      />
 
-          <div className="flex items-center gap-2">
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              transition={springTactile.snappy}
-              onClick={handleRefreshAll}
-              disabled={isSyncing}
-              title="Päivitä sää ja kalenterit"
-              className="p-2 rounded-full bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-pitch' : ''}`} />
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsFamilyShareOpen(true)}
-              title="Perhejako & Varmuuskopio"
-              className="p-2 rounded-full bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle cursor-pointer"
-            >
-              <Share2 className="w-4 h-4 text-pitch" />
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsAmbientMode(!isAmbientMode)}
-              title="Google Nest Ambient -näkymä"
-              className="p-2 rounded-full bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle cursor-pointer"
-            >
-              <Tv className="w-4 h-4" />
-            </motion.button>
-
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              transition={springTactile.snappy}
-              onClick={handleClearData}
-              title="Tyhjennä tiedot & Aloita alusta"
-              className="p-2 rounded-full bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle cursor-pointer transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </motion.button>
-
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      {/* Offline / Degraded Mode Alert Banner */}
-      {isOffline && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-500 text-xs py-1.5 px-4 text-center font-semibold flex items-center justify-center gap-1.5">
-          <AlertTriangle className="w-3.5 h-3.5" />
-          <span>Offline-tila: Näytetään viimeisimmät tallennetut ottelutiedot laitteelta.</span>
-        </div>
-      )}
-
-      {/* Main Container */}
-      <main className="max-w-4xl mx-auto px-4 pt-4">
-        {/* Demo Mode Banner (if sample data is active) */}
-        {isDemoActive && (
-          <DemoBanner
-            onOpenImport={() => setIsImportModalOpen(true)}
-            onClearDemo={handleClearData}
-          />
-        )}
-
-        {/* Multi-Profile Selector Bar */}
-        <div className="mb-5">
+      <main className="mx-auto max-w-5xl px-4 pt-4">
+        <div className="mb-4">
           <MultiProfileHeader
             profiles={profiles}
             activeProfileId={activeProfileId}
             onSelectProfile={(id) => setActiveProfileId(id)}
-            onAddProfile={() => setIsImportModalOpen(true)}
+            onAddProfile={() => openAddTeam(activePlayerName)}
             onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
           />
         </div>
 
-        {/* Section Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary">
-              Tulevat ottelut & harjoitukset
-            </h2>
-            <p className="text-xs text-text-secondary">
-              Reaaliaikainen sää, pysäköinti ja Nappisvahti
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsSmartImportOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pitch/15 border border-pitch/30 text-pitch text-xs font-bold cursor-pointer hover:bg-pitch hover:text-text-inverse transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Äly-tuonti</span>
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsLogisticsOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
-            >
-              <Car className="w-3.5 h-3.5 text-pitch" />
-              <span className="hidden sm:inline">Kyytiapuri</span>
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsAskCopilotOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
-            >
-              <MessageSquarePlus className="w-3.5 h-3.5 text-pitch" />
-              <span className="hidden sm:inline">Kysy Älyltä</span>
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsFamilyShareOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
-            >
-              <Share2 className="w-3.5 h-3.5 text-pitch" />
-              <span className="hidden sm:inline">Jaa perheelle</span>
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsImportModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-semibold cursor-pointer hover:border-pitch"
-            >
-              <CalendarPlus className="w-3.5 h-3.5 text-pitch" />
-              <span className="hidden sm:inline">Tuo .ics</span>
-            </motion.button>
-          </div>
-        </div>
+        {snapshot.days.length > 0 && (
+          <WeekendStrip days={snapshot.days} weekendLabel={snapshot.weekendLabel} />
+        )}
 
-        {/* General Drop-in Bar for WhatsApp, MyClub & freeform text */}
+        {snapshot.conflicts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsLogisticsOpen(true)}
+            className="mb-4 flex min-h-11 w-full items-start gap-2 rounded-xl border border-whistle/35 bg-whistle/12 px-3 py-3 text-left"
+          >
+            <span className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-whistle">
+              Ristiriita
+            </span>
+            <span className="text-sm text-text-primary">{snapshot.conflicts[0]?.message}</span>
+          </button>
+        )}
+
+        <TalkooBoard talkoo={snapshot.talkoo} />
+        <TournamentWeekendPanel blocks={snapshot.tournaments} />
+
+        {snapshot.nextEvent && (
+          <div className="mb-4">
+            <HeroMatchCard
+              event={snapshot.nextEvent}
+              profile={snapshot.nextPlayer}
+              kit={snapshot.kitByEventId[snapshot.nextEvent.id]}
+              conflicts={snapshot.conflicts}
+              onNavigate={() => {
+                const ev = snapshot.nextEvent;
+                if (!ev) return;
+                window.open(
+                  `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                  '_blank'
+                );
+              }}
+            />
+          </div>
+        )}
+
         <QuickDropInBar
           existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
           activeProfilePlayerName={
@@ -664,37 +675,39 @@ export const App: React.FC = () => {
           onEventCreated={() => {}}
         />
 
-        {/* Bento Grid Match Cards */}
         {filteredEvents.length > 0 ? (
-          <div className="flex flex-col gap-4">
-            {filteredEvents.map((event) => {
-              const profile = profiles.find((p) => p.id === event.profileId);
-              return (
-                <MatchdayCard
-                  key={event.id}
-                  event={event}
-                  playerName={profile?.playerName}
-                  onResolveMismatch={handleResolveMismatch}
-                />
-              );
-            })}
+          <div className="flex flex-col gap-3 pb-8">
+            {filteredEvents
+              .filter((e) => e.id !== snapshot.nextEvent?.id)
+              .map((event) => {
+                const profile = profiles.find((p) => p.id === event.profileId);
+                return (
+                  <MatchdayCard
+                    key={event.id}
+                    event={event}
+                    playerName={profile?.playerName}
+                    colorHex={profile?.colorHex}
+                    compact
+                    onResolveMismatch={handleResolveMismatch}
+                  />
+                );
+              })}
           </div>
         ) : (
-          <div className="text-center py-16 px-4 rounded-3xl bg-surface-elevated/40 border border-border-subtle">
-            <Smartphone className="w-10 h-10 text-text-muted mx-auto mb-3" />
-            <h3 className="text-base font-bold text-text-primary">Ei otteluita kalenterissa</h3>
-            <p className="text-xs text-text-secondary max-w-sm mx-auto mt-1 mb-4">
-              Tuo joukkueesi kalenteri tai liitä valmentajan WhatsApp-viesti / Excel-taulukko.
+          <div className="rounded-2xl border border-border-subtle bg-surface px-4 py-16 text-center">
+            <Smartphone className="mx-auto mb-3 h-10 w-10 text-text-muted" />
+            <h3 className="text-base font-semibold text-text-primary">Ei otteluita kalenterissa</h3>
+            <p className="mx-auto mt-1 mb-4 max-w-sm text-sm text-text-secondary">
+              Tuo joukkueesi kalenteri tai liitä valmentajan WhatsApp-viesti.
             </p>
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => setIsSmartImportOpen(true)}
-                className="px-4 py-2 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 cursor-pointer flex items-center gap-1.5"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Äly-tuonti (WhatsApp / Excel / Kuva)</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsSmartImportOpen(true)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-pitch px-4 text-sm font-semibold text-text-inverse"
+            >
+              <Sparkles className="h-4 w-4" />
+              Tuo ottelut
+            </button>
           </div>
         )}
       </main>
@@ -726,9 +739,13 @@ export const App: React.FC = () => {
       {/* Calendar Import Modal */}
       <CalendarImportModal
         isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={closeImport}
         onImport={handleImportCalendar}
-        existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+        existingPlayers={playerNames}
+        initialSport={importDefaults.sport}
+        initialTeamUrl={importDefaults.url}
+        initialTeamName={importDefaults.name}
+        initialPlayerName={importDefaults.playerName}
       />
 
       {/* Family Management & Child Roster Modal */}
@@ -738,8 +755,7 @@ export const App: React.FC = () => {
         profiles={profiles}
         onOpenImportForPlayer={(playerName) => {
           setIsFamilyManageOpen(false);
-          setImportDefaults({ name: `${playerName}:n joukkue` });
-          setIsImportModalOpen(true);
+          openAddTeam(playerName);
         }}
         onOpenFamilyShare={() => {
           setIsFamilyManageOpen(false);

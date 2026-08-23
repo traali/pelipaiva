@@ -16,6 +16,11 @@ describe('National Sports Geocoder', () => {
     expect(mosahalli.isIndoor).toBe(true);
     expect(mosahalli.surface).toBe('indoor_synthetic');
 
+    const esport = await resolveSportsVenue('Esport Center 2');
+    expect(esport.name).toContain('Esport');
+    expect(esport.isIndoor).toBe(true);
+    expect(esport.coordinates.lat).toBeCloseTo(60.1756, 2);
+
     const kauppi = await resolveSportsVenue('Kauppi TN 1');
     expect(kauppi.name).toContain('Kaupin');
     expect(kauppi.coordinates.lat).toBeCloseTo(61.5034, 2);

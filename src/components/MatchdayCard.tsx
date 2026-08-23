@@ -25,6 +25,8 @@ import { Edit3 } from 'lucide-react';
 interface MatchdayCardProps {
   event: MatchdayEvent;
   playerName?: string;
+  colorHex?: string;
+  compact?: boolean;
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
 }
@@ -32,6 +34,8 @@ interface MatchdayCardProps {
 export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   event,
   playerName,
+  colorHex,
+  compact = false,
   onNavigateToVenue,
   onResolveMismatch
 }) => {
@@ -86,8 +90,17 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         layout
         whileTap={{ scale: 0.99 }}
         transition={springTactile.squishy}
-        className="liquid-glass relative overflow-hidden rounded-3xl p-5 md:p-6 transition-colors"
+        className={`liquid-glass relative overflow-hidden rounded-3xl transition-colors ${
+          compact ? 'p-4 md:p-5' : 'p-5 md:p-6'
+        }`}
       >
+        {colorHex && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-0 h-full w-1.5"
+            style={{ backgroundColor: colorHex }}
+          />
+        )}
         {/* Background Ambience Glow */}
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-pitch/10 blur-3xl" />
 
@@ -279,8 +292,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </motion.button>
         )}
 
-        {/* Weather Rain Curve & Live Radar Trigger */}
-        {event.weather && (
+        {!compact && event.weather && (
           <div className="mb-4">
             <RainRadarCurve
               weather={event.weather}
@@ -302,8 +314,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           {event.parking && <ParkingEaseBadge parking={event.parking} venueName={event.venue.name} />}
         </div>
 
-        {/* Packing Advice & Spectator Note */}
-        {event.briefing && (
+        {!compact && event.briefing && (
           <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
             <div className="font-semibold text-text-primary">
               {isTraining ? '🎒 Treenivarusteet:' : '🎒 Varustesuositus & Katsomo-opas:'}

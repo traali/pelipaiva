@@ -6,6 +6,7 @@ import { SportType } from '../types/matchday';
 import { parseFreeformSportsMessage, ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
 import { convertExtractedToMatchdayEvent } from '../lib/ai/localAiEngine';
 import { db } from '../lib/storage/db';
+import { pickNextTeamColor } from '../lib/sport/teamColors';
 
 interface QuickDropInBarProps {
   existingPlayers: string[];
@@ -70,6 +71,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
 
       let profileId = profile?.id;
       if (!profileId) {
+        const swatch = pickNextTeamColor(existingProfiles.map((p) => p.colorHex));
         profileId = `profile-${Date.now()}`;
         await db.profiles.add({
           id: profileId,
@@ -79,9 +81,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
               ? previewEvent.homeTeam
               : `${selectedSport === 'floorball' ? 'Salibandy' : selectedSport === 'basketball' ? 'Koripallo' : 'Jalkapallo'}`,
           sport: selectedSport,
-          primaryColor: 'punainen',
+          primaryColor: swatch.label,
           calendarUrl: '',
-          colorHex: '#10b981'
+          colorHex: swatch.hex
         });
       }
 

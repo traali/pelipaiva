@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { PlayerProfile } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
-import { User, Plus } from 'lucide-react';
+import { User, Plus, Users } from 'lucide-react';
 
 interface MultiProfileHeaderProps {
   profiles: PlayerProfile[];
@@ -31,16 +31,16 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   }, [profiles]);
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
       {onOpenFamilyManage && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           transition={springTactile.snappy}
           onClick={onOpenFamilyManage}
           title="Hallitse perheen pelaajia ja joukkueita"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-pitch text-text-inverse shadow-sm shadow-pitch/20 cursor-pointer shrink-0 transition-all"
+          className="touch-target inline-flex shrink-0 items-center gap-1.5 rounded-md bg-pitch px-3 text-xs font-semibold text-text-inverse"
         >
-          <span>👨‍👩‍👧‍👦</span>
+          <Users className="h-4 w-4" />
           <span>Perhe</span>
         </motion.button>
       )}
@@ -49,13 +49,13 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         whileTap={{ scale: 0.95 }}
         transition={springTactile.snappy}
         onClick={() => onSelectProfile('all')}
-        className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5 shrink-0 ${
+        className={`touch-target inline-flex shrink-0 items-center rounded-md border px-3 text-xs font-semibold ${
           activeProfileId === 'all'
-            ? 'bg-surface-elevated text-pitch border-pitch shadow-sm'
-            : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+            ? 'border-pitch bg-surface-elevated text-pitch'
+            : 'border-border-subtle bg-surface-elevated text-text-secondary'
         }`}
       >
-        <span>Kaikki ottelut ({profiles.length})</span>
+        Kaikki
       </motion.button>
 
       {playerGroups.map(([playerName, playerProfiles]) => {
@@ -69,10 +69,10 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
                 whileTap={{ scale: 0.95 }}
                 transition={springTactile.snappy}
                 onClick={() => onSelectProfile(`player:${playerName}`)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border ${
+                className={`touch-target inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-xs font-semibold ${
                   isPlayerActive
-                    ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
-                    : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                    ? 'border-pitch bg-pitch text-text-inverse'
+                    : 'border-border-subtle bg-surface-elevated text-text-secondary'
                 }`}
               >
                 <User className="w-3 h-3" />
@@ -88,14 +88,17 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
                   whileTap={{ scale: 0.95 }}
                   transition={springTactile.snappy}
                   onClick={() => onSelectProfile(p.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap cursor-pointer transition-all border ${
+                  className={`touch-target inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-xs font-medium ${
                     isSelected
-                      ? 'bg-pitch text-text-inverse border-pitch shadow-sm shadow-pitch/20'
-                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                      ? 'border-pitch bg-pitch text-text-inverse'
+                      : 'border-border-subtle bg-surface-elevated text-text-secondary'
                   }`}
                 >
-                  <span>{p.sport === 'football' ? '⚽' : p.sport === 'floorball' ? '🏑' : p.sport === 'basketball' ? '🏀' : '🏐'}</span>
-                  <span>{hasMultipleTeams ? p.teamName : `${p.playerName} (${p.teamName})`}</span>
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: p.colorHex }}
+                  />
+                  <span>{hasMultipleTeams ? p.teamName : `${p.playerName} · ${p.teamName}`}</span>
                 </motion.button>
               );
             })}
@@ -107,8 +110,8 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         whileTap={{ scale: 0.95 }}
         transition={springTactile.snappy}
         onClick={onAddProfile}
-        title="Lisää pelaaja tai joukkue"
-        className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-elevated/70 border border-border-strong text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+        title="Lisää joukkue tai turnaus valitulle pelaajalle"
+        className="touch-target inline-flex shrink-0 items-center gap-1 rounded-md border border-border-strong bg-surface-elevated px-3 text-xs font-medium text-text-muted"
       >
         <Plus className="w-3 h-3" />
         <span>+ Joukkue</span>

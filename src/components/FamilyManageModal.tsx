@@ -11,6 +11,7 @@ import {
 import { springTactile } from '../lib/motion/springs';
 import { PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
+import { TeamColorPicker } from './TeamColorPicker';
 
 interface FamilyManageModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
 }) => {
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
+  const [colorForId, setColorForId] = useState<string | null>(null);
 
   // Group profiles by player name
   const playerGroups = React.useMemo(() => {
@@ -84,7 +86,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                   Perheen pelaajat & joukkueet
                 </h2>
                 <p className="text-xs text-text-muted">
-                  Hallitse perheenjäsenten harrastuksia ja kalentereita
+                  Hallitse perheenjäsenten harrastuksia. Samalle lapselle voi lisätä sarjan ja cupit.
                 </p>
               </div>
             </div>
@@ -119,7 +121,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     className="py-1 px-2.5 rounded-lg bg-surface border border-border-strong text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
                   >
                     <Plus className="w-3 h-3" />
-                    <span>Lisää joukkue</span>
+                    <span>Lisää joukkue / turnaus</span>
                   </button>
                 </div>
 
@@ -128,34 +130,44 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                   {playerProfiles.map((p) => (
                     <div
                       key={p.id}
-                      className="p-2.5 rounded-xl bg-surface border border-border-subtle flex items-center justify-between text-xs"
+                      className="rounded-xl bg-surface border border-border-subtle text-xs overflow-hidden"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">
-                          {p.sport === 'football'
-                            ? '⚽'
-                            : p.sport === 'floorball'
-                            ? '🏑'
-                            : p.sport === 'basketball'
-                            ? '🏀'
-                            : '🏐'}
-                        </span>
-                        <div>
-                          <div className="font-bold text-text-primary">{p.teamName}</div>
-                          <div className="text-[10px] text-text-muted line-clamp-1">
-                            {p.calendarUrl || 'Manuaaliset merkinnät'}
+                      <div className="flex items-center justify-between p-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <button
+                            type="button"
+                            title="Vaihda joukkueen väri"
+                            onClick={() => setColorForId(colorForId === p.id ? null : p.id)}
+                            className="h-8 w-8 shrink-0 rounded-full border-2 border-border-strong"
+                            style={{ background: p.colorHex }}
+                          />
+                          <div className="min-w-0">
+                            <div className="font-bold text-text-primary truncate">{p.teamName}</div>
+                            <div className="text-[10px] text-text-muted line-clamp-1">
+                              {p.calendarUrl || 'Manuaaliset merkinnät'}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProfile(p.id)}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
-                        title="Poista joukkue"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProfile(p.id)}
+                          className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
+                          title="Poista joukkue"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {colorForId === p.id && (
+                        <div className="px-2.5 pb-2.5">
+                          <TeamColorPicker
+                            value={p.colorHex}
+                            onChange={async (hex, label) => {
+                              await db.profiles.update(p.id, { colorHex: hex, primaryColor: label });
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

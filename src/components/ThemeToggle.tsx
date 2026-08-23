@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Sun, Moon } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 
 export const ThemeToggle: React.FC = () => {
@@ -27,23 +27,16 @@ export const ThemeToggle: React.FC = () => {
 
   return (
     <motion.button
-      whileTap={{ scale: 0.92 }}
+      type="button"
+      whileTap={{ scale: 0.94 }}
       transition={springTactile.snappy}
       onClick={() => setIsDark(!isDark)}
-      aria-label="Vaihda teemaa"
-      className="relative flex items-center justify-between h-9 w-16 p-1 rounded-full bg-surface-elevated border border-border-strong cursor-pointer"
+      aria-label={isDark ? 'Vaihda tulitukseen' : 'Vaihda yötilaan'}
+      title={isDark ? 'Tulitus' : 'Yö'}
+      className="touch-target inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-surface-elevated px-2.5 text-text-primary"
     >
-      <motion.div
-        layout
-        transition={springTactile.snappy}
-        className={`absolute h-7 w-7 rounded-full bg-pitch flex items-center justify-center text-text-inverse shadow-md ${
-          isDark ? 'right-1' : 'left-1'
-        }`}
-      >
-        {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-      </motion.div>
-      <Sun className="w-3.5 h-3.5 ml-1.5 text-text-muted" />
-      <Moon className="w-3.5 h-3.5 mr-1.5 text-text-muted" />
+      {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+      <span className="hidden text-xs font-semibold sm:inline">{isDark ? 'Yö' : 'Tulitus'}</span>
     </motion.button>
   );
 };

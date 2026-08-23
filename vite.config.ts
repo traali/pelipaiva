@@ -44,6 +44,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
+          'vendor-icons': ['lucide-react'],
           'vendor-motion': ['motion'],
           'vendor-calendar': ['ical.js'],
           'vendor-db': ['dexie', 'dexie-react-hooks'],

@@ -1,5 +1,6 @@
 import { PitchSurface, VenueInfo } from '../../types/matchday';
 import { db } from '../storage/db';
+import { proxiedUrl } from '../api/proxyUrl';
 
 export const NATIONAL_FIELD_ALIASES: Record<
   string,
@@ -12,6 +13,26 @@ export const NATIONAL_FIELD_ALIASES: Record<
     hasFloodlights: boolean;
   }
 > = {
+  'lauttasaari tn b': { name: 'Lauttasaari TN B', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lauttasaari tn a': { name: 'Lauttasaari TN A', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lauttasaari tn': { name: 'Lauttasaaren tekonurmi', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lauttasaari': { name: 'Lauttasaaren urheilukenttä', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'hansavalkama': { name: 'Hansavalkama TN', lat: 60.19083, lng: 24.58667, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'hansavalkama tn a': { name: 'Hansavalkama TN A', lat: 60.19083, lng: 24.58667, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'kaitaa tn': { name: 'Kaitaa TN', lat: 60.14863, lng: 24.69589, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'kaitaa tn a': { name: 'Kaitaa TN A', lat: 60.14863, lng: 24.69589, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'koskelantie': { name: 'Koskelantie nap TN', lat: 60.20193, lng: 24.94491, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'ruukinlahti': { name: 'Ruukinlahti nap TN', lat: 60.16197, lng: 24.86975, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'pirkkola tn': { name: 'Pirkkolan tekonurmi', lat: 60.2342, lng: 24.9205, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'pirkkola tn b': { name: 'Pirkkola TN B', lat: 60.2342, lng: 24.9205, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'kallio tn': { name: 'Kallion tekonurmi', lat: 60.1878, lng: 24.9518, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'kallio tn b': { name: 'Kallio TN B', lat: 60.1878, lng: 24.9518, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'espoonlahti tn': { name: 'Espoonlahden tekonurmi', lat: 60.1485, lng: 24.6530, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'espoonlahti 1 tn a': { name: 'Espoonlahti 1 TN A', lat: 60.1485, lng: 24.6530, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'töölö pk 3': { name: 'Töölön Pallokenttä 3', lat: 60.1878, lng: 24.9242, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'matinkylä 2 tn b': { name: 'Matinkylän Urheilupuisto TN 2 B', lat: 60.15859, lng: 24.75067, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'keski espoo 2 tn b': { name: 'Keski-Espoo 2 TN B', lat: 60.20927, lng: 24.67705, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+
   // === HELSINKI ===
   'bubu': { name: 'Puotilan Tekonurmi (Bubu)', lat: 60.2132, lng: 25.1098, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'puotila tn': { name: 'Puotilan Tekonurmi', lat: 60.2132, lng: 25.1098, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
@@ -35,6 +56,9 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'kupla': { name: 'Käpylän Kuplahalli', lat: 60.2140, lng: 24.9460, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
   'töölön kisahalli': { name: 'Töölön Kisahalli (Kisis)', lat: 60.1835, lng: 24.9282, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'kisis': { name: 'Töölön Kisahalli (Kisis)', lat: 60.1835, lng: 24.9282, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'esport center': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'esport center 2': { name: 'Esport Center 2', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'esport tapiola': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'mosahalli': { name: 'Tapanilan Mosahalli', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'mosahalli 1': { name: 'Tapanilan Mosahalli 1', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'mosahalli 2': { name: 'Tapanilan Mosahalli 2', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
@@ -58,6 +82,8 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'jakomäki tn': { name: 'Jakomäen Tekonurmi', lat: 60.2612, lng: 25.0781, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'puistola tn': { name: 'Puistolan Tekonurmi', lat: 60.2781, lng: 25.0412, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'tapuli tn': { name: 'Tapulin Tekonurmi', lat: 60.2751, lng: 25.0312, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'tapuli nap': { name: 'Tapulin tekonurmi', lat: 60.2751, lng: 25.0312, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'tapuli': { name: 'Tapulin tekonurmi', lat: 60.2751, lng: 25.0312, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'laajasalo tn': { name: 'Laajasalon Tekonurmi', lat: 60.1781, lng: 25.0412, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'jätkäsaari tn': { name: 'Jätkäsaaren Tekonurmi', lat: 60.1581, lng: 24.9181, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'talin halli': { name: 'Talin Jalkapallohalli', lat: 60.2141, lng: 24.8612, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
@@ -170,7 +196,25 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'eerikkilä tn 1': { name: 'Eerikkilän Urheiluopisto TN 1', lat: 60.7785, lng: 23.7541, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'pajulahti': { name: 'Pajulahden Urheiluopisto', lat: 60.9612, lng: 25.9341, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'kuortane': { name: 'Kuortaneen Urheiluopisto', lat: 62.8112, lng: 23.5112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'vierumäki': { name: 'Vierumäen Urheiluopisto', lat: 61.1141, lng: 26.0112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true }
+  'vierumäki': { name: 'Vierumäen Urheiluopisto', lat: 61.1141, lng: 26.0112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+
+  // === MULTI-SPORT HALLS (salibandy, koripallo, lentopallo, jääkiekko) ===
+  'helsinki jäähalli': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'nordis': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'jäähalli': { name: 'Helsingin Jäähalli', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'pirkkola jäähalli': { name: 'Pirkkolan jäähalli', lat: 60.2348, lng: 24.9201, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'vantaa jäähalli': { name: 'Tikkurilan jäähalli', lat: 60.2984, lng: 25.0372, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'haagan palloiluhalli': { name: 'Haagan palloiluhalli', lat: 60.2156, lng: 24.9004, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'meilahti liikuntahalli': { name: 'Meilahden liikuntahalli', lat: 60.1908, lng: 24.9075, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'myllypuro palloiluhalli': { name: 'Myllypuron palloiluhalli', lat: 60.2238, lng: 25.0774, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'unihalli': { name: 'Tampereen Unihalli', lat: 61.4985, lng: 23.7612, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'tampereen unihalli': { name: 'Tampereen Unihalli', lat: 61.4985, lng: 23.7612, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'espoo metsäkallio': { name: 'Tapiolan urheiluhalli', lat: 60.1778, lng: 24.8062, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'tapiolan urheiluhalli': { name: 'Tapiolan urheiluhalli', lat: 60.1778, lng: 24.8062, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'leppävaara liikuntahalli': { name: 'Leppävaaran liikuntahalli', lat: 60.2194, lng: 24.8135, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'sellon salibandy': { name: 'Leppävaaran liikuntahalli', lat: 60.2194, lng: 24.8135, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'paradice': { name: 'Paradice-jäähalli Vuosaari', lat: 60.2075, lng: 25.1441, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'vuosaari jäähalli': { name: 'Paradice-jäähalli Vuosaari', lat: 60.2075, lng: 25.1441, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true }
 };
 
 function matchesAliasWord(text: string, alias: string): boolean {
@@ -181,14 +225,65 @@ function matchesAliasWord(text: string, alias: string): boolean {
   return regex.test(text);
 }
 
-export async function resolveSportsVenue(rawVenueString: string): Promise<VenueInfo> {
+export interface VenueResolveHint {
+  lat?: number;
+  lng?: number;
+  city?: string;
+}
+
+function extractLipasPoint(site: Record<string, unknown>): { lat: number; lng: number } | null {
+  const location = site.location as Record<string, unknown> | undefined;
+  const geometries = location?.geometries as Record<string, unknown> | undefined;
+  const features = geometries?.features as Array<Record<string, unknown>> | undefined;
+  const coords = features?.[0]?.geometry
+    ? ((features[0].geometry as Record<string, unknown>).coordinates as number[] | undefined)
+    : undefined;
+  if (Array.isArray(coords) && coords.length >= 2) {
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+  return null;
+}
+
+function scoreName(siteName: string, query: string): number {
+  const a = siteName.toLowerCase();
+  const b = query.toLowerCase();
+  if (!a || !b) return 0;
+  if (a === b) return 100;
+  if (a.includes(b) || b.includes(a)) return 80;
+  const tokens = b.split(/\s+/).filter((t) => t.length > 2);
+  const hits = tokens.filter((t) => a.includes(t)).length;
+  return tokens.length ? (hits / tokens.length) * 60 : 0;
+}
+
+export async function resolveSportsVenue(
+  rawVenueString: string,
+  hint?: VenueResolveHint
+): Promise<VenueInfo> {
   const normalized = (rawVenueString || '')
     .toLowerCase()
     .replace(/[\.,\-\/\(\)]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
-  // 1. Check IndexedDB User Custom Pins first
+  const indoorGuess = /halli|arena|center|sali/.test(normalized);
+
+  if (hint?.lat && hint?.lng) {
+    const aliasHit = Object.entries(NATIONAL_FIELD_ALIASES)
+      .sort((a, b) => b[0].length - a[0].length)
+      .find(([alias]) => matchesAliasWord(normalized, alias));
+    return {
+      name: aliasHit?.[1].name || rawVenueString,
+      normalizedName: normalized,
+      city: hint.city,
+      coordinates: { lat: hint.lat, lng: hint.lng },
+      isIndoor: aliasHit?.[1].isIndoor ?? indoorGuess,
+      surface: aliasHit?.[1].surface ?? (indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g'),
+      hasFloodlights: aliasHit?.[1].hasFloodlights ?? true
+    };
+  }
+
   try {
     const customPin = await db.venuePins.get(normalized);
     if (customPin) {
@@ -203,10 +298,9 @@ export async function resolveSportsVenue(rawVenueString: string): Promise<VenueI
       };
     }
   } catch {
-    // Database access fallback if testing outside browser
+    // outside browser
   }
 
-  // 2. Check Curated National Alias Dictionary (longest alias first)
   const sortedAliases = Object.entries(NATIONAL_FIELD_ALIASES).sort(
     (a, b) => b[0].length - a[0].length
   );
@@ -224,81 +318,89 @@ export async function resolveSportsVenue(rawVenueString: string): Promise<VenueI
     }
   }
 
-  // 3. Query LIPAS.fi (National Sports Facility API - covers all 42,000+ Finnish venues)
-  if (typeof fetch !== 'undefined') {
+  if (typeof fetch !== 'undefined' && rawVenueString) {
     try {
-      const lipasUrl = `https://lipas.fi/api/sports-places?searchString=${encodeURIComponent(rawVenueString)}&fields=name,location.coordinates.wgs84,type.name,properties`;
-      const res = await fetch(lipasUrl, { headers: { Accept: 'application/json' } });
+      const lipasUrl =
+        'https://api.lipas.fi/v2/sports-sites?city-codes=91,49,92&type-codes=1110,1340,1350&page-size=200';
+      const res = await fetch(proxiedUrl(lipasUrl), { headers: { Accept: 'application/json' } });
       if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const top = data[0];
-          const coords = top.location?.coordinates?.wgs84;
-          if (coords && coords.lat && coords.lon) {
-            const typeName = (top.type?.name || '').toLowerCase();
-            const isIndoor =
-              typeName.includes('halli') ||
-              typeName.includes('sali') ||
-              typeName.includes('koulu') ||
-              typeName.includes('areena');
-            let surface: PitchSurface = 'artificial_turf_3g';
-            if (typeName.includes('nurmi') && !typeName.includes('teko')) surface = 'natural_grass';
-            if (typeName.includes('hiekka')) surface = 'sand_artificial_turf';
-            if (isIndoor) surface = typeName.includes('parketti') ? 'indoor_parquet' : 'indoor_synthetic';
-
+        const payload = await res.json();
+        const items: Record<string, unknown>[] = Array.isArray(payload?.items) ? payload.items : [];
+        let best: { site: Record<string, unknown>; score: number } | null = null;
+        for (const site of items) {
+          const score = scoreName(String(site.name || ''), rawVenueString);
+          if (score >= 50 && (!best || score > best.score)) best = { site, score };
+        }
+        if (best) {
+          const point = extractLipasPoint(best.site);
+          if (point) {
+            const typeName = String(
+              (best.site.type as Record<string, unknown> | undefined)?.name ||
+                (best.site.type as Record<string, unknown> | undefined)?.['type-code'] ||
+                ''
+            ).toLowerCase();
+            const isIndoor = /halli|sali|areena/.test(typeName) || indoorGuess;
+            const location = best.site.location as Record<string, unknown> | undefined;
+            const city = location?.city as Record<string, unknown> | undefined;
             return {
-              name: top.name || rawVenueString,
+              name: String(best.site.name || rawVenueString),
               normalizedName: normalized,
-              address: top.location?.address,
-              city: top.location?.city?.name,
-              postalCode: top.location?.postalCode,
-              coordinates: { lat: coords.lat, lng: coords.lon },
+              address: location?.address as string | undefined,
+              city: (city?.name as string) || undefined,
+              postalCode: location?.['postal-code'] as string | undefined,
+              coordinates: point,
               isIndoor,
-              surface,
-              hasFloodlights: top.properties?.surface_lighting === true,
-              lipasId: top.sportsPlaceId
+              surface: isIndoor ? 'indoor_synthetic' : 'artificial_turf_3g',
+              hasFloodlights: true,
+              lipasId: Number(best.site['lipas-id']) || undefined
             };
           }
         }
       }
     } catch {
-      // Fallback
+      // fallback
     }
 
-    // 4. Fallback: Palvelukartta (Helsinki Metropolitan Area)
     try {
       const pUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(rawVenueString)}&type=unit`;
-      const pRes = await fetch(pUrl);
+      const pRes = await fetch(proxiedUrl(pUrl));
       if (pRes.ok) {
         const pJson = await pRes.json();
-        if (pJson.results && pJson.results.length > 0) {
-          const top = pJson.results[0];
-          if (top.location && top.location.coordinates) {
-            const [lng, lat] = top.location.coordinates;
-            return {
-              name: top.name?.fi || rawVenueString,
-              normalizedName: normalized,
-              address: top.street_address?.fi,
-              coordinates: { lat, lng },
-              isIndoor: normalized.includes('halli') || normalized.includes('arena'),
-              surface: 'artificial_turf_3g',
-              hasFloodlights: true
-            };
-          }
+        const results: Array<Record<string, unknown>> = pJson.results || [];
+        const sporty = results.find((top) => {
+          const name = String((top.name as Record<string, string> | undefined)?.fi || '').toLowerCase();
+          if (/patsas|veistos|muistomerkki|sculpture/.test(name)) return false;
+          return /kenttä|tekonurmi|halli|puisto|urheilu|pallo|areena|tn\b/.test(name);
+        });
+        const top = sporty;
+        const loc = top?.location as Record<string, unknown> | undefined;
+        const coords = loc?.coordinates as number[] | undefined;
+        if (top && coords && coords.length >= 2) {
+          const [lng, lat] = coords;
+          const nameObj = top.name as Record<string, string> | undefined;
+          const addr = top.street_address as Record<string, string> | undefined;
+          return {
+            name: nameObj?.fi || rawVenueString,
+            normalizedName: normalized,
+            address: addr?.fi,
+            coordinates: { lat: Number(lat), lng: Number(lng) },
+            isIndoor: indoorGuess,
+            surface: indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g',
+            hasFloodlights: true
+          };
         }
       }
     } catch {
-      // Fallback
+      // fallback
     }
   }
 
-  // 5. Ultimate Fallback (Default to center of Helsinki Töölö sports hub)
   return {
     name: rawVenueString || 'Tuntematon kenttä',
     normalizedName: normalized,
     coordinates: { lat: 60.1872, lng: 24.9248 },
-    isIndoor: normalized.includes('halli') || normalized.includes('center'),
-    surface: 'artificial_turf_3g',
+    isIndoor: indoorGuess,
+    surface: indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g',
     hasFloodlights: true
   };
 }
