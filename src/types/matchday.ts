@@ -219,6 +219,8 @@ export interface ParsedAssociationUrl {
   association: AssociationType;
   teamId: string;
   matchId?: string;
+  playerId?: string;
+  playerName?: string;
   subdomain?: string; // for *.torneopal.fi
   canonicalUrl: string;
   seasonId?: string;

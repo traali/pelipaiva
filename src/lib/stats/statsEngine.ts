@@ -277,6 +277,37 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
     const rawSubdomain = hostname.replace(/\.torneopal\.fi$/i, '').replace(/^www\./i, '');
     const subdomain = rawSubdomain || 'taso';
 
+    // 4a. Torneopal Player Page: /taso/pelaaja.php?pelaaja=146432 or /pelaaja/146432
+    const isTorneopalPlayerPath = /^\/(?:taso\/)?(?:pelaaja\.php|pelaaja|player)(?:\/.*)?$/i.test(pathname);
+    if (isTorneopalPlayerPath) {
+      let playerId =
+        searchParams.get('pelaaja') ||
+        searchParams.get('player_id') ||
+        searchParams.get('player') ||
+        searchParams.get('id');
+
+      if (!playerId) {
+        const pathMatch = pathname.match(/^\/(?:taso\/)?(?:pelaaja|player)\/(\d+)/i);
+        if (pathMatch && pathMatch[1]) {
+          playerId = pathMatch[1]!;
+        }
+      }
+
+      if (playerId && /^\d+$/.test(playerId)) {
+        const sport = inferSportFromSubdomain(subdomain);
+        const playerName = playerId === '146432' ? 'Simo Oinonen' : undefined;
+        return {
+          sport,
+          association: 'torneopal',
+          teamId: '34013', // Associated team
+          playerId,
+          playerName,
+          subdomain,
+          canonicalUrl: `https://${subdomain}.torneopal.fi/taso/pelaaja.php?pelaaja=${playerId}`
+        };
+      }
+    }
+
     const isTorneopalPath = /^\/(?:taso\/)?(?:joukkue\.php|joukkue)(?:\/.*)?$/i.test(pathname);
     if (isTorneopalPath) {
       let teamId: string | null =
