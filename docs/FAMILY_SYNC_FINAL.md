@@ -22,7 +22,7 @@ Tulospalvelu = when and against whom.
 
 | Layer | Mechanism | Role |
 | --- | --- | --- |
-| Bus | Family code `SAIMA-4` on existing `MATCHDAY_KV` | Other phone sees new roster row in ~30s |
+| Bus | Family code `PERHE-2` on existing `MATCHDAY_KV` | Other phone sees new roster row in ~30s |
 | Engine | Existing ingest (`extractOfficialTeamData` + cup fallback) | Each phone hydrates Espoo Liikkuu / KW / Helsinki Cup itself |
 | Airgap | JSON backup v2 + short `?perhe=` link | Works if Worker is down |
 | Human transport | WhatsApp synthetics (copy/paste, no LLM) | Join + delta + talkoo |
@@ -105,7 +105,7 @@ Reuse `teamSourceKey` in `src/lib/clubs/attachTeam.ts`. Stop `profile-${Date.now
 
 ```
 key: 'family'
-syncKey: 'SAIMA-4'
+syncKey: 'PERHE-2'
 lastSyncedAt: ISO
 pendingUpload: boolean   // offline queue flag (keep 2.6)
 ```
@@ -114,10 +114,10 @@ pendingUpload: boolean   // offline queue flag (keep 2.6)
 
 ## 5. Family code
 
-Display: `SAIMA-4`  
+Display: `PERHE-2`  
 Alphabet: Crockford-32 `0123456789ABCDEFGHJKMNPQRSTVWXYZ`  
 Regex: `^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$`  
-Deep link: `https://pelipaiva.pages.dev/?perhe=SAIMA-4`  
+Deep link: `https://pelipaiva.pages.dev/?perhe=PERHE-2`  
 Possession of the code = membership.
 
 Optional: last character is a checksum; validate on device before fetch.
@@ -179,8 +179,8 @@ Pool: **max 2 parallel**. A failing KW 503 must not block TOPOLA. Use `Promise.a
 Join:
 
 ```
-Pelipäivä-perhe SAIMA-4
-Avaa: https://pelipaiva.pages.dev/?perhe=SAIMA-4
+Pelipäivä-perhe PERHE-2
+Avaa: https://pelipaiva.pages.dev/?perhe=PERHE-2
 
 Etunimi ja joukkue-URL Cloudflareen 7 pv.
 Ottelut tulospalvelusta. Ei sukunimeä, ei vammoja.
@@ -265,7 +265,7 @@ Tests:
 
 1. Phone A adds Aada + https://espooliikkuutournament.fi/team/203621
 2. Phone A sends join WhatsApp
-3. Phone B opens `?perhe=SAIMA-4` (or pastes the message)
+3. Phone B opens `?perhe=PERHE-2` (or pastes the message)
 4. Phone B HUD: Aada / TOPOLA / Espoo Liikkuu / Esport Center 2
 5. No `Basket.fi / ToPo (5756346)`, no fake 22p
 6. Airplane mode on B: cup still on HUD

@@ -17,7 +17,7 @@ This document details **7 critical hardening specifications** to prevent product
 
 ## 2. The 7 Engineering Hardening Specifications
 
-### 2.1 Self-Validating Crockford-32 Checksum (`SAIMA-4`)
+### 2.1 Self-Validating Crockford-32 Checksum (`PERHE-2`)
 - **Problem**: If a user mistypes a family code on mobile, an unvalidated code triggers a network roundtrip to Cloudflare KV. Random network scanning against `/api/family/:code` also consumes KV rate limits.
 - **Solution**: Make the final character in the 6-character code (`XXXXX-C`) a **Crockford-32 Luhn/Damm Checksum Digit**.
 - **Behavior**:

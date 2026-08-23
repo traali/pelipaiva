@@ -36,12 +36,12 @@ Constitution (do not break):
  Phone A (aiti)                         Cloudflare                         Phone B (isa)
  +---------------------+                +------------------+               +---------------------+
  | Dexie profiles      |  PUT roster    | MATCHDAY_KV      |  GET roster   | Dexie profiles      |
- |  Aada + TOPOLA URL  |--------------->| family:SAIMA-4   |-------------->|  Aada + TOPOLA URL  |
+ |  Aada + TOPOLA URL  |--------------->| family:PERHE-2   |-------------->|  Aada + TOPOLA URL  |
  |                     |  ~2 KB, 7d     | rev, tombstones  |  on focus     |                     |
  | extractOfficial...  |                +------------------+               | extractOfficial...  |
  | mergeOfficialWith...|        ^                                          | mergeOfficialWith...|
  | officialDataToEvents|        | WhatsApp synthetic                       | officialDataToEvents|
- | -> events (local)   |        | "Pelipaiva-perhe SAIMA-4"                | -> events (local)   |
+ | -> events (local)   |        | "Pelipaiva-perhe PERHE-2"                | -> events (local)   |
  +---------------------+        |                                          +---------------------+
         |                       |
         |  tulospalvelu / Torneopal / Espoo Liikkuu / KW / hc2026
@@ -107,7 +107,7 @@ On GET:
 
 ```
 key: 'family'
-syncKey: 'SAIMA-4'
+syncKey: 'PERHE-2'
 lastSyncedAt: ISO
 ```
 
@@ -138,7 +138,7 @@ Merge: `findExistingTeamProfile(profiles, playerName, url)` before insert.
 
 ## 6. Family code
 
-Format: Crockford-32, 6 chars, display `SAIMA-4` (5 + hyphen + 1).
+Format: Crockford-32, 6 chars, display `PERHE-2` (5 + hyphen + 1).
 
 ```
 Alphabet: 0123456789ABCDEFGHJKMNPQRSTVWXYZ  (no I, L, O, U)
@@ -148,7 +148,7 @@ Entropy:  32^6 ≈ 1.07e9
 
 Generate on first "Luo perhe-koodi". Retry if KV key occupied. Rotate = new code, copy roster, DELETE old key. Possession of the code = membership. No logins.
 
-Deep link: `https://pelipaiva.pages.dev/?perhe=SAIMA-4`
+Deep link: `https://pelipaiva.pages.dev/?perhe=PERHE-2`
 
 ## 7. Worker API
 
@@ -250,8 +250,8 @@ Example test fixtures (ship in `src/lib/sync/familyWhatsApp.examples.ts`):
 
 ```
 1) Join
-   Pelipäivä-perhe SAIMA-4
-   Avaa: https://pelipaiva.pages.dev/?perhe=SAIMA-4
+   Pelipäivä-perhe PERHE-2
+   Avaa: https://pelipaiva.pages.dev/?perhe=PERHE-2
 
 2) Add cup
    Pelipäivä: Aada → TOPOLA
@@ -282,7 +282,7 @@ FamilyShareModal tabs:
 
 After `handleImportCalendar` succeeds: sheet "Jaa perheeseen?" opens tab 1 with join + delta messages.
 
-Onboarding / empty state: "Liity koodilla" input. Accept `SAIMA-4` or paste a full WhatsApp blob.
+Onboarding / empty state: "Liity koodilla" input. Accept `PERHE-2` or paste a full WhatsApp blob.
 
 Honest copy (replace the false "ilman valikasia" line):
 
@@ -374,7 +374,7 @@ Tests:
 
 1. Phone A: add Aada + https://espooliikkuutournament.fi/team/203621
 2. Phone A: copy join WhatsApp, send to family group
-3. Phone B: open https://pelipaiva.pages.dev/?perhe=SAIMA-4 (or paste the message)
+3. Phone B: open https://pelipaiva.pages.dev/?perhe=PERHE-2 (or paste the message)
 4. Phone B HUD shows Aada / TOPOLA / Espoo Liikkuu / Esport Center 2
 5. No `Basket.fi / ToPo (5756346)`, no fake 22p table
 6. Airplane mode on B: HUD still shows the cup from Dexie

@@ -74,7 +74,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   const handleJoinWithCode = async () => {
     const clean = normalizeFamilyCode(inputCode);
     if (!isValidFamilyCode(clean)) {
-      setStatusMessage('Virheellinen perhe-koodi (esim. SAIMA-4)');
+      setStatusMessage('Virheellinen perhe-koodi (esim. PERHE-2)');
       setTimeout(() => setStatusMessage(null), 2500);
       return;
     }
@@ -345,7 +345,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
-                          placeholder="esim. SAIMA-4"
+                          placeholder="esim. PERHE-2"
                           value={inputCode}
                           onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                           className="flex-1 py-2 px-3 rounded-xl bg-surface border border-border-strong text-xs font-mono font-bold tracking-wider text-text-primary placeholder:text-text-muted focus:outline-none focus:border-pitch"

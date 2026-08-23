@@ -5,8 +5,9 @@ import { parseAssociationUrl } from '../api/associationUrlParser';
 import { extractOfficialTeamData } from '../api/associationExtractor';
 import { exampleTournamentFromUrl, mergeOfficialWithCupFallback, isCupName } from '../clubs/exampleTournaments';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
-import { generateOrResolveMatchStats } from '../stats/statsEngine';
+import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 
+export { generateFamilyCode, isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
 
 export interface FamilyRosterRow {
@@ -34,64 +35,38 @@ export interface FamilyRosterV1 {
   tombstones: TombstoneRecord[];
 }
 
-const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-
-/**
- * Generates a clean 6-character Crockford-32 code: e.g. "SAIMA-4" or "KOPPI-8".
- */
-export function generateFamilyCode(): string {
-  let chars = '';
-  for (let i = 0; i < 5; i++) {
-    const idx = Math.floor(Math.random() * CROCKFORD_ALPHABET.length);
-    chars += CROCKFORD_ALPHABET[idx];
-  }
-  const checkIdx = Math.floor(Math.random() * CROCKFORD_ALPHABET.length);
-  return `${chars}-${CROCKFORD_ALPHABET[checkIdx]}`;
-}
-
-export function isValidFamilyCode(code?: string): boolean {
-  if (!code) return false;
-  const clean = code.trim().toUpperCase();
-  return /^[0-9A-Z]{5}-[0-9A-Z]$/.test(clean) || /^[0-9A-Z]{6}$/.test(clean);
-}
-
-export function normalizeFamilyCode(code: string): string {
-  const clean = code.trim().toUpperCase();
-  if (clean.includes('-')) return clean;
-  if (clean.length === 6) return `${clean.slice(0, 5)}-${clean.slice(5)}`;
-  return clean;
-}
-
 /**
  * Fetches Family Roster from Cloudflare Worker KV.
+ * 404 → null (create path). 400/429/network throw so the cycle does not PUT a new family.
  */
 export async function fetchFamilyRoster(
   code: string,
   baseUrl: string = WORKER_BASE_URL
 ): Promise<FamilyRosterV1 | null> {
   const cleanCode = normalizeFamilyCode(code);
-  try {
-    const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json'
-      }
-    });
-
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      throw new Error(`Worker GET failed with status ${res.status}`);
+  const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json'
     }
+  });
 
-    const data = (await res.json()) as FamilyRosterV1;
-    if (!data || data.v !== 1 || !Array.isArray(data.profiles)) {
-      return null;
-    }
-    return data;
-  } catch (err) {
-    console.warn('[FAMILY_CLOUD] Failed to fetch family roster:', err);
-    return null;
+  if (res.status === 404) return null;
+  if (res.status === 400) {
+    throw new Error('invalid_code_format');
   }
+  if (res.status === 429) {
+    throw new Error('rate_limited');
+  }
+  if (!res.ok) {
+    throw new Error(`Worker GET failed with status ${res.status}`);
+  }
+
+  const data = (await res.json()) as FamilyRosterV1;
+  if (!data || data.v !== 1 || !Array.isArray(data.profiles)) {
+    throw new Error('invalid_roster_schema');
+  }
+  return data;
 }
 
 export type PushRosterResult =
@@ -149,6 +124,20 @@ export async function pushFamilyRoster(
   }
 }
 
+export function rosterFingerprint(
+  profiles: Array<Pick<FamilyRosterRow, 'id' | 'playerName' | 'teamName' | 'sport' | 'colorHex' | 'calendarUrl' | 'associationUrl' | 'teamId'>>,
+  tombstones: TombstoneRecord[]
+): string {
+  const p = profiles
+    .map(
+      (r) =>
+        `${r.id}|${r.playerName}|${r.teamName}|${r.sport}|${r.colorHex}|${r.calendarUrl}|${r.associationUrl || ''}|${r.teamId || ''}`
+    )
+    .sort();
+  const t = tombstones.map((x) => x.id).sort();
+  return JSON.stringify({ p, t });
+}
+
 /**
  * Merges local profiles and remote roster, respecting tombstones and stable IDs.
  */
@@ -197,7 +186,7 @@ export function mergeRosters(
     const stableId = lp.id.startsWith('p:')
       ? lp.id
       : generateStableProfileId(lp.playerName, lp.calendarUrl || lp.associationUrl || '');
-    if (tombstoneMap.has(stableId)) continue;
+    if (tombstoneMap.has(stableId) || tombstoneMap.has(lp.id)) continue;
 
     profileMap.set(stableId, {
       ...lp,
@@ -211,10 +200,27 @@ export function mergeRosters(
     deletedAt
   }));
 
+  const remoteFp = remoteRoster
+    ? rosterFingerprint(remoteRoster.profiles, remoteRoster.tombstones)
+    : '';
+  const mergedFp = rosterFingerprint(
+    mergedProfiles.map((p) => ({
+      id: p.id,
+      playerName: p.playerName,
+      teamName: p.teamName,
+      sport: p.sport,
+      colorHex: p.colorHex || '#3b82f6',
+      calendarUrl: p.calendarUrl || '',
+      associationUrl: p.associationUrl,
+      teamId: p.teamId
+    })),
+    tombstones
+  );
+
   return {
     mergedProfiles,
     tombstones,
-    hasChanges: true
+    hasChanges: remoteFp !== mergedFp
   };
 }
 
@@ -225,10 +231,16 @@ export async function hydrateRosterProfiles(
   profiles: PlayerProfile[],
   databaseInstance: PelipaivaDB = db
 ): Promise<void> {
-  const needsHydration = profiles.filter((p) => Boolean(p.calendarUrl || p.associationUrl));
+  const needsHydration: PlayerProfile[] = [];
+  for (const p of profiles) {
+    if (!p.calendarUrl && !p.associationUrl) continue;
+    const eventCount = await databaseInstance.events.where('profileId').equals(p.id).count();
+    if (eventCount === 0 || !p.lastOfficialSyncAt) {
+      needsHydration.push(p);
+    }
+  }
   if (needsHydration.length === 0) return;
 
-  // Process in chunks of 2 with 150ms delay
   const chunkSize = 2;
   for (let i = 0; i < needsHydration.length; i += chunkSize) {
     const chunk = needsHydration.slice(i, i + chunkSize);
@@ -245,7 +257,6 @@ export async function hydrateRosterProfiles(
             fallbackToSynthetic: false
           }).catch(() => null);
 
-          // Example cup fallback integration
           const cup = exampleTournamentFromUrl(url);
           officialData = mergeOfficialWithCupFallback(cup, officialData);
 
@@ -290,9 +301,7 @@ export async function hydrateRosterProfiles(
                 officialFixtureId: fix.id,
                 reconciliationStatus: 'auto_matched',
                 confidenceScore: 1.0,
-                stats: thisCup
-                  ? undefined
-                  : generateOrResolveMatchStats(fix.homeTeam, fix.awayTeam, officialData.sport)
+                stats: undefined
               };
               eventsToInsert.push(event);
             }
@@ -301,6 +310,11 @@ export async function hydrateRosterProfiles(
               await databaseInstance.events.put(ev);
             }
           }
+
+          await databaseInstance.profiles.put({
+            ...profile,
+            lastOfficialSyncAt: new Date().toISOString()
+          });
         } catch (err) {
           console.warn(`[FAMILY_CLOUD] Hydration failed for ${profile.playerName}:`, err);
         }
@@ -330,26 +344,37 @@ export async function syncFamilyRosterCycle(
   try {
     // 1. Load local profiles
     const localProfiles = await databaseInstance.profiles.toArray();
+    const syncRecord = await databaseInstance.syncState.get('family');
     const localTombstonesStr = localStorage.getItem(`pelipaiva_tombstones_${cleanCode}`);
     const localTombstones: TombstoneRecord[] = localTombstonesStr ? JSON.parse(localTombstonesStr) : [];
 
-    // 2. Fetch remote KV
     const remote = await fetchFamilyRoster(cleanCode, baseUrl);
 
-    // 3. Merge
-    const { mergedProfiles, tombstones } = mergeRosters(localProfiles, remote, localTombstones);
+    const { mergedProfiles, tombstones, hasChanges } = mergeRosters(
+      localProfiles,
+      remote,
+      localTombstones
+    );
 
-    // Persist tombstones locally
     localStorage.setItem(`pelipaiva_tombstones_${cleanCode}`, JSON.stringify(tombstones));
 
-    // 4. Update Dexie profiles: add new / update existing / remove tombstoned
     const tombstoneIds = new Set(tombstones.map((t) => t.id));
     for (const lp of localProfiles) {
-      if (tombstoneIds.has(lp.id)) {
+      const stableId = lp.id.startsWith('p:')
+        ? lp.id
+        : generateStableProfileId(lp.playerName, lp.calendarUrl || lp.associationUrl || '');
+      if (tombstoneIds.has(lp.id) || tombstoneIds.has(stableId)) {
         await databaseInstance.profiles.delete(lp.id);
         const events = await databaseInstance.events.where('profileId').equals(lp.id).toArray();
         for (const ev of events) {
           await databaseInstance.events.delete(ev.id);
+        }
+        if (stableId !== lp.id) {
+          await databaseInstance.profiles.delete(stableId);
+          const more = await databaseInstance.events.where('profileId').equals(stableId).toArray();
+          for (const ev of more) {
+            await databaseInstance.events.delete(ev.id);
+          }
         }
       }
     }
@@ -358,10 +383,11 @@ export async function syncFamilyRosterCycle(
       await databaseInstance.profiles.put(mp);
     }
 
-    // 5. Hydrate fixtures for new teams
     await hydrateRosterProfiles(mergedProfiles, databaseInstance);
 
-    // 6. Push updated roster to Cloudflare KV
+    const pendingUpload = Boolean(syncRecord?.pendingUpload);
+    const shouldPut = hasChanges || pendingUpload || !remote;
+
     const rosterToPush: FamilyRosterV1 = {
       v: 1,
       rev: remote ? remote.rev + 1 : 1,
@@ -380,34 +406,40 @@ export async function syncFamilyRosterCycle(
       tombstones
     };
 
-    let pushRes = await pushFamilyRoster(cleanCode, rosterToPush, remote?.rev, baseUrl);
+    let pushRes: PushRosterResult = {
+      success: true,
+      rev: remote?.rev || 0,
+      updatedAt: remote?.updatedAt || new Date().toISOString()
+    };
 
-    // 409 Conflict Retry: GET -> re-merge -> bump rev -> PUT
-    if (!pushRes.success && pushRes.error === 'rev_conflict') {
-      const freshRemote = await fetchFamilyRoster(cleanCode, baseUrl);
-      const remerged = mergeRosters(mergedProfiles, freshRemote, tombstones);
-      rosterToPush.profiles = remerged.mergedProfiles.map((p) => ({
-        id: p.id,
-        playerName: p.playerName,
-        teamName: p.teamName,
-        sport: p.sport,
-        colorHex: p.colorHex || '#3b82f6',
-        calendarUrl: p.calendarUrl || '',
-        associationUrl: p.associationUrl,
-        associationType: p.associationType,
-        teamId: p.teamId
-      }));
-      rosterToPush.tombstones = remerged.tombstones;
-      rosterToPush.rev = (freshRemote?.rev || 0) + 1;
-      pushRes = await pushFamilyRoster(cleanCode, rosterToPush, freshRemote?.rev, baseUrl);
+    if (shouldPut) {
+      pushRes = await pushFamilyRoster(cleanCode, rosterToPush, remote?.rev, baseUrl);
+
+      if (!pushRes.success && pushRes.error === 'rev_conflict') {
+        const freshRemote = await fetchFamilyRoster(cleanCode, baseUrl);
+        const remerged = mergeRosters(mergedProfiles, freshRemote, tombstones);
+        rosterToPush.profiles = remerged.mergedProfiles.map((p) => ({
+          id: p.id,
+          playerName: p.playerName,
+          teamName: p.teamName,
+          sport: p.sport,
+          colorHex: p.colorHex || '#3b82f6',
+          calendarUrl: p.calendarUrl || '',
+          associationUrl: p.associationUrl,
+          associationType: p.associationType,
+          teamId: p.teamId
+        }));
+        rosterToPush.tombstones = remerged.tombstones;
+        rosterToPush.rev = (freshRemote?.rev || 0) + 1;
+        pushRes = await pushFamilyRoster(cleanCode, rosterToPush, freshRemote?.rev, baseUrl);
+      }
     }
 
-    // Save syncState in Dexie
     await databaseInstance.syncState.put({
       key: 'family',
       syncKey: cleanCode,
       lastSyncedAt: new Date().toISOString(),
-      pendingUpload: false
+      pendingUpload: shouldPut ? !pushRes.success : pendingUpload
     });
 
     return {

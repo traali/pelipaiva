@@ -14,10 +14,10 @@ import {
 } from './familyWhatsApp.examples';
 
 describe('familyWhatsApp Synthetics & Parse-back', () => {
-  it('Fixture 1: parses join WhatsApp message into familyCode SAIMA-4', () => {
+  it('Fixture 1: parses join WhatsApp message into familyCode PERHE-2', () => {
     const parsed = parseFamilyWhatsAppMessage(FIXTURE_1_JOIN);
     expect(parsed.type).toBe('join');
-    expect(parsed.familyCode).toBe('SAIMA-4');
+    expect(parsed.familyCode).toBe('PERHE-2');
   });
 
   it('Fixture 2: parses Espoo Liikkuu cup addition delta', () => {
@@ -55,8 +55,15 @@ describe('familyWhatsApp Synthetics & Parse-back', () => {
     expect(parsed.familyCode).toBeUndefined();
   });
 
+  it('does not treat Crockford-illegal SAIMA-4 as a join code', () => {
+    const parsed = parseFamilyWhatsAppMessage(
+      'Pelipäivä-perhe SAIMA-4\nAvaa: https://pelipaiva.pages.dev/?perhe=SAIMA-4'
+    );
+    expect(parsed.type).toBe('none');
+  });
+
   it('generates exact deterministic join and delta templates', () => {
-    const join = generateJoinWhatsApp('SAIMA-4');
+    const join = generateJoinWhatsApp('PERHE-2');
     expect(join).toBe(FIXTURE_1_JOIN);
 
     const delta = generateRosterDeltaWhatsApp(

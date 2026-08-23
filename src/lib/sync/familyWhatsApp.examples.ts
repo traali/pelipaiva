@@ -2,8 +2,8 @@
  * 5 Canonical WhatsApp synthetic message fixtures per docs/FAMILY_SYNC_FINAL.md
  */
 
-export const FIXTURE_1_JOIN = `Pelipäivä-perhe SAIMA-4
-Avaa: https://pelipaiva.pages.dev/?perhe=SAIMA-4
+export const FIXTURE_1_JOIN = `Pelipäivä-perhe PERHE-2
+Avaa: https://pelipaiva.pages.dev/?perhe=PERHE-2
 
 Etunimi ja joukkue-URL Cloudflareen 7 pv.
 Ottelut tulospalvelusta. Ei sukunimeä, ei vammoja.`;

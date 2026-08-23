@@ -125,7 +125,7 @@ export const App: React.FC = () => {
         setIsAmbientMode(true);
       }
 
-      // Handle ?perhe=SAIMA-4 deep link join
+      // Handle ?perhe=PERHE-2 deep link join
       const perheCode = params.get('perhe');
       if (perheCode) {
         (async () => {
@@ -502,6 +502,7 @@ export const App: React.FC = () => {
       // Background Family Cloud Sync if active
       const syncRecord = await db.syncState.get('family');
       if (syncRecord && syncRecord.syncKey) {
+        await db.syncState.put({ ...syncRecord, pendingUpload: true });
         syncFamilyRosterCycle(syncRecord.syncKey, db).catch((e) =>
           console.warn('[FAMILY_CLOUD] Background sync after add failed:', e)
         );

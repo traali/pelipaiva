@@ -59,8 +59,10 @@ export function parseFamilyWhatsAppMessage(rawText: string): ParsedWhatsAppResul
   if (!rawText || typeof rawText !== 'string') return { type: 'none' };
   const text = rawText.trim();
 
-  // 1. Check for ?perhe= deep link: e.g. /?perhe=SAIMA-4
-  const deepLinkMatch = text.match(/[?&]perhe=([A-Z0-9]{5}-[A-Z0-9]|[A-Z0-9]{6})/i);
+  // 1. Check for ?perhe= deep link: e.g. /?perhe=PERHE-2
+  const deepLinkMatch = text.match(
+    /[?&]perhe=([0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]|[0-9A-HJKMNP-TV-Z]{6})/i
+  );
   if (deepLinkMatch && deepLinkMatch[1]) {
     let code = deepLinkMatch[1].toUpperCase();
     if (!code.includes('-') && code.length === 6) {
@@ -69,8 +71,10 @@ export function parseFamilyWhatsAppMessage(rawText: string): ParsedWhatsAppResul
     return { type: 'join', familyCode: code };
   }
 
-  // 2. Check for "Pelipäivä-perhe SAIMA-4" header
-  const headerMatch = text.match(/Pelipäivä-perhe\s+([A-Z0-9]{5}-[A-Z0-9]|[A-Z0-9]{6})/i);
+  // 2. Check for "Pelipäivä-perhe PERHE-2" header
+  const headerMatch = text.match(
+    /Pelipäivä-perhe\s+([0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]|[0-9A-HJKMNP-TV-Z]{6})/i
+  );
   if (headerMatch && headerMatch[1]) {
     let code = headerMatch[1].toUpperCase();
     if (!code.includes('-') && code.length === 6) {

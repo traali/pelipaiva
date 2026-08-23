@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   generateFamilyCode,
   isValidFamilyCode,
@@ -8,19 +10,43 @@ import {
   fetchFamilyRoster,
   pushFamilyRoster
 } from './familyCloud';
+import { FAMILY_CODE_REGEX, existingRosterPutConflicts } from './familyCode';
 import { PlayerProfile } from '../../types/matchday';
 
 describe('familyCloud Sync & Merge Engine', () => {
   it('generates valid Crockford-32 family code format (5-1)', () => {
     const code = generateFamilyCode();
     expect(isValidFamilyCode(code)).toBe(true);
-    expect(code).toMatch(/^[0-9A-Z]{5}-[0-9A-Z]$/);
+    expect(code).toMatch(FAMILY_CODE_REGEX);
+  });
+
+  it('rejects Crockford-illegal letters I L O U (SAIMA-4 is invalid)', () => {
+    expect(isValidFamilyCode('SAIMA-4')).toBe(false);
+    expect(isValidFamilyCode('KOPPI-8')).toBe(false);
+    expect(isValidFamilyCode('PERHE-2')).toBe(true);
+    expect(isValidFamilyCode('SAKKA-4')).toBe(true);
   });
 
   it('normalizes unhyphenated 6-char family codes', () => {
-    expect(normalizeFamilyCode('SAIMA4')).toBe('SAIMA-4');
-    expect(normalizeFamilyCode('saima-4')).toBe('SAIMA-4');
-    expect(normalizeFamilyCode('KOPPI8')).toBe('KOPPI-8');
+    expect(normalizeFamilyCode('PERHE2')).toBe('PERHE-2');
+    expect(normalizeFamilyCode('perhe-2')).toBe('PERHE-2');
+    expect(normalizeFamilyCode('SAKKA4')).toBe('SAKKA-4');
+  });
+
+  it('worker source shares the client Crockford regex and requires If-Match on existing keys', () => {
+    const workerSrc = readFileSync(resolve(__dirname, '../../../cloudflare-worker/worker.ts'), 'utf8');
+    expect(workerSrc).toContain(FAMILY_CODE_REGEX.source);
+    expect(workerSrc).toContain('if (!ifMatch || parseInt(ifMatch, 10) !== currentRev)');
+    expect(workerSrc).toContain('rate_limited');
+    expect(workerSrc).toContain('GET: 20');
+    expect(workerSrc).toContain('PUT: 5');
+  });
+
+  it('existing KV PUT without If-Match conflicts', () => {
+    expect(existingRosterPutConflicts(3, null)).toBe(true);
+    expect(existingRosterPutConflicts(3, '"2"')).toBe(true);
+    expect(existingRosterPutConflicts(3, '"3"')).toBe(false);
+    expect(existingRosterPutConflicts(3, '3')).toBe(false);
   });
 
   it('merges remote roster with local profiles cleanly using stable IDs', () => {
@@ -136,6 +162,50 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(mergedProfiles.map((p) => p.id)).toContain('p:simo:tulospalvelu.palloliitto.fi:185085:hc2026');
   });
 
+  it('reports hasChanges false when local already matches remote roster', () => {
+    const localProfiles: PlayerProfile[] = [
+      {
+        id: 'p:aada:espooliikkuutournament.fi:203621',
+        playerName: 'Aada',
+        teamName: 'TOPOLA',
+        sport: 'basketball',
+        primaryColor: 'sininen',
+        calendarUrl: 'https://espooliikkuutournament.fi/team/203621',
+        colorHex: '#3b82f6'
+      }
+    ];
+    const remoteRoster: FamilyRosterV1 = {
+      v: 1,
+      rev: 4,
+      updatedAt: new Date().toISOString(),
+      profiles: [
+        {
+          id: 'p:aada:espooliikkuutournament.fi:203621',
+          playerName: 'Aada',
+          teamName: 'TOPOLA',
+          sport: 'basketball',
+          colorHex: '#3b82f6',
+          calendarUrl: 'https://espooliikkuutournament.fi/team/203621'
+        }
+      ],
+      tombstones: []
+    };
+    const { hasChanges, mergedProfiles } = mergeRosters(localProfiles, remoteRoster);
+    expect(mergedProfiles.length).toBe(1);
+    expect(hasChanges).toBe(false);
+  });
+
+  it('GET 400 invalid_code_format throws instead of looking like an empty family', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'invalid_code_format' })
+    });
+    await expect(fetchFamilyRoster('SAIMA-4', 'https://mock.worker')).rejects.toThrow(
+      'invalid_code_format'
+    );
+  });
+
   it('handles mock fetch GET and PUT with 409 conflict detection', async () => {
     const mockRoster: FamilyRosterV1 = {
       v: 1,
@@ -167,13 +237,13 @@ describe('familyCloud Sync & Merge Engine', () => {
       });
     });
 
-    const fetched = await fetchFamilyRoster('SAIMA-4', 'https://mock.worker');
+    const fetched = await fetchFamilyRoster('PERHE-2', 'https://mock.worker');
     expect(fetched?.v).toBe(1);
 
-    const matchPush = await pushFamilyRoster('SAIMA-4', mockRoster, 1, 'https://mock.worker');
+    const matchPush = await pushFamilyRoster('PERHE-2', mockRoster, 1, 'https://mock.worker');
     expect(matchPush.success).toBe(true);
 
-    const conflictPush = await pushFamilyRoster('SAIMA-4', mockRoster, 0, 'https://mock.worker');
+    const conflictPush = await pushFamilyRoster('PERHE-2', mockRoster, 0, 'https://mock.worker');
     expect(conflictPush.success).toBe(false);
     if (!conflictPush.success && conflictPush.error === 'rev_conflict') {
       expect((conflictPush as any).currentRev).toBe(5);

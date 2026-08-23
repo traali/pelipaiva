@@ -42,6 +42,45 @@ export interface FamilyRosterV1 {
   tombstones: Array<{ id: string; deletedAt: string }>;
 }
 
+const FAMILY_RATE_WINDOW_SEC = 900;
+const FAMILY_RATE_LIMITS: Record<string, number> = { GET: 20, PUT: 5, DELETE: 3 };
+
+async function rateLimitFamily(
+  request: Request,
+  method: string,
+  corsHeaders: Record<string, string>
+): Promise<Response | null> {
+  const limit = FAMILY_RATE_LIMITS[method];
+  if (!limit) return null;
+  const ip =
+    request.headers.get('CF-Connecting-IP') ||
+    request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
+    'unknown';
+  const bucket = Math.floor(Date.now() / (FAMILY_RATE_WINDOW_SEC * 1000));
+  const cacheKey = new Request(
+    `https://pelipaiva-ratelimit.internal/family/${method}/${encodeURIComponent(ip)}/${bucket}`
+  );
+  const cache = caches.default;
+  const hit = await cache.match(cacheKey);
+  const count = hit ? parseInt(await hit.text(), 10) || 0 : 0;
+  if (count >= limit) {
+    return new Response(JSON.stringify({ error: 'rate_limited' }), {
+      status: 429,
+      headers: {
+        ...corsHeaders,
+        'Retry-After': String(FAMILY_RATE_WINDOW_SEC)
+      }
+    });
+  }
+  await cache.put(
+    cacheKey,
+    new Response(String(count + 1), {
+      headers: { 'Cache-Control': `max-age=${FAMILY_RATE_WINDOW_SEC}` }
+    })
+  );
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -66,6 +105,7 @@ export default {
         ? `${rawCode.slice(0, 5)}-${rawCode.slice(5)}`
         : rawCode;
 
+      // Keep in sync with src/lib/sync/familyCode.ts FAMILY_CODE_REGEX (Crockford-32, no I/L/O/U)
       const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
       if (!codeRegex.test(code)) {
         return new Response(JSON.stringify({ error: 'invalid_code_format' }), {
@@ -73,6 +113,9 @@ export default {
           headers: corsHeaders
         });
       }
+
+      const limited = await rateLimitFamily(request, request.method, corsHeaders);
+      if (limited) return limited;
 
       const kvKey = `family:${code}`;
 
@@ -125,7 +168,8 @@ export default {
             request.headers.get('If-Match')?.replace(/"/g, '') ||
             request.headers.get('X-Pelipaiva-Rev');
 
-          if (ifMatch && parseInt(ifMatch, 10) !== currentRev) {
+          // Existing key: missing or stale If-Match → 409 (never silent overwrite)
+          if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
             return new Response(
               JSON.stringify({ error: 'rev_conflict', currentRev }),
               {
