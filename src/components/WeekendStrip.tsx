@@ -12,10 +12,13 @@ export const WeekendStrip: React.FC<WeekendStripProps> = ({ days, weekendLabel, 
   const total = days.reduce((n, d) => n + d.events.length, 0);
   if (total === 0) return null;
 
+  const isWeekendOnly = days.length === 3 && days.every((d) => ['pe', 'la', 'su'].includes(d.weekday.toLowerCase()));
+  const title = isWeekendOnly ? 'Viikonloppu' : 'Lähipäivät & Treenit';
+
   return (
     <section className="mb-4">
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-bold text-text-primary">Viikonloppu</h2>
+        <h2 className="text-sm font-bold text-text-primary">{title}</h2>
         <p className="text-xs font-medium text-text-muted">{weekendLabel}</p>
       </div>
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">

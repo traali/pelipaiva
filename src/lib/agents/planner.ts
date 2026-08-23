@@ -29,8 +29,12 @@ function buildDayStrips(
   fridayISO: string,
   now = new Date()
 ): WeekendDayStrip[] {
-  const days = [0, 1, 2].map((offset) => addHelsinkiDays(fridayISO, offset));
   const todayISO = helsinkiDateISO(now);
+  const dow = new Date(`${todayISO}T12:00:00+03:00`).getDay(); // 0 Sun, 1 Mon...
+  const isWeekday = dow >= 1 && dow <= 4;
+  const days = isWeekday
+    ? Array.from({ length: Math.min(5, 7 - dow + 1) }, (_, offset) => addHelsinkiDays(todayISO, offset))
+    : [0, 1, 2].map((offset) => addHelsinkiDays(fridayISO, offset));
   const nowMs = now.getTime();
 
   return days.map((date) => {
