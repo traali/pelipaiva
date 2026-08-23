@@ -31,6 +31,10 @@ import {
   generateOrResolveMatchStats
 } from './lib/stats/statsEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
+import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
+import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
+import { exampleTournamentFromUrl, isCupName } from './lib/clubs/exampleTournaments';
+import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
@@ -47,6 +51,7 @@ export const App: React.FC = () => {
     }
     return true;
   });
+  const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
@@ -103,12 +108,26 @@ export const App: React.FC = () => {
 
   // Dexie Reactive Live Queries
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
-  const rawEvents = useLiveQuery(() => db.events.toArray(), []) || [];
+  const eventsQuery = useLiveQuery(() => db.events.toArray(), []);
+  const rawEvents = eventsQuery || [];
 
-  const isDemoActive = profiles.some((p) => p.id.startsWith('profile-ppj-') || p.id === 'profile-hjk-demo');
+  const isDemoActive = profiles.some(
+    (p) =>
+      p.id.startsWith('profile-ppj-') ||
+      p.id.startsWith('profile-topola-') ||
+      p.id.startsWith('profile-kw-') ||
+      p.id === 'profile-hjk-demo'
+  );
+  const needsDemoRefresh =
+    isDemoActive &&
+    !isSeeding &&
+    eventsQuery !== undefined &&
+    !rawEvents.some((e) => e.id === 'demo-elt-aada-1');
 
   // Seed user default teams (PPJ 185085, 185083, 185086, Salibandy 25301, Basket 5756346)
   const handleStartDemo = async () => {
+    setIsSeeding(true);
+    try {
     await db.profiles.clear();
     await db.events.clear();
 
@@ -141,7 +160,7 @@ export const App: React.FC = () => {
         primaryColor: 'valkoinen',
         secondaryColor: 'sininen',
         calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-        colorHex: '#10b981'
+        colorHex: '#64748b'
       },
       {
         id: 'profile-basket-5756346',
@@ -166,6 +185,9 @@ export const App: React.FC = () => {
     ];
 
     for (const p of defaultProfiles) {
+      await db.profiles.add(p);
+    }
+    for (const p of EXTRA_PROFILES) {
       await db.profiles.add(p);
     }
 
@@ -268,7 +290,18 @@ export const App: React.FC = () => {
       ev.briefing = generateMatchdayBriefing(ev, [ev]);
       await db.events.put(ev);
     }
+    for (const extra of buildWeekendShowcaseEvents()) {
+      await db.events.put(extra);
+    }
+    } finally {
+      setIsSeeding(false);
+    }
   };
+
+  useEffect(() => {
+    if (!needsDemoRefresh || isSeeding) return;
+    void handleStartDemo();
+  }, [needsDemoRefresh, isSeeding]);
 
   const handleClearData = async () => {
     await db.profiles.clear();
@@ -308,7 +341,8 @@ export const App: React.FC = () => {
     playerName: string,
     teamName: string,
     sport: SportType,
-    url: string
+    url: string,
+    colorHex?: string
   ) => {
     // If we're currently on demo data, clean demo data first
     if (isDemoActive) {
@@ -316,15 +350,28 @@ export const App: React.FC = () => {
       await db.events.clear();
     }
 
+    const existing = await db.profiles.toArray();
+    const cup = exampleTournamentFromUrl(url);
+    const club = searchPopularClubs(teamName).find((c) => c.sport === sport);
+    const named = colorFromNameHint(`${teamName} ${url}`);
+    const swatch = colorHex
+      ? swatchForHex(colorHex)
+      : cup
+        ? { hex: cup.colorHex, label: cup.primaryColor }
+        : named ||
+          (club
+            ? { hex: club.colorHex, label: club.primaryColor }
+            : pickNextTeamColor(existing.map((p) => p.colorHex)));
+
     const profileId = `profile-${Date.now()}`;
     await db.profiles.add({
       id: profileId,
       playerName,
       teamName,
       sport,
-      primaryColor: 'punainen',
+      primaryColor: swatch.label,
       calendarUrl: url,
-      colorHex: '#10b981'
+      colorHex: swatch.hex
     });
 
     try {
@@ -364,7 +411,7 @@ export const App: React.FC = () => {
             id: `fixture-${fixture.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             profileId,
             title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
-            eventType: 'match',
+            eventType: isCupName(fixture.leagueName) ? 'tournament' : 'match',
             isTraining: false,
             sport: parsedAssoc.sport,
             homeTeam: fixture.homeTeam,

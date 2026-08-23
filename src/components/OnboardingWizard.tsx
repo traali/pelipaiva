@@ -12,6 +12,7 @@ import {
   Users
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
+import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import type { SportType } from '../types/matchday';
 
 interface AddedSource {
@@ -36,45 +37,38 @@ interface OnboardingWizardProps {
 const PRESET_TORNEOPAL_TEAMS: Array<{
   name: string;
   sport: SportType;
-  icon: string;
   url: string;
   association: string;
+  colorHex: string;
 }> = [
   {
-    name: 'PPJ Laru Sininen (185085)',
+    name: 'PPJ/Laru sin · P13 Kolmonen',
     sport: 'football',
-    icon: '⚽',
     url: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
-    association: 'Palloliitto'
+    association: 'Palloliitto',
+    colorHex: '#3b82f6'
   },
   {
-    name: 'PPJ Laru Valkoinen (185083)',
+    name: 'PPJ/Laru mus · P13 Vitonen',
     sport: 'football',
-    icon: '⚽',
     url: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-    association: 'Palloliitto'
+    association: 'Palloliitto',
+    colorHex: '#64748b'
   },
   {
-    name: 'PPJ Laru Oranssi (185086)',
+    name: 'PPJ/Laru oran · P13 Vitonen',
     sport: 'football',
-    icon: '⚽',
     url: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
-    association: 'Palloliitto'
+    association: 'Palloliitto',
+    colorHex: '#f97316'
   },
-  {
-    name: 'Salibandy / ErVi (25301)',
-    sport: 'floorball',
-    icon: '🏑',
-    url: 'https://tulospalvelu.salibandy.fi/team/25301/info',
-    association: 'Salibandyliitto'
-  },
-  {
-    name: 'Basket.fi / ToPo (5756346)',
-    sport: 'basketball',
-    icon: '🏀',
-    url: 'https://tulospalvelu.basket.fi/team/5756346/info',
-    association: 'Basket.fi'
-  }
+  ...EXAMPLE_TOURNAMENTS.filter((cup) => cup.id !== 'hc2026-ppj-sin').map((cup) => ({
+    name: `${cup.name} · ${cup.teamName}`,
+    sport: cup.sport,
+    url: cup.url,
+    association: cup.source === 'football-stats' ? 'Helsinki Cup' : cup.name,
+    colorHex: cup.colorHex
+  }))
 ];
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
@@ -247,7 +241,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         : 'bg-surface text-text-secondary border-border-strong hover:text-text-primary'
                     }`}
                   >
-                    <span>👤 {name}</span>
+                    <span>{name}</span>
                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                       isActive ? 'bg-white/25 text-white' : 'bg-pitch/15 text-pitch'
                     }`}>
@@ -340,9 +334,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           : 'bg-surface-elevated text-text-primary border-border-subtle hover:border-pitch'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span>{team.icon}</span>
-                        <span>{team.name}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ background: team.colorHex }}
+                        />
+                        <span className="truncate">{team.name}</span>
                       </div>
 
                       <div className="text-[11px] flex items-center gap-1 shrink-0">
@@ -397,10 +394,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         onChange={(e) => setCustomSport(e.target.value as SportType)}
                         className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-strong text-text-primary text-[11px]"
                       >
-                        <option value="football">⚽ Futis</option>
-                        <option value="floorball">🏑 Säbä</option>
-                        <option value="basketball">🏀 Koris</option>
-                        <option value="volleyball">🏐 Lentis</option>
+                        <option value="football">Jalkapallo</option>
+                        <option value="floorball">Salibandy</option>
+                        <option value="basketball">Koripallo</option>
+                        <option value="volleyball">Lentopallo</option>
                       </select>
                     </div>
 
@@ -470,7 +467,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     onClick={onFinishOnboarding}
                     className="w-full py-3.5 px-4 rounded-2xl bg-pitch text-text-inverse font-black text-sm flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-pitch/20 cursor-pointer"
                   >
-                    <span>🚀 Valmis! Avaa Pelipäivä ({totalSourcesCount} joukkuetta)</span>
+                    <span>Valmis, avaa Pelipäivä ({totalSourcesCount} joukkuetta)</span>
                     <ArrowRight className="w-4 h-4" />
                   </motion.button>
                 )}

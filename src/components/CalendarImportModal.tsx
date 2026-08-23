@@ -5,11 +5,14 @@ import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
 import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
 import { searchPopularClubs } from '../lib/clubs/popularClubsCatalog';
+import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
+import { TeamColorPicker } from './TeamColorPicker';
+import { pickNextTeamColor } from '../lib/sport/teamColors';
 
 interface CalendarImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (playerName: string, teamName: string, sport: SportType, icsUrl: string) => Promise<void>;
+  onImport: (playerName: string, teamName: string, sport: SportType, icsUrl: string, colorHex?: string) => Promise<void>;
   initialSport?: SportType;
   initialTeamUrl?: string;
   initialTeamName?: string;
@@ -31,6 +34,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   const [icsUrl, setIcsUrl] = useState(initialTeamUrl || '');
   const [isLoading, setIsLoading] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,7 +62,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
     if (!teamName || !icsUrl) return;
     setIsLoading(true);
     try {
-      await onImport(playerName || teamName, teamName, sport, icsUrl);
+      await onImport(playerName || teamName, teamName, sport, icsUrl, colorHex);
       onClose();
     } catch (err) {
       console.error(err);
@@ -104,6 +108,41 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
               </button>
             </div>
 
+            {/* Example tournaments for testing */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                Esimerkkiturnaukset
+              </label>
+              <div className="flex flex-col gap-1.5">
+                {EXAMPLE_TOURNAMENTS.map((cup) => (
+                  <button
+                    key={cup.id}
+                    type="button"
+                    onClick={() => {
+                      setTeamName(cup.teamName);
+                      setSport(cup.sport);
+                      setIcsUrl(cup.url);
+                      setColorHex(cup.colorHex);
+                    }}
+                    className="flex min-h-11 items-center gap-2 rounded-xl border border-border-subtle bg-surface-elevated px-3 py-2 text-left"
+                  >
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ background: cup.colorHex }}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-text-primary truncate">
+                        {cup.name}
+                      </span>
+                      <span className="block text-[11px] text-text-muted truncate">
+                        {cup.teamName}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Quick Club Preset Search */}
             <div className="mb-4">
               <label className="block text-xs font-semibold text-text-secondary mb-1">
@@ -121,6 +160,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                       setTeamName(top.name);
                       setSport(top.sport);
                       setIcsUrl(top.sampleTeamUrl);
+                      setColorHex(top.colorHex);
                     }
                   }
                 }}
@@ -247,6 +287,8 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                     <div><strong>🏑 Salibandy:</strong> tulospalvelu.salibandy.fi/team/{'{id}'}</div>
                     <div><strong>🏀 Basket.fi:</strong> basket.fi/basket/sarjat/joukkue/?team_id={'{id}'}</div>
                     <div><strong>🏐 Torneopal:</strong> *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
+                    <div><strong>🏀 Espoo Liikkuu:</strong> espooliikkuutournament.fi/team/{'{id}'}</div>
+                    <div><strong>🏑 KW Memorial:</strong> kwmemorialcup*.torneopal.fi/taso/joukkue.php</div>
                     <div><strong>📅 Kalenterit:</strong> Nimenhuuto, MyClub, Jopox (.ics)</div>
                   </motion.div>
                 )}
@@ -255,6 +297,16 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-pitch" />
                   100% Yksityinen: tallentuu vain puhelimesi selaimeen (Dexie IndexedDB).
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-text-secondary mb-1.5">
+                  Joukkueen väri
+                </label>
+                <TeamColorPicker
+                  value={colorHex}
+                  onChange={(hex) => setColorHex(hex)}
+                />
               </div>
 
               <div className="pt-3 border-t border-border-subtle flex items-center justify-end gap-2">

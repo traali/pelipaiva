@@ -320,6 +320,33 @@ describe('Sports Association URL Parser', () => {
         seasonId: '12'
       });
     });
+
+    it('parses Espoo Liikkuu Tournament team page as basketball', () => {
+      const result = parseAssociationUrl('https://espooliikkuutournament.fi/team/203621');
+      expect(result).toMatchObject({
+        sport: 'basketball',
+        association: 'basket',
+        teamId: '203621',
+        seasonId: 'esli2026',
+        canonicalUrl: 'https://espooliikkuutournament.fi/team/203621'
+      });
+    });
+
+    it('parses KW Memorial Cup URL as floorball and keeps turnaus + sarja', () => {
+      const result = parseAssociationUrl(
+        'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546'
+      );
+      expect(result).toMatchObject({
+        sport: 'floorball',
+        association: 'torneopal',
+        teamId: '34013',
+        subdomain: 'kwmemorialcup26',
+        leagueId: '2546',
+        seasonId: 'EräViikingit_0005'
+      });
+      expect(result?.canonicalUrl).toContain('sarja=2546');
+      expect(result?.canonicalUrl).toContain('turnaus=');
+    });
   });
 
   describe('Edge Cases & Sanitization', () => {
@@ -568,6 +595,8 @@ describe('Association Extractor & Parser', () => {
       expect(inferSportFromSubdomain('salibandy')).toBe('floorball');
       expect(inferSportFromSubdomain('lentopallo')).toBe('volleyball');
       expect(inferSportFromSubdomain('kori')).toBe('basketball');
+      expect(inferSportFromSubdomain('kwmemorialcup26')).toBe('floorball');
+      expect(inferSportFromSubdomain('espooliikkuu')).toBe('basketball');
     });
 
     it('generates synthetic official team data for offline resilience and tests', async () => {

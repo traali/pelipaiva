@@ -45,6 +45,7 @@ export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile
       venueName: first.venue.name,
       childName: profile?.playerName || 'Lapsi',
       profileId: first.profileId,
+      colorHex: profile?.colorHex || '#10b981',
       matchCount: sorted.length,
       firstKickoff: first.startTime,
       lastEnd: last.endTime,

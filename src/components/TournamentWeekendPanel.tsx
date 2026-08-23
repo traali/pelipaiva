@@ -18,18 +18,25 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
       </div>
       <ul className="flex flex-col gap-3">
         {blocks.map((b) => (
-          <li key={b.id}>
-            <div className="text-sm font-semibold text-text-primary">
-              {b.childName} · {b.name}
+          <li key={b.id} className="flex gap-2">
+            <span
+              className="mt-0.5 h-10 w-1.5 shrink-0 rounded-full"
+              style={{ background: b.colorHex }}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-text-primary">
+                {b.childName} · {b.name}
+              </div>
+              <div className="mt-0.5 text-xs text-text-secondary">
+                {b.matchCount} peliä · {formatFiTime(b.firstKickoff)}–{formatFiTime(b.lastEnd)} ·{' '}
+                {b.venueName}
+              </div>
+              <div className="mt-1 font-tabular text-sm font-semibold text-floodlight">
+                Lähde klo {b.leaveBy}
+              </div>
+              <p className="mt-1 text-xs text-text-muted">{b.packingNote}</p>
             </div>
-            <div className="mt-0.5 text-xs text-text-secondary">
-              {b.matchCount} peliä · {formatFiTime(b.firstKickoff)}–{formatFiTime(b.lastEnd)} ·{' '}
-              {b.venueName}
-            </div>
-            <div className="mt-1 font-tabular text-sm font-semibold text-floodlight">
-              Lähde klo {b.leaveBy}
-            </div>
-            <p className="mt-1 text-xs text-text-muted">{b.packingNote}</p>
           </li>
         ))}
       </ul>

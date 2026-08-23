@@ -260,6 +260,7 @@ describe('tournamentAgent', () => {
     const blocks = tournamentAgent(events, profiles);
     expect(blocks.length).toBe(1);
     expect(blocks[0]?.matchCount).toBe(2);
+    expect(blocks[0]?.colorHex).toBe('#ef4444');
   });
 });
 

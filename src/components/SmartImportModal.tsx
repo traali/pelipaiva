@@ -23,6 +23,7 @@ import {
 } from '../lib/ai/localAiEngine';
 import { ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
 import { db } from '../lib/storage/db';
+import { pickNextTeamColor } from '../lib/sport/teamColors';
 
 interface SmartImportModalProps {
   isOpen: boolean;
@@ -130,6 +131,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
       let profileId = profile?.id;
       if (!profileId) {
+        const swatch = pickNextTeamColor(existingProfiles.map((p) => p.colorHex));
         profileId = `profile-${Date.now()}`;
         await db.profiles.add({
           id: profileId,
@@ -139,9 +141,9 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
               ? eventsToSave[0].homeTeam
               : `${selectedSport === 'floorball' ? 'Salibandy' : selectedSport === 'basketball' ? 'Koripallo' : 'Jalkapallo'}`,
           sport: selectedSport,
-          primaryColor: 'punainen',
+          primaryColor: swatch.label,
           calendarUrl: '',
-          colorHex: '#10b981'
+          colorHex: swatch.hex
         });
       }
 
