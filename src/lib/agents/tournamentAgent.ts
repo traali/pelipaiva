@@ -7,10 +7,10 @@ export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile
   const groups = new Map<string, MatchdayEvent[]>();
 
   for (const ev of events) {
-    const day = helsinkiDateISO(new Date(ev.startTime));
     const explicit = ev.eventType === 'tournament';
+    const day = helsinkiDateISO(new Date(ev.startTime));
     const key = explicit
-      ? `${ev.profileId}|${ev.tournamentName || 'turnaus'}|${day}`
+      ? `${ev.profileId}|${(ev.tournamentName || 'turnaus').toLowerCase().trim()}`
       : `${ev.profileId}|${ev.venue.normalizedName || ev.venue.name}|${day}`;
     const list = groups.get(key) || [];
     list.push(ev);
@@ -30,6 +30,7 @@ export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile
     const first = sorted[0]!;
     const last = sorted[sorted.length - 1]!;
     const profile = profiles.find((p) => p.id === first.profileId);
+    if (!profile) continue;
     const recovery =
       sorted.length >= 2
         ? Math.round(

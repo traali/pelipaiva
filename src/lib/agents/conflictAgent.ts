@@ -20,7 +20,7 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
     const a = upcoming[i]!;
     for (let j = i + 1; j < upcoming.length; j++) {
       const b = upcoming[j]!;
-      if (a.profileId === b.profileId) continue;
+      if (a.id === b.id) continue;
 
       const sameVenue = a.venue.normalizedName === b.venue.normalizedName || a.venue.name === b.venue.name;
       const drive = estimateDriveMinutes(
@@ -31,12 +31,15 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
       );
       const nameA = childName(a, profiles);
       const nameB = childName(b, profiles);
+      const isSameChild = nameA.toLowerCase() === nameB.toLowerCase();
 
       // Presence window is warmup → final whistle, not just kickoff → end.
       const overlap = overlapMinutes(a.warmupTime, a.endTime, b.warmupTime, b.endTime);
 
-      if (overlap > 0 && !sameVenue) {
-        const severity = drive > 25 || overlap > 40 ? 'critical' : 'warn';
+      if (overlap > 0) {
+        if (sameVenue && !isSameChild) continue;
+
+        const severity = isSameChild || drive > 25 || overlap > 40 ? 'critical' : 'warn';
         conflicts.push({
           id: `c-${a.id}-${b.id}`,
           severity,
@@ -47,10 +50,13 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
           venueA: a.venue.name,
           venueB: b.venue.name,
           overlapMinutes: overlap,
-          travelMinutesEstimate: drive,
-          message: `Päällekkäisyys: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) päällekkäin ${overlap} min — siirtymä ~${drive} min.`,
-          suggestedFix:
-            severity === 'critical'
+          travelMinutesEstimate: sameVenue ? 0 : drive,
+          message: isSameChild
+            ? `Päällekkäisyys: ${nameA} on merkitty kahteen peliin samaan aikaan (${a.venue.name} & ${b.venue.name}) päällekkäin ${overlap} min.`
+            : `Päällekkäisyys: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) päällekkäin ${overlap} min — siirtymä ~${drive} min.`,
+          suggestedFix: isSameChild
+            ? `Ilmoita valmentajalle valinta kumpaan peliin ${nameA} osallistuu.`
+            : severity === 'critical'
               ? 'Kaksi kuskia. Sovi kummankin lapsen kyyti etukäteen; älä yritä ehtiä molempiin.'
               : 'Yksi vanhempi per kenttä. Toinen hakee, toinen vie — vaihto ei ehdi.'
         });
@@ -74,7 +80,7 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
 
         conflicts.push({
           id: `c-${a.id}-${b.id}-tight`,
-          severity: isDriveImpossible ? 'critical' : 'warn',
+          severity: isDriveImpossible || isSameChild ? 'critical' : 'warn',
           childA: nameA,
           childB: nameB,
           eventAId: a.id,
@@ -83,12 +89,16 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
           venueB: b.venue.name,
           overlapMinutes: 0,
           travelMinutesEstimate: drive,
-          message: isDriveImpossible
-            ? `Ajoaika ei riitä: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min, ajo ~${drive} min.`
-            : `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.max(0, Math.round(gapWarmup))} min, ajo ~${drive} min.`,
-          suggestedFix: isDriveImpossible
-            ? 'Kaksi kuskia tarvitaan. Yksi auto ei ehdi siirtymää pelien välillä.'
-            : 'Lähde suoraan kentältä. Pakkaa kakkosen kassi autoon valmiiksi.'
+          message: isSameChild
+            ? `${nameA}: siirtymäaika (${Math.max(0, Math.round(gapKickoff))} min) ei riitä siirtymään ${a.venue.name} ➔ ${b.venue.name} (ajo ~${drive} min).`
+            : isDriveImpossible
+              ? `Ajoaika ei riitä: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min, ajo ~${drive} min.`
+              : `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.max(0, Math.round(gapWarmup))} min, ajo ~${drive} min.`,
+          suggestedFix: isSameChild
+            ? `Aikataulu on liian tiukka samalle pelaajalle. Varoita valmentajaa myöhästymisestä.`
+            : isDriveImpossible
+              ? 'Kaksi kuskia tarvitaan. Yksi auto ei ehdi siirtymää pelien välillä.'
+              : 'Lähde suoraan kentältä. Pakkaa kakkosen kassi autoon valmiiksi.'
         });
       }
     }

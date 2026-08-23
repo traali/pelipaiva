@@ -35,7 +35,7 @@ function buildDayStrips(
 
   return days.map((date) => {
     const dayEvents = events
-      .filter((e) => helsinkiDateISO(new Date(e.startTime)) === date)
+      .filter((e) => helsinkiDateISO(new Date(e.startTime)) === date && profiles.some((p) => p.id === e.profileId))
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     const weekday = formatFiWeekday(date);
     const label = new Date(`${date}T12:00:00+03:00`).toLocaleDateString('fi-FI', {

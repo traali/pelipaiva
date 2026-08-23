@@ -23,6 +23,31 @@ interface TimelineCalendarViewProps {
   onClearFilter?: () => void;
 }
 
+function surfaceLabel(surface?: string, indoor?: boolean): string | null {
+  if (!surface) return null;
+  if (indoor) {
+    if (surface === 'indoor_parquet') return 'Parketti';
+    if (surface === 'indoor_synthetic') return 'Sisäalusta';
+    return 'Sisähalli';
+  }
+  switch (surface) {
+    case 'artificial_turf_3g':
+      return 'Tekonurmi 3G';
+    case 'sand_artificial_turf':
+      return 'Hiekkatekonurmi';
+    case 'natural_grass':
+      return 'Luonnonnurmi';
+    case 'indoor_parquet':
+      return 'Parketti';
+    case 'indoor_synthetic':
+      return 'Sisäalusta';
+    case 'gravel':
+      return 'Hiekka';
+    default:
+      return surface.replace(/_/g, ' ');
+  }
+}
+
 export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   events,
   profiles,
@@ -232,9 +257,9 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       <div className="flex items-center gap-1.5 truncate min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
                         <span className="truncate font-medium">{ev.venue.name}</span>
-                        {ev.venue.surface && (
+                        {surfaceLabel(ev.venue.surface, ev.venue.isIndoor) && (
                           <span className="text-[10px] text-text-muted shrink-0">
-                            • {ev.venue.surface}
+                            • {surfaceLabel(ev.venue.surface, ev.venue.isIndoor)}
                           </span>
                         )}
                       </div>

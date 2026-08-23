@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -61,6 +61,17 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   const [logNotes, setLogNotes] = useState<string>(playerLog?.notes ?? '');
   const [matchScoreInput, setMatchScoreInput] = useState<string>(score || `${stats.liveScore?.home ?? 0}–${stats.liveScore?.away ?? 0}`);
   const [isSavedFeedback, setIsSavedFeedback] = useState<boolean>(false);
+
+  useEffect(() => {
+    setLogGoals(playerLog?.goals ?? 0);
+    setLogAssists(playerLog?.assists ?? 0);
+    setLogPoints(playerLog?.points ?? 0);
+    setLogSaves(playerLog?.saves ?? 0);
+    setLogMinutes(playerLog?.minutesPlayed ?? (sport === 'floorball' ? 45 : 60));
+    setLogStarAward(playerLog?.starPlayerAward ?? false);
+    setLogNotes(playerLog?.notes ?? '');
+    setMatchScoreInput(score || `${stats.liveScore?.home ?? 0}–${stats.liveScore?.away ?? 0}`);
+  }, [playerLog, score, stats, sport]);
 
   const handleSaveLog = () => {
     const updatedLog: PlayerMatchLog = {

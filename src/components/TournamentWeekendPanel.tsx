@@ -119,6 +119,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                     {matches.map((m, idx) => {
                       const start = new Date(m.startTime);
                       const end = new Date(m.endTime);
+                      const dayLabel = start.toLocaleDateString('fi-FI', { weekday: 'short', day: 'numeric', month: 'numeric' });
                       const timeStr = `${start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}–${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
                       const isPast = end.getTime() < Date.now();
                       const isCurrent = start.getTime() <= Date.now() && Date.now() <= end.getTime();
@@ -136,18 +137,21 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-pitch">
+                                {dayLabel}
+                              </span>
                               {m.matchNumber && (
                                 <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-surface border border-border-subtle text-text-muted">
                                   #{m.matchNumber}
                                 </span>
                               )}
                               {m.stage && (
-                                <span className="text-[10px] font-bold text-pitch">
-                                  {m.stage}
+                                <span className="text-[10px] font-bold text-text-secondary">
+                                  • {m.stage}
                                 </span>
                               )}
                               <span className="font-mono text-[11px] font-bold text-text-primary">
-                                {timeStr}
+                                klo {timeStr}
                               </span>
                             </div>
 

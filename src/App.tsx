@@ -365,9 +365,14 @@ export const App: React.FC = () => {
     [filteredEvents, activeProfiles]
   );
 
+  const otherCardsEvents = useMemo(
+    () => filteredEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
+    [filteredEvents, snapshot.nextEvent?.id]
+  );
+
   const eventsGroupedByDay = useMemo(() => {
     const map = new Map<string, { dateStr: string; label: string; events: MatchdayEvent[] }>();
-    for (const ev of filteredEvents) {
+    for (const ev of otherCardsEvents) {
       const d = new Date(ev.startTime);
       const key = d.toISOString().split('T')[0] || '';
       if (!map.has(key)) {
@@ -382,7 +387,7 @@ export const App: React.FC = () => {
       map.get(key)!.events.push(ev);
     }
     return Array.from(map.values());
-  }, [filteredEvents]);
+  }, [otherCardsEvents]);
 
   const handleImportCalendar = async (
     playerName: string,
@@ -859,8 +864,8 @@ export const App: React.FC = () => {
               <div className="flex flex-col gap-6 pb-4">
                 {eventsGroupedByDay.map((dayGroup) => (
                   <div key={dayGroup.dateStr} className="flex flex-col gap-3">
-                    {/* Sticky Day Section Header */}
-                    <div className="sticky top-14 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
+                    {/* Day Section Header */}
+                    <div className="py-2 px-3 rounded-2xl bg-surface-elevated/90 backdrop-blur-md border border-border-subtle flex items-center justify-between shadow-xs">
                       <div className="flex items-center gap-2">
                         <div className="p-1 rounded-md bg-pitch/15 text-pitch">
                           <CalendarIcon className="w-3.5 h-3.5" />
@@ -869,7 +874,7 @@ export const App: React.FC = () => {
                           {dayGroup.label}
                         </span>
                       </div>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface text-text-secondary border border-border-subtle">
                         {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
                       </span>
                     </div>

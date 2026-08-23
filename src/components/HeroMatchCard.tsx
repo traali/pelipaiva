@@ -213,11 +213,15 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Nappisvahti</div>
               <div className="text-xs font-bold text-text-primary truncate">
-                {event.briefing?.gearAndPackingAdvice.footwear
-                  ? event.briefing.gearAndPackingAdvice.footwear.replace('_', ' ')
-                  : event.venue.isIndoor
-                    ? 'Sisäpelikengät'
-                    : 'AG-Nappikset'}
+                {(() => {
+                  const fw = event.briefing?.gearAndPackingAdvice.footwear;
+                  if (fw === 'AG_ARTIFICIAL_GRASS') return 'Tekonurmikengät (AG)';
+                  if (fw === 'FG_FIRM_GROUND') return 'Nappikset (FG)';
+                  if (fw === 'SG_SOFT_GROUND') return 'Rautatapit (SG)';
+                  if (fw === 'TF_TURF_SHOES') return 'Turf-kengät (TF)';
+                  if (fw === 'INDOOR_NON_MARKING') return 'Sisäpelikengät';
+                  return event.venue.isIndoor ? 'Sisäpelikengät' : 'Tekonurmikengät (AG)';
+                })()}
               </div>
             </div>
           </div>

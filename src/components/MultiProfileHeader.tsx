@@ -19,11 +19,12 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   onAddProfile,
   onOpenFamilyManage
 }) => {
-  // Group profiles by playerName
+  // Group profiles by playerName (normalized casing)
   const playerGroups = React.useMemo(() => {
     const map = new Map<string, PlayerProfile[]>();
     for (const p of profiles) {
-      const name = p.playerName || 'Pelaaja';
+      const raw = (p.playerName || 'Pelaaja').trim();
+      const name = raw.charAt(0).toUpperCase() + raw.slice(1);
       if (!map.has(name)) map.set(name, []);
       map.get(name)!.push(p);
     }
