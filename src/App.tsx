@@ -11,13 +11,14 @@ import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
 import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
-import { Sparkles, Smartphone } from 'lucide-react';
+import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties } from 'lucide-react';
 import { FamilyShareModal } from './components/FamilyShareModal';
 import { SmartImportModal } from './components/SmartImportModal';
 import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
 import { AskCopilotModal } from './components/AskCopilotModal';
 import { FamilyManageModal } from './components/FamilyManageModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
+import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
 import { WeekendStrip } from './components/WeekendStrip';
@@ -55,6 +56,7 @@ export const App: React.FC = () => {
   });
   const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
     url?: string;
@@ -352,6 +354,30 @@ export const App: React.FC = () => {
     () => runMissionControlGraph(rawEvents, profiles, new Date()),
     [rawEvents, profiles]
   );
+
+  const otherEvents = useMemo(
+    () => filteredEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
+    [filteredEvents, snapshot.nextEvent?.id]
+  );
+
+  const eventsGroupedByDay = useMemo(() => {
+    const map = new Map<string, { dateStr: string; label: string; events: MatchdayEvent[] }>();
+    for (const ev of otherEvents) {
+      const d = new Date(ev.startTime);
+      const key = d.toISOString().split('T')[0] || '';
+      if (!map.has(key)) {
+        const fiLabel = d.toLocaleDateString('fi-FI', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'numeric'
+        });
+        const capitalized = fiLabel.charAt(0).toUpperCase() + fiLabel.slice(1);
+        map.set(key, { dateStr: key, label: capitalized, events: [] });
+      }
+      map.get(key)!.events.push(ev);
+    }
+    return Array.from(map.values());
+  }, [otherEvents]);
 
   const handleImportCalendar = async (
     playerName: string,
@@ -653,15 +679,61 @@ export const App: React.FC = () => {
         onClear={handleClearData}
       />
 
-      <main className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="mb-4">
-          <MultiProfileHeader
-            profiles={profiles}
-            activeProfileId={activeProfileId}
-            onSelectProfile={(id) => setActiveProfileId(id)}
-            onAddProfile={() => openAddTeam(activePlayerName)}
-            onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
-          />
+      <main className="mx-auto max-w-5xl px-4 pt-2">
+        {/* Sticky Profile Filter & View Mode Switcher Header */}
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-xs">
+          <div className="flex-1 min-w-0">
+            <MultiProfileHeader
+              profiles={profiles}
+              activeProfileId={activeProfileId}
+              onSelectProfile={(id) => setActiveProfileId(id)}
+              onAddProfile={() => openAddTeam(activePlayerName)}
+              onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
+            />
+          </div>
+
+          {/* View Mode Switcher: Cards vs Timeline vs Calendar */}
+          <div className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              title="Korttinäkymä"
+              className={`py-1 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'cards'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+              <span>Kortit</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('timeline')}
+              title="Tiivis aikajana"
+              className={`py-1 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'timeline'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <TableProperties className="w-3.5 h-3.5" />
+              <span>Tiivis</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('calendar')}
+              title="Kalenteriruudukko"
+              className={`py-1 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'calendar'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <CalendarIcon className="w-3.5 h-3.5" />
+              <span>Kalenteri</span>
+            </button>
+          </div>
         </div>
 
         {snapshot.days.length > 0 && (
@@ -672,7 +744,7 @@ export const App: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsLogisticsOpen(true)}
-            className="mb-4 flex min-h-11 w-full items-start gap-2 rounded-xl border border-whistle/35 bg-whistle/12 px-3 py-3 text-left"
+            className="mb-4 flex min-h-11 w-full items-start gap-2 rounded-xl border border-whistle/35 bg-whistle/12 px-3 py-3 text-left cursor-pointer hover:brightness-105 transition-all"
           >
             <span className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-whistle">
               Ristiriita
@@ -714,23 +786,59 @@ export const App: React.FC = () => {
         />
 
         {filteredEvents.length > 0 ? (
-          <div className="flex flex-col gap-3 pb-8">
-            {filteredEvents
-              .filter((e) => e.id !== snapshot.nextEvent?.id)
-              .map((event) => {
-                const profile = profiles.find((p) => p.id === event.profileId);
-                return (
-                  <MatchdayCard
-                    key={event.id}
-                    event={event}
-                    playerName={profile?.playerName}
-                    colorHex={profile?.colorHex}
-                    compact
-                    onResolveMismatch={handleResolveMismatch}
-                  />
-                );
-              })}
-          </div>
+          viewMode === 'cards' ? (
+            /* Cards Feed with Sticky Day Dividers */
+            <div className="flex flex-col gap-6 pb-8">
+              {eventsGroupedByDay.map((dayGroup) => (
+                <div key={dayGroup.dateStr} className="flex flex-col gap-3">
+                  {/* Sticky Day Section Header */}
+                  <div className="sticky top-14 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-md bg-pitch/15 text-pitch">
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black tracking-wide text-text-primary">
+                        {dayGroup.label}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
+                      {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
+                    </span>
+                  </div>
+
+                  {/* Day's Match Cards */}
+                  <div className="flex flex-col gap-3">
+                    {dayGroup.events.map((event) => {
+                      const profile = profiles.find((p) => p.id === event.profileId);
+                      return (
+                        <MatchdayCard
+                          key={event.id}
+                          event={event}
+                          playerName={profile?.playerName}
+                          colorHex={profile?.colorHex}
+                          compact
+                          onResolveMismatch={handleResolveMismatch}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Compact Timeline or Calendar Grid View */
+            <TimelineCalendarView
+              events={otherEvents}
+              profiles={profiles}
+              viewMode={viewMode}
+              onNavigate={(ev) =>
+                window.open(
+                  `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                  '_blank'
+                )
+              }
+            />
+          )
         ) : (
           <div className="rounded-2xl border border-border-subtle bg-surface px-4 py-16 text-center">
             <Smartphone className="mx-auto mb-3 h-10 w-10 text-text-muted" />

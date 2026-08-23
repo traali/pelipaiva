@@ -73,6 +73,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onStartDemo,
+  onOpenFamilyShare,
   onOpenSmartImport,
   onQuickAddTeam,
   onFinishOnboarding,
@@ -284,6 +285,52 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   >
                     <span>Jatka</span>
                     <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Quick Start Alternative Actions */}
+                <div className="pt-4 border-t border-border-subtle flex flex-col gap-2">
+                  <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                    Tai aloita suoraan:
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {onOpenFamilyShare && (
+                      <button
+                        type="button"
+                        onClick={onOpenFamilyShare}
+                        className="p-3 rounded-2xl bg-surface border border-border-strong text-left hover:border-pitch cursor-pointer transition-all flex items-center gap-2.5"
+                      >
+                        <span className="text-base">🔑</span>
+                        <div>
+                          <div className="text-xs font-bold text-text-primary">Minulla on Perhe-koodi</div>
+                          <div className="text-[10px] text-text-muted">Liity toisen vanhemman luomaan perheeseen</div>
+                        </div>
+                      </button>
+                    )}
+
+                    {onOpenSmartImport && (
+                      <button
+                        type="button"
+                        onClick={onOpenSmartImport}
+                        className="p-3 rounded-2xl bg-surface border border-border-strong text-left hover:border-pitch cursor-pointer transition-all flex items-center gap-2.5"
+                      >
+                        <span className="text-base">💬</span>
+                        <div>
+                          <div className="text-xs font-bold text-text-primary">Liitä WhatsApp-viesti</div>
+                          <div className="text-[10px] text-text-muted">AI-tunnistus otteluille ja turnauksille</div>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onStartDemo}
+                    className="mt-1 p-2.5 rounded-xl bg-pitch/10 text-pitch border border-pitch/25 text-xs font-bold flex items-center justify-center gap-2 hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Kokeile esimerkkidatalla (HJK, PPJ, Honka, TOPOLA)</span>
                   </button>
                 </div>
               </div>
