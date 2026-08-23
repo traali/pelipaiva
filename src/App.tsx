@@ -12,24 +12,7 @@ import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
 import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
-import { CalendarImportModal } from './components/CalendarImportModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
-
-const SmartImportModal = lazy(() =>
-  import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
-);
-const FamilyLogisticsModal = lazy(() =>
-  import('./components/FamilyLogisticsModal').then((m) => ({ default: m.FamilyLogisticsModal }))
-);
-const AskCopilotModal = lazy(() =>
-  import('./components/AskCopilotModal').then((m) => ({ default: m.AskCopilotModal }))
-);
-const FamilyShareModal = lazy(() =>
-  import('./components/FamilyShareModal').then((m) => ({ default: m.FamilyShareModal }))
-);
-const FamilyManageModal = lazy(() =>
-  import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
-);
 import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
@@ -50,6 +33,22 @@ import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
+
+const SmartImportModal = lazy(() =>
+  import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
+);
+const FamilyLogisticsModal = lazy(() =>
+  import('./components/FamilyLogisticsModal').then((m) => ({ default: m.FamilyLogisticsModal }))
+);
+const AskCopilotModal = lazy(() =>
+  import('./components/AskCopilotModal').then((m) => ({ default: m.AskCopilotModal }))
+);
+const FamilyShareModal = lazy(() =>
+  import('./components/FamilyShareModal').then((m) => ({ default: m.FamilyShareModal }))
+);
+const FamilyManageModal = lazy(() =>
+  import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
+);
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
