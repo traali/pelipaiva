@@ -503,8 +503,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                 onSubmit={async (e) => {
                   e.preventDefault();
                   if (!classicUrl) return;
-                  await onImportClassic?.(selectedPlayer, classicTeamName || 'Oma joukkue', selectedSport, classicUrl);
-                  onClose();
+                  try {
+                    await onImportClassic?.(selectedPlayer, classicTeamName || 'Oma joukkue', selectedSport, classicUrl);
+                    onClose();
+                  } catch {
+                    /* import surfaces the miss by staying open */
+                  }
                 }}
                 className="flex flex-col gap-3"
               >

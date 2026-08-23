@@ -134,8 +134,8 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
   {
     id: 'kwm2026-ervi',
     name: 'KW Memorial Cup 2026',
-    teamName: 'EräViikingit',
-    clubName: 'EräViikingit',
+    teamName: 'Indians',
+    clubName: 'WESTEND INDIANS',
     sport: 'floorball',
     primaryColor: 'tummansininen',
     colorHex: '#1d4ed8',
@@ -148,30 +148,47 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
     fixtures: [
       {
         id: 'kw1',
-        home: 'EräViikingit',
+        home: 'Indians',
         away: 'Oilers NG White',
-        start: weekendAt(0, 9, 0),
-        venueName: 'Arena Center Myllypuro Kenttä 6',
+        start: weekendAt(6, 12, 35),
+        venueName: 'Arena Center kenttä 6',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 2,
+        awayScore: 12
       },
       {
         id: 'kw2',
         home: 'RSS Panthers',
-        away: 'EräViikingit',
-        start: weekendAt(0, 11, 15),
-        venueName: 'Arena Center Myllypuro Kenttä 6',
+        away: 'Indians',
+        start: weekendAt(6, 16, 55),
+        venueName: 'Arena Center kenttä 6',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 4,
+        awayScore: 9
       },
       {
         id: 'kw3',
-        home: 'EräViikingit',
+        home: 'FBC Turku',
         away: 'Indians',
-        start: weekendAt(0, 14, 50),
-        venueName: 'Arena Center Myllypuro Kenttä 6',
+        start: weekendAt(0, 11, 0),
+        venueName: 'Arena Center kenttä 6',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 7,
+        awayScore: 3
+      },
+      {
+        id: 'kw4',
+        home: 'Indians',
+        away: 'EräViikingit',
+        start: weekendAt(0, 14, 50),
+        venueName: 'Arena Center kenttä 6',
+        venueCity: 'Helsinki',
+        status: 'played',
+        homeScore: 12,
+        awayScore: 8
       }
     ]
   }

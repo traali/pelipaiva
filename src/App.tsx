@@ -26,6 +26,7 @@ import {
   generateOrResolveMatchStats
 } from './lib/stats/statsEngine';
 import { ingestOfficialForProfile } from './lib/clubs/ingestOfficial';
+import { helsinkiDateISO } from './lib/agents/time';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
@@ -388,12 +389,13 @@ export const App: React.FC = () => {
     const map = new Map<string, { dateStr: string; label: string; events: MatchdayEvent[] }>();
     for (const ev of otherEvents) {
       const d = new Date(ev.startTime);
-      const key = d.toISOString().split('T')[0] || '';
+      const key = helsinkiDateISO(d);
       if (!map.has(key)) {
         const fiLabel = d.toLocaleDateString('fi-FI', {
           weekday: 'long',
           day: 'numeric',
-          month: 'numeric'
+          month: 'numeric',
+          timeZone: 'Europe/Helsinki'
         });
         const capitalized = fiLabel.charAt(0).toUpperCase() + fiLabel.slice(1);
         map.set(key, { dateStr: key, label: capitalized, events: [] });
@@ -448,8 +450,9 @@ export const App: React.FC = () => {
 
     try {
       const parsedAssoc = parseAssociationUrl(url);
+      let imported = 0;
       if (parsedAssoc || cup) {
-        await ingestOfficialForProfile({
+        const result = await ingestOfficialForProfile({
           profileId,
           playerName,
           teamName: cup?.teamName || teamName,
@@ -457,6 +460,7 @@ export const App: React.FC = () => {
           url,
           includeWeather: true
         });
+        imported = result.official?.fixtures.length || 0;
       } else {
         const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
         const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;
@@ -472,6 +476,14 @@ export const App: React.FC = () => {
           withMeta.push(fullEv);
         }
         if (withMeta.length > 0) await db.events.bulkPut(withMeta);
+        imported = withMeta.length;
+      }
+
+      if (imported === 0) {
+        if (!reused) {
+          await db.profiles.delete(profileId);
+        }
+        throw new Error('Otteluita ei löytynyt tästä osoitteesta');
       }
 
       const syncRecord = await db.syncState.get('family');
@@ -483,6 +495,7 @@ export const App: React.FC = () => {
       }
     } catch (err) {
       console.warn('Team / Calendar fetch error:', err);
+      throw err;
     }
   };
 
@@ -505,16 +518,32 @@ export const App: React.FC = () => {
   const handleRefreshAll = async () => {
     setIsSyncing(true);
     try {
-      for (const ev of rawEvents) {
-        const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-        const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-        const updated: MatchdayEvent = { ...ev, weather, parking };
-        updated.briefing = generateMatchdayBriefing(updated, rawEvents);
-        await db.events.put(updated);
+      for (const p of profiles) {
+        const url = p.associationUrl || p.calendarUrl;
+        if (!url) continue;
+        await ingestOfficialForProfile({
+          profileId: p.id,
+          playerName: p.playerName,
+          teamName: p.teamName,
+          sport: p.sport,
+          url,
+          includeWeather: true
+        }).catch((e) => console.warn('[REFRESH]', p.teamName, e));
       }
     } finally {
       setTimeout(() => setIsSyncing(false), 600);
     }
+  };
+
+  const handleRemoveImportedTeam = async (playerName: string, url?: string) => {
+    const hit = profiles.find(
+      (p) =>
+        p.playerName === playerName &&
+        (!url || p.calendarUrl === url || p.associationUrl === url)
+    );
+    if (!hit) return;
+    await db.events.where('profileId').equals(hit.id).delete();
+    await db.profiles.delete(hit.id);
   };
 
   const handleResolveMismatch = async (
@@ -584,6 +613,7 @@ export const App: React.FC = () => {
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
             await handleImportCalendar(playerName, teamName, sport, url);
           }}
+          onRemoveTeam={handleRemoveImportedTeam}
         />
         <Suspense fallback={null}>
         <SmartImportModal

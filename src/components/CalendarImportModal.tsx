@@ -41,6 +41,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   const [sport, setSport] = useState<SportType>('football');
   const [icsUrl, setIcsUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
   const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
   const [playerHint, setPlayerHint] = useState('');
@@ -55,6 +56,7 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
     setShowGuide(false);
     setPlayerHint('');
     setIsLoading(false);
+    setImportError(null);
   }, [isOpen, initialPlayerName, initialTeamName, initialSport, initialTeamUrl]);
 
   const handleUrlChange = (val: string) => {
@@ -77,11 +79,13 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   ) => {
     if (!name.trim() || !url.trim()) return;
     setIsLoading(true);
+    setImportError(null);
     try {
       await onImport(name.trim(), team, nextSport, url, hex);
       onClose();
     } catch (err) {
       console.error(err);
+      setImportError('Otteluita ei löytynyt. Tarkista osoite ja verkko.');
     } finally {
       setIsLoading(false);
     }
@@ -345,6 +349,10 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                 </label>
                 <TeamColorPicker value={colorHex} onChange={(hex) => setColorHex(hex)} />
               </div>
+
+              {importError && (
+                <p className="text-xs font-semibold text-stoppage">{importError}</p>
+              )}
 
               <div className="flex items-center justify-end gap-2 border-t border-border-subtle pt-3">
                 <button

@@ -21,8 +21,8 @@ describe('example tournaments', () => {
     expect(
       exampleTournamentFromUrl(
         'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013'
-      )?.sport
-    ).toBe('floorball');
+      )?.teamName
+    ).toBe('Indians');
   });
 
   it('does not treat Palloliitto team 203621 as Espoo Liikkuu', () => {

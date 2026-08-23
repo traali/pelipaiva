@@ -30,6 +30,7 @@ interface OnboardingWizardProps {
   onOpenFamilyShare?: () => void;
   onOpenSmartImport?: () => void;
   onQuickAddTeam: (playerName: string, teamName: string, sport: SportType, url: string) => Promise<void>;
+  onRemoveTeam?: (playerName: string, url?: string) => Promise<void>;
   onFinishOnboarding?: () => void;
   existingProfilesCount?: number;
 }
@@ -76,6 +77,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onOpenFamilyShare,
   onOpenSmartImport,
   onQuickAddTeam,
+  onRemoveTeam,
   onFinishOnboarding,
   existingProfilesCount = 0
 }) => {
@@ -92,6 +94,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [customSport, setCustomSport] = useState<SportType>('football');
   const [showCustomIcsInput, setShowCustomIcsInput] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   // Group added sources by player name
   const playerGroups = React.useMemo(() => {
@@ -118,6 +121,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleAddPresetTorneopal = async (team: (typeof PRESET_TORNEOPAL_TEAMS)[0]) => {
     if (!activePlayerName) return;
     setIsLoading(true);
+    setAddError(null);
     try {
       await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
       setAddedSources((prev) => [
@@ -131,6 +135,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           url: team.url
         }
       ]);
+    } catch {
+      setAddError(`Otteluita ei saatu: ${team.name}. Tarkista verkko ja yritä uudelleen.`);
     } finally {
       setIsLoading(false);
     }
@@ -142,6 +148,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     if (!trimmedUrl) return;
 
     setIsLoading(true);
+    setAddError(null);
     try {
       await onQuickAddTeam(activePlayerName, `${activePlayerName}:n joukkue`, customSport, trimmedUrl);
       setAddedSources((prev) => [
@@ -157,13 +164,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       ]);
       setCustomIcsUrl('');
       setShowCustomIcsInput(false);
+    } catch {
+      setAddError('Kalenterilinkistä ei löytynyt otteluita.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRemoveSource = (id: string) => {
-    setAddedSources((prev) => prev.filter((s) => s.id !== id));
+  const handleRemoveSource = (src: AddedSource) => {
+    setAddedSources((prev) => prev.filter((s) => s.id !== src.id));
+    void onRemoveTeam?.(src.playerName, src.url);
   };
 
   const handleAddNewPlayer = () => {
@@ -367,6 +377,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {/* Ready Torneopal Teams */}
               <div className="space-y-1.5">
                 <div className="text-[11px] font-bold text-text-muted">Valmiit joukkueet:</div>
+                {isLoading && (
+                  <p className="text-xs text-pitch font-semibold">Haetaan otteluita tulospalvelusta…</p>
+                )}
+                {addError && (
+                  <p className="text-xs text-stoppage font-semibold">{addError}</p>
+                )}
                 {PRESET_TORNEOPAL_TEAMS.map((team) => {
                   const isAdded = currentPlayerSources.some((s) => s.name === team.name);
                   return (
@@ -484,7 +500,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       <span className="font-semibold text-text-primary">{src.name}</span>
                       <button
                         type="button"
-                        onClick={() => handleRemoveSource(src.id)}
+                        onClick={() => handleRemoveSource(src)}
                         className="text-text-muted hover:text-radar p-1 cursor-pointer"
                         title="Poista lähde"
                       >

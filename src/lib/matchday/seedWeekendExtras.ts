@@ -129,7 +129,7 @@ export const EXTRA_PROFILES: PlayerProfile[] = [
   {
     id: 'profile-kw-eemil',
     playerName: 'Eemil',
-    teamName: 'EräViikingit',
+    teamName: 'Indians',
     sport: 'floorball',
     primaryColor: 'tummansininen',
     secondaryColor: 'punainen',
