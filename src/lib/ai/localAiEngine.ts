@@ -6,7 +6,6 @@ import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
-import { generateOrResolveMatchStats } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
 
 export interface FamilyLogisticsPlan {
@@ -40,14 +39,16 @@ export async function convertExtractedToMatchdayEvent(
 ): Promise<MatchdayEvent> {
   const venue = await resolveSportsVenue(extracted.venueHint);
 
-  const startTime = new Date(`${extracted.dateStr}T${extracted.kickoffTime}:00+03:00`).toISOString();
-  const endTime = new Date(`${extracted.dateStr}T${extracted.endTime}:00+03:00`).toISOString();
-  const warmupTime = new Date(`${extracted.dateStr}T${extracted.warmupTime}:00+03:00`).toISOString();
+  const formatHelsinkiIso = (timeStr: string) => {
+    const d = new Date(`${extracted.dateStr}T${timeStr}:00`);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  };
+
+  const startTime = formatHelsinkiIso(extracted.kickoffTime);
+  const endTime = formatHelsinkiIso(extracted.endTime);
+  const warmupTime = formatHelsinkiIso(extracted.warmupTime);
 
   const isTraining = extracted.eventType === 'training';
-  const matchStats = isTraining
-    ? undefined
-    : generateOrResolveMatchStats(extracted.homeTeam, extracted.awayTeam, extracted.sport);
 
   const matchEvent: MatchdayEvent = {
     id: `event-ai-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -64,7 +65,7 @@ export async function convertExtractedToMatchdayEvent(
     warmupTime,
     venue,
     volunteerDuty: extracted.volunteerDuties.length > 0 ? extracted.volunteerDuties.join(' • ') : undefined,
-    stats: matchStats,
+    stats: undefined,
     reconciliationStatus: 'auto_matched',
     confidenceScore: extracted.confidenceScore
   };
@@ -127,12 +128,24 @@ export function queryFamilySchedule(
 ): CopilotQueryResult {
   const norm = query.toLowerCase().trim();
 
+  // Child name detection (e.g. "Milloin Maijalla", "Aada", "Simo", "Lilli")
+  const matchedProfile = profiles.find((p) => {
+    const firstName = p.playerName.split(' ')[0]?.toLowerCase();
+    return firstName && firstName.length >= 3 && norm.includes(firstName);
+  });
+
+  const targetEvents = matchedProfile
+    ? events.filter((e) => e.profileId === matchedProfile.id)
+    : events;
+
   // 1. Volunteer duties query
   if (norm.includes('kahvio') || norm.includes('toimitsija') || norm.includes('vuoro') || norm.includes('kirjuri')) {
-    const dutyEvents = events.filter((e) => e.volunteerDuty && e.volunteerDuty.length > 0);
+    const dutyEvents = targetEvents.filter((e) => e.volunteerDuty && e.volunteerDuty.length > 0);
     if (dutyEvents.length === 0) {
       return {
-        answer: 'Sinulla ei ole merkittyjä kahvio- tai toimitsijavuoroja tulevissa otteluissa.',
+        answer: matchedProfile
+          ? `Ei merkittyjä kahvio- tai toimitsijavuoroja pelaajan ${matchedProfile.playerName} otteluissa.`
+          : 'Sinulla ei ole merkittyjä kahvio- tai toimitsijavuoroja tulevissa otteluissa.',
         relevantEvents: [],
         confidence: 0.95
       };
@@ -151,14 +164,23 @@ export function queryFamilySchedule(
   }
 
   // 2. Next game query
-  if (norm.includes('seuraava') || norm.includes('milloin') || norm.includes('huomenna') || norm.includes('tuleva')) {
-    const upcoming = events
+  if (
+    norm.includes('seuraava') ||
+    norm.includes('milloin') ||
+    norm.includes('huomenna') ||
+    norm.includes('tuleva') ||
+    norm.includes('peli') ||
+    matchedProfile != null
+  ) {
+    const upcoming = targetEvents
       .filter((e) => new Date(e.startTime) >= new Date())
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
     if (upcoming.length === 0) {
       return {
-        answer: 'Ei tulevia otteluita kalenterissa.',
+        answer: matchedProfile
+          ? `Ei tulevia otteluita kalenterissa pelaajalle ${matchedProfile.playerName}.`
+          : 'Ei tulevia otteluita kalenterissa.',
         relevantEvents: [],
         confidence: 0.9
       };

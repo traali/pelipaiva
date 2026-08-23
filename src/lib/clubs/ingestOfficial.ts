@@ -125,20 +125,25 @@ export async function ingestOfficialForProfile(
       stats
     };
 
-    try {
-      const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
-      const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
-      matchEvent.weather = weather;
-      matchEvent.parking = parking;
-      matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
-    } catch {
-      // Offline / graceful degradation
-    }
-
     eventsToInsert.push(matchEvent);
   }
 
+  const existingEvents = await dbInstance.events.toArray().catch(() => []);
+  const allEventsCombined = [...existingEvents.filter(e => !eventsToInsert.some(n => n.id === e.id)), ...eventsToInsert];
+
   for (const ev of eventsToInsert) {
+    const sameDayEvents = allEventsCombined.filter(
+      (other) => other.startTime.slice(0, 10) === ev.startTime.slice(0, 10)
+    );
+    try {
+      const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
+      const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
+      ev.weather = weather;
+      ev.parking = parking;
+      ev.briefing = generateMatchdayBriefing(ev, sameDayEvents);
+    } catch {
+      // Offline / graceful degradation
+    }
     await dbInstance.events.put(ev);
   }
 

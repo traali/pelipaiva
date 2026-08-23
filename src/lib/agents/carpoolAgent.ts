@@ -36,7 +36,7 @@ export function carpoolAgent(
     const ev = sorted[i]!;
     const profile = childOf(ev, profiles);
     const childName = profile?.playerName || 'Lapsi';
-    const { departureTime } = calculateDepartureCountdown(ev);
+    const { departureTime } = calculateDepartureCountdown(ev, profile?.arrivalRules);
     const next = sorted[i + 1];
     const sameVenueNext = canShareWithNext(ev, next);
     const shareWith = sameVenueNext ? childOf(next!, profiles)?.playerName : undefined;

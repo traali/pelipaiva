@@ -37,7 +37,7 @@ export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile
             (new Date(sorted[1]!.startTime).getTime() - new Date(first.endTime).getTime()) / 60000
           )
         : 0;
-    const { departureTime } = calculateDepartureCountdown(first);
+    const { departureTime } = calculateDepartureCountdown(first, profile?.arrivalRules);
 
     blocks.push({
       id: `tn-${first.id}`,

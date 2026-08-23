@@ -420,6 +420,7 @@ export interface PlayerProfile {
   teamId?: string;
   clubId?: string;
   squadName?: string;
+  arrivalRules?: ArrivalRules;
   lastOfficialSyncAt?: string;
 }
 

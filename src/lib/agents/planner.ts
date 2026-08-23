@@ -92,7 +92,7 @@ export function runMissionControlGraph(
 
   const nextEvent = upcoming.find((e) => new Date(e.endTime).getTime() >= now.getTime()) || upcoming[0];
   const nextPlayer = nextEvent ? profiles.find((p) => p.id === nextEvent.profileId) : undefined;
-  const depart = nextEvent ? calculateDepartureCountdown(nextEvent) : undefined;
+  const depart = nextEvent ? calculateDepartureCountdown(nextEvent, nextPlayer?.arrivalRules) : undefined;
 
   const windowEvents = eventsInRange(events, weekend.start, weekend.end).sort(byStart);
 
