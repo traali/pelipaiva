@@ -693,12 +693,18 @@ export const App: React.FC = () => {
           </div>
 
           {/* View Mode Switcher: Cards vs Timeline vs Calendar */}
-          <div className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto">
+          <div
+            role="tablist"
+            aria-label="Näkymän valitsin"
+            className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto"
+          >
             <button
               type="button"
+              role="tab"
+              aria-selected={viewMode === 'cards'}
               onClick={() => setViewMode('cards')}
               title="Korttinäkymä"
-              className={`py-1 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                 viewMode === 'cards'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'text-text-secondary hover:text-text-primary'
@@ -709,9 +715,11 @@ export const App: React.FC = () => {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={viewMode === 'timeline'}
               onClick={() => setViewMode('timeline')}
               title="Tiivis aikajana"
-              className={`py-1 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                 viewMode === 'timeline'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'text-text-secondary hover:text-text-primary'
@@ -722,9 +730,11 @@ export const App: React.FC = () => {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={viewMode === 'calendar'}
               onClick={() => setViewMode('calendar')}
               title="Kalenteriruudukko"
-              className={`py-1 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                 viewMode === 'calendar'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'text-text-secondary hover:text-text-primary'
@@ -744,12 +754,20 @@ export const App: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsLogisticsOpen(true)}
-            className="mb-4 flex min-h-11 w-full items-start gap-2 rounded-xl border border-whistle/35 bg-whistle/12 px-3 py-3 text-left cursor-pointer hover:brightness-105 transition-all"
+            aria-label={`Logistiikkaristiriita: ${snapshot.conflicts[0]?.message}. Avaa kuskijako.`}
+            className="mb-4 flex min-h-[48px] w-full items-start gap-2.5 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 text-left cursor-pointer hover:brightness-105 transition-all shadow-xs focus-visible:ring-2 focus-visible:ring-whistle"
           >
-            <span className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-whistle">
+            <span className="mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse shrink-0">
               Ristiriita
             </span>
-            <span className="text-sm text-text-primary">{snapshot.conflicts[0]?.message}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-text-primary leading-snug">
+                {snapshot.conflicts[0]?.message}
+              </div>
+              <div className="text-xs font-bold text-whistle mt-1 flex items-center gap-1">
+                <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
+              </div>
+            </div>
           </button>
         )}
 

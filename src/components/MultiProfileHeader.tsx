@@ -31,14 +31,19 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   }, [profiles]);
 
   return (
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+    <nav
+      aria-label="Pelaaja- ja joukkueprofiilit"
+      role="tablist"
+      className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 scrollbar-none"
+    >
       {onOpenFamilyManage && (
         <motion.button
           whileTap={{ scale: 0.95 }}
           transition={springTactile.snappy}
           onClick={onOpenFamilyManage}
+          aria-label="Hallitse perheen pelaajia ja joukkueita"
           title="Hallitse perheen pelaajia ja joukkueita"
-          className="touch-target inline-flex shrink-0 items-center gap-1.5 rounded-md bg-pitch px-3 text-xs font-semibold text-text-inverse"
+          className="touch-target inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-pitch px-3.5 text-xs font-bold text-text-inverse shadow-xs focus-visible:ring-2 focus-visible:ring-pitch"
         >
           <Users className="h-4 w-4" />
           <span>Perhe</span>
@@ -46,13 +51,15 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
       )}
 
       <motion.button
+        role="tab"
+        aria-selected={activeProfileId === 'all'}
         whileTap={{ scale: 0.95 }}
         transition={springTactile.snappy}
         onClick={() => onSelectProfile('all')}
-        className={`touch-target inline-flex shrink-0 items-center rounded-md border px-3 text-xs font-semibold ${
+        className={`touch-target inline-flex shrink-0 items-center rounded-xl border px-3.5 text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-pitch ${
           activeProfileId === 'all'
-            ? 'border-pitch bg-surface-elevated text-pitch'
-            : 'border-border-subtle bg-surface-elevated text-text-secondary'
+            ? 'border-pitch bg-pitch text-text-inverse shadow-xs'
+            : 'border-border-subtle bg-surface-elevated text-text-secondary hover:text-text-primary'
         }`}
       >
         Kaikki
@@ -66,16 +73,18 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
           <React.Fragment key={playerName}>
             {hasMultipleTeams ? (
               <motion.button
+                role="tab"
+                aria-selected={isPlayerActive}
                 whileTap={{ scale: 0.95 }}
                 transition={springTactile.snappy}
                 onClick={() => onSelectProfile(`player:${playerName}`)}
-                className={`touch-target inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-xs font-semibold ${
+                className={`touch-target inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3.5 text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-pitch ${
                   isPlayerActive
-                    ? 'border-pitch bg-pitch text-text-inverse'
-                    : 'border-border-subtle bg-surface-elevated text-text-secondary'
+                    ? 'border-pitch bg-pitch text-text-inverse shadow-xs'
+                    : 'border-border-subtle bg-surface-elevated text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <User className="w-3 h-3" />
+                <User className="w-3.5 h-3.5" />
                 <span>{playerName} ({playerProfiles.length} lajia/tiimiä)</span>
               </motion.button>
             ) : null}
@@ -85,17 +94,19 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
               return (
                 <motion.button
                   key={p.id}
+                  role="tab"
+                  aria-selected={isSelected}
                   whileTap={{ scale: 0.95 }}
                   transition={springTactile.snappy}
                   onClick={() => onSelectProfile(p.id)}
-                  className={`touch-target inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-xs font-medium ${
+                  className={`touch-target inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3.5 text-xs font-bold transition-all focus-visible:ring-2 focus-visible:ring-pitch ${
                     isSelected
-                      ? 'border-pitch bg-pitch text-text-inverse'
-                      : 'border-border-subtle bg-surface-elevated text-text-secondary'
+                      ? 'border-pitch bg-pitch text-text-inverse shadow-xs'
+                      : 'border-border-subtle bg-surface-elevated text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   <span
-                    className="h-2.5 w-2.5 rounded-full"
+                    className="h-2.5 w-2.5 rounded-full ring-1 ring-black/20"
                     style={{ background: p.colorHex }}
                   />
                   <span>{hasMultipleTeams ? p.teamName : `${p.playerName} · ${p.teamName}`}</span>
@@ -110,12 +121,13 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         whileTap={{ scale: 0.95 }}
         transition={springTactile.snappy}
         onClick={onAddProfile}
+        aria-label="Lisää joukkue tai turnaus"
         title="Lisää joukkue tai turnaus valitulle pelaajalle"
-        className="touch-target inline-flex shrink-0 items-center gap-1 rounded-md border border-border-strong bg-surface-elevated px-3 text-xs font-medium text-text-muted"
+        className="touch-target inline-flex shrink-0 items-center gap-1 rounded-xl border border-border-strong bg-surface-elevated px-3 text-xs font-bold text-text-muted hover:text-pitch hover:border-pitch transition-all focus-visible:ring-2 focus-visible:ring-pitch"
       >
-        <Plus className="w-3 h-3" />
+        <Plus className="w-3.5 h-3.5" />
         <span>+ Joukkue</span>
       </motion.button>
-    </div>
+    </nav>
   );
 };

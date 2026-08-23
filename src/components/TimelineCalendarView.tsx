@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
+import { getContrastTextColor } from '../lib/sport/teamColors';
 
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
@@ -137,8 +138,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         </span>
 
                         <span
-                          className="text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 text-white truncate max-w-[140px]"
-                          style={{ backgroundColor: profile?.colorHex || '#3b82f6' }}
+                          className="text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 truncate max-w-[140px] shadow-xs"
+                          style={{
+                            backgroundColor: profile?.colorHex || '#3b82f6',
+                            color: getContrastTextColor(profile?.colorHex)
+                          }}
                         >
                           <span>{profile?.playerName || 'Pelaaja'}</span>
                         </span>
@@ -157,7 +161,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     {/* Middle Row: Match Title & Opponent */}
                     <div className="pl-1.5 flex items-baseline justify-between gap-2">
-                      <div className="text-sm font-bold text-text-primary truncate">
+                      <div className="text-sm font-bold text-text-primary line-clamp-2 break-words leading-snug">
                         {ev.title}
                       </div>
                       {ev.isHomeMatch !== undefined && (
@@ -181,20 +185,22 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                       <button
                         type="button"
+                        aria-label={`Navigoi kentälle ${ev.venue.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onNavigate) {
                             onNavigate(ev);
                           } else {
+                            const coords = ev.parking?.coordinates || ev.venue.coordinates;
                             window.open(
-                              `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                              `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
                               '_blank'
                             );
                           }
                         }}
-                        className="py-1 px-2.5 rounded-lg bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                        className="min-h-[44px] px-3 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
                       >
-                        <Navigation className="w-3 h-3" />
+                        <Navigation className="w-3.5 h-3.5" />
                         <span>Reitti</span>
                       </button>
                     </div>
@@ -282,8 +288,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black font-mono text-pitch">{timeStr}</span>
                       <span
-                        className="text-[11px] font-bold px-2 py-0.5 rounded-md text-white"
-                        style={{ backgroundColor: profile?.colorHex || '#3b82f6' }}
+                        className="text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xs"
+                        style={{
+                          backgroundColor: profile?.colorHex || '#3b82f6',
+                          color: getContrastTextColor(profile?.colorHex)
+                        }}
                       >
                         {profile?.playerName}
                       </span>
@@ -294,7 +303,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="pl-2 text-sm font-bold text-text-primary">
+                  <div className="pl-2 text-sm font-bold text-text-primary line-clamp-2 break-words">
                     {ev.title}
                   </div>
 
@@ -306,15 +315,17 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     <button
                       type="button"
+                      aria-label={`Navigoi kentälle ${ev.venue.name}`}
                       onClick={() => {
+                        const coords = ev.parking?.coordinates || ev.venue.coordinates;
                         window.open(
-                          `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                          `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
                           '_blank'
                         );
                       }}
-                      className="py-1 px-2.5 rounded-lg bg-pitch text-text-inverse font-bold text-[11px] flex items-center gap-1 hover:brightness-110 cursor-pointer"
+                      className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs focus-visible:ring-2 focus-visible:ring-pitch"
                     >
-                      <Navigation className="w-3 h-3" />
+                      <Navigation className="w-3.5 h-3.5" />
                       <span>Reitti</span>
                     </button>
                   </div>

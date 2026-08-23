@@ -55,8 +55,8 @@
     --nv-bg-surface-glass: rgba(17, 17, 17, 0.72);
     --nv-bg-surface: #111111;
 
-    --nv-border-subtle: rgba(250, 255, 105, 0.08);
-    --nv-border-strong: rgba(255, 255, 255, 0.16);
+    --nv-border-subtle: rgba(255, 255, 255, 0.09);
+    --nv-border-strong: rgba(255, 255, 255, 0.18);
     --nv-border-focus: #10b981;
 
     --nv-text-primary: #f4f4f0;

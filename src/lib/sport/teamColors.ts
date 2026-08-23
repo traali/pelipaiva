@@ -47,3 +47,21 @@ export function colorFromNameHint(name: string): TeamColorSwatch | undefined {
   if (/\bvalko(inen)?\b|white/.test(n)) return swatchForHex('#64748b');
   return undefined;
 }
+
+/**
+ * Calculates WCAG 2.2 relative luminance and returns optimal contrast text color ('#0a0a0a' or '#ffffff').
+ */
+export function getContrastTextColor(hex: string | undefined): string {
+  if (!hex) return '#ffffff';
+  const cleanHex = hex.replace('#', '');
+  if (cleanHex.length < 6) return '#ffffff';
+  const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+  const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+  const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
+
+  const toLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
+  return L > 0.36 ? '#0a0a0a' : '#ffffff';
+}
+

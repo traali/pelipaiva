@@ -21,6 +21,7 @@ import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { Edit3 } from 'lucide-react';
 import type { PitchSurface } from '../types/matchday';
+import { getContrastTextColor } from '../lib/sport/teamColors';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return 'Sisähalli';
@@ -173,7 +174,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2 flex-wrap">
             {playerName && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-pitch/20 text-pitch border border-pitch/30">
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-xs"
+                style={{
+                  backgroundColor: colorHex || '#3b82f6',
+                  color: getContrastTextColor(colorHex)
+                }}
+              >
                 <span>👤</span>
                 <span>{playerName}</span>
               </span>
@@ -224,16 +231,16 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         {/* Event Header (Matchup vs Training Title) */}
         <div className="mb-4">
           {isTraining ? (
-            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary">
+            <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary break-words">
               {event.title}
             </h2>
           ) : (
-            <h2 className="text-xl md:text-2xl font-bold tracking-tight text-text-primary flex items-baseline gap-2">
-              <span>{event.homeTeam}</span>
+            <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-words">
+              <span className="break-words">{event.homeTeam}</span>
               {event.awayTeam && (
                 <>
-                  <span className="text-text-muted font-normal text-sm">vs</span>
-                  <span>{event.awayTeam}</span>
+                  <span className="text-text-muted font-normal text-sm select-none" aria-label="vastaan">vs</span>
+                  <span className="break-words">{event.awayTeam}</span>
                 </>
               )}
             </h2>
@@ -248,10 +255,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             <button
               type="button"
               onClick={() => setIsVenueModalOpen(true)}
-              title="Korjaa kentän nimeä tai sijaintia"
-              className="p-1 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors"
+              aria-label={`Korjaa kentän tietoja: ${localVenue.name}`}
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-2 -mr-2 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
             >
-              <Edit3 className="w-3 h-3" />
+              <Edit3 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -362,8 +369,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               whileTap={{ scale: 0.95 }}
               transition={springTactile.snappy}
               onClick={handleShareWhatsApp}
+              aria-label="Jaa ottelun tiedot WhatsAppiin"
               title="Jaa WhatsAppiin"
-              className="p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary cursor-pointer"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
             >
               <Share2 className="w-4 h-4" />
             </motion.button>
@@ -375,11 +383,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               onClick={
                 onNavigateToVenue ||
                 (() => {
-                  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.venue.coordinates.lat},${event.venue.coordinates.lng}`;
+                  const targetCoords = event.parking?.coordinates || event.venue.coordinates;
+                  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`;
                   window.open(mapsUrl, '_blank');
                 })
               }
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pitch text-text-inverse font-semibold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer"
+              aria-label={`Navigoi kohteeseen ${event.venue.name}`}
+              className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
             >
               <Navigation className="w-3.5 h-3.5" />
               <span>Navigoi paikalle</span>
