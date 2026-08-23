@@ -28,13 +28,13 @@ import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import {
   parseAssociationUrl,
-  extractOfficialTeamData,
   generateOrResolveMatchStats
 } from './lib/stats/statsEngine';
+import { ingestOfficialForProfile } from './lib/clubs/ingestOfficial';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
-import { exampleTournamentFromUrl, isCupName, mergeOfficialWithCupFallback, isUglyTeamName } from './lib/clubs/exampleTournaments';
+import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
@@ -96,8 +96,8 @@ export const App: React.FC = () => {
     // Initial sync
     runBackgroundSync();
 
-    // 30s interval
-    syncTimer = setInterval(runBackgroundSync, 30000);
+  // 30s interval → 3 min so one phone stays under Worker GET:20 / 15 min
+    syncTimer = setInterval(runBackgroundSync, 180000);
 
     const handleVisibility = () => {
       if (!document.hidden) {
@@ -164,6 +164,7 @@ export const App: React.FC = () => {
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
   const eventsQuery = useLiveQuery(() => db.events.toArray(), []);
   const rawEvents = eventsQuery || [];
+  const arrivalRules = useLiveQuery(() => db.arrivalRules.toArray(), []) || [];
 
   const isDemoActive = profiles.some(
     (p) =>
@@ -363,8 +364,8 @@ export const App: React.FC = () => {
   );
 
   const snapshot = useMemo(
-    () => runMissionControlGraph(rawEvents, profiles, new Date()),
-    [rawEvents, profiles]
+    () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules),
+    [rawEvents, profiles, arrivalRules]
   );
 
   const otherEvents = useMemo(
@@ -436,108 +437,32 @@ export const App: React.FC = () => {
 
     try {
       const parsedAssoc = parseAssociationUrl(url);
-      let officialData: Awaited<ReturnType<typeof extractOfficialTeamData>> | null = null;
-      if (parsedAssoc) {
-        try {
-          officialData = await extractOfficialTeamData(parsedAssoc, {
-            customTeamName: cup?.teamName || teamName,
-            fallbackToSynthetic: false
-          });
-        } catch (err) {
-          console.warn('Official fetch failed, using cup fallback if any', err);
-        }
-      }
-
-      officialData = mergeOfficialWithCupFallback(cup, officialData);
-
-      if (officialData && officialData.fixtures.length > 0) {
-        for (const fix of officialData.fixtures) {
-          await db.officialFixtures.put(fix);
-        }
-
-        const resolvedName =
-          officialData.teamName && !isUglyTeamName(officialData.teamName)
-            ? officialData.teamName
-            : cup?.teamName || teamName;
-
-        await db.profiles.update(profileId, {
-          teamName: resolvedName,
-          teamId: parsedAssoc?.teamId || cup?.teamId,
-          associationType: parsedAssoc?.association,
-          associationUrl: url
+      if (parsedAssoc || cup) {
+        await ingestOfficialForProfile({
+          profileId,
+          playerName,
+          teamName: cup?.teamName || teamName,
+          sport,
+          url,
+          includeWeather: true
         });
-
-        const eventsToInsert: MatchdayEvent[] = [];
-        const cupish = Boolean(cup) || isCupName(officialData.leagueName);
-        const fixtures = cupish
-          ? officialData.fixtures.filter((f) => f.status !== 'cancelled')
-          : officialData.fixtures;
-        for (const fixture of fixtures) {
-          const venue = await resolveSportsVenue(fixture.venueName, {
-            lat: fixture.venueLat,
-            lng: fixture.venueLng,
-            city: fixture.venueCity
-          });
-          const startTime = fixture.startTime || new Date().toISOString();
-          const endTime =
-            fixture.endTime || new Date(new Date(startTime).getTime() + 90 * 60 * 1000).toISOString();
-          const warmupTime = new Date(new Date(startTime).getTime() - 45 * 60 * 1000).toISOString();
-
-          const isHome =
-            fixture.isHome ??
-            (fixture.homeTeam.toLowerCase().includes((resolvedName || teamName).toLowerCase()) ||
-              fixture.homeTeam.toLowerCase().includes(playerName.toLowerCase()));
-
-          const thisCup = cupish || isCupName(fixture.leagueName);
-          const matchEvent: MatchdayEvent = {
-            id: `fixture-${profileId}-${fixture.id}`,
-            profileId,
-            title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
-            eventType: thisCup ? 'tournament' : 'match',
-            isTraining: false,
-            sport: officialData.sport || parsedAssoc?.sport || sport,
-            homeTeam: fixture.homeTeam,
-            awayTeam: fixture.awayTeam,
-            isHomeMatch: isHome,
-            startTime,
-            endTime,
-            warmupTime,
-            tournamentName: thisCup ? fixture.leagueName || officialData.leagueName : undefined,
-            venue,
-            officialFixtureId: fixture.id,
-            reconciliationStatus: 'auto_matched',
-            confidenceScore: 1.0,
-            stats: thisCup ? undefined : generateOrResolveMatchStats(fixture.homeTeam, fixture.awayTeam, officialData.sport)
-          };
-
-          const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
-          const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
-          matchEvent.weather = weather;
-          matchEvent.parking = parking;
-          matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
-          eventsToInsert.push(matchEvent);
-        }
-
-        for (const ev of eventsToInsert) {
-          await db.events.put(ev);
-        }
-      } else if (!parsedAssoc) {
-        // Standard iCal feed from Nimenhuuto, MyClub, Jopox
+      } else {
         const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
         const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;
         const res = await fetch(target);
         const text = await res.text();
-        const parsed = await parseICSFeed(text, profileId, sport);
+        const parsed = await parseICSFeed(text, profileId, sport, teamName);
+        const withMeta: MatchdayEvent[] = [];
         for (const ev of parsed) {
           const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
           const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
           const fullEv: MatchdayEvent = { ...ev, weather, parking };
           fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
-          await db.events.put(fullEv);
+          withMeta.push(fullEv);
         }
+        if (withMeta.length > 0) await db.events.bulkPut(withMeta);
       }
 
-      // Background Family Cloud Sync if active
       const syncRecord = await db.syncState.get('family');
       if (syncRecord && syncRecord.syncKey) {
         await db.syncState.put({ ...syncRecord, pendingUpload: true });

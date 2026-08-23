@@ -318,6 +318,9 @@ export function parseFreeformSportsMessage(
   let homeTeam = 'Oma joukkue';
   let awayTeam = 'Vastustaja';
   let isHomeMatch = true;
+  if (/\bvieras(?:peli|ottelu)?\b|\baway\b/.test(norm) || /\s@\s/.test(rawText)) {
+    isHomeMatch = false;
+  }
 
   const vsMatch = rawText.match(/\b([a-zA-ZäöåÄÖÅ]{2,}[a-zA-Z0-9äöåÄÖÅ\s-]*?)\s+(?:vs\.?|vastaan)\s+([a-zA-ZäöåÄÖÅ]{2,}[a-zA-Z0-9äöåÄÖÅ\s-]*)/i);
   if (vsMatch && vsMatch[1] && vsMatch[2]) {

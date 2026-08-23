@@ -11,7 +11,6 @@ import type {
   TeamSquadRoster,
   TopScorer,
 } from "../../types/matchday";
-import { proxiedUrl } from "./proxyUrl";
 
 /** Public SPA keys used by official tulospalvelu frontends. */
 const TUPA_KEY = "tpqgz8ddy2rt9w8xuyxr";
@@ -82,6 +81,30 @@ function isFinnishSummerTime(dateStr: string): boolean {
   return t >= lastSunMarch.getTime() && t < lastSunOct.getTime();
 }
 
+export function isTorneopalCompetitionId(raw?: string): boolean {
+  if (!raw) return false;
+  return /^[a-z0-9][a-z0-9-]{1,24}$/i.test(raw);
+}
+
+export function looksLikeCupRequest(parsed: ParsedAssociationUrl): boolean {
+  const blob = [parsed.canonicalUrl, parsed.seasonId, parsed.subdomain, parsed.leagueId]
+    .filter(Boolean)
+    .join(" ");
+  return /cup|turnaus|tournament|memorial|hc20|esli|kwmemorial|espooliikkuu/i.test(blob);
+}
+
+export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<string, string> {
+  const params: Record<string, string> = { team_id: parsed.teamId };
+  if (!looksLikeCupRequest(parsed)) {
+    const today = new Date();
+    params.start_date = new Date(today.getTime() - 21 * 86400000).toISOString().slice(0, 10);
+    params.end_date = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
+  }
+  if (isTorneopalCompetitionId(parsed.seasonId)) params.competition_id = parsed.seasonId!;
+  if (parsed.leagueId && /^\d+$/.test(parsed.leagueId)) params.category_id = parsed.leagueId;
+  return params;
+}
+
 async function torneopalGet<T>(
   association: AssociationType,
   method: string,
@@ -96,9 +119,7 @@ async function torneopalGet<T>(
       apiKey: TUPA_KEY,
     });
   }
-  const dedicatedHost =
-    Boolean(subdomain) && /memorial|kwmemorial|cup|turnaus/i.test(subdomain!);
-  if (endpoint && !dedicatedHost) attempts.push(endpoint);
+  if (endpoint) attempts.push(endpoint);
 
   for (const ep of attempts) {
     const search = new URLSearchParams({
@@ -108,7 +129,9 @@ async function torneopalGet<T>(
     const url = `${ep.base}/${method}?${search.toString()}`;
 
     try {
-      const res = await fetch(proxiedUrl(url), {
+      // Torneopal REST sends Access-Control-Allow-Origin: *. Fetch from the
+      // phone — Cloudflare Worker IPs are 403'd by the origin.
+      const res = await fetch(url, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(4000),
       });
@@ -121,9 +144,8 @@ async function torneopalGet<T>(
       } catch {
         continue;
       }
-      if (json && typeof json === "object" && json.call?.status && json.call.status !== "ok") {
-        continue;
-      }
+      if (!json || typeof json !== "object") continue;
+      if (json.call?.status && json.call.status !== "ok") continue;
       return json;
     } catch (err) {
       console.warn("[PELIPAIVA:TORNEOPAL]", method, err);
@@ -204,7 +226,7 @@ function pickCurrentGroup(groups: Record<string, unknown>[]): Record<string, unk
   );
 }
 
-function mapFixture(
+export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
   teamName: string
@@ -254,7 +276,9 @@ function mapFixture(
     awayScore,
     officialMatchUrl: parsed.canonicalUrl,
     matchId,
-    round: str(match.round_name) || undefined,
+    round: str(match.round_name) || str(match.round_id) || undefined,
+    stage: str(match.stage_name) || str(match.stage) || str(match.group_name) || undefined,
+    matchNumber: str(match.match_number) || undefined,
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -326,17 +350,7 @@ export async function fetchTorneopalTeamData(
   const groups = Array.isArray(team.groups) ? (team.groups as Record<string, unknown>[]) : [];
   const currentGroup = pickCurrentGroup(groups);
 
-  const today = new Date();
-  const start = new Date(today.getTime() - 21 * 86400000).toISOString().slice(0, 10);
-  const end = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
-
-  const matchParams: Record<string, string> = {
-    team_id: parsed.teamId,
-    start_date: start,
-    end_date: end,
-  };
-  if (parsed.seasonId) matchParams.competition_id = parsed.seasonId;
-  if (parsed.leagueId) matchParams.category_id = parsed.leagueId;
+  const matchParams = buildGetMatchesParams(parsed);
 
   const [matchesJson, groupJson] = await Promise.all([
     torneopalGet<TorneopalMatchesPayload>(parsed.association, "getMatches", matchParams, parsed.subdomain),
@@ -354,7 +368,9 @@ export async function fetchTorneopalTeamData(
       : Promise.resolve(null),
   ]);
 
-  const fixtures = (matchesJson?.matches || []).map((m) => mapFixture(m, parsed, teamName));
+  const fixtures = (Array.isArray(matchesJson?.matches) ? matchesJson!.matches : []).map((m) =>
+    mapFixture(m, parsed, teamName)
+  );
   const group = groupJson?.group || {};
   const teamRows = Array.isArray(group.teams) ? (group.teams as Record<string, unknown>[]) : [];
   const standings = teamRows.map(mapStanding).filter((r) => r.teamName);

@@ -96,6 +96,49 @@ async function rateLimitFamily(
   return null;
 }
 
+function hostnameAllowed(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === 'nimenhuuto.com' || h.endsWith('.nimenhuuto.com')) return true;
+  if (h === 'myclub.fi' || h.endsWith('.myclub.fi')) return true;
+  if (h === 'opendata.fmi.fi' || h === 'openwms.fmi.fi') return true;
+  if (h === 'api.lipas.fi' || h === 'api.hel.fi') return true;
+  if (h === 'tulospalvelu.palloliitto.fi' || h === 'www.tulospalvelu.palloliitto.fi') return true;
+  if (h === 'tulospalvelu.salibandy.fi' || h === 'www.tulospalvelu.salibandy.fi') return true;
+  if (h === 'basket.fi' || h === 'www.basket.fi' || h === 'tulospalvelu.basket.fi') return true;
+  if (h === 'espooliikkuutournament.fi' || h === 'www.espooliikkuutournament.fi') return true;
+  if (h === 'tupa.api.torneopal.com' || h === 'salibandy-api.torneopal.net') return true;
+  if (h === 'spl.torneopal.fi' || h.endsWith('.torneopal.fi') || h.endsWith('.torneopal.net') || h.endsWith('.torneopal.com')) {
+    return true;
+  }
+  return false;
+}
+
+function isAssociationHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return (
+    h.includes('tulospalvelu.') ||
+    h.endsWith('basket.fi') ||
+    h.endsWith('torneopal.fi') ||
+    h.endsWith('torneopal.net') ||
+    h.endsWith('torneopal.com') ||
+    h.endsWith('espooliikkuutournament.fi')
+  );
+}
+
+function isAllowedProxyTarget(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:') return false;
+  if (parsed.username || parsed.password) return false;
+  if (parsed.port && parsed.port !== '443') return false;
+  if (/^[\d.]+$/.test(parsed.hostname) || parsed.hostname.includes(':')) return false;
+  return hostnameAllowed(parsed.hostname);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -338,16 +381,10 @@ export default {
       );
     }
 
-    // 3. Privacy-Preserving Streaming CORS Proxy for .ics & FMI Feeds
+    // 3. CORS proxy for ICS, FMI, LIPAS, hel.fi, association HTML — not an open proxy.
     if (url.pathname === '/api/proxy/ics') {
       const targetUrl = url.searchParams.get('url');
-      if (
-        !targetUrl ||
-        (!targetUrl.startsWith('https://nimenhuuto.com') &&
-          !targetUrl.startsWith('https://myclub.fi') &&
-          !targetUrl.startsWith('https://opendata.fmi.fi') &&
-          !targetUrl.startsWith('https://'))
-      ) {
+      if (!targetUrl || !isAllowedProxyTarget(targetUrl)) {
         return new Response(JSON.stringify({ error: 'Disallowed or missing URL parameter' }), {
           status: 400,
           headers: corsHeaders
@@ -355,28 +392,27 @@ export default {
       }
 
       const feedRes = await fetch(targetUrl, {
+        redirect: 'error',
         headers: {
-          'User-Agent': 'Pelipaiva-MatchdayHub/2.1 (+https://pelipaiva.pages.dev)'
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          Accept: request.headers.get('Accept') || 'application/json,text/html,text/calendar,*/*',
+          Referer: new URL(targetUrl).origin + '/'
         }
       });
-      const icsText = await feedRes.text();
+      const body = await feedRes.text();
+      const host = new URL(targetUrl).hostname.toLowerCase();
+      const isPublicAssociation = isAssociationHost(host);
+      const cacheControlHeader =
+        feedRes.ok && isPublicAssociation
+          ? 'public, s-maxage=300, stale-while-revalidate=600'
+          : 'private, max-age=60';
 
-      // For public association pages, enable 5-minute edge cache; private iCal feeds stay short
-      const isPublicAssociation =
-        targetUrl.includes('tulospalvelu.palloliitto.fi') ||
-        targetUrl.includes('tulospalvelu.salibandy.fi') ||
-        targetUrl.includes('basket.fi') ||
-        targetUrl.includes('torneopal.fi');
-
-      const cacheControlHeader = isPublicAssociation
-        ? 'public, s-maxage=300, stale-while-revalidate=600'
-        : 'private, max-age=60';
-
-      return new Response(icsText, {
+      return new Response(body, {
         status: feedRes.status,
         headers: {
           ...corsHeaders,
-          'Content-Type': feedRes.headers.get('Content-Type') || 'text/calendar; charset=utf-8',
+          'Content-Type': feedRes.headers.get('Content-Type') || 'application/octet-stream',
           'Cache-Control': cacheControlHeader
         }
       });

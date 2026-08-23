@@ -6,7 +6,7 @@ import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
-import { generateOrResolveMatchStats } from '../stats/statsEngine';
+import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
 
 export interface FamilyLogisticsPlan {
@@ -40,14 +40,12 @@ export async function convertExtractedToMatchdayEvent(
 ): Promise<MatchdayEvent> {
   const venue = await resolveSportsVenue(extracted.venueHint);
 
-  const startTime = new Date(`${extracted.dateStr}T${extracted.kickoffTime}:00+03:00`).toISOString();
-  const endTime = new Date(`${extracted.dateStr}T${extracted.endTime}:00+03:00`).toISOString();
-  const warmupTime = new Date(`${extracted.dateStr}T${extracted.warmupTime}:00+03:00`).toISOString();
+  const offset = getFinnishTimezoneOffset(new Date(`${extracted.dateStr}T12:00:00Z`));
+  const startTime = new Date(`${extracted.dateStr}T${extracted.kickoffTime}:00${offset}`).toISOString();
+  const endTime = new Date(`${extracted.dateStr}T${extracted.endTime}:00${offset}`).toISOString();
+  const warmupTime = new Date(`${extracted.dateStr}T${extracted.warmupTime}:00${offset}`).toISOString();
 
   const isTraining = extracted.eventType === 'training';
-  const matchStats = isTraining
-    ? undefined
-    : generateOrResolveMatchStats(extracted.homeTeam, extracted.awayTeam, extracted.sport);
 
   const matchEvent: MatchdayEvent = {
     id: `event-ai-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -64,7 +62,7 @@ export async function convertExtractedToMatchdayEvent(
     warmupTime,
     venue,
     volunteerDuty: extracted.volunteerDuties.length > 0 ? extracted.volunteerDuties.join(' • ') : undefined,
-    stats: matchStats,
+    stats: undefined,
     reconciliationStatus: 'auto_matched',
     confidenceScore: extracted.confidenceScore
   };
@@ -86,7 +84,9 @@ export function planFamilyLogistics(
   profiles: PlayerProfile[],
   targetDate?: string
 ): FamilyLogisticsPlan {
-  const now = targetDate ? new Date(`${targetDate}T12:00:00+03:00`) : new Date();
+  const now = targetDate
+    ? new Date(`${targetDate}T12:00:00${getFinnishTimezoneOffset(new Date(`${targetDate}T12:00:00Z`))}`)
+    : new Date();
   const snap = runMissionControlGraph(events, profiles, now);
   const date = targetDate || snap.weekendLabel;
 
@@ -127,9 +127,26 @@ export function queryFamilySchedule(
 ): CopilotQueryResult {
   const norm = query.toLowerCase().trim();
 
+  const namedProfile = profiles.find((p) => p.playerName && norm.includes(p.playerName.toLowerCase()));
+  const scopedEvents = namedProfile ? events.filter((e) => e.profileId === namedProfile.id) : events;
+
+  if (
+    norm.includes('kyyti') ||
+    norm.includes('kyydit') ||
+    norm.includes('kuski') ||
+    norm.includes('carpool')
+  ) {
+    const plan = planFamilyLogistics(scopedEvents, profiles);
+    return {
+      answer: plan.whatsAppShareText || plan.summaryNarrative,
+      relevantEvents: scopedEvents.slice(0, 8),
+      confidence: 0.9
+    };
+  }
+
   // 1. Volunteer duties query
   if (norm.includes('kahvio') || norm.includes('toimitsija') || norm.includes('vuoro') || norm.includes('kirjuri')) {
-    const dutyEvents = events.filter((e) => e.volunteerDuty && e.volunteerDuty.length > 0);
+    const dutyEvents = scopedEvents.filter((e) => e.volunteerDuty && e.volunteerDuty.length > 0);
     if (dutyEvents.length === 0) {
       return {
         answer: 'Sinulla ei ole merkittyjä kahvio- tai toimitsijavuoroja tulevissa otteluissa.',
@@ -152,7 +169,7 @@ export function queryFamilySchedule(
 
   // 2. Next game query
   if (norm.includes('seuraava') || norm.includes('milloin') || norm.includes('huomenna') || norm.includes('tuleva')) {
-    const upcoming = events
+    const upcoming = scopedEvents
       .filter((e) => new Date(e.startTime) >= new Date())
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
@@ -180,7 +197,7 @@ export function queryFamilySchedule(
 
   // 3. Surface / Footwear query
   if (norm.includes('kengät') || norm.includes('nappikset') || norm.includes('tekonurmi') || norm.includes('alusta')) {
-    const turfEvents = events.filter((e) => e.venue.surface === 'artificial_turf_3g');
+    const turfEvents = scopedEvents.filter((e) => e.venue.surface === 'artificial_turf_3g');
     return {
       answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
       relevantEvents: turfEvents,

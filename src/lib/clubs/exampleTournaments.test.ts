@@ -25,6 +25,10 @@ describe('example tournaments', () => {
     ).toBe('floorball');
   });
 
+  it('does not treat Palloliitto team 203621 as Espoo Liikkuu', () => {
+    expect(exampleTournamentFromUrl('https://tulospalvelu.palloliitto.fi/team/203621')).toBeUndefined();
+  });
+
   it('does not treat Palloliitto league 185085 as Helsinki Cup', () => {
     expect(exampleTournamentFromUrl('https://tulospalvelu.palloliitto.fi/team/185085/info')).toBeUndefined();
     expect(

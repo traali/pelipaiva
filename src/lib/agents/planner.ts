@@ -1,4 +1,4 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { ArrivalRules, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import { carpoolAgent } from './carpoolAgent';
 import { conflictAgent } from './conflictAgent';
@@ -83,16 +83,18 @@ function byStart(a: MatchdayEvent, b: MatchdayEvent): number {
 export function runMissionControlGraph(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  arrivalRules: ArrivalRules[] = []
 ): MissionControlSnapshot {
   const weekend = sportsWeekendRange(now);
   const lookbackMs = now.getTime() - 2 * 3600 * 1000;
+  const rulesFor = (profileId: string) => arrivalRules.find((r) => r.profileId === profileId);
 
   const upcoming = [...events].filter((e) => new Date(e.endTime).getTime() >= lookbackMs).sort(byStart);
 
   const nextEvent = upcoming.find((e) => new Date(e.endTime).getTime() >= now.getTime()) || upcoming[0];
   const nextPlayer = nextEvent ? profiles.find((p) => p.id === nextEvent.profileId) : undefined;
-  const depart = nextEvent ? calculateDepartureCountdown(nextEvent) : undefined;
+  const depart = nextEvent ? calculateDepartureCountdown(nextEvent, rulesFor(nextEvent.profileId)) : undefined;
 
   const windowEvents = eventsInRange(events, weekend.start, weekend.end).sort(byStart);
 

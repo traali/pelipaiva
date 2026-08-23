@@ -449,7 +449,8 @@ export function splitICSBySquad(icsContent: string, squadName: string): string {
 export async function parseICSFeed(
   icsContent: string,
   profileId: string,
-  sport: SportType = 'football'
+  sport: SportType = 'football',
+  defaultTeamName?: string
 ): Promise<MatchdayEvent[]> {
   const events: MatchdayEvent[] = [];
 
@@ -474,7 +475,7 @@ export async function parseICSFeed(
         : new Date(startDate.getTime() + 90 * 60 * 1000);
 
       const isTraining = isTrainingEvent(title, description);
-      const parsedTitle = parseMatchTitle(title);
+      const parsedTitle = parseMatchTitle(title, defaultTeamName);
 
       const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
         startDate,

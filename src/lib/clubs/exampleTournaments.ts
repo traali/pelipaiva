@@ -186,7 +186,7 @@ export function isCupName(name?: string): boolean {
 export function exampleTournamentFromUrl(url: string): ExampleTournament | undefined {
   const raw = url.trim().toLowerCase();
   if (!raw) return undefined;
-  if (raw.includes('espooliikkuutournament') || raw.includes('/team/203621')) {
+  if (raw.includes('espooliikkuutournament.fi') && /\/team\/203621(?:\/|$|\?)/.test(raw)) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'esli2026-topola');
   }
   if (raw.includes('kwmemorial') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) {
