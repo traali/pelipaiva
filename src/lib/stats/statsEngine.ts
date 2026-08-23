@@ -611,6 +611,22 @@ export function parseTorneopalHtml(
       (header.some((h) => h.includes('koti') || h.includes('hem') || h.includes('home') || h.includes('ottelu')) ||
         header.some((h) => h.includes('kenttä') || h.includes('nro')));
 
+    // Try to detect section/stage header right before this table (e.g. Alkulohko B, Jatko-ottelut, Sijat 1-4)
+    let tableStage: string | undefined = undefined;
+    const tableIndex = html.indexOf(tableHtml);
+    if (tableIndex > 0) {
+      const precedingHtml = html.slice(Math.max(0, tableIndex - 500), tableIndex);
+      const headingMatch =
+        precedingHtml.match(/<(?:h[2-5]|div|caption)[^>]*class=["'][^"']*(?:otsikko|stage|title|sarja|lohko)[^"']*["'][^>]*>([\s\S]*?)<\/(?:h[2-5]|div|caption)>/i) ||
+        precedingHtml.match(/<(?:h[2-5]|caption)[^>]*>([\s\S]*?)<\/(?:h[2-5]|caption)>/i);
+      if (headingMatch && headingMatch[1]) {
+        const text = cleanHtmlText(headingMatch[1]);
+        if (text && text.length > 2 && text.length < 80 && !/suosikiksi/i.test(text)) {
+          tableStage = text;
+        }
+      }
+    }
+
     if (isFixturesTable) {
       const nroIdx = header.findIndex((h) => h.includes('nro') || h === '#' || h.includes('ottelu'));
       const pvmIdx = header.findIndex((h) => h.includes('pvm') || h.includes('datum') || h.includes('date'));
@@ -698,6 +714,7 @@ export function parseTorneopalHtml(
           fieldNumber,
           status,
           score: cleanScore,
+          round: tableStage || leagueName,
           fetchedAt: now
         });
       }
