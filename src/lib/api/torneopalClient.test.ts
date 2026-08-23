@@ -3,7 +3,8 @@ import {
   buildGetMatchesParams,
   isTorneopalCompetitionId,
   looksLikeCupRequest,
-  mapFixture
+  mapFixture,
+  shouldTryAssociationEndpoint
 } from './torneopalClient';
 import type { ParsedAssociationUrl } from '../../types/matchday';
 
@@ -33,6 +34,12 @@ const kw: ParsedAssociationUrl = {
 };
 
 describe('torneopal match params', () => {
+  it('does not send cup subdomain team ids to tupa (ids collide across federations)', () => {
+    expect(shouldTryAssociationEndpoint('kwmemorialcup26')).toBe(false);
+    expect(shouldTryAssociationEndpoint('spl')).toBe(true);
+    expect(shouldTryAssociationEndpoint(undefined)).toBe(true);
+  });
+
   it('accepts compact competition ids and rejects turnaus slugs', () => {
     expect(isTorneopalCompetitionId('hc2026')).toBe(true);
     expect(isTorneopalCompetitionId('esli2026')).toBe(true);

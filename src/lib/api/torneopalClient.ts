@@ -93,6 +93,11 @@ export function looksLikeCupRequest(parsed: ParsedAssociationUrl): boolean {
   return /cup|turnaus|tournament|memorial|hc20|esli|kwmemorial|espooliikkuu/i.test(blob);
 }
 
+export function shouldTryAssociationEndpoint(subdomain?: string): boolean {
+  if (!subdomain) return true;
+  return !/memorial|kwmemorial|cup|turnaus/i.test(subdomain);
+}
+
 export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<string, string> {
   const params: Record<string, string> = { team_id: parsed.teamId };
   if (!looksLikeCupRequest(parsed)) {
@@ -119,7 +124,10 @@ async function torneopalGet<T>(
       apiKey: TUPA_KEY,
     });
   }
-  if (endpoint) attempts.push(endpoint);
+  const dedicatedHost = !shouldTryAssociationEndpoint(subdomain);
+  // Cup subdomains have their own REST; association hosts reuse numeric team ids
+  // across federations (KW 34013 ≠ tupa 34013 / Örebro 2008).
+  if (endpoint && !dedicatedHost) attempts.push(endpoint);
 
   for (const ep of attempts) {
     const search = new URLSearchParams({
@@ -369,9 +377,13 @@ export async function fetchTorneopalTeamData(
       : Promise.resolve(null),
   ]);
 
-  const fixtures = (Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [])
+  let fixtures = (Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [])
     .map((m) => mapFixture(m, parsed, teamName))
-    .filter((f): f is NonNullable<typeof f> => Boolean(f));
+    .filter((f): f is NonNullable<typeof f> => Boolean(f))
+    .filter((f) => new Date(f.startTime).getUTCFullYear() >= 2024);
+  if (looksLikeCupRequest(parsed)) {
+    fixtures = fixtures.filter((f) => /turnaus|tournament|cup|memorial/i.test(f.leagueName));
+  }
   const group = groupJson?.group || {};
   const teamRows = Array.isArray(group.teams) ? (group.teams as Record<string, unknown>[]) : [];
   const standings = teamRows.map(mapStanding).filter((r) => r.teamName);
