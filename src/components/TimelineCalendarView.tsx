@@ -227,7 +227,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       );
                     })()}
 
-                    {/* Bottom Row: Venue, Nappisvahti & Navigation */}
+                    {/* Bottom Row: Venue, Nappisvahti & Navigation / Result */}
                     <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2">
                       <div className="flex items-center gap-1.5 truncate min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
@@ -239,26 +239,35 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        aria-label={`Navigoi kentälle ${ev.venue.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onNavigate) {
-                            onNavigate(ev);
-                          } else {
-                            const coords = ev.parking?.coordinates || ev.venue.coordinates;
-                            window.open(
-                              `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                              '_blank'
-                            );
-                          }
-                        }}
-                        className="min-h-[44px] px-3 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
-                      >
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>Reitti</span>
-                      </button>
+                      {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="min-h-[36px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
+                            <Trophy className="w-3.5 h-3.5 text-pitch" />
+                            <span>{ev.score ? `Tulos: ${ev.score}` : 'Päättynyt'}</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Navigoi kentälle ${ev.venue.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNavigate) {
+                              onNavigate(ev);
+                            } else {
+                              const coords = ev.parking?.coordinates || ev.venue.coordinates;
+                              window.open(
+                                `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                                '_blank'
+                              );
+                            }
+                          }}
+                          className="min-h-[44px] px-3 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>Reitti</span>
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 );
@@ -395,27 +404,37 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                     );
                   })()}
 
-                  <div className="pl-2 flex items-center justify-between text-xs text-text-secondary pt-1 border-t border-border-subtle">
-                    <div className="flex items-center gap-1.5 truncate">
+                  <div className="pl-2 flex items-center justify-between text-xs text-text-secondary pt-1 border-t border-border-subtle gap-2">
+                    <div className="flex items-center gap-1.5 truncate min-w-0">
                       <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
                       <span className="truncate">{ev.venue.name}</span>
                     </div>
 
-                    <button
-                      type="button"
-                      aria-label={`Navigoi kentälle ${ev.venue.name}`}
-                      onClick={() => {
-                        const coords = ev.parking?.coordinates || ev.venue.coordinates;
-                        window.open(
-                          `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                          '_blank'
-                        );
-                      }}
-                      className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs focus-visible:ring-2 focus-visible:ring-pitch"
-                    >
-                      <Navigation className="w-3.5 h-3.5" />
-                      <span>Reitti</span>
-                    </button>
+                    {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="min-h-[36px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
+                          <Trophy className="w-3.5 h-3.5 text-pitch" />
+                          <span>{ev.score ? `Tulos: ${ev.score}` : 'Päättynyt'}</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`Navigoi kentälle ${ev.venue.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const coords = ev.parking?.coordinates || ev.venue.coordinates;
+                          window.open(
+                            `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                            '_blank'
+                          );
+                        }}
+                        className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        <span>Reitti</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

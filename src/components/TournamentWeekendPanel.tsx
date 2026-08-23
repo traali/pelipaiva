@@ -174,25 +174,31 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                               {m.title}
                             </span>
 
-                            <button
-                              type="button"
-                              aria-label={`Navigoi kentälle ${m.venue.name}`}
-                              onClick={() => {
-                                if (onNavigate) {
-                                  onNavigate(m.venue.coordinates);
-                                } else {
-                                  const coords = m.parking?.coordinates || m.venue.coordinates;
-                                  window.open(
-                                    `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                                    '_blank'
-                                  );
-                                }
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer text-[11px] font-bold shrink-0"
-                            >
-                              <Navigation className="w-3 h-3" />
-                              <span>{m.venue.name.includes('Kenttä') ? m.venue.name.split('(')[1]?.replace(')', '') || 'Kenttä' : 'Reitti'}</span>
-                            </button>
+                            {isPast || m.score ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-surface border border-border-strong text-text-primary font-mono font-black text-xs shrink-0 shadow-2xs">
+                                {m.score ? `Tulos: ${m.score}` : 'Päättynyt'}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                aria-label={`Navigoi kentälle ${m.venue.name}`}
+                                onClick={() => {
+                                  if (onNavigate) {
+                                    onNavigate(m.venue.coordinates);
+                                  } else {
+                                    const coords = m.parking?.coordinates || m.venue.coordinates;
+                                    window.open(
+                                      `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                                      '_blank'
+                                    );
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer text-[11px] font-bold shrink-0"
+                              >
+                                <Navigation className="w-3 h-3" />
+                                <span>{m.venue.name.includes('Kenttä') ? m.venue.name.split('(')[1]?.replace(')', '') || 'Kenttä' : 'Reitti'}</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

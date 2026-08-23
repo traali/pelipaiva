@@ -510,24 +510,38 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <Share2 className="w-4 h-4" />
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.96 }}
-              transition={springTactile.snappy}
-              onClick={
-                onNavigateToVenue ||
-                (() => {
-                  const targetCoords = event.parking?.coordinates || event.venue.coordinates;
-                  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`;
-                  window.open(mapsUrl, '_blank');
-                })
-              }
-              aria-label={`Navigoi kohteeseen ${event.venue.name}`}
-              className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              <span>Navigoi paikalle</span>
-            </motion.button>
+            {isPast ? (
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.96 }}
+                transition={springTactile.snappy}
+                onClick={() => setIsStatsModalOpen(true)}
+                aria-label="Avaa ottelutilastot ja tulos"
+                className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold text-xs shadow-xs hover:border-pitch hover:text-pitch cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
+              >
+                <Trophy className="w-3.5 h-3.5 text-pitch" />
+                <span>{currentScore ? `Tulos: ${currentScore}` : 'Katso tilastot & tulos'}</span>
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.96 }}
+                transition={springTactile.snappy}
+                onClick={
+                  onNavigateToVenue ||
+                  (() => {
+                    const targetCoords = event.parking?.coordinates || event.venue.coordinates;
+                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`;
+                    window.open(mapsUrl, '_blank');
+                  })
+                }
+                aria-label={`Navigoi kohteeseen ${event.venue.name}`}
+                className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                <span>Navigoi paikalle</span>
+              </motion.button>
+            )}
           </div>
         </div>
       </motion.div>
