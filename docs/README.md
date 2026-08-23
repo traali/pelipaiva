@@ -17,4 +17,4 @@ Start here:
 1. [AUDIT.md](./AUDIT.md) — APIs, Dexie, gaps
 2. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
 3. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
-4. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
+5. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — Cloudflare family code + WhatsApp synthetics (not yet implemented)
