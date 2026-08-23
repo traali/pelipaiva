@@ -47,6 +47,20 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
 
   if (!isOpen) return null;
 
+  const recordTombstones = async (deletedIds: string[]) => {
+    const sync = await db.syncState.get('family');
+    if (sync && sync.syncKey) {
+      const key = `pelipaiva_tombstones_${sync.syncKey}`;
+      const existingStr = localStorage.getItem(key);
+      const list: Array<{ id: string; deletedAt: string }> = existingStr ? JSON.parse(existingStr) : [];
+      for (const id of deletedIds) {
+        list.push({ id, deletedAt: new Date().toISOString() });
+      }
+      localStorage.setItem(key, JSON.stringify(list));
+      await db.syncState.update('family', { pendingUpload: true });
+    }
+  };
+
   const handleDeleteProfile = async (profileId: string) => {
     if (window.confirm('Haluatko varmasti poistaa tämän joukkueen?')) {
       await db.profiles.delete(profileId);
@@ -54,6 +68,21 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
       for (const ev of eventsToDelete) {
         await db.events.delete(ev.id);
       }
+      await recordTombstones([profileId]);
+    }
+  };
+
+  const handleDeleteChild = async (name: string, childProfiles: PlayerProfile[]) => {
+    if (window.confirm(`Haluatko varmasti poistaa pelaajan ${name} ja kaikki hänen joukkueensa?`)) {
+      const ids = childProfiles.map((p) => p.id);
+      for (const p of childProfiles) {
+        await db.profiles.delete(p.id);
+        const events = await db.events.where('profileId').equals(p.id).toArray();
+        for (const ev of events) {
+          await db.events.delete(ev.id);
+        }
+      }
+      await recordTombstones(ids);
     }
   };
 
@@ -115,14 +144,24 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => onOpenImportForPlayer(playerName)}
-                    className="py-1 px-2.5 rounded-lg bg-surface border border-border-strong text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Lisää joukkue / turnaus</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onOpenImportForPlayer(playerName)}
+                      className="py-1 px-2.5 rounded-lg bg-surface border border-border-strong text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Lisää joukkue</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteChild(playerName, playerProfiles)}
+                      className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
+                      title={`Poista pelaaja ${playerName} ja kaikki joukkueet`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Teams List for this Child */}

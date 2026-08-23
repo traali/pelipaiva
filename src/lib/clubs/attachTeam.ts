@@ -43,3 +43,20 @@ export function findExistingTeamProfile(
     return Boolean(p.teamId && idFromKey && p.teamId === idFromKey);
   });
 }
+
+/** Converts child first name to lowercase alphanumeric slug. */
+export function slugPlayerName(name: string): string {
+  return (name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9åäö]/gi, '')
+    .substring(0, 24) || 'pelaaja';
+}
+
+/** Generates deterministic profile ID: p:{slug(playerName)}:{teamSourceKey(url)} */
+export function generateStableProfileId(playerName: string, url: string): string {
+  const s = slugPlayerName(playerName);
+  const k = teamSourceKey(url);
+  return `p:${s}:${k}`;
+}
+

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PlayerProfile } from '../../types/matchday';
-import { findExistingTeamProfile, teamSourceKey } from './attachTeam';
+import { findExistingTeamProfile, teamSourceKey, generateStableProfileId } from './attachTeam';
 
 const simo: PlayerProfile = {
   id: 'p1',
@@ -61,5 +61,24 @@ describe('attachTeam', () => {
       'https://tulospalvelu.palloliitto.fi/team/185085/info'
     );
     expect(hit).toBeUndefined();
+  });
+
+  it('generates consistent deterministic stable profile IDs', () => {
+    const id1 = generateStableProfileId('Aada', 'https://espooliikkuutournament.fi/team/203621');
+    const id2 = generateStableProfileId('  aada  ', 'https://espooliikkuutournament.fi/team/203621');
+    expect(id1).toBe('p:aada:espooliikkuutournament.fi:203621');
+    expect(id2).toBe(id1);
+
+    const hcId = generateStableProfileId(
+      'Simo',
+      'https://tulospalvelu.palloliitto.fi/team/185085/info?season=hc2026&category=B13-8'
+    );
+    expect(hcId).toBe('p:simo:tulospalvelu.palloliitto.fi:185085:hc2026');
+
+    const kwId = generateStableProfileId(
+      'Eemil',
+      'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546'
+    );
+    expect(kwId).toContain('p:eemil:kwmemorialcup26.torneopal.fi:34013');
   });
 });

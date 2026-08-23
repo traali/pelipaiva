@@ -44,6 +44,14 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+            'clsx',
+            'tailwind-merge'
+          ],
           'vendor-icons': ['lucide-react'],
           'vendor-motion': ['motion'],
           'vendor-calendar': ['ical.js'],
@@ -53,7 +61,8 @@ export default defineConfig({
           'vendor-ocr': ['tesseract.js']
         }
       }
-    }
+    },
+    chunkSizeWarningLimit: 600
   },
   server: {
     port: 3000

@@ -36,6 +36,7 @@ export interface SyncStateRecord {
   syncKey: string;
   lastSyncedAt: string;
   activeProfileId?: string;
+  pendingUpload?: boolean;
 }
 
 export class PelipaivaDB extends Dexie {

@@ -126,4 +126,31 @@ describe('Tier 0: Architectural & Recovery Tests (Zero-Auth Family Sync & Backup
     const invalidUnpack = unpackSharePayload('invalid-corrupted-base64-payload!!!');
     expect(invalidUnpack).toEqual([]);
   });
+
+  it('t0.05: Preserves widened fields including associationUrl, teamId, and raw query string', () => {
+    const profiles: PlayerProfile[] = [
+      {
+        id: 'p:simo:tulospalvelu.palloliitto.fi:185085:hc2026',
+        playerName: 'Simo',
+        teamName: 'PPJ/Laru sin',
+        sport: 'football',
+        primaryColor: 'sininen',
+        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info?season=hc2026&category=B13-8',
+        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info?season=hc2026&category=B13-8',
+        associationType: 'palloliitto',
+        teamId: '185085',
+        colorHex: '#3b82f6'
+      }
+    ];
+
+    const payload = generateSharePayload(profiles);
+    const unpacked = unpackSharePayload(payload);
+
+    expect(unpacked.length).toBe(1);
+    expect(unpacked[0]?.id).toBe('p:simo:tulospalvelu.palloliitto.fi:185085:hc2026');
+    expect(unpacked[0]?.calendarUrl).toBe('https://tulospalvelu.palloliitto.fi/team/185085/info?season=hc2026&category=B13-8');
+    expect(unpacked[0]?.teamId).toBe('185085');
+    expect(unpacked[0]?.associationType).toBe('palloliitto');
+    expect(unpacked[0]?.colorHex).toBe('#3b82f6');
+  });
 });

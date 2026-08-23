@@ -8,6 +8,10 @@ import { convertExtractedToMatchdayEvent } from '../lib/ai/localAiEngine';
 import { db } from '../lib/storage/db';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
 
+import { generateStableProfileId } from '../lib/clubs/attachTeam';
+import { parseFamilyWhatsAppMessage } from '../lib/sync/familyWhatsApp';
+import { syncFamilyRosterCycle } from '../lib/sync/familyCloud';
+
 interface QuickDropInBarProps {
   existingPlayers: string[];
   activeProfilePlayerName?: string;
@@ -28,6 +32,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   );
   const [selectedSport, setSelectedSport] = useState<SportType>('football');
   const [previewEvent, setPreviewEvent] = useState<ExtractedSportsEvent | null>(null);
+  const [familyJoinCode, setFamilyJoinCode] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -41,7 +46,16 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   // Live parse text as user types or pastes
   useEffect(() => {
     const trimmed = text.trim();
-    if (trimmed.length > 8) {
+    if (trimmed.length > 5) {
+      // Check for family code / whatsapp invite join
+      const waParse = parseFamilyWhatsAppMessage(trimmed);
+      if (waParse.type === 'join' && waParse.familyCode) {
+        setFamilyJoinCode(waParse.familyCode);
+        return;
+      } else {
+        setFamilyJoinCode(null);
+      }
+
       // Check if text mentions an existing child name
       const mentionedChild = existingPlayers.find((p) =>
         new RegExp(`\\b${p}\\b`, 'i').test(trimmed)
@@ -55,8 +69,25 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
       setSelectedSport(parsed.sport);
     } else {
       setPreviewEvent(null);
+      setFamilyJoinCode(null);
     }
   }, [text, existingPlayers]);
+
+  const handleJoinFamily = async (code: string) => {
+    setIsSaving(true);
+    const res = await syncFamilyRosterCycle(code, db);
+    setIsSaving(false);
+    if (res.success) {
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setText('');
+        setFamilyJoinCode(null);
+        setIsExpanded(false);
+        setSaveSuccess(false);
+        onEventCreated?.();
+      }, 1000);
+    }
+  };
 
   const handleSave = async () => {
     if (!previewEvent) return;
@@ -72,7 +103,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
       let profileId = profile?.id;
       if (!profileId) {
         const swatch = pickNextTeamColor(existingProfiles.map((p) => p.colorHex));
-        profileId = `profile-${Date.now()}`;
+        profileId = generateStableProfileId(selectedPlayer.trim(), `manual:${selectedSport}`);
         await db.profiles.add({
           id: profileId,
           playerName: selectedPlayer.trim() || 'Pelaaja',
@@ -137,7 +168,20 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
             </button>
           )}
 
-          {previewEvent && !saveSuccess && (
+          {familyJoinCode && !saveSuccess && (
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              transition={springTactile.snappy}
+              onClick={() => handleJoinFamily(familyJoinCode)}
+              disabled={isSaving}
+              className="py-1.5 px-3 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center gap-1.5 hover:brightness-110 cursor-pointer shrink-0 shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Liity ({familyJoinCode})</span>
+            </motion.button>
+          )}
+
+          {previewEvent && !familyJoinCode && !saveSuccess && (
             <motion.button
               whileTap={{ scale: 0.94 }}
               transition={springTactile.snappy}

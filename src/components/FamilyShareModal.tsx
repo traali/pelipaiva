@@ -1,38 +1,149 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Upload, Copy, Check, Share2, ShieldCheck, Smartphone } from 'lucide-react';
+import {
+  X,
+  Download,
+  Upload,
+  Copy,
+  Check,
+  Share2,
+  ShieldCheck,
+  Smartphone,
+  RefreshCw,
+  MessageCircle,
+  Key
+} from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { PlayerProfile } from '../types/matchday';
-import { exportFamilyBackup, importFamilyBackup, generateSharePayload } from '../lib/sync/familyShare';
+import { db } from '../lib/storage/db';
+import { exportFamilyBackup, importFamilyBackup } from '../lib/sync/familyShare';
+import {
+  generateFamilyCode,
+  syncFamilyRosterCycle,
+  isValidFamilyCode,
+  normalizeFamilyCode
+} from '../lib/sync/familyCloud';
+import { generateJoinWhatsApp } from '../lib/sync/familyWhatsApp';
 
 interface FamilyShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  profiles: PlayerProfile[];
+  profiles?: PlayerProfile[];
   onDataImported: () => void;
 }
 
 export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   isOpen,
   onClose,
-  profiles,
   onDataImported
 }) => {
-  const [activeTab, setActiveTab] = useState<'share' | 'backup'>('share');
+  const [activeTab, setActiveTab] = useState<'code' | 'link' | 'backup'>('code');
+  const [familyCode, setFamilyCode] = useState<string>('');
+  const [inputCode, setInputCode] = useState<string>('');
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const sharePayload = generateSharePayload(profiles);
-  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}?share=${sharePayload}` : '';
-  // Generates a lightweight Google Chart QR code image URL for zero-dependency rendering
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+  useEffect(() => {
+    if (isOpen) {
+      db.syncState.get('family').then((record) => {
+        if (record && record.syncKey) {
+          setFamilyCode(record.syncKey);
+          setLastSynced(record.lastSyncedAt);
+        }
+      });
+    }
+  }, [isOpen]);
+
+  const handleGenerateCode = async () => {
+    const code = generateFamilyCode();
+    setFamilyCode(code);
+    setIsSyncing(true);
+    const res = await syncFamilyRosterCycle(code, db);
+    setIsSyncing(false);
+    if (res.success) {
+      setStatusMessage('Perhe-koodi luotu ja synkronoitu!');
+      setLastSynced(new Date().toISOString());
+    } else {
+      setStatusMessage('Synkronointi epäonnistui');
+    }
+    setTimeout(() => setStatusMessage(null), 2500);
+  };
+
+  const handleJoinWithCode = async () => {
+    const clean = normalizeFamilyCode(inputCode);
+    if (!isValidFamilyCode(clean)) {
+      setStatusMessage('Virheellinen perhe-koodi (esim. SAIMA-4)');
+      setTimeout(() => setStatusMessage(null), 2500);
+      return;
+    }
+
+    setIsSyncing(true);
+    const res = await syncFamilyRosterCycle(clean, db);
+    setIsSyncing(false);
+
+    if (res.success) {
+      setFamilyCode(clean);
+      setLastSynced(new Date().toISOString());
+      setStatusMessage('Liitytty perheeseen onnistuneesti!');
+      onDataImported();
+      setTimeout(() => setStatusMessage(null), 2500);
+    } else {
+      setStatusMessage('Perhettä ei löytynyt tai verkkovirhe');
+      setTimeout(() => setStatusMessage(null), 2500);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    if (!familyCode) return;
+    setIsSyncing(true);
+    const res = await syncFamilyRosterCycle(familyCode, db);
+    setIsSyncing(false);
+    if (res.success) {
+      setLastSynced(new Date().toISOString());
+      setStatusMessage('Synkronoitu!');
+      onDataImported();
+    } else {
+      setStatusMessage('Synkronointivirhe');
+    }
+    setTimeout(() => setStatusMessage(null), 2000);
+  };
+
+  const handleLeaveFamily = async () => {
+    if (window.confirm('Haluatko varmasti poistua perheestä tällä laitteella?')) {
+      await db.syncState.delete('family');
+      setFamilyCode('');
+      setLastSynced(null);
+      setStatusMessage('Poistuttu perhejaosta.');
+      setTimeout(() => setStatusMessage(null), 2000);
+    }
+  };
+
+  const shareUrl = typeof window !== 'undefined' && familyCode
+    ? `${window.location.origin}/?perhe=${familyCode}`
+    : '';
 
   const handleCopyLink = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyWhatsAppMessage = () => {
+    if (!familyCode) return;
+    const msg = generateJoinWhatsApp(familyCode);
+    navigator.clipboard.writeText(msg);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!familyCode) return;
+    const msg = generateJoinWhatsApp(familyCode);
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   const handleDownloadBackup = async () => {
@@ -54,14 +165,14 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       const text = await file.text();
       const data = JSON.parse(text);
       const res = await importFamilyBackup(data);
-      setImportStatus(`Tuotu onnistuneesti: ${res.profilesCount} joukkuetta, ${res.rulesCount} sääntöä!`);
+      setStatusMessage(`Tuotu onnistuneesti: ${res.profilesCount} joukkuetta, ${res.rulesCount} sääntöä!`);
       onDataImported();
       setTimeout(() => {
-        setImportStatus(null);
+        setStatusMessage(null);
         onClose();
       }, 1500);
     } catch (err) {
-      setImportStatus('Virhe: Tiedoston lukeminen epäonnistui');
+      setStatusMessage('Virhe: Tiedoston lukeminen epäonnistui');
     }
   };
 
@@ -82,7 +193,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}
             transition={springTactile.gentle}
-            className="liquid-glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl z-10"
+            className="liquid-glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
@@ -91,8 +202,8 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                   <Share2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-text-primary">Perhejako & Varmuuskopio</h3>
-                  <p className="text-xs text-text-muted">100 % Yksityinen • Ei käyttäjätilejä</p>
+                  <h3 className="text-lg font-bold text-text-primary">Perhejako (Live Sync)</h3>
+                  <p className="text-xs text-text-muted">Zero-Auth • 7 pv synkronointi</p>
                 </div>
               </div>
               <button
@@ -107,15 +218,27 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
             <div className="flex rounded-xl bg-surface-elevated p-1 mb-5 border border-border-subtle">
               <button
                 type="button"
-                onClick={() => setActiveTab('share')}
+                onClick={() => setActiveTab('code')}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  activeTab === 'share'
+                  activeTab === 'code'
+                    ? 'bg-pitch text-text-inverse shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>Perhe-koodi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('link')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeTab === 'link'
                     ? 'bg-pitch text-text-inverse shadow-sm'
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span>Jaa toiseen puhelimeen</span>
+                <span>Jaa linkki</span>
               </button>
               <button
                 type="button"
@@ -127,38 +250,151 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                 }`}
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Varmuuskopio (JSON)</span>
+                <span>Tiedosto</span>
               </button>
             </div>
 
-            {activeTab === 'share' ? (
-              <div className="flex flex-col items-center gap-4 text-center">
-                <p className="text-xs text-text-secondary">
-                  Skannaa QR-koodi toisella puhelimella (tai kopioi jakolinkki) siirtääksesi kaikki omat joukkueesi toiselle vanhemmalle:
-                </p>
+            {/* Tab 1: Perhe-koodi */}
+            {activeTab === 'code' && (
+              <div className="flex flex-col gap-4">
+                {familyCode ? (
+                  <div className="p-4 rounded-2xl bg-surface-elevated border border-pitch/30 flex flex-col items-center text-center gap-2">
+                    <span className="text-xs text-text-muted font-semibold uppercase tracking-wider">
+                      Aktiivinen perhe-koodi
+                    </span>
+                    <span className="text-3xl font-black tracking-widest text-pitch font-mono">
+                      {familyCode}
+                    </span>
+                    {lastSynced && (
+                      <span className="text-[11px] text-text-muted">
+                        Viimeksi synkronoitu:{' '}
+                        {new Date(lastSynced).toLocaleTimeString('fi-FI', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
 
-                {/* QR Code Container */}
-                <div className="p-3 bg-white rounded-2xl shadow-md border border-border-subtle inline-block">
-                  <img
-                    src={qrCodeUrl}
-                    alt="Perhejaon QR-koodi"
-                    className="w-44 h-44 rounded-lg"
-                    loading="lazy"
-                  />
-                </div>
+                    <div className="flex items-center gap-2 mt-2 w-full">
+                      <button
+                        type="button"
+                        onClick={handleSyncNow}
+                        disabled={isSyncing}
+                        className="flex-1 py-2 rounded-xl bg-surface border border-border-strong text-xs font-bold text-text-primary flex items-center justify-center gap-1.5 hover:border-pitch cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                        <span>Päivitä nyt</span>
+                      </button>
 
-                <div className="w-full flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    className="w-full py-2.5 px-4 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pitch/20 hover:brightness-110 cursor-pointer"
-                  >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    <span>{copied ? 'Kopioitu leikepöydälle!' : 'Kopioi jakolinkki'}</span>
-                  </button>
-                </div>
+                      <button
+                        type="button"
+                        onClick={handleShareWhatsApp}
+                        className="flex-1 py-2 rounded-xl bg-[#25D366] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-105 cursor-pointer"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>WhatsAppiin</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyWhatsAppMessage}
+                      className="w-full py-2 rounded-xl bg-surface-elevated border border-border-subtle text-xs font-bold text-text-secondary hover:text-text-primary flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-pitch" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copied ? 'Kopioitu leikepöydälle!' : 'Kopioi liittymisviesti'}</span>
+                    </button>
+
+                    <div className="flex items-center justify-between w-full pt-2 border-t border-border-subtle mt-2 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={handleGenerateCode}
+                        className="text-text-muted hover:text-text-primary underline cursor-pointer"
+                      >
+                        Luo uusi koodi
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLeaveFamily}
+                        className="text-radar hover:brightness-110 underline cursor-pointer"
+                      >
+                        Poistu perheestä
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-3">
+                      <div className="text-xs font-bold text-text-primary">Luo uusi perhe-koodi</div>
+                      <p className="text-xs text-text-muted">
+                        Luo 6-merkkinen koodi, jolla toinen vanhempi tai perheenjäsen saa samat joukkueet heti näkyviin.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleGenerateCode}
+                        disabled={isSyncing}
+                        className="w-full py-2.5 px-4 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-md shadow-pitch/20"
+                      >
+                        <Key className="w-4 h-4" />
+                        <span>Luo perhe-koodi</span>
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5">
+                      <div className="text-xs font-bold text-text-primary">Tai liity koodilla</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="esim. SAIMA-4"
+                          value={inputCode}
+                          onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                          className="flex-1 py-2 px-3 rounded-xl bg-surface border border-border-strong text-xs font-mono font-bold tracking-wider text-text-primary placeholder:text-text-muted focus:outline-none focus:border-pitch"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleJoinWithCode}
+                          disabled={isSyncing || !inputCode.trim()}
+                          className="py-2 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer disabled:opacity-50"
+                        >
+                          Liity
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
+            )}
+
+            {/* Tab 2: Jaa linkki */}
+            {activeTab === 'link' && (
+              <div className="flex flex-col gap-3 text-center">
+                {familyCode ? (
+                  <>
+                    <p className="text-xs text-text-secondary">
+                      Avaa tämä linkki toisessa puhelimessa liittyäksesi perheeseen yhdellä napautuksella:
+                    </p>
+                    <div className="p-3 rounded-xl bg-surface border border-border-strong font-mono text-xs text-text-primary break-all">
+                      {shareUrl}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="w-full py-2.5 px-4 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pitch/20 hover:brightness-110 cursor-pointer"
+                    >
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      <span>{copied ? 'Kopioitu leikepöydälle!' : 'Kopioi linkki'}</span>
+                    </button>
+                  </>
+                ) : (
+                  <div className="py-6 text-center text-xs text-text-muted">
+                    Luo perhe-koodi ensin Perhe-koodi -välilehdeltä luodaksesi jakolinkin.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Tiedosto (Airgap Backup) */}
+            {activeTab === 'backup' && (
               <div className="flex flex-col gap-4">
                 <p className="text-xs text-text-secondary">
                   Tallenna kaikki joukkueesi, sääntösi ja kenttäpinnauksesi tiedostoksi uuden puhelimen käyttöönottoa tai selaimen tyhjennystä varten:
@@ -185,18 +421,24 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                     />
                   </label>
                 </div>
-
-                {importStatus && (
-                  <div className="p-2.5 rounded-xl bg-pitch/15 border border-pitch/30 text-pitch text-xs font-semibold text-center">
-                    {importStatus}
-                  </div>
-                )}
               </div>
             )}
 
-            <div className="mt-5 pt-3 border-t border-border-subtle flex items-center gap-2 text-[11px] text-text-muted justify-center">
-              <ShieldCheck className="w-3.5 h-3.5 text-pitch shrink-0" />
-              <span>Tiedot siirtyvät suoraan laitteelta toiselle ilman välikäsiä.</span>
+            {statusMessage && (
+              <div className="mt-3 p-2.5 rounded-xl bg-pitch/15 border border-pitch/30 text-pitch text-xs font-semibold text-center">
+                {statusMessage}
+              </div>
+            )}
+
+            {/* Honest Disclosure & Privacy Footer */}
+            <div className="mt-5 pt-3 border-t border-border-subtle flex flex-col gap-1.5 text-[11px] text-text-muted">
+              <div className="flex items-center gap-1.5 font-bold text-text-primary">
+                <ShieldCheck className="w-3.5 h-3.5 text-pitch shrink-0" />
+                <span>Yksityisyys & GDPR</span>
+              </div>
+              <p className="leading-relaxed">
+                Etunimi ja joukkue-URL Cloudflareen 7 päivää. Ottelut haetaan tulospalvelusta tällä puhelimella. Ei käyttäjätunnusta.
+              </p>
             </div>
           </motion.div>
         </div>

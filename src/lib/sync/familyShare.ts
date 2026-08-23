@@ -1,5 +1,6 @@
 import { db, PelipaivaDB, CustomVenuePin, CustomAliasRecord } from '../storage/db';
 import { PlayerProfile, ArrivalRules } from '../../types/matchday';
+import { generateStableProfileId } from '../clubs/attachTeam';
 
 export interface FamilyBackupData {
   version: 2;
@@ -98,11 +99,14 @@ export async function importFamilyBackup(
  */
 export function generateSharePayload(profiles: PlayerProfile[]): string {
   const minimal = profiles.map((p) => ({
-    id: p.id,
+    id: p.id || generateStableProfileId(p.playerName, p.calendarUrl || p.associationUrl || ''),
     playerName: p.playerName,
     teamName: p.teamName,
     sport: p.sport,
-    calendarUrl: p.calendarUrl,
+    calendarUrl: p.calendarUrl || '',
+    associationUrl: p.associationUrl || '',
+    associationType: p.associationType || '',
+    teamId: p.teamId || '',
     colorHex: p.colorHex || '#10b981'
   }));
 
@@ -115,7 +119,7 @@ export function generateSharePayload(profiles: PlayerProfile[]): string {
 }
 
 /**
- * Decodes a share payload back into PlayerProfiles.
+ * Decodes a share payload back into PlayerProfiles with stable IDs.
  */
 export function unpackSharePayload(payload: string): PlayerProfile[] {
   try {
@@ -129,17 +133,29 @@ export function unpackSharePayload(payload: string): PlayerProfile[] {
     const rawList = JSON.parse(jsonStr);
     if (!Array.isArray(rawList)) return [];
 
-    return rawList.map((item) => ({
-      id: item.id || `profile-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      playerName: item.playerName || 'Pelaaja',
-      teamName: item.teamName || 'Joukkue',
-      sport: item.sport || 'football',
-      primaryColor: 'vihreä',
-      calendarUrl: item.calendarUrl || '',
-      colorHex: item.colorHex || '#10b981'
-    }));
+    return rawList.map((item) => {
+      const playerName = item.playerName || 'Pelaaja';
+      const calendarUrl = item.calendarUrl || item.associationUrl || '';
+      const stableId = item.id && item.id.startsWith('p:')
+        ? item.id
+        : generateStableProfileId(playerName, calendarUrl);
+
+      return {
+        id: stableId,
+        playerName,
+        teamName: item.teamName || 'Joukkue',
+        sport: item.sport || 'football',
+        primaryColor: 'vihreä',
+        calendarUrl,
+        associationUrl: item.associationUrl || undefined,
+        associationType: item.associationType || undefined,
+        teamId: item.teamId || undefined,
+        colorHex: item.colorHex || '#10b981'
+      };
+    });
   } catch (e) {
     console.error('Failed to unpack share payload:', e);
     return [];
   }
 }
+

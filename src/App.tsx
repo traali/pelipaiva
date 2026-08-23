@@ -35,7 +35,8 @@ import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedW
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl, isCupName, mergeOfficialWithCupFallback, isUglyTeamName } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
-import { findExistingTeamProfile } from './lib/clubs/attachTeam';
+import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
+import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
@@ -64,7 +65,7 @@ export const App: React.FC = () => {
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
 
-  // Listen to network status changes
+  // Listen to network status changes & background family sync
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
@@ -78,12 +79,59 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Check URL params for ?share= or ?ambient=true
+  // Background Family Cloud Sync Loop (every 30s while document is visible)
+  useEffect(() => {
+    let syncTimer: any;
+    const runBackgroundSync = async () => {
+      if (document.hidden || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+      const sync = await db.syncState.get('family');
+      if (sync && sync.syncKey) {
+        await syncFamilyRosterCycle(sync.syncKey, db);
+      }
+    };
+
+    // Initial sync
+    runBackgroundSync();
+
+    // 30s interval
+    syncTimer = setInterval(runBackgroundSync, 30000);
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        runBackgroundSync();
+      }
+    };
+
+    const handleOnlineSync = () => {
+      setIsOffline(false);
+      runBackgroundSync();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', handleOnlineSync);
+
+    return () => {
+      clearInterval(syncTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnlineSync);
+    };
+  }, []);
+
+  // Check URL params for ?perhe=, ?share= or ?ambient=true
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('ambient') === 'true' || window.location.pathname === '/ambient') {
         setIsAmbientMode(true);
+      }
+
+      // Handle ?perhe=SAIMA-4 deep link join
+      const perheCode = params.get('perhe');
+      if (perheCode) {
+        (async () => {
+          await syncFamilyRosterCycle(perheCode, db);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })();
       }
 
       // Handle family share link payload
@@ -95,6 +143,7 @@ export const App: React.FC = () => {
             for (const profile of unpacked) {
               await db.profiles.put(profile);
             }
+            await hydrateRosterProfiles(unpacked, db);
             // Clean up URL query param
             window.history.replaceState({}, document.title, window.location.pathname);
           })();
@@ -325,7 +374,7 @@ export const App: React.FC = () => {
             : pickNextTeamColor(existing.map((p) => p.colorHex)));
 
     const reused = findExistingTeamProfile(existing, playerName, url);
-    const profileId = reused?.id || `profile-${Date.now()}`;
+    const profileId = reused?.id || generateStableProfileId(playerName, url);
 
     if (reused) {
       await db.profiles.update(profileId, {
@@ -448,6 +497,14 @@ export const App: React.FC = () => {
           fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
           await db.events.put(fullEv);
         }
+      }
+
+      // Background Family Cloud Sync if active
+      const syncRecord = await db.syncState.get('family');
+      if (syncRecord && syncRecord.syncKey) {
+        syncFamilyRosterCycle(syncRecord.syncKey, db).catch((e) =>
+          console.warn('[FAMILY_CLOUD] Background sync after add failed:', e)
+        );
       }
     } catch (err) {
       console.warn('Team / Calendar fetch error:', err);
