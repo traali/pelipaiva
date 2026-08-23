@@ -66,7 +66,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return Array.from(map.values());
   }, [events]);
 
-  const todayISO = new Date().toISOString().split('T')[0] || '';
+  const todayISO = helsinkiDateISO(new Date());
   const [selectedDayKey, setSelectedDayKey] = useState<string>(() => {
     const hasToday = groupedByDay.some((g) => g.dateStr === todayISO);
     if (hasToday) return todayISO;
@@ -278,8 +278,13 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
               const end = new Date(ev.endTime);
               const timeStr = `${start.toLocaleTimeString('fi-FI', {
                 hour: '2-digit',
-                minute: '2-digit'
-              })} – ${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                minute: '2-digit',
+                timeZone: 'Europe/Helsinki'
+              })} – ${end.toLocaleTimeString('fi-FI', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Europe/Helsinki'
+              })}`;
 
               return (
                 <div

@@ -97,7 +97,8 @@ export function calculateDepartureCountdown(
 
   const departureTime = leaveHomeDate.toLocaleTimeString('fi-FI', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Europe/Helsinki'
   });
 
   const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - Date.now()) / 60000));

@@ -627,11 +627,11 @@ export function parseTorneopalHtml(
         if (!row || row.length < 4) continue;
 
         const dateStr = (pvmIdx !== -1 ? row[pvmIdx] : row[0]) || '';
-        const timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '15:00';
+        const timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '';
         const home = (kotiIdx !== -1 ? row[kotiIdx] : row[1]) || '';
         const away = (vierasIdx !== -1 ? row[vierasIdx] : row[2]) || '';
         const scoreStr = (tulosIdx !== -1 ? row[tulosIdx] : '') || '';
-        const rawVenue = (kenttaIdx !== -1 ? row[kenttaIdx] : '') || 'Kotikenttä TN';
+        const rawVenue = (kenttaIdx !== -1 ? row[kenttaIdx] : '') || 'Kenttä ilmoitetaan';
         const matchCode = (otteluIdx !== -1 ? row[otteluIdx] : '') || `${teamId}_${i}`;
 
         if (!home || !away) continue;

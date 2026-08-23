@@ -155,8 +155,13 @@ export function queryFamilySchedule(
     }
     const list = dutyEvents
       .map((e) => {
-        const d = new Date(e.startTime).toLocaleDateString('fi-FI', { weekday: 'short', day: 'numeric', month: 'numeric' });
-        return `• ${d} klo ${new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })} @ ${e.venue.name}: ${e.volunteerDuty}`;
+        const d = new Date(e.startTime).toLocaleDateString('fi-FI', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'numeric',
+          timeZone: 'Europe/Helsinki'
+        });
+        return `• ${d} klo ${new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' })} @ ${e.venue.name}: ${e.volunteerDuty}`;
       })
       .join('\n');
     return {

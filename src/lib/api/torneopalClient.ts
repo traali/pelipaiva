@@ -11,6 +11,7 @@ import type {
   TeamSquadRoster,
   TopScorer,
 } from "../../types/matchday";
+import { helsinkiDateISO, addHelsinkiDays } from "../agents/time";
 
 /** Public SPA keys used by official tulospalvelu frontends. */
 const TUPA_KEY = "tpqgz8ddy2rt9w8xuyxr";
@@ -107,9 +108,9 @@ export function shouldTryAssociationEndpoint(subdomain?: string): boolean {
 export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<string, string> {
   const params: Record<string, string> = { team_id: parsed.teamId };
   if (!looksLikeCupRequest(parsed)) {
-    const today = new Date();
-    params.start_date = new Date(today.getTime() - 21 * 86400000).toISOString().slice(0, 10);
-    params.end_date = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
+    const todayIso = helsinkiDateISO();
+    params.start_date = addHelsinkiDays(todayIso, -21);
+    params.end_date = addHelsinkiDays(todayIso, 90);
   }
   if (parsed.seasonId) params.competition_id = parsed.seasonId;
   if (parsed.leagueId && (/^\d+$/.test(parsed.leagueId) || looksLikeCupRequest(parsed))) {

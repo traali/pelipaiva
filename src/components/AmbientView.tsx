@@ -35,9 +35,9 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      setTimeStr(now.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }));
+      setTimeStr(now.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' }));
       setDateStr(
-        now.toLocaleDateString('fi-FI', { weekday: 'long', day: 'numeric', month: 'long' })
+        now.toLocaleDateString('fi-FI', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Helsinki' })
       );
     };
     tick();
@@ -147,7 +147,8 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
               {shown.isTraining ? 'Treenit' : 'Alkulämpö'}{' '}
               {new Date(shown.startTime).toLocaleTimeString('fi-FI', {
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                timeZone: 'Europe/Helsinki'
               })}
             </span>
           </div>

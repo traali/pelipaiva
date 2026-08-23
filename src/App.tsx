@@ -136,8 +136,12 @@ export const App: React.FC = () => {
       const perheCode = params.get('perhe');
       if (perheCode) {
         (async () => {
-          await syncFamilyRosterCycle(perheCode, db);
-          window.history.replaceState({}, document.title, window.location.pathname);
+          const res = await syncFamilyRosterCycle(perheCode, db);
+          if (res.success) {
+            localStorage.setItem('pelipaiva_onboarding_done', 'true');
+            setIsOnboardingActive(false);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
         })();
       }
 
@@ -151,7 +155,8 @@ export const App: React.FC = () => {
               await db.profiles.put(profile);
             }
             await hydrateRosterProfiles(unpacked, db);
-            // Clean up URL query param
+            localStorage.setItem('pelipaiva_onboarding_done', 'true');
+            setIsOnboardingActive(false);
             window.history.replaceState({}, document.title, window.location.pathname);
           })();
         }
@@ -236,18 +241,33 @@ export const App: React.FC = () => {
     }
 
     const seeded = [...defaultProfiles, ...EXTRA_PROFILES];
-    await Promise.all(
-      seeded.map((p) =>
-        ingestSourceForProfile({
-          profileId: p.id,
-          playerName: p.playerName,
-          teamName: p.teamName,
-          sport: p.sport,
-          url: p.associationUrl || p.calendarUrl,
-          includeWeather: true
-        }).catch((e) => console.warn('[DEMO_INGEST]', p.teamName, e))
-      )
-    );
+    const ingested: number[] = [];
+    for (let i = 0; i < seeded.length; i += 2) {
+      const chunk = seeded.slice(i, i + 2);
+      const part = await Promise.all(
+        chunk.map((p) =>
+          ingestSourceForProfile({
+            profileId: p.id,
+            playerName: p.playerName,
+            teamName: p.teamName,
+            sport: p.sport,
+            url: p.associationUrl || p.calendarUrl,
+            includeWeather: false
+          }).catch((e) => {
+            console.warn('[DEMO_INGEST]', p.teamName, e);
+            return 0;
+          })
+        )
+      );
+      ingested.push(...part);
+    }
+    const total = ingested.reduce((a, b) => a + b, 0);
+    if (total === 0) {
+      await db.profiles.clear();
+      await db.events.clear();
+      return false;
+    }
+    return true;
     } finally {
       setIsSeeding(false);
     }
@@ -510,10 +530,12 @@ export const App: React.FC = () => {
     return (
       <>
         <OnboardingWizard
-          onStartDemo={() => {
-            localStorage.setItem('pelipaiva_onboarding_done', 'true');
-            setIsOnboardingActive(false);
-            handleStartDemo();
+          onStartDemo={async () => {
+            const ok = await handleStartDemo();
+            if (ok) {
+              localStorage.setItem('pelipaiva_onboarding_done', 'true');
+              setIsOnboardingActive(false);
+            }
           }}
           onFinishOnboarding={() => {
             localStorage.setItem('pelipaiva_onboarding_done', 'true');

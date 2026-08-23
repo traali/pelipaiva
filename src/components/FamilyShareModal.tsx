@@ -225,7 +225,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                 }`}
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span>Jaa linkki</span>
+                <span>Jakolinkki</span>
               </button>
               <button
                 type="button"
@@ -257,7 +257,8 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                         Viimeksi synkronoitu:{' '}
                         {new Date(lastSynced).toLocaleTimeString('fi-FI', {
                           hour: '2-digit',
-                          minute: '2-digit'
+                          minute: '2-digit',
+                          timeZone: 'Europe/Helsinki'
                         })}
                       </span>
                     )}

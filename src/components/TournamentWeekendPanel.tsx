@@ -119,7 +119,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                     {matches.map((m, idx) => {
                       const start = new Date(m.startTime);
                       const end = new Date(m.endTime);
-                      const timeStr = `${start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}–${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                      const timeStr = `${start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' })}–${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' })}`;
                       const isPast = end.getTime() < Date.now();
                       const isCurrent = start.getTime() <= Date.now() && Date.now() <= end.getTime();
 

@@ -198,7 +198,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const totalSourcesCount = addedSources.length || existingProfilesCount;
 
   return (
-    <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 md:py-10 flex flex-col justify-between">
+    <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 pt-[max(1.5rem,env(safe-area-inset-top))] md:py-10 flex flex-col justify-between">
       <div className="max-w-xl mx-auto w-full space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">

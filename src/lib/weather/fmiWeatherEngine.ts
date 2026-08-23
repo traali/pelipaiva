@@ -47,7 +47,23 @@ export function calculateFeelsLike(tempC: number, windSpeedMs: number, humidityP
 /**
  * Fetches point weather from FMI Open Data (WFS Harmonie model) for match location and time.
  */
+const weatherMemo = new Map<string, Promise<WeatherCondition>>();
+
 export async function fetchFmiMatchWeather(
+  coords: Coordinates,
+  startTimeIso: string,
+  endTimeIso: string,
+  proxyUrl?: string
+): Promise<WeatherCondition> {
+  const key = `${coords.lat.toFixed(3)},${coords.lng.toFixed(3)}`;
+  const hit = weatherMemo.get(key);
+  if (hit) return hit;
+  const pending = fetchFmiMatchWeatherUncached(coords, startTimeIso, endTimeIso, proxyUrl);
+  weatherMemo.set(key, pending);
+  return pending;
+}
+
+async function fetchFmiMatchWeatherUncached(
   coords: Coordinates,
   startTimeIso: string,
   endTimeIso: string,

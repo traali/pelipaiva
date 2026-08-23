@@ -159,7 +159,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1">
-              ⚽ Kickoff
+              ⏱️ Aloitus
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-text-primary mt-0.5">
               {kickoff}

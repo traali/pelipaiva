@@ -261,7 +261,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
               className="w-full py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5 text-pitch" />
-              <span>📱 Jaa koko perhe toiselle vanhemmalle (QR / WhatsApp)</span>
+              <span>Liity perhe-koodilla / WhatsApp</span>
             </button>
 
             <button
