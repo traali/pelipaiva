@@ -1124,7 +1124,11 @@ export function generateSyntheticOfficialTeamData(
         { jerseyNumber: 30, playerName: 'Lenni Marjamäki', position: 'DF', goals: 0, assists: 1, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
         { jerseyNumber: 37, playerName: 'Romeo Lencioni', position: 'FW', goals: 3, assists: 2, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
         { jerseyNumber: 55, playerName: 'Simo Oinonen', position: 'FW', goals: 3, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
-        { jerseyNumber: 64, playerName: 'Matias Kivimäki', position: 'GK', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
+        { jerseyNumber: 64, playerName: 'Matias Kivimäki', position: 'GK', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 71, playerName: 'Jasperi Karkio', position: 'FW', goals: 2, assists: 1, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 74, playerName: 'Samuel Gröning', position: 'DF', goals: 1, assists: 3, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 97, playerName: 'Daniel Dahlström', position: 'FW', goals: 2, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 98, playerName: 'Lauri Kaartokangas', position: 'DF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
       ]
     };
 

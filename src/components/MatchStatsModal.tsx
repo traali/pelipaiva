@@ -598,28 +598,41 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
 
                       {/* Goals, Assists, Cards Stats */}
                       <div className="flex items-center gap-3 text-right shrink-0">
-                        {player.goals > 0 && (
+                        {sport === 'floorball' ? (
                           <div className="flex flex-col items-end">
-                            <span className="text-xs font-black text-pitch font-tabular flex items-center gap-0.5">
-                              <Target className="w-3 h-3 text-pitch" />
-                              {player.goals} maalia
+                            <span className="text-xs font-black text-pitch font-tabular">
+                              {player.goals} + {player.assists} = {player.goals + player.assists} p
                             </span>
-                            {player.assists > 0 && (
-                              <span className="text-[10px] text-text-secondary">
-                                +{player.assists} syöttöä
+                            <span className="text-[10px] text-text-muted">
+                              {player.goals}M, {player.assists}S
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            {player.goals > 0 && (
+                              <div className="flex flex-col items-end">
+                                <span className="text-xs font-black text-pitch font-tabular flex items-center gap-0.5">
+                                  <Target className="w-3 h-3 text-pitch" />
+                                  {player.goals} maalia
+                                </span>
+                                {player.assists > 0 && (
+                                  <span className="text-[10px] text-text-secondary">
+                                    +{player.assists} syöttöä
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {player.goals === 0 && player.assists > 0 && (
+                              <span className="text-xs font-semibold text-text-secondary">
+                                {player.assists} syöttöä
                               </span>
                             )}
-                          </div>
-                        )}
 
-                        {player.goals === 0 && player.assists > 0 && (
-                          <span className="text-xs font-semibold text-text-secondary">
-                            {player.assists} syöttöä
-                          </span>
-                        )}
-
-                        {player.goals === 0 && player.assists === 0 && (
-                          <span className="text-xs text-text-muted">Puolustava</span>
+                            {player.goals === 0 && player.assists === 0 && (
+                              <span className="text-xs text-text-muted">Puolustava</span>
+                            )}
+                          </>
                         )}
 
                         {player.yellowCards > 0 && (
