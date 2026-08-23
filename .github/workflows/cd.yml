@@ -45,7 +45,3 @@ jobs:
           workingDirectory: 'cloudflare-worker'
           wranglerVersion: '4.24.0'
           command: deploy
-          secrets: |
-            FAMILY_CODES
-        env:
-          FAMILY_CODES: ${{ secrets.FAMILY_CODES }}
