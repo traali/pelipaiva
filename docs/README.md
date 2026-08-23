@@ -18,3 +18,4 @@ Start here:
 2. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
 3. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
 5. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — Cloudflare family code + WhatsApp synthetics (not yet implemented)
+6. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — 7 Engineering hardening specs (checksum, GC, hydration queue, offline sync)
