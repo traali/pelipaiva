@@ -10,10 +10,15 @@ import {
   Sparkles,
   GitCompare,
   Users,
+  Star,
+  Check,
+  Plus,
+  Minus,
+  Save,
   Target,
   ChevronRight
 } from 'lucide-react';
-import { FullMatchStats } from '../types/matchday';
+import { FullMatchStats, PlayerMatchLog, SportType } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 
 interface MatchStatsModalProps {
@@ -22,19 +27,58 @@ interface MatchStatsModalProps {
   stats: FullMatchStats;
   homeTeam: string;
   awayTeam: string;
+  playerName?: string;
+  playerLog?: PlayerMatchLog;
+  score?: string;
+  sport?: SportType;
+  onSavePlayerLog?: (log: PlayerMatchLog, updatedScore?: string) => void;
 }
 
-type StatsTab = 'stats' | 'standings' | 'scorers' | 'roster' | 'common' | 'h2h' | 'scout';
+type StatsTab = 'stats' | 'player_log' | 'roster' | 'standings' | 'scorers' | 'common' | 'h2h' | 'scout';
 
 export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   isOpen,
   onClose,
   stats,
   homeTeam,
-  awayTeam
+  awayTeam,
+  playerName,
+  playerLog,
+  score,
+  sport = 'football',
+  onSavePlayerLog
 }) => {
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
+
+  // Local state for recording player stats
+  const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
+  const [logAssists, setLogAssists] = useState<number>(playerLog?.assists ?? 0);
+  const [logPoints, setLogPoints] = useState<number>(playerLog?.points ?? 0);
+  const [logSaves, setLogSaves] = useState<number>(playerLog?.saves ?? 0);
+  const [logMinutes, setLogMinutes] = useState<number>(playerLog?.minutesPlayed ?? (sport === 'floorball' ? 45 : 60));
+  const [logStarAward, setLogStarAward] = useState<boolean>(playerLog?.starPlayerAward ?? false);
+  const [logNotes, setLogNotes] = useState<string>(playerLog?.notes ?? '');
+  const [matchScoreInput, setMatchScoreInput] = useState<string>(score || `${stats.liveScore?.home ?? 0}–${stats.liveScore?.away ?? 0}`);
+  const [isSavedFeedback, setIsSavedFeedback] = useState<boolean>(false);
+
+  const handleSaveLog = () => {
+    const updatedLog: PlayerMatchLog = {
+      goals: logGoals,
+      assists: logAssists,
+      points: logPoints,
+      saves: logSaves,
+      minutesPlayed: logMinutes,
+      starPlayerAward: logStarAward,
+      notes: logNotes.trim() || undefined,
+      loggedAt: new Date().toISOString()
+    };
+    if (onSavePlayerLog) {
+      onSavePlayerLog(updatedLog, matchScoreInput.trim() || undefined);
+    }
+    setIsSavedFeedback(true);
+    setTimeout(() => setIsSavedFeedback(false), 2500);
+  };
 
   if (!stats) return null;
 
@@ -204,8 +248,9 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             {/* Navigation Sub-Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none border-b border-border-subtle">
               {[
-                { id: 'stats', label: 'Tilastot', icon: BarChart3 },
-                { id: 'roster', label: 'Pelaajat & Maalit', icon: Users },
+                { id: 'stats', label: 'Ottelutilastot', icon: BarChart3 },
+                { id: 'player_log', label: playerName ? `🌟 ${playerName} (Omat tilastot)` : '🌟 Omat tilastot', icon: Star },
+                { id: 'roster', label: 'Pelaajat & Kokoonpanot', icon: Users },
                 { id: 'standings', label: 'Sarjataulukko', icon: Trophy },
                 { id: 'scorers', label: 'Maalipörssi', icon: Award },
                 { id: 'common', label: 'Yhteiset vastustajat', icon: GitCompare },
@@ -272,6 +317,192 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   awayVal={awayStats.fouls}
                   higherIsBetter={false}
                 />
+              </div>
+            )}
+
+            {/* TAB: Player Performance Logger & Highlights */}
+            {activeTab === 'player_log' && (
+              <div className="flex flex-col gap-4 p-4 rounded-2xl bg-surface-elevated/50 border border-border-subtle">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-text-primary flex items-center gap-1.5">
+                      <Star className="w-4 h-4 text-whistle fill-whistle" />
+                      <span>{playerName ? `${playerName} — Ottelun suoritukset` : 'Omat ottelutilastot'}</span>
+                    </h3>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Kirjaa maalit, syötöt, peliaika ja ottelun kohokohdat muistiin.
+                    </p>
+                  </div>
+                  {isSavedFeedback && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-pitch/20 text-pitch border border-pitch/30 flex items-center gap-1 animate-pulse">
+                      <Check className="w-3.5 h-3.5" />
+                      Tallennettu!
+                    </span>
+                  )}
+                </div>
+
+                {/* Counter Steppers Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {/* Goals */}
+                  <div className="p-3 rounded-xl bg-surface-base border border-border-subtle flex flex-col items-center justify-between">
+                    <span className="text-[11px] font-bold text-text-secondary">
+                      {sport === 'basketball' ? '🏀 Pisteet' : '⚽ Maalit'}
+                    </span>
+                    <span className="text-2xl font-black font-tabular my-1 text-pitch">
+                      {sport === 'basketball' ? logPoints : logGoals}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          sport === 'basketball'
+                            ? setLogPoints((v) => Math.max(0, v - (v >= 2 ? 2 : 1)))
+                            : setLogGoals((v) => Math.max(0, v - 1))
+                        }
+                        className="w-7 h-7 rounded-lg bg-surface-elevated hover:bg-border-strong flex items-center justify-center text-text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          sport === 'basketball'
+                            ? setLogPoints((v) => v + 2)
+                            : setLogGoals((v) => v + 1)
+                        }
+                        className="w-7 h-7 rounded-lg bg-pitch text-text-inverse hover:brightness-110 flex items-center justify-center font-bold cursor-pointer transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Assists */}
+                  <div className="p-3 rounded-xl bg-surface-base border border-border-subtle flex flex-col items-center justify-between">
+                    <span className="text-[11px] font-bold text-text-secondary">👟 Syötöt</span>
+                    <span className="text-2xl font-black font-tabular my-1 text-radar">{logAssists}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLogAssists((v) => Math.max(0, v - 1))}
+                        className="w-7 h-7 rounded-lg bg-surface-elevated hover:bg-border-strong flex items-center justify-center text-text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogAssists((v) => v + 1)}
+                        className="w-7 h-7 rounded-lg bg-radar text-text-inverse hover:brightness-110 flex items-center justify-center font-bold cursor-pointer transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Saves / Torjunnat */}
+                  <div className="p-3 rounded-xl bg-surface-base border border-border-subtle flex flex-col items-center justify-between">
+                    <span className="text-[11px] font-bold text-text-secondary">🧤 Torjunnat</span>
+                    <span className="text-2xl font-black font-tabular my-1 text-text-primary">{logSaves}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLogSaves((v) => Math.max(0, v - 1))}
+                        className="w-7 h-7 rounded-lg bg-surface-elevated hover:bg-border-strong flex items-center justify-center text-text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogSaves((v) => v + 1)}
+                        className="w-7 h-7 rounded-lg bg-surface-elevated hover:bg-border-strong flex items-center justify-center text-text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Minutes */}
+                  <div className="p-3 rounded-xl bg-surface-base border border-border-subtle flex flex-col items-center justify-between col-span-2 sm:col-span-1">
+                    <span className="text-[11px] font-bold text-text-secondary">⏱️ Peliaika</span>
+                    <span className="text-2xl font-black font-tabular my-1 text-text-primary">
+                      {logMinutes} <span className="text-xs font-normal text-text-muted">min</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLogMinutes((v) => Math.max(0, v - 5))}
+                        className="w-7 h-7 rounded-lg bg-surface-elevated hover:bg-border-strong flex items-center justify-center text-text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        -5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogMinutes((v) => v + 5)}
+                        className="w-7 h-7 rounded-lg bg-surface-elevated hover:bg-border-strong flex items-center justify-center text-text-primary font-bold cursor-pointer transition-colors"
+                      >
+                        +5
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Star Player / Tsemppari Toggle */}
+                  <div
+                    onClick={() => setLogStarAward((v) => !v)}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all col-span-2 sm:col-span-2 ${
+                      logStarAward
+                        ? 'bg-whistle/15 border-whistle text-whistle'
+                        : 'bg-surface-base border-border-subtle text-text-secondary hover:border-border-strong'
+                    }`}
+                  >
+                    <Star
+                      className={`w-6 h-6 transition-all ${
+                        logStarAward ? 'text-whistle fill-whistle scale-110' : 'text-text-muted'
+                      }`}
+                    />
+                    <span className="text-xs font-bold text-center">
+                      {logStarAward ? '🌟 Tsemppari / Ottelun tähti palkittu!' : 'Merkitse tsemppari / tähdistöpelaaja'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Score & Notes Row */}
+                <div className="flex flex-col gap-2.5 pt-2 border-t border-border-subtle">
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs font-bold text-text-secondary whitespace-nowrap">
+                      Lopputulos:
+                    </label>
+                    <input
+                      type="text"
+                      value={matchScoreInput}
+                      onChange={(e) => setMatchScoreInput(e.target.value)}
+                      placeholder="esim. 4–2"
+                      className="px-3 py-1.5 rounded-xl bg-surface-base border border-border-strong text-xs font-mono font-bold text-text-primary max-w-[120px] text-center focus-visible:ring-2 focus-visible:ring-pitch"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-text-secondary">
+                      Omat muistiinpanot & fiilikset pelistä:
+                    </label>
+                    <textarea
+                      value={logNotes}
+                      onChange={(e) => setLogNotes(e.target.value)}
+                      placeholder="Esim. Loistava prässi toisella jaksolla, hieno syöttö Maijan maaliin!"
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-base border border-border-subtle text-xs text-text-primary placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-pitch resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <button
+                  type="button"
+                  onClick={handleSaveLog}
+                  className="w-full py-2.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-sm transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Tallenna ottelutilastot</span>
+                </button>
               </div>
             )}
 

@@ -10,9 +10,11 @@ import {
   BarChart3,
   ChevronRight,
   Trophy,
-  Dumbbell
+  Dumbbell,
+  Star,
+  Sparkles
 } from 'lucide-react';
-import { MatchdayEvent } from '../types/matchday';
+import { MatchdayEvent, FullMatchStats, PlayerMatchLog } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { NappisvahtiPill } from './NappisvahtiPill';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
@@ -23,6 +25,8 @@ import { Edit3 } from 'lucide-react';
 import type { PitchSurface } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
+import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
+import { db } from '../lib/storage/db';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return 'Sisähalli';
@@ -66,11 +70,16 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
   const [localVenue, setLocalVenue] = useState(event.venue);
+  const [stats, setStats] = useState<FullMatchStats | undefined>(event.stats);
+  const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
+  const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
 
   const relatedConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
 
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
+  const isPast =
+    new Date(event.endTime) <= new Date() || currentScore !== undefined;
   const formattedKickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
     minute: '2-digit'
@@ -81,7 +90,27 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   });
 
   const isTraining = event.isTraining || event.eventType === 'training';
-  const stats = !isTraining ? event.stats : undefined;
+
+  const handleOpenStats = () => {
+    let resolved = stats;
+    if (!resolved && !isTraining) {
+      resolved = generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport);
+      setStats(resolved);
+      db.events.update(event.id, { stats: resolved }).catch(console.warn);
+    }
+    setIsStatsModalOpen(true);
+  };
+
+  const handleSavePlayerLog = async (log: PlayerMatchLog, updatedScore?: string) => {
+    setPlayerLog(log);
+    if (updatedScore) setCurrentScore(updatedScore);
+    const updates: Partial<MatchdayEvent> = {
+      playerLog: log,
+      score: updatedScore || currentScore
+    };
+    if (stats) updates.stats = stats;
+    await db.events.update(event.id, updates).catch(console.warn);
+  };
 
   const getSportBadge = () => {
     switch (event.sport) {
@@ -261,20 +290,38 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               {event.title}
             </h2>
           ) : (
-            <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-words">
-              <span className="break-words">{event.homeTeam}</span>
-              {event.awayTeam && (
-                <>
-                  <span className="text-text-muted font-normal text-sm select-none" aria-label="vastaan">vs</span>
-                  <span className="break-words">{event.awayTeam}</span>
-                </>
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary flex flex-wrap items-baseline gap-x-2 gap-y-0.5 break-words">
+                <span className="break-words">{event.homeTeam}</span>
+                {event.awayTeam && (
+                  <>
+                    <span className="text-text-muted font-normal text-sm select-none" aria-label="vastaan">vs</span>
+                    <span className="break-words">{event.awayTeam}</span>
+                  </>
+                )}
+                {currentScore && (
+                  <span className="ml-1 font-mono text-sm font-black px-2 py-0.5 rounded-md bg-pitch/15 text-pitch border border-pitch/25">
+                    {currentScore}
+                  </span>
+                )}
+              </h2>
+
+              {/* Personal Player Match Log Badge (if logged) */}
+              {playerLog && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-whistle/15 text-whistle border border-whistle/30">
+                    <Star className="w-3.5 h-3.5 fill-whistle text-whistle" />
+                    <span>
+                      {event.sport === 'basketball'
+                        ? `${playerLog.points ?? 0} pistettä • ${playerLog.assists ?? 0} syöttöä`
+                        : `${playerLog.goals ?? 0} maalia • ${playerLog.assists ?? 0} syöttöä`}
+                      {playerLog.saves ? ` • ${playerLog.saves} torjuntaa` : ''}
+                      {playerLog.starPlayerAward ? ' • 🏆 Tsemppari' : ''}
+                    </span>
+                  </span>
+                </div>
               )}
-              {event.score && (
-                <span className="ml-1 font-mono text-sm font-black px-2 py-0.5 rounded-md bg-pitch/15 text-pitch border border-pitch/25">
-                  {event.score}
-                </span>
-              )}
-            </h2>
+            </div>
           )}
 
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
@@ -331,50 +378,69 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         )}
 
-        {/* Modern Sports Stats Preview Strip (Only for Matches with Stats) */}
-        {!isTraining && stats && (
+        {/* Modern Sports Stats & Match Report Strip (Interactive for all Matches & Past Games) */}
+        {!isTraining && (
           <motion.button
             type="button"
             whileTap={{ scale: 0.98 }}
             whileHover={{ scale: 1.01 }}
             transition={springTactile.snappy}
-            onClick={() => setIsStatsModalOpen(true)}
-            className="w-full mb-4 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle hover:border-pitch/40 cursor-pointer flex items-center justify-between gap-3 text-left transition-all group"
+            onClick={handleOpenStats}
+            className={`w-full mb-4 p-3 rounded-2xl border cursor-pointer flex items-center justify-between gap-3 text-left transition-all group ${
+              isPast
+                ? 'bg-surface-elevated/90 border-pitch/30 hover:border-pitch hover:bg-surface-elevated'
+                : 'bg-surface-elevated/70 border-border-subtle hover:border-pitch/40'
+            }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-2 rounded-xl bg-pitch/15 text-pitch shrink-0">
-                <Trophy className="w-4 h-4" />
+              <div className={`p-2 rounded-xl shrink-0 ${isPast ? 'bg-pitch/20 text-pitch' : 'bg-pitch/15 text-pitch'}`}>
+                {isPast ? <BarChart3 className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-text-primary flex items-center gap-2">
-                  <span>
-                    {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
-                  </span>
-                  {event.awayTeam && (
+                  {stats ? (
                     <>
-                      <span className="text-text-muted font-normal">vs</span>
                       <span>
-                        {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                        {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
                       </span>
+                      {event.awayTeam && (
+                        <>
+                          <span className="text-text-muted font-normal">vs</span>
+                          <span>
+                            {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                          </span>
+                        </>
+                      )}
                     </>
+                  ) : (
+                    <span>{isPast ? 'Ottelutilastot & Kirjaa suoritus' : 'Avaa sarjatilastot & ennakko'}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-text-muted">Kunto:</span>
-                    <div className="flex items-center gap-0.5">
-                      {stats.homeStanding.form.slice(-3).map((f, idx) => (
-                        <span
-                          key={idx}
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
-                          }`}
-                        />
-                      ))}
+                  {stats?.homeStanding.form ? (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-text-muted">Kunto:</span>
+                      <div className="flex items-center gap-0.5">
+                        {stats.homeStanding.form.slice(-3).map((f, idx) => (
+                          <span
+                            key={idx}
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
+                            }`}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <span className="flex items-center gap-1 text-pitch font-medium">
+                      <Sparkles className="w-3 h-3" />
+                      {isPast ? 'Päättynyt ottelu • Klikkaa tilastoihin' : 'Sarjataulukko & pelaajatilastot'}
+                    </span>
+                  )}
                   <span>•</span>
-                  <span className="truncate text-pitch font-medium">Avaa tilastot & kokoonpanot</span>
+                  <span className="truncate text-pitch font-medium">
+                    {isPast ? 'Kirjaa omat tilastot & raportti' : 'Avaa kokoonpanot'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -466,14 +532,19 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         </div>
       </motion.div>
 
-      {/* Interactive Full Match Stats Modal (if match stats exist) */}
-      {!isTraining && stats && (
+      {/* Interactive Full Match Stats Modal & Player Log */}
+      {!isTraining && (
         <MatchStatsModal
           isOpen={isStatsModalOpen}
           onClose={() => setIsStatsModalOpen(false)}
-          stats={stats}
+          stats={stats || generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport)}
           homeTeam={event.homeTeam}
           awayTeam={event.awayTeam || 'Vastustaja'}
+          playerName={playerName}
+          playerLog={playerLog}
+          score={currentScore}
+          sport={event.sport}
+          onSavePlayerLog={handleSavePlayerLog}
         />
       )}
 

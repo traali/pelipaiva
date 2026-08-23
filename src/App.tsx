@@ -18,6 +18,7 @@ import { AskCopilotModal } from './components/AskCopilotModal';
 import { FamilyManageModal } from './components/FamilyManageModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
+import { MatchStatsModal } from './components/MatchStatsModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
 import { WeekendStrip } from './components/WeekendStrip';
@@ -45,6 +46,7 @@ export const App: React.FC = () => {
   const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
+  const [selectedStatsEvent, setSelectedStatsEvent] = useState<MatchdayEvent | null>(null);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
@@ -931,6 +933,7 @@ export const App: React.FC = () => {
                   profiles={profiles}
                   viewMode={viewMode}
                   conflicts={snapshot.conflicts}
+                  onSelectEvent={(ev) => setSelectedStatsEvent(ev)}
                   onClearFilter={() => setActiveProfileId('all')}
                   onNavigate={(ev) =>
                     window.open(
@@ -1043,6 +1046,43 @@ export const App: React.FC = () => {
         profiles={profiles}
         onDataImported={() => {}}
       />
+
+      {/* Global Interactive Match Stats Modal (for Timeline & Calendar selections) */}
+      {selectedStatsEvent && !selectedStatsEvent.isTraining && (
+        <MatchStatsModal
+          isOpen={true}
+          onClose={() => setSelectedStatsEvent(null)}
+          stats={
+            selectedStatsEvent.stats ||
+            generateOrResolveMatchStats(
+              selectedStatsEvent.homeTeam,
+              selectedStatsEvent.awayTeam,
+              selectedStatsEvent.sport
+            )
+          }
+          homeTeam={selectedStatsEvent.homeTeam}
+          awayTeam={selectedStatsEvent.awayTeam || 'Vastustaja'}
+          playerName={profiles.find((p) => p.id === selectedStatsEvent.profileId)?.playerName}
+          playerLog={selectedStatsEvent.playerLog}
+          score={selectedStatsEvent.score}
+          sport={selectedStatsEvent.sport}
+          onSavePlayerLog={async (log, updatedScore) => {
+            const updates: Partial<MatchdayEvent> = {
+              playerLog: log,
+              score: updatedScore || selectedStatsEvent.score
+            };
+            if (!selectedStatsEvent.stats) {
+              updates.stats = generateOrResolveMatchStats(
+                selectedStatsEvent.homeTeam,
+                selectedStatsEvent.awayTeam,
+                selectedStatsEvent.sport
+              );
+            }
+            await db.events.update(selectedStatsEvent.id, updates).catch(console.warn);
+            setSelectedStatsEvent((prev) => (prev ? { ...prev, ...updates } : null));
+          }}
+        />
+      )}
     </div>
   );
 };

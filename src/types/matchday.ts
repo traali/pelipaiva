@@ -418,6 +418,17 @@ export interface PlayerProfile {
   lastOfficialSyncAt?: string;
 }
 
+export interface PlayerMatchLog {
+  goals?: number;
+  assists?: number;
+  points?: number;
+  saves?: number;
+  minutesPlayed?: number;
+  starPlayerAward?: boolean; // Tsemppari / Ottelun tähti
+  notes?: string;
+  loggedAt?: string;
+}
+
 export interface MatchdayEvent {
   id: string;
   profileId: string;
@@ -441,6 +452,7 @@ export interface MatchdayEvent {
   lightning?: LightningSafetyAlert;
   parking?: ParkingInfo;
   stats?: FullMatchStats;
+  playerLog?: PlayerMatchLog;
   briefing?: MatchdayBriefing;
 
   // Milestone 1 & 3 additions:
