@@ -45,19 +45,21 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     await expect(allTab).toBeVisible();
     await expect(allTab).toHaveAttribute('aria-selected', 'true');
 
-    // Switch to a child profile tab
+    // Switch to a child profile tab (e.g. Simo or Aada)
     const profileTabs = page.locator('nav[aria-label="Pelaaja- ja joukkueprofiilit"] button[role="tab"]');
     await expect(profileTabs.nth(1)).toBeVisible();
 
     const secondTab = profileTabs.nth(1);
     await secondTab.scrollIntoViewIfNeeded();
-    await secondTab.click({ force: true });
+    await secondTab.click();
     await expect(secondTab).toHaveAttribute('aria-selected', 'true');
+    await expect(allTab).toHaveAttribute('aria-selected', 'false');
 
     // Switch back to "Kaikki"
     await allTab.scrollIntoViewIfNeeded();
-    await allTab.click({ force: true });
+    await allTab.click();
     await expect(allTab).toHaveAttribute('aria-selected', 'true');
+    await expect(secondTab).toHaveAttribute('aria-selected', 'false');
   });
 
   test('Flow 3: Unified Smart Import Modal & Tabs Navigation', async ({ page }) => {

@@ -371,20 +371,14 @@ export const App: React.FC = () => {
     return profiles.filter((p) => p.id === activeProfileId);
   }, [profiles, activeProfileId]);
 
-  const scopedEvents = useMemo(() => {
-    if (activeProfileId === 'all') return rawEvents;
-    const allowedIds = new Set(activeProfiles.map((p) => p.id));
-    return rawEvents.filter((e) => allowedIds.has(e.profileId));
-  }, [rawEvents, activeProfiles, activeProfileId]);
-
   const snapshot = useMemo(
     () =>
       runMissionControlGraph(
-        scopedEvents.length > 0 ? scopedEvents : rawEvents,
-        activeProfiles.length > 0 ? activeProfiles : profiles,
+        filteredEvents,
+        activeProfiles,
         new Date()
       ),
-    [scopedEvents, activeProfiles, rawEvents, profiles]
+    [filteredEvents, activeProfiles]
   );
 
   const otherEvents = useMemo(
