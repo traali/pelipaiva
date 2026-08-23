@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MapPin, ShieldCheck, Thermometer } from 'lucide-react';
 import type { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
@@ -12,11 +12,15 @@ interface AmbientViewProps {
   onExit?: () => void;
 }
 
+const IDLE_MS = 90_000;
+
 export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [], onExit }) => {
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
   const [cursor, setCursor] = useState(0);
   const [dim, setDim] = useState(false);
+  const dimRef = useRef(false);
+  const armIdleRef = useRef<() => void>(() => {});
 
   const snapshot = useMemo(
     () => runMissionControlGraph(events, profiles, new Date()),
@@ -48,14 +52,40 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
   }, [cycle.length]);
 
   useEffect(() => {
-    const idle = setTimeout(() => setDim(true), 90_000);
-    const wake = () => setDim(false);
-    window.addEventListener('pointerdown', wake);
+    let idle: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        dimRef.current = true;
+        setDim(true);
+      }, IDLE_MS);
+    };
+    armIdleRef.current = arm;
+    arm();
+    const onActivity = () => {
+      if (dimRef.current) return;
+      arm();
+    };
+    window.addEventListener('pointermove', onActivity);
     return () => {
       clearTimeout(idle);
-      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('pointermove', onActivity);
     };
   }, []);
+
+  const wakeScreen = () => {
+    dimRef.current = false;
+    setDim(false);
+    armIdleRef.current();
+  };
+
+  const handleSurfaceClick = () => {
+    if (dimRef.current) {
+      wakeScreen();
+      return;
+    }
+    onExit?.();
+  };
 
   const shown = cycle[cursor] || snapshot.nextEvent;
   const profile = shown ? profiles.find((p) => p.id === shown.profileId) : undefined;
@@ -67,7 +97,7 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
       className={`flex min-h-dvh w-full flex-col justify-between bg-canvas px-6 py-8 text-text-primary md:px-16 md:py-12 ${
         dim ? 'opacity-70' : ''
       }`}
-      onClick={onExit}
+      onClick={handleSurfaceClick}
       onKeyDown={(e) => {
         if (e.key === 'Escape') onExit?.();
       }}
@@ -80,8 +110,20 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
           </div>
           <div className="mt-1 text-base capitalize text-radar md:text-xl">{dateStr}</div>
         </div>
-        <div className="rounded-md border border-border-subtle px-3 py-2 text-xs font-semibold uppercase tracking-wide text-pitch">
-          Pelipäivä
+        <div className="flex items-center gap-2">
+          <div className="rounded-md border border-border-subtle px-3 py-2 text-xs font-semibold uppercase tracking-wide text-pitch">
+            Pelipäivä
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExit?.();
+            }}
+            className="min-h-11 rounded-md border border-border-strong bg-surface-elevated px-3 text-xs font-semibold uppercase tracking-wide text-text-primary"
+          >
+            Poistu
+          </button>
         </div>
       </div>
 

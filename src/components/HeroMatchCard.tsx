@@ -161,7 +161,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
         {showKit && kit && (
           <div className="mt-3">
-            <KitChecklist plan={kit} compact />
+            <KitChecklist plan={kit} eventId={event.id} compact />
           </div>
         )}
       </div>

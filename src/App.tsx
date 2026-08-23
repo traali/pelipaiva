@@ -300,8 +300,8 @@ export const App: React.FC = () => {
     });
 
   const snapshot = useMemo(
-    () => runMissionControlGraph(filteredEvents, profiles, new Date()),
-    [filteredEvents, profiles]
+    () => runMissionControlGraph(rawEvents, profiles, new Date()),
+    [rawEvents, profiles]
   );
 
   const handleImportCalendar = async (

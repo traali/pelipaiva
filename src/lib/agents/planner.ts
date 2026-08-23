@@ -57,9 +57,18 @@ function buildDayStrips(
   });
 }
 
+function byStart(a: MatchdayEvent, b: MatchdayEvent): number {
+  return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+}
+
 /**
  * Deterministic family mission-control graph.
  * Planner runs specialists in a fixed order — no LLM, no network.
+ *
+ * nextEvent / leave-by come from the full upcoming calendar so a Wednesday
+ * match is never starved by a Saturday fixture. The Fri–Sun strip stays
+ * weekend-only. Specialists run on "now → end of this sports weekend"
+ * (plus nextEvent if it falls later) so midweek conflicts still surface.
  */
 export function runMissionControlGraph(
   events: MatchdayEvent[],
@@ -67,30 +76,28 @@ export function runMissionControlGraph(
   now: Date = new Date()
 ): MissionControlSnapshot {
   const weekend = sportsWeekendRange(now);
-  const windowEvents = eventsInRange(events, weekend.start, weekend.end).sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-  );
+  const lookbackMs = now.getTime() - 2 * 3600 * 1000;
 
-  const horizon =
-    windowEvents.length > 0
-      ? windowEvents
-      : [...events]
-          .filter((e) => new Date(e.endTime).getTime() >= now.getTime() - 2 * 3600 * 1000)
-          .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-          .slice(0, 8);
+  const upcoming = [...events].filter((e) => new Date(e.endTime).getTime() >= lookbackMs).sort(byStart);
 
-  const conflicts = conflictAgent(horizon, profiles);
-  const carpool = carpoolAgent(horizon, profiles, conflicts);
-  const talkoo = volunteerAgent(horizon, profiles);
-  const tournaments = tournamentAgent(horizon, profiles);
-  const kitByEventId = kitAgent(horizon, profiles);
-
-  const nextEvent = horizon.find((e) => new Date(e.endTime).getTime() >= now.getTime()) || horizon[0];
+  const nextEvent = upcoming.find((e) => new Date(e.endTime).getTime() >= now.getTime()) || upcoming[0];
   const nextPlayer = nextEvent ? profiles.find((p) => p.id === nextEvent.profileId) : undefined;
   const depart = nextEvent ? calculateDepartureCountdown(nextEvent) : undefined;
 
+  const windowEvents = eventsInRange(events, weekend.start, weekend.end).sort(byStart);
+
+  const graphEvents = upcoming.filter((e) => new Date(e.startTime).getTime() <= weekend.end.getTime());
+  const specialistEvents =
+    nextEvent && !graphEvents.some((e) => e.id === nextEvent.id) ? [...graphEvents, nextEvent] : graphEvents;
+
+  const conflicts = conflictAgent(specialistEvents, profiles);
+  const carpool = carpoolAgent(specialistEvents, profiles, conflicts);
+  const talkoo = volunteerAgent(specialistEvents, profiles);
+  const tournaments = tournamentAgent(specialistEvents, profiles);
+  const kitByEventId = kitAgent(specialistEvents, profiles);
+
   const fridayISO = helsinkiDateISO(weekend.start);
-  const days = buildDayStrips(horizon, profiles, fridayISO);
+  const days = buildDayStrips(windowEvents, profiles, fridayISO);
 
   const conflictLine =
     conflicts.length === 0
@@ -98,9 +105,11 @@ export function runMissionControlGraph(
       : `${conflicts.length} ristiriita${conflicts.length === 1 ? '' : 'a'}: ${conflicts[0]!.message}`;
 
   const summary =
-    horizon.length === 0
+    windowEvents.length === 0 && !nextEvent
       ? 'Ei merkittyjä otteluita tälle urheiluviikonlopulle.'
-      : `${horizon.length} tapahtumaa ${weekend.label}. ${conflictLine} ${talkoo.recommendation}`;
+      : windowEvents.length === 0 && nextEvent
+        ? `Seuraava: ${childName(nextEvent, profiles)} ${formatFiTime(nextEvent.startTime)} · ${nextEvent.venue.name}. ${conflictLine}`
+        : `${windowEvents.length} tapahtumaa ${weekend.label}. ${conflictLine} ${talkoo.recommendation}`;
 
   const ambientLine = nextEvent
     ? `${childName(nextEvent, profiles)} · lähde klo ${depart?.departureTime} · ${nextEvent.venue.name}`
@@ -108,6 +117,7 @@ export function runMissionControlGraph(
 
   const whatsAppShareText = [
     `PELIPÄIVÄ ${weekend.label}`,
+    'Kyytisuunnitelma',
     ...carpool.map(
       (l) =>
         `• Lähde ${l.leaveBy} · ${l.childName} → ${l.venueName} (${l.driverSlot}${

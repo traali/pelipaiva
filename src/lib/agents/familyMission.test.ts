@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { conflictAgent } from './conflictAgent';
+import { carpoolAgent } from './carpoolAgent';
 import { buildSportKitPlan } from './kitAgent';
 import { runMissionControlGraph } from './planner';
 import { tournamentAgent } from './tournamentAgent';
@@ -89,6 +90,72 @@ describe('conflictAgent', () => {
     ];
     const conflicts = conflictAgent(events, profiles);
     expect(conflicts.length).toBe(0);
+  });
+
+  it('flags warmup that starts before the other match ends at a different venue', () => {
+    const events = [
+      ev({
+        id: 'a',
+        profileId: 'p-simo',
+        startTime: '2026-08-22T09:00:00+03:00',
+        endTime: '2026-08-22T10:30:00+03:00',
+        warmupTime: '2026-08-22T08:15:00+03:00'
+      }),
+      ev({
+        id: 'b',
+        profileId: 'p-aada',
+        sport: 'basketball',
+        startTime: '2026-08-22T10:45:00+03:00',
+        endTime: '2026-08-22T12:00:00+03:00',
+        warmupTime: '2026-08-22T10:00:00+03:00',
+        venue: {
+          name: 'Töölön Kisahalli',
+          normalizedName: 'kisahalli',
+          coordinates: { lat: 60.18, lng: 24.93 },
+          isIndoor: true,
+          surface: 'indoor_parquet',
+          hasFloodlights: true
+        }
+      })
+    ];
+    const conflicts = conflictAgent(events, profiles);
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0]?.message).toContain('Päällekkäisyys');
+  });
+});
+
+describe('carpoolAgent', () => {
+  it('does not pair Friday and Sunday matches at the same venue as yhteiskyyti', () => {
+    const events = [
+      ev({ id: 'fri', profileId: 'p-simo', startTime: '2026-08-21T17:00:00+03:00' }),
+      ev({ id: 'sun', profileId: 'p-aada', startTime: '2026-08-23T14:00:00+03:00' })
+    ];
+    const legs = carpoolAgent(events, profiles, []);
+    expect(legs.every((l) => l.driverSlot !== 'yhteiskyyti')).toBe(true);
+    expect(legs.every((l) => !l.canShareRideWith)).toBe(true);
+  });
+
+  it('shares a ride when two kids play the same venue the same day within 90 min', () => {
+    const events = [
+      ev({
+        id: 'm1',
+        profileId: 'p-simo',
+        startTime: '2026-08-22T11:00:00+03:00',
+        endTime: '2026-08-22T12:30:00+03:00',
+        warmupTime: '2026-08-22T10:15:00+03:00'
+      }),
+      ev({
+        id: 'm2',
+        profileId: 'p-aada',
+        startTime: '2026-08-22T13:30:00+03:00',
+        endTime: '2026-08-22T15:00:00+03:00',
+        warmupTime: '2026-08-22T12:45:00+03:00'
+      })
+    ];
+    const legs = carpoolAgent(events, profiles, []);
+    const first = legs.find((l) => l.eventId === 'm1');
+    expect(first?.driverSlot).toBe('yhteiskyyti');
+    expect(first?.canShareRideWith).toBe('Aada');
   });
 });
 
@@ -218,6 +285,39 @@ describe('runMissionControlGraph', () => {
     const snap = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'));
     expect(snap.leaveBy).toBeTruthy();
     expect(snap.whatsAppShareText.includes('PELIPÄIVÄ')).toBe(true);
+    expect(snap.whatsAppShareText.includes('Kyytisuunnitelma')).toBe(true);
     expect(snap.conflicts.length).toBe(1);
+    expect(snap.conflicts[0]?.message).toContain('Päällekkäisyys');
+  });
+
+  it('selects a midweek nextEvent even when the weekend also has a match', () => {
+    const events = [
+      ev({
+        id: 'wed',
+        profileId: 'p-simo',
+        startTime: '2026-08-19T18:00:00+03:00',
+        endTime: '2026-08-19T19:30:00+03:00',
+        warmupTime: '2026-08-19T17:15:00+03:00'
+      }),
+      ev({
+        id: 'sat',
+        profileId: 'p-aada',
+        sport: 'basketball',
+        startTime: '2026-08-22T11:00:00+03:00',
+        venue: {
+          name: 'Töölön Kisahalli',
+          normalizedName: 'kisahalli',
+          coordinates: { lat: 60.18, lng: 24.93 },
+          isIndoor: true,
+          surface: 'indoor_parquet',
+          hasFloodlights: true
+        }
+      })
+    ];
+    const snap = runMissionControlGraph(events, profiles, new Date('2026-08-18T14:00:00+03:00'));
+    expect(snap.nextEvent?.id).toBe('wed');
+    const stripIds = snap.days.flatMap((d) => d.events.map((e) => e.eventId));
+    expect(stripIds).toContain('sat');
+    expect(stripIds).not.toContain('wed');
   });
 });

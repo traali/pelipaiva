@@ -1,10 +1,24 @@
 import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import type { CarpoolLeg, FamilyConflict } from './types';
-import { formatFiTime } from './time';
+import { formatFiTime, helsinkiDateISO } from './time';
+
+/** Same-venue rides share only if the next warmup starts within this gap after this whistle. */
+const SHARE_WINDOW_MIN = 90;
 
 function childOf(event: MatchdayEvent, profiles: PlayerProfile[]): PlayerProfile | undefined {
   return profiles.find((p) => p.id === event.profileId);
+}
+
+function canShareWithNext(ev: MatchdayEvent, next: MatchdayEvent | undefined): boolean {
+  if (!next) return false;
+  if (next.profileId === ev.profileId) return false;
+  const sameVenue =
+    next.venue.name === ev.venue.name || next.venue.normalizedName === ev.venue.normalizedName;
+  if (!sameVenue) return false;
+  if (helsinkiDateISO(new Date(ev.startTime)) !== helsinkiDateISO(new Date(next.startTime))) return false;
+  const gapMin = (new Date(next.warmupTime).getTime() - new Date(ev.endTime).getTime()) / 60000;
+  return gapMin < SHARE_WINDOW_MIN;
 }
 
 export function carpoolAgent(
@@ -24,10 +38,8 @@ export function carpoolAgent(
     const childName = profile?.playerName || 'Lapsi';
     const { departureTime } = calculateDepartureCountdown(ev);
     const next = sorted[i + 1];
-    const sameVenueNext =
-      next &&
-      (next.venue.name === ev.venue.name || next.venue.normalizedName === ev.venue.normalizedName);
-    const shareWith = sameVenueNext ? childOf(next, profiles)?.playerName : undefined;
+    const sameVenueNext = canShareWithNext(ev, next);
+    const shareWith = sameVenueNext ? childOf(next!, profiles)?.playerName : undefined;
     const isConflicted = conflictedIds.has(ev.id);
 
     let driverSlot: CarpoolLeg['driverSlot'] = 'kuski-1';

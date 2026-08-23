@@ -1,18 +1,49 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, Shirt } from 'lucide-react';
 import type { SportKitPlan } from '../lib/agents';
 import { sportLabelFi } from '../lib/sport/sportMeta';
 
 interface KitChecklistProps {
   plan: SportKitPlan;
+  eventId?: string;
   compact?: boolean;
 }
 
-export const KitChecklist: React.FC<KitChecklistProps> = ({ plan, compact }) => {
-  const [packed, setPacked] = useState<Record<string, boolean>>({});
+function kitStorageKey(eventId: string): string {
+  return `pelipaiva_kit_${eventId}`;
+}
+
+function readPacked(eventId?: string): Record<string, boolean> {
+  if (!eventId || typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(kitStorageKey(eventId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+export const KitChecklist: React.FC<KitChecklistProps> = ({ plan, eventId, compact }) => {
+  const [packed, setPacked] = useState<Record<string, boolean>>(() => readPacked(eventId));
   const items = compact ? plan.playerItems.filter((i) => i.required).slice(0, 5) : plan.playerItems;
   const kitLabel =
     plan.kitSet === 'ykkönen' ? 'Ykköspaita' : plan.kitSet === 'vieras' ? 'Vieraspaita' : 'Treenipaita';
+
+  useEffect(() => {
+    setPacked(readPacked(eventId));
+  }, [eventId]);
+
+  useEffect(() => {
+    if (!eventId || typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(kitStorageKey(eventId), JSON.stringify(packed));
+    } catch {
+      /* quota / private mode */
+    }
+  }, [eventId, packed]);
 
   return (
     <div className="rounded-lg border border-border-subtle bg-surface-elevated p-3.5">
