@@ -391,15 +391,23 @@ export default {
         });
       }
 
-      const feedRes = await fetch(targetUrl, {
-        redirect: 'error',
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-          Accept: request.headers.get('Accept') || 'application/json,text/html,text/calendar,*/*',
-          Referer: new URL(targetUrl).origin + '/'
-        }
-      });
+      let feedRes: Response;
+      try {
+        feedRes = await fetch(targetUrl, {
+          redirect: 'follow',
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+            Accept: request.headers.get('Accept') || 'application/json,text/html,text/calendar,*/*',
+            Referer: new URL(targetUrl).origin + '/'
+          }
+        });
+      } catch {
+        return new Response(JSON.stringify({ error: 'upstream_fetch_failed' }), {
+          status: 502,
+          headers: corsHeaders
+        });
+      }
       const body = await feedRes.text();
       const host = new URL(targetUrl).hostname.toLowerCase();
       const isPublicAssociation = isAssociationHost(host);
