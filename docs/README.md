@@ -17,5 +17,7 @@ Start here:
 1. [AUDIT.md](./AUDIT.md) — APIs, Dexie, gaps
 2. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
 3. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
-5. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — Cloudflare family code + WhatsApp synthetics (not yet implemented)
-6. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — 7 Engineering hardening specs (checksum, GC, hydration queue, offline sync)
+4. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
+5. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — **implement this** (family code + WhatsApp, v2.0)
+6. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
+7. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2
