@@ -132,46 +132,63 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
     ]
   },
   {
-    id: 'kwm2026-ervi',
+    id: 'kwm2026-indians',
     name: 'KW Memorial Cup 2026',
-    teamName: 'EräViikingit',
-    clubName: 'EräViikingit',
+    teamName: 'Indians',
+    clubName: 'Westend Indians',
     sport: 'floorball',
-    primaryColor: 'tummansininen',
-    colorHex: '#1d4ed8',
+    primaryColor: 'keltainen',
+    colorHex: '#ca8a04',
     url: 'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
     teamId: '34013',
     competitionId: 'EräViikingit_0005',
     categoryId: '2546',
-    note: 'Tapanilan Mosahalli · KW Memorial (torneopal-subdomain)',
+    note: 'Arena Center Myllypuro (Kenttä 6) · P14 Haastaja Lohko B & Jatko-ottelut',
     source: 'torneopal',
     fixtures: [
       {
-        id: 'kw1',
-        home: 'EräViikingit',
-        away: 'Oilers',
-        start: weekendAt(0, 9, 0),
-        venueName: 'Tapanilan Mosahalli',
+        id: '222',
+        home: 'Indians',
+        away: 'Oilers NG White',
+        start: '2026-08-22T10:00:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 2,
+        awayScore: 12
       },
       {
-        id: 'kw2',
-        home: 'EräViikingit',
-        away: 'Classic',
-        start: weekendAt(0, 11, 15),
-        venueName: 'Tapanilan Mosahalli',
-        venueCity: 'Helsinki',
-        status: 'upcoming'
-      },
-      {
-        id: 'kw3',
-        home: 'EräViikingit',
+        id: '221',
+        home: 'RSS Panthers',
         away: 'Indians',
-        start: weekendAt(0, 14, 30),
-        venueName: 'Tapanilan Mosahalli',
+        start: '2026-08-22T13:00:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 4,
+        awayScore: 9
+      },
+      {
+        id: '224',
+        home: 'FBC Turku',
+        away: 'Indians',
+        start: '2026-08-23T11:15:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
+        venueCity: 'Helsinki',
+        status: 'played',
+        homeScore: 7,
+        awayScore: 3
+      },
+      {
+        id: '227',
+        home: 'Indians',
+        away: 'EräViikingit',
+        start: '2026-08-23T14:30:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
+        venueCity: 'Helsinki',
+        status: 'played',
+        homeScore: 12,
+        awayScore: 8
       }
     ]
   }
@@ -189,8 +206,8 @@ export function exampleTournamentFromUrl(url: string): ExampleTournament | undef
   if (raw.includes('espooliikkuutournament') || raw.includes('/team/203621')) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'esli2026-topola');
   }
-  if (raw.includes('kwmemorial') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) {
-    return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'kwm2026-ervi');
+  if (raw.includes('kwmemorial') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005') || raw.includes('34013')) {
+    return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'kwm2026-indians');
   }
   if (raw.includes('hc2026') || raw.includes('b13-8') || raw.includes('helsinki cup')) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'hc2026-ppj-sin');

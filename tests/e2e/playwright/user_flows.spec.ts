@@ -78,25 +78,23 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     const modal = page.locator('div[role="dialog"]');
     await expect(modal).toBeVisible();
 
-    // Verify all 4 tabs exist
-    await expect(page.getByRole('tab', { name: /Liitto/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /WhatsApp/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Excel/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /Kuvakaappaus/i })).toBeVisible();
+    // Verify all 4 tabs exist in modal
+    await expect(modal.getByRole('tab', { name: /Liitto/i })).toBeVisible();
+    await expect(modal.getByRole('tab', { name: /WhatsApp/i })).toBeVisible();
+    await expect(modal.getByRole('tab', { name: /Excel/i })).toBeVisible();
+    await expect(modal.getByRole('tab', { name: /Kuvakaappaus/i })).toBeVisible();
 
     // Switch to WhatsApp tab
-    const whatsappTab = page.getByRole('tab', { name: /WhatsApp/i });
-    await whatsappTab.scrollIntoViewIfNeeded();
-    await whatsappTab.click({ force: true });
+    const whatsappTab = modal.getByRole('tab', { name: /WhatsApp/i });
+    await whatsappTab.click();
     await expect(whatsappTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByText(/Liitä valmentajan WhatsApp-viesti/i)).toBeVisible();
+    await expect(modal.getByText(/Liitä valmentajan WhatsApp-viesti/i)).toBeVisible();
 
     // Switch to Excel / Sheets tab
-    const excelTab = page.getByRole('tab', { name: /Excel/i });
-    await excelTab.scrollIntoViewIfNeeded();
-    await excelTab.click({ force: true });
+    const excelTab = modal.getByRole('tab', { name: /Excel/i });
+    await excelTab.click();
+    await expect(modal.getByText(/Kopioi taulukko Sheetsistä/i)).toBeVisible();
     await expect(excelTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByText(/Kopioi taulukko Sheetsistä/i)).toBeVisible();
 
     // Close modal via Escape key
     await page.keyboard.press('Escape');

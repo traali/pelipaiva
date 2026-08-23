@@ -10,7 +10,7 @@ import {
 describe('example tournaments', () => {
   it('ships Helsinki Cup plus the two parent-provided cups', () => {
     expect(EXAMPLE_TOURNAMENTS.map((t) => t.id).sort()).toEqual(
-      ['esli2026-topola', 'hc2026-ppj-sin', 'kwm2026-ervi'].sort()
+      ['esli2026-topola', 'hc2026-ppj-sin', 'kwm2026-indians'].sort()
     );
   });
 

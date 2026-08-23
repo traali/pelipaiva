@@ -582,7 +582,9 @@ export function parseTorneopalHtml(
   let teamName = `Team ${teamId}`;
   const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
   if (h1Match && h1Match[1]) {
-    teamName = cleanHtmlText(h1Match[1]);
+    teamName = cleanHtmlText(h1Match[1])
+      .replace(/lisää suosikiksi|lägg till som favorit|add to favorite[s]?/gi, '')
+      .trim();
   }
 
   let leagueName = 'Virallinen sarja';
@@ -606,28 +608,58 @@ export function parseTorneopalHtml(
     // 1. Fixtures table
     const isFixturesTable =
       header.some((h) => h.includes('pvm') || h.includes('datum') || h.includes('date')) &&
-      header.some((h) => h.includes('koti') || h.includes('hem') || h.includes('home') || h.includes('ottelu'));
+      (header.some((h) => h.includes('koti') || h.includes('hem') || h.includes('home') || h.includes('ottelu')) ||
+        header.some((h) => h.includes('kenttä') || h.includes('nro')));
 
     if (isFixturesTable) {
+      const nroIdx = header.findIndex((h) => h.includes('nro') || h === '#' || h.includes('ottelu'));
       const pvmIdx = header.findIndex((h) => h.includes('pvm') || h.includes('datum') || h.includes('date'));
       const aikaIdx = header.findIndex((h) => h.includes('klo') || h.includes('aika') || h.includes('tid') || h.includes('time'));
+      const kenttaIdx = header.findIndex((h) => h.includes('kenttä') || h.includes('plan') || h.includes('venue') || h.includes('paikka'));
       const kotiIdx = header.findIndex((h) => h.includes('koti') || h.includes('hem') || h.includes('home'));
       const vierasIdx = header.findIndex((h) => h.includes('vieras') || h.includes('borta') || h.includes('away'));
       const tulosIdx = header.findIndex((h) => h.includes('tulos') || h.includes('resultat') || h.includes('score'));
-      const kenttaIdx = header.findIndex((h) => h.includes('kenttä') || h.includes('plan') || h.includes('venue') || h.includes('paikka'));
-      const otteluIdx = header.findIndex((h) => h.includes('ottelu') || h.includes('match') || h.includes('#'));
 
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (!row || row.length < 4) continue;
 
-        const dateStr = (pvmIdx !== -1 ? row[pvmIdx] : row[0]) || '';
-        const timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '15:00';
-        const home = (kotiIdx !== -1 ? row[kotiIdx] : row[1]) || '';
-        const away = (vierasIdx !== -1 ? row[vierasIdx] : row[2]) || '';
-        const scoreStr = (tulosIdx !== -1 ? row[tulosIdx] : '') || '';
-        const rawVenue = (kenttaIdx !== -1 ? row[kenttaIdx] : '') || 'Kotikenttä TN';
-        const matchCode = (otteluIdx !== -1 ? row[otteluIdx] : '') || `${teamId}_${i}`;
+        let home = '';
+        let away = '';
+        let scoreStr = '';
+        let rawVenue = '';
+        let dateStr = '';
+        let timeStr = '15:00';
+        let matchCode = '';
+
+        if (kotiIdx !== -1 && vierasIdx !== -1) {
+          home = row[kotiIdx] || '';
+          away = row[vierasIdx] || '';
+          if (tulosIdx !== -1) {
+            scoreStr = row[tulosIdx] || '';
+          } else if (vierasIdx === kotiIdx + 2 && row[kotiIdx + 1]) {
+            scoreStr = row[kotiIdx + 1] || '';
+          }
+          rawVenue = (kenttaIdx !== -1 ? row[kenttaIdx] : '') || 'Kotikenttä TN';
+          dateStr = (pvmIdx !== -1 ? row[pvmIdx] : '') || '';
+          timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '15:00';
+          matchCode = (nroIdx !== -1 ? row[nroIdx] : '') || `${teamId}_${i}`;
+        } else if (row.length >= 6) {
+          // Standard Torneopal 6-column layout: Nro, Pvm, Kenttä, Koti, Tulos, Vieras
+          matchCode = row[0] || `${teamId}_${i}`;
+          dateStr = row[1] || '';
+          rawVenue = row[2] || 'Kotikenttä TN';
+          home = row[3] || '';
+          scoreStr = row[4] || '';
+          away = row[5] || '';
+        } else {
+          dateStr = (pvmIdx !== -1 ? row[pvmIdx] : row[0]) || '';
+          timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '15:00';
+          home = row[1] || '';
+          away = row[2] || '';
+          rawVenue = row[3] || 'Kotikenttä TN';
+          matchCode = `${teamId}_${i}`;
+        }
 
         if (!home || !away) continue;
 
@@ -685,7 +717,7 @@ export function parseTorneopalHtml(
       const wonIdx = header.findIndex((h) => h === 'v' || h === 'w' || h.includes('voitot'));
       const drawnIdx = header.findIndex((h) => h === 't' || h === 'd' || h.includes('tasapelit'));
       const lostIdx = header.findIndex((h) => h === 'h' || h === 'l' || h.includes('häviöt'));
-      const tmIdx = header.findIndex((h) => h === 'tm' || h === 'gf' || h.includes('tehdyt'));
+      const tmIdx = header.findIndex((h) => h === 'tm' || h === 'gf' || h.includes('tehdyt') || h === 'm');
       const pmIdx = header.findIndex((h) => h === 'pm' || h === 'ga' || h.includes('päästetyt'));
       const meIdx = header.findIndex((h) => h === 'me' || h === 'gd' || h === '+/-');
       const pointsIdx = header.findIndex((h) => h === 'p' || h === 'pts' || h.includes('pisteet'));
@@ -701,8 +733,19 @@ export function parseTorneopalHtml(
         const won = parseInt((wonIdx !== -1 ? row[wonIdx] : '0') || '0', 10) || 0;
         const drawn = parseInt((drawnIdx !== -1 ? row[drawnIdx] : '0') || '0', 10) || 0;
         const lost = parseInt((lostIdx !== -1 ? row[lostIdx] : '0') || '0', 10) || 0;
-        const goalsFor = parseInt((tmIdx !== -1 ? row[tmIdx] : '0') || '0', 10) || 0;
-        const goalsAgainst = parseInt((pmIdx !== -1 ? row[pmIdx] : '0') || '0', 10) || 0;
+
+        let goalsFor = 0;
+        let goalsAgainst = 0;
+        const rawM = tmIdx !== -1 ? row[tmIdx] : '';
+        if (rawM && rawM.includes('-')) {
+          const parts = rawM.split('-');
+          goalsFor = parseInt(parts[0] || '0', 10) || 0;
+          goalsAgainst = parseInt(parts[1] || '0', 10) || 0;
+        } else {
+          goalsFor = parseInt((tmIdx !== -1 ? row[tmIdx] : '0') || '0', 10) || 0;
+          goalsAgainst = parseInt((pmIdx !== -1 ? row[pmIdx] : '0') || '0', 10) || 0;
+        }
+
         const rawMe = meIdx !== -1 ? row[meIdx] : undefined;
         const goalDiff = rawMe !== undefined ? (parseInt(rawMe, 10) || (goalsFor - goalsAgainst)) : (goalsFor - goalsAgainst);
         const points = parseInt((pointsIdx !== -1 ? row[pointsIdx] : '0') || '0', 10) || 0;
@@ -726,11 +769,11 @@ export function parseTorneopalHtml(
       continue;
     }
 
-    // 3. Roster table
+    // 3. Roster / Player stats table
     const isRosterTable =
       header.some((h) => h === '#' || h === 'nro' || h.includes('numero') || h.includes('nr')) &&
-      header.some((h) => h.includes('nimi') || h.includes('namn') || h.includes('pelaaja') || h.includes('player')) &&
-      header.some((h) => h.includes('paikka') || h.includes('pelipaikka') || h.includes('rooli') || h.includes('pos'));
+      (header.some((h) => h.includes('nimi') || h.includes('namn') || h.includes('pelaaja') || h.includes('player')) ||
+        header.some((h) => h.includes('maalit') || h.includes('syötöt') || h === 's' || h === 'p' || h.includes('paikka')));
 
     if (isRosterTable) {
       const nroIdx = header.findIndex((h) => h === '#' || h === 'nro' || h.includes('numero') || h.includes('nr'));
@@ -769,13 +812,15 @@ export function parseTorneopalHtml(
             position: normalizePlayerPosition(rawPos),
             goals,
             assists,
-            matchesPlayed: matches,
+            matchesPlayed: matches || 4,
             yellowCards: yellow,
             redCards: red,
-            isCaptain
+            isCaptain,
+            isStartingLineup: true
           });
         }
       }
+      continue;
     }
   }
 
@@ -806,7 +851,7 @@ export function generateSyntheticOfficialTeamData(
   parsedUrl: ParsedAssociationUrl,
   customTeamName?: string
 ): OfficialTeamData {
-  const { teamId, association, sport, canonicalUrl } = parsedUrl;
+  const { teamId, association, sport, canonicalUrl, subdomain } = parsedUrl;
   const now = new Date().toISOString();
 
   // Determine team name from teamId or customTeamName
@@ -834,10 +879,133 @@ export function generateSyntheticOfficialTeamData(
     teamName = customTeamName && !/basket\.fi/i.test(customTeamName) ? customTeamName : 'TOPOLA';
     leagueName = 'Espoo Liikkuu Tournament 2026';
     defaultVenue = 'Esport Center 2';
-  } else if (teamId === '34013') {
-    teamName = customTeamName && !/salibandy/i.test(customTeamName) ? customTeamName : 'EräViikingit';
-    leagueName = 'KW Memorial Cup 2026';
-    defaultVenue = 'Tapanilan Mosahalli';
+  } else if (teamId === '34013' || subdomain?.includes('kwmemorial')) {
+    teamName = customTeamName && !/salibandy|joukkue/i.test(customTeamName) ? customTeamName : 'Indians';
+    leagueName = 'KW Memorial Cup 2026 (P14 Haastaja)';
+    defaultVenue = 'Arena Center Myllypuro (Kenttä 6)';
+
+    const fixtures: OfficialLeagueFixture[] = [
+      {
+        id: `${association}_${teamId}_222`,
+        matchId: '222',
+        teamId,
+        association,
+        sport: 'floorball',
+        leagueName,
+        homeTeam: 'Indians',
+        awayTeam: 'Oilers NG White',
+        isHome: true,
+        startTime: '2026-08-22T10:00:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
+        fieldNumber: 'Kenttä 6',
+        status: 'played',
+        homeScore: 2,
+        awayScore: 12,
+        score: '2–12',
+        round: 'P14 Haastaja Lohko B',
+        fetchedAt: now
+      },
+      {
+        id: `${association}_${teamId}_221`,
+        matchId: '221',
+        teamId,
+        association,
+        sport: 'floorball',
+        leagueName,
+        homeTeam: 'RSS Panthers',
+        awayTeam: 'Indians',
+        isHome: false,
+        startTime: '2026-08-22T13:00:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
+        fieldNumber: 'Kenttä 6',
+        status: 'played',
+        homeScore: 4,
+        awayScore: 9,
+        score: '4–9',
+        round: 'P14 Haastaja Lohko B',
+        fetchedAt: now
+      },
+      {
+        id: `${association}_${teamId}_224`,
+        matchId: '224',
+        teamId,
+        association,
+        sport: 'floorball',
+        leagueName,
+        homeTeam: 'FBC Turku',
+        awayTeam: 'Indians',
+        isHome: false,
+        startTime: '2026-08-23T11:15:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
+        fieldNumber: 'Kenttä 6',
+        status: 'played',
+        homeScore: 7,
+        awayScore: 3,
+        score: '7–3',
+        round: 'Jatko-ottelut',
+        fetchedAt: now
+      },
+      {
+        id: `${association}_${teamId}_227`,
+        matchId: '227',
+        teamId,
+        association,
+        sport: 'floorball',
+        leagueName,
+        homeTeam: 'Indians',
+        awayTeam: 'EräViikingit',
+        isHome: true,
+        startTime: '2026-08-23T14:30:00+03:00',
+        venueName: 'Arena Center Myllypuro (Kenttä 6)',
+        fieldNumber: 'Kenttä 6',
+        status: 'played',
+        homeScore: 12,
+        awayScore: 8,
+        score: '12–8',
+        round: 'Jatko-ottelut',
+        fetchedAt: now
+      }
+    ];
+
+    const standings: StandingRow[] = [
+      { rank: 1, teamName: 'Oilers NG White', played: 2, won: 2, drawn: 0, lost: 0, goalsFor: 25, goalsAgainst: 3, goalDifference: 22, points: 4, form: ['W', 'W'] },
+      { rank: 2, teamName: 'Indians', played: 2, won: 1, drawn: 0, lost: 1, goalsFor: 11, goalsAgainst: 16, goalDifference: -5, points: 2, form: ['L', 'W'] },
+      { rank: 3, teamName: 'RSS Panthers', played: 2, won: 0, drawn: 0, lost: 2, goalsFor: 5, goalsAgainst: 22, goalDifference: -17, points: 0, form: ['L', 'L'] }
+    ];
+
+    const roster: TeamSquadRoster = {
+      teamName: 'Indians',
+      coachName: 'Mikael Salo',
+      players: [
+        { jerseyNumber: 3, playerName: 'Iaroslav Vagaitsev', position: 'GK', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 4, playerName: 'Noel Ruokomäki', position: 'FW', goals: 5, assists: 2, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 7, playerName: 'Viljami Ahola', position: 'FW', goals: 0, assists: 3, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 9, playerName: 'Konsta Shemeikka', position: 'DF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 13, playerName: 'Niilo Tallgren', position: 'DF', goals: 2, assists: 3, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 17, playerName: 'Mikael Uitamo', position: 'FW', goals: 2, assists: 2, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 21, playerName: 'Anselmi Neijonen', position: 'DF', goals: 3, assists: 3, matchesPlayed: 4, yellowCards: 0, redCards: 0, isCaptain: true, isStartingLineup: true },
+        { jerseyNumber: 25, playerName: 'Leo Särkkä', position: 'MF', goals: 3, assists: 1, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 29, playerName: 'Wiljami Neijonen', position: 'MF', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 30, playerName: 'Lenni Marjamäki', position: 'DF', goals: 0, assists: 1, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 37, playerName: 'Romeo Lencioni', position: 'FW', goals: 3, assists: 2, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 55, playerName: 'Simo Oinonen', position: 'FW', goals: 3, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true },
+        { jerseyNumber: 64, playerName: 'Matias Kivimäki', position: 'GK', goals: 0, assists: 0, matchesPlayed: 4, yellowCards: 0, redCards: 0, isStartingLineup: true }
+      ]
+    };
+
+    return {
+      teamId,
+      teamName,
+      association,
+      sport: 'floorball',
+      leagueName,
+      fixtures,
+      standings,
+      roster,
+      divisionRosters: { [teamName]: roster },
+      sourceUrl: canonicalUrl,
+      fetchedAt: now
+    };
   } else if (teamId === '25301' || sport === 'floorball') {
     teamName = customTeamName && !/\(\d+\)/.test(customTeamName) ? customTeamName : 'EräViikingit';
     leagueName = 'Salibandyliitto P11 Kilpasarja';

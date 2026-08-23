@@ -127,19 +127,19 @@ export const EXTRA_PROFILES: PlayerProfile[] = [
     colorHex: '#21C3F7'
   },
   {
-    id: 'profile-kw-eemil',
-    playerName: 'Eemil',
-    teamName: 'EräViikingit',
+    id: 'profile-kw-simo',
+    playerName: 'Simo',
+    teamName: 'Indians',
     sport: 'floorball',
-    primaryColor: 'tummansininen',
-    secondaryColor: 'punainen',
+    primaryColor: 'keltainen',
+    secondaryColor: 'musta',
     calendarUrl:
       'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
     associationUrl:
       'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
     associationType: 'torneopal',
     teamId: '34013',
-    colorHex: '#1d4ed8'
+    colorHex: '#ca8a04'
   }
 ];
 
@@ -150,8 +150,6 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
   const eltSat945 = new Date('2026-08-22T09:45:00+03:00');
   const eltSat15 = new Date('2026-08-22T15:00:00+03:00');
   const eltSun1030 = new Date('2026-08-23T10:30:00+03:00');
-  const kwSun9 = atWeekend(0, 9, 0);
-  const kwSun1115 = atWeekend(0, 11, 15);
 
   return [
     ev({
@@ -225,13 +223,13 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       tournamentName: 'Espoo Liikkuu Tournament 2026'
     }),
     ev({
-      id: 'demo-kw-eemil-1',
-      profileId: 'profile-kw-eemil',
+      id: 'demo-kw-indians-1',
+      profileId: 'profile-kw-simo',
       sport: 'floorball',
       title: 'Indians vs Oilers NG White',
       home: 'Indians',
       away: 'Oilers NG White',
-      start: kwSun9,
+      start: new Date('2026-08-22T10:00:00+03:00'),
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
@@ -240,13 +238,13 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       score: '2–12'
     }),
     ev({
-      id: 'demo-kw-eemil-2',
-      profileId: 'profile-kw-eemil',
+      id: 'demo-kw-indians-2',
+      profileId: 'profile-kw-simo',
       sport: 'floorball',
       title: 'RSS Panthers vs Indians',
       home: 'RSS Panthers',
       away: 'Indians',
-      start: kwSun1115,
+      start: new Date('2026-08-22T13:00:00+03:00'),
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
@@ -255,13 +253,13 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       score: '4–9'
     }),
     ev({
-      id: 'demo-kw-eemil-3',
-      profileId: 'profile-kw-eemil',
+      id: 'demo-kw-indians-3',
+      profileId: 'profile-kw-simo',
       sport: 'floorball',
       title: 'FBC Turku vs Indians',
       home: 'FBC Turku',
       away: 'Indians',
-      start: atWeekend(0, 13, 0),
+      start: new Date('2026-08-23T11:15:00+03:00'),
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
@@ -270,18 +268,19 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       score: '7–3'
     }),
     ev({
-      id: 'demo-kw-eemil-4',
-      profileId: 'profile-kw-eemil',
+      id: 'demo-kw-indians-4',
+      profileId: 'profile-kw-simo',
       sport: 'floorball',
       title: 'Indians vs EräViikingit',
       home: 'Indians',
       away: 'EräViikingit',
-      start: atWeekend(0, 14, 50),
+      start: new Date('2026-08-23T14:30:00+03:00'),
       venue: ARENA_CENTER,
       eventType: 'tournament',
       tournamentName: 'KW Memorial Cup 2026',
       stage: 'Jatko-ottelut',
       matchNumber: '227',
+      score: '12–8',
       volunteerDuty: 'Kahviovuoro (klo 14:00 - 16:00)'
     })
   ];

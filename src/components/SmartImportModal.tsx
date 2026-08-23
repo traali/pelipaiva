@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -108,9 +108,10 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Sync initial props when opened
+  // Sync initial props when opened (only on open transition)
+  const prevIsOpen = useRef(false);
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpen.current) {
       setSelectedPlayer(initialPlayerName || existingPlayers[0] || 'Maija');
       setSelectedSport(initialSport || 'football');
       setClassicUrl(initialTeamUrl || '');
@@ -121,7 +122,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
       setErrorMessage('');
       setIsSaving(false);
     }
-  }, [isOpen, initialPlayerName, initialSport, initialTeamUrl, initialTeamName, initialTab, existingPlayers]);
+    prevIsOpen.current = isOpen;
+  }, [isOpen, initialPlayerName, initialSport, initialTeamUrl, initialTeamName, initialTab]);
 
   const handleUrlChange = (val: string) => {
     setClassicUrl(val);
