@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { helsinkiDateISO } from '../lib/agents/time';
+import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 
@@ -116,14 +117,10 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 const profile = profileMap.get(ev.profileId);
                 const start = new Date(ev.startTime);
                 const end = new Date(ev.endTime);
-                const timeStr = `${start.toLocaleTimeString('fi-FI', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })} – ${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                const tz = { hour: '2-digit' as const, minute: '2-digit' as const, timeZone: 'Europe/Helsinki' };
+                const timeStr = `${start.toLocaleTimeString('fi-FI', tz)} – ${end.toLocaleTimeString('fi-FI', tz)}`;
 
                 const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
-                const sportIcon =
-                  ev.sport === 'football' ? '⚽' : ev.sport === 'floorball' ? '🏑' : '🏀';
 
                 return (
                   <motion.div
@@ -165,7 +162,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                             Turnaus
                           </span>
                         )}
-                        <span className="text-sm">{sportIcon}</span>
+                        <span className="text-[10px] font-bold text-text-muted">{sportLabelFi(ev.sport)}</span>
                       </div>
                     </div>
 

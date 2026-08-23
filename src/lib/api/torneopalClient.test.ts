@@ -62,6 +62,22 @@ describe('torneopal match params', () => {
     expect(leagueParams.end_date).toBeDefined();
   });
 
+  it('keeps Helsinki Cup season and B13-8 category on getMatches', () => {
+    const hc: ParsedAssociationUrl = {
+      sport: 'football',
+      association: 'palloliitto',
+      teamId: '185085',
+      seasonId: 'hc2026',
+      leagueId: 'B13-8',
+      canonicalUrl: 'https://tulospalvelu.palloliitto.fi/team/185085?season=hc2026&category=B13-8'
+    };
+    expect(looksLikeCupRequest(hc)).toBe(true);
+    const params = buildGetMatchesParams(hc);
+    expect(params.competition_id).toBe('hc2026');
+    expect(params.category_id).toBe('B13-8');
+    expect(params.start_date).toBeUndefined();
+  });
+
   it('maps match_number and stage from live Torneopal fields', () => {
     const fixture = mapFixture(
       {

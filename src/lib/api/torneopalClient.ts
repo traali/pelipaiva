@@ -112,7 +112,9 @@ export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<stri
     params.end_date = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
   }
   if (parsed.seasonId) params.competition_id = parsed.seasonId;
-  if (parsed.leagueId && /^\d+$/.test(parsed.leagueId)) params.category_id = parsed.leagueId;
+  if (parsed.leagueId && (/^\d+$/.test(parsed.leagueId) || looksLikeCupRequest(parsed))) {
+    params.category_id = parsed.leagueId;
+  }
   return params;
 }
 
@@ -425,10 +427,13 @@ export async function fetchTorneopalTeamData(
   const categories = Array.isArray(team.categories) ? (team.categories as Record<string, unknown>[]) : [];
   const primary = (team.primary_category as Record<string, unknown> | undefined) || categories[0];
   let currentGroup = pickCurrentGroup(groups);
-  const competitionId =
-    str(currentGroup?.competition_id) || parsed.seasonId || str(primary?.competition_id);
-  const categoryId =
-    str(currentGroup?.category_id) || parsed.leagueId || str(primary?.category_id);
+  const keepCupIds = looksLikeCupRequest(parsed);
+  const competitionId = keepCupIds && parsed.seasonId
+    ? parsed.seasonId
+    : str(currentGroup?.competition_id) || parsed.seasonId || str(primary?.competition_id);
+  const categoryId = keepCupIds && parsed.leagueId
+    ? parsed.leagueId
+    : str(currentGroup?.category_id) || parsed.leagueId || str(primary?.category_id);
 
   const matchParams = buildGetMatchesParams({
     ...parsed,

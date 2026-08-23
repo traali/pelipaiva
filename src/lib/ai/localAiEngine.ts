@@ -193,9 +193,22 @@ export function queryFamilySchedule(
     const next = upcoming[0]!;
     const profile = profiles.find((p) => p.id === next.profileId);
     const childName = profile?.playerName || 'Pelaaja';
-    const dateStr = new Date(next.startTime).toLocaleDateString('fi-FI', { weekday: 'long', day: 'numeric', month: 'numeric' });
-    const timeStr = new Date(next.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
-    const warmupStr = new Date(next.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = new Date(next.startTime).toLocaleDateString('fi-FI', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'numeric',
+      timeZone: 'Europe/Helsinki'
+    });
+    const timeStr = new Date(next.startTime).toLocaleTimeString('fi-FI', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Helsinki'
+    });
+    const warmupStr = new Date(next.warmupTime).toLocaleTimeString('fi-FI', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Helsinki'
+    });
 
     return {
       answer: `Seuraava ottelu on ${childName}:lla ${dateStr} klo ${timeStr} (alkulämpö klo ${warmupStr}) kentällä ${next.venue.name}. Vastassa on ${next.awayTeam}.`,

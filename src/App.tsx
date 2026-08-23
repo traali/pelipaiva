@@ -1,15 +1,11 @@
 import React, { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, ensureStoragePersistence } from './lib/storage/db';
+import { db, deleteOfficialTeamData, ensureStoragePersistence } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
 import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { CalendarImportModal } from './components/CalendarImportModal';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { parseICSFeed } from './lib/calendar/icsParser';
-import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
-import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
-import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
 import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
@@ -22,14 +18,9 @@ import { HeroMatchCard } from './components/HeroMatchCard';
 import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
-import {
-  parseAssociationUrl,
-  generateOrResolveMatchStats
-} from './lib/stats/statsEngine';
-import { ingestOfficialForProfile } from './lib/clubs/ingestOfficial';
+import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
 import { helsinkiDateISO } from './lib/agents/time';
-import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
-import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
+import { EXTRA_PROFILES } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
@@ -188,13 +179,7 @@ export const App: React.FC = () => {
         p.id.startsWith('profile-kw-') ||
         p.id === 'profile-hjk-demo'
     );
-  const needsDemoRefresh =
-    isDemoActive &&
-    !isSeeding &&
-    eventsQuery !== undefined &&
-    !rawEvents.some((e) => e.id === 'demo-elt-aada-1');
-
-  // Seed family demo: PPJ league sides + Helsinki Cup / Espoo Liikkuu / KW Memorial
+  // Seed family demo from live tulospalvelu — no invented KäPa/Honka cards.
   const handleStartDemo = async () => {
     setIsSeeding(true);
     try {
@@ -250,94 +235,23 @@ export const App: React.FC = () => {
       await db.profiles.add(p);
     }
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0] || '2026-08-21';
-    const tmrw = new Date(now.getTime() + 86400000);
-    const tmrwStr = tmrw.toISOString().split('T')[0] || '2026-08-22';
-    const dayAfter = new Date(now.getTime() + 172800000);
-    const dayAfterStr = dayAfter.toISOString().split('T')[0] || '2026-08-23';
-
-    const demoEventsConfig = [
-      {
-        profileId: 'profile-ppj-185085',
-        title: 'PPJ/Laru sin vs KäPa',
-        homeTeam: 'PPJ/Laru sin',
-        awayTeam: 'KäPa',
-        sport: 'football' as SportType,
-        venueName: 'Väinämöisen kenttä (Väiski)',
-        startTime: `${todayStr}T16:30:00+03:00`,
-        endTime: `${todayStr}T18:00:00+03:00`,
-        warmupTime: `${todayStr}T15:45:00+03:00`,
-        duty: 'Kahviovuoro klo 16:00 - 18:00'
-      },
-      {
-        profileId: 'profile-ppj-185083',
-        title: 'PPJ/Laru mus vs FC Honka',
-        homeTeam: 'PPJ/Laru mus',
-        awayTeam: 'FC Honka',
-        sport: 'football' as SportType,
-        venueName: 'Tapiolan Urheilupuisto TN 2',
-        startTime: `${tmrwStr}T14:30:00+03:00`,
-        endTime: `${tmrwStr}T16:00:00+03:00`,
-        warmupTime: `${tmrwStr}T13:45:00+03:00`
-      },
-      {
-        profileId: 'profile-ppj-185086',
-        title: 'PPJ/Laru oran vs VJS',
-        homeTeam: 'PPJ/Laru oran',
-        awayTeam: 'VJS',
-        sport: 'football' as SportType,
-        venueName: 'Puotilan Tekonurmi (Bubu)',
-        startTime: `${dayAfterStr}T15:00:00+03:00`,
-        endTime: `${dayAfterStr}T16:30:00+03:00`,
-        warmupTime: `${dayAfterStr}T14:15:00+03:00`
-      }
-    ];
-
-    for (let i = 0; i < demoEventsConfig.length; i++) {
-      const cfg = demoEventsConfig[i]!;
-      const venue = await resolveSportsVenue(cfg.venueName);
-      const weather = await fetchFmiMatchWeather(venue.coordinates, cfg.startTime, cfg.endTime);
-      const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(cfg.startTime));
-      const stats = generateOrResolveMatchStats(cfg.homeTeam, cfg.awayTeam, cfg.sport);
-
-      const ev: MatchdayEvent = {
-        id: `demo-event-${i + 1}`,
-        profileId: cfg.profileId,
-        sport: cfg.sport,
-        eventType: 'match',
-        isTraining: false,
-        title: cfg.title,
-        homeTeam: cfg.homeTeam,
-        awayTeam: cfg.awayTeam,
-        isHomeMatch: true,
-        startTime: cfg.startTime,
-        endTime: cfg.endTime,
-        warmupTime: cfg.warmupTime,
-        venue,
-        volunteerDuty: cfg.duty,
-        weather,
-        parking,
-        stats,
-        reconciliationStatus: 'auto_matched',
-        confidenceScore: 0.95
-      };
-      ev.briefing = generateMatchdayBriefing(ev, [ev]);
-      await db.events.put(ev);
-    }
-    for (const extra of buildWeekendShowcaseEvents()) {
-      await db.events.put(extra);
-    }
+    const seeded = [...defaultProfiles, ...EXTRA_PROFILES];
+    await Promise.all(
+      seeded.map((p) =>
+        ingestSourceForProfile({
+          profileId: p.id,
+          playerName: p.playerName,
+          teamName: p.teamName,
+          sport: p.sport,
+          url: p.associationUrl || p.calendarUrl,
+          includeWeather: true
+        }).catch((e) => console.warn('[DEMO_INGEST]', p.teamName, e))
+      )
+    );
     } finally {
       setIsSeeding(false);
     }
   };
-
-  useEffect(() => {
-    if (needsDemoRefresh && !isSeeding) {
-      void handleStartDemo();
-    }
-  }, [needsDemoRefresh, isSeeding]);
 
   const handleClearData = async () => {
     await db.profiles.clear();
@@ -452,35 +366,14 @@ export const App: React.FC = () => {
     }
 
     try {
-      const parsedAssoc = parseAssociationUrl(url);
-      let imported = 0;
-      if (parsedAssoc || cup) {
-        const result = await ingestOfficialForProfile({
-          profileId,
-          playerName,
-          teamName: cup?.teamName || teamName,
-          sport,
-          url,
-          includeWeather: true
-        });
-        imported = result.official?.fixtures.length || 0;
-      } else {
-        const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
-        const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;
-        const res = await fetch(target);
-        const text = await res.text();
-        const parsed = await parseICSFeed(text, profileId, sport, teamName);
-        const withMeta: MatchdayEvent[] = [];
-        for (const ev of parsed) {
-          const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-          const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-          const fullEv: MatchdayEvent = { ...ev, weather, parking };
-          fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
-          withMeta.push(fullEv);
-        }
-        if (withMeta.length > 0) await db.events.bulkPut(withMeta);
-        imported = withMeta.length;
-      }
+      const imported = await ingestSourceForProfile({
+        profileId,
+        playerName,
+        teamName: cup?.teamName || teamName,
+        sport,
+        url,
+        includeWeather: true
+      });
 
       if (imported === 0) {
         if (!reused) {
@@ -524,7 +417,7 @@ export const App: React.FC = () => {
       for (const p of profiles) {
         const url = p.associationUrl || p.calendarUrl;
         if (!url) continue;
-        await ingestOfficialForProfile({
+        await ingestSourceForProfile({
           profileId: p.id,
           playerName: p.playerName,
           teamName: p.teamName,
@@ -547,6 +440,18 @@ export const App: React.FC = () => {
     if (!hit) return;
     await db.events.where('profileId').equals(hit.id).delete();
     await db.profiles.delete(hit.id);
+    if (hit.teamId) {
+      await deleteOfficialTeamData(hit.teamId);
+    }
+    const sync = await db.syncState.get('family');
+    if (sync && sync.syncKey) {
+      const key = `pelipaiva_tombstones_${sync.syncKey}`;
+      const existingStr = localStorage.getItem(key);
+      const list: Array<{ id: string; deletedAt: string }> = existingStr ? JSON.parse(existingStr) : [];
+      list.push({ id: hit.id, deletedAt: new Date().toISOString() });
+      localStorage.setItem(key, JSON.stringify(list));
+      await db.syncState.update('family', { pendingUpload: true });
+    }
   };
 
   const handleResolveMismatch = async (
@@ -590,6 +495,14 @@ export const App: React.FC = () => {
 
   if (isAmbientMode) {
     return <AmbientView events={filteredEvents} profiles={profiles} />;
+  }
+
+  if (isSeeding) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-canvas px-6 text-center text-text-primary">
+        <p className="text-sm font-semibold text-pitch">Haetaan otteluita tulospalvelusta…</p>
+      </div>
+    );
   }
 
   // If no profiles exist yet or onboarding is explicitly in progress, show the Interactive Onboarding Wizard

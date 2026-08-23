@@ -1,8 +1,7 @@
 import { db, PelipaivaDB } from '../storage/db';
 import { PlayerProfile, SportType } from '../../types/matchday';
 import { generateStableProfileId } from '../clubs/attachTeam';
-import { parseAssociationUrl } from '../api/associationUrlParser';
-import { ingestOfficialForProfile } from '../clubs/ingestOfficial';
+import { ingestSourceForProfile } from '../clubs/ingestOfficial';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 
 export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
@@ -254,9 +253,8 @@ export async function hydrateRosterProfiles(
         try {
           const url = profile.associationUrl || profile.calendarUrl;
           if (!url) return;
-          if (!parseAssociationUrl(url)) return;
 
-          await ingestOfficialForProfile({
+          await ingestSourceForProfile({
             profileId: profile.id,
             playerName: profile.playerName,
             teamName: profile.teamName,

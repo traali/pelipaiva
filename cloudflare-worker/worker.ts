@@ -80,6 +80,7 @@ function hostnameAllowed(host: string): boolean {
   const h = host.toLowerCase();
   if (h === 'nimenhuuto.com' || h.endsWith('.nimenhuuto.com')) return true;
   if (h === 'myclub.fi' || h.endsWith('.myclub.fi')) return true;
+  if (h === 'jopox.fi' || h.endsWith('.jopox.fi')) return true;
   if (h === 'opendata.fmi.fi' || h === 'openwms.fmi.fi') return true;
   if (h === 'api.lipas.fi' || h === 'api.hel.fi') return true;
   if (h === 'tulospalvelu.palloliitto.fi' || h === 'www.tulospalvelu.palloliitto.fi') return true;
