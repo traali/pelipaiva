@@ -7,7 +7,7 @@ import { exampleTournamentFromUrl, mergeOfficialWithCupFallback, isCupName } fro
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 
-export { generateFamilyCode, isValidFamilyCode, normalizeFamilyCode } from './familyCode';
+export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
 
 export interface FamilyRosterRow {
@@ -52,6 +52,9 @@ export async function fetchFamilyRoster(
   });
 
   if (res.status === 404) return null;
+  if (res.status === 403) {
+    throw new Error('unknown_family');
+  }
   if (res.status === 400) {
     throw new Error('invalid_code_format');
   }
@@ -106,6 +109,10 @@ export async function pushFamilyRoster(
         error: 'rev_conflict',
         currentRev: (errJson as any).currentRev || 0
       };
+    }
+
+    if (res.status === 403) {
+      return { success: false, error: 'unknown_family' };
     }
 
     if (!res.ok) {

@@ -1,5 +1,7 @@
 export interface Env {
   MATCHDAY_KV: KVNamespace;
+  /** Comma-separated issued Crockford codes. Empty = no family slots. Never commit values. */
+  FAMILY_CODES?: string;
 }
 
 export interface SyncPayload {
@@ -40,6 +42,19 @@ export interface FamilyRosterV1 {
   updatedAt: string;
   profiles: FamilyRosterRow[];
   tombstones: Array<{ id: string; deletedAt: string }>;
+}
+
+async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (!raw) return set;
+  const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
+  for (const part of raw.split(/[,\s]+/)) {
+    if (!part.trim()) continue;
+    const c = part.trim().toUpperCase();
+    const code = c.includes('-') ? c : c.length === 6 ? `${c.slice(0, 5)}-${c.slice(5)}` : c;
+    if (codeRegex.test(code)) set.add(code);
+  }
+  return set;
 }
 
 const FAMILY_RATE_WINDOW_SEC = 900;
@@ -116,6 +131,14 @@ export default {
 
       const limited = await rateLimitFamily(request, request.method, corsHeaders);
       if (limited) return limited;
+
+      const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
+      if (issued.size === 0 || !issued.has(code)) {
+        return new Response(JSON.stringify({ error: 'unknown_family' }), {
+          status: 403,
+          headers: corsHeaders
+        });
+      }
 
       const kvKey = `family:${code}`;
 

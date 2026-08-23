@@ -18,7 +18,6 @@ import { PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
 import { exportFamilyBackup, importFamilyBackup } from '../lib/sync/familyShare';
 import {
-  generateFamilyCode,
   syncFamilyRosterCycle,
   isValidFamilyCode,
   normalizeFamilyCode
@@ -56,25 +55,10 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleGenerateCode = async () => {
-    const code = generateFamilyCode();
-    setFamilyCode(code);
-    setIsSyncing(true);
-    const res = await syncFamilyRosterCycle(code, db);
-    setIsSyncing(false);
-    if (res.success) {
-      setStatusMessage('Perhe-koodi luotu ja synkronoitu!');
-      setLastSynced(new Date().toISOString());
-    } else {
-      setStatusMessage('Synkronointi epäonnistui');
-    }
-    setTimeout(() => setStatusMessage(null), 2500);
-  };
-
   const handleJoinWithCode = async () => {
     const clean = normalizeFamilyCode(inputCode);
     if (!isValidFamilyCode(clean)) {
-      setStatusMessage('Virheellinen perhe-koodi (esim. PERHE-2)');
+      setStatusMessage('Virheellinen koodin muoto');
       setTimeout(() => setStatusMessage(null), 2500);
       return;
     }
@@ -88,6 +72,9 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       setLastSynced(new Date().toISOString());
       setStatusMessage('Liitytty perheeseen onnistuneesti!');
       onDataImported();
+      setTimeout(() => setStatusMessage(null), 2500);
+    } else if (res.error === 'unknown_family') {
+      setStatusMessage('Koodi ei ole voimassa');
       setTimeout(() => setStatusMessage(null), 2500);
     } else {
       setStatusMessage('Perhettä ei löytynyt tai verkkovirhe');
@@ -305,14 +292,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                       <span>{copied ? 'Kopioitu leikepöydälle!' : 'Kopioi liittymisviesti'}</span>
                     </button>
 
-                    <div className="flex items-center justify-between w-full pt-2 border-t border-border-subtle mt-2 text-[11px]">
-                      <button
-                        type="button"
-                        onClick={handleGenerateCode}
-                        className="text-text-muted hover:text-text-primary underline cursor-pointer"
-                      >
-                        Luo uusi koodi
-                      </button>
+                    <div className="flex items-center justify-end w-full pt-2 border-t border-border-subtle mt-2 text-[11px]">
                       <button
                         type="button"
                         onClick={handleLeaveFamily}
@@ -324,28 +304,17 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-3">
-                      <div className="text-xs font-bold text-text-primary">Luo uusi perhe-koodi</div>
-                      <p className="text-xs text-text-muted">
-                        Luo 6-merkkinen koodi, jolla toinen vanhempi tai perheenjäsen saa samat joukkueet heti näkyviin.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleGenerateCode}
-                        disabled={isSyncing}
-                        className="w-full py-2.5 px-4 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-md shadow-pitch/20"
-                      >
-                        <Key className="w-4 h-4" />
-                        <span>Luo perhe-koodi</span>
-                      </button>
-                    </div>
-
                     <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5">
-                      <div className="text-xs font-bold text-text-primary">Tai liity koodilla</div>
+                      <div className="text-xs font-bold text-text-primary">Liity perhe-koodilla</div>
+                      <p className="text-xs text-text-muted">
+                        Koodit jaetaan perheen kesken. Sovellus ei luo uusia koodeja.
+                      </p>
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
-                          placeholder="esim. PERHE-2"
+                          placeholder="XXXXX-X"
+                          autoComplete="off"
+                          autoCapitalize="characters"
                           value={inputCode}
                           onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                           className="flex-1 py-2 px-3 rounded-xl bg-surface border border-border-strong text-xs font-mono font-bold tracking-wider text-text-primary placeholder:text-text-muted focus:outline-none focus:border-pitch"
@@ -387,7 +356,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                   </>
                 ) : (
                   <div className="py-6 text-center text-xs text-text-muted">
-                    Luo perhe-koodi ensin Perhe-koodi -välilehdeltä luodaksesi jakolinkin.
+                    Liity koodilla Perhe-koodi -välilehdeltä, niin jakolinkki syntyy.
                   </div>
                 )}
               </div>

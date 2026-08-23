@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  generateFamilyCode,
   isValidFamilyCode,
   normalizeFamilyCode,
   mergeRosters,
@@ -10,14 +9,13 @@ import {
   fetchFamilyRoster,
   pushFamilyRoster
 } from './familyCloud';
-import { FAMILY_CODE_REGEX, existingRosterPutConflicts } from './familyCode';
+import { FAMILY_CODE_REGEX, existingRosterPutConflicts, parseFamilyAllowlist } from './familyCode';
 import { PlayerProfile } from '../../types/matchday';
 
 describe('familyCloud Sync & Merge Engine', () => {
-  it('generates valid Crockford-32 family code format (5-1)', () => {
-    const code = generateFamilyCode();
-    expect(isValidFamilyCode(code)).toBe(true);
-    expect(code).toMatch(FAMILY_CODE_REGEX);
+  it('accepts Crockford-32 format without treating example strings as issued slots', () => {
+    expect(FAMILY_CODE_REGEX.test('PERHE-2')).toBe(true);
+    expect(isValidFamilyCode('PERHE-2')).toBe(true);
   });
 
   it('rejects Crockford-illegal letters I L O U (SAIMA-4 is invalid)', () => {
@@ -40,6 +38,20 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).toContain('rate_limited');
     expect(workerSrc).toContain('GET: 20');
     expect(workerSrc).toContain('PUT: 5');
+    expect(workerSrc).toContain('FAMILY_CODES');
+    expect(workerSrc).toContain('unknown_family');
+    expect(workerSrc).not.toMatch(/FAMILY_CODES\s*=\s*['\"][0-9A-HJKMNP-TV-Z]{5}-/);
+  });
+
+  it('allowlist is fail-closed and does not live in the client', () => {
+    expect(parseFamilyAllowlist(undefined).size).toBe(0);
+    expect(parseFamilyAllowlist('').size).toBe(0);
+    const issued = parseFamilyAllowlist('AAAAA-1, BBBBB-2\nCCCCC-3');
+    expect(issued.has('AAAAA-1')).toBe(true);
+    expect(issued.has('BBBBB-2')).toBe(true);
+    expect(issued.has('CCCCC-3')).toBe(true);
+    expect(issued.has('PERHE-2')).toBe(false);
+    expect(issued.size).toBe(3);
   });
 
   it('existing KV PUT without If-Match conflicts', () => {
@@ -193,6 +205,17 @@ describe('familyCloud Sync & Merge Engine', () => {
     const { hasChanges, mergedProfiles } = mergeRosters(localProfiles, remoteRoster);
     expect(mergedProfiles.length).toBe(1);
     expect(hasChanges).toBe(false);
+  });
+
+  it('GET 403 unknown_family throws instead of looking like an empty family', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: () => Promise.resolve({ error: 'unknown_family' })
+    });
+    await expect(fetchFamilyRoster('PERHE-2', 'https://mock.worker')).rejects.toThrow(
+      'unknown_family'
+    );
   });
 
   it('GET 400 invalid_code_format throws instead of looking like an empty family', async () => {

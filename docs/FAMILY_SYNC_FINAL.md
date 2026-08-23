@@ -114,13 +114,15 @@ pendingUpload: boolean   // offline queue flag (keep 2.6)
 
 ## 5. Family code
 
-Display: `PERHE-2`  
-Alphabet: Crockford-32 `0123456789ABCDEFGHJKMNPQRSTVWXYZ`  
-Regex: `^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$`  
-Deep link: `https://pelipaiva.pages.dev/?perhe=PERHE-2`  
-Possession of the code = membership.
+Display: `XXXXX-X` (Crockford-32, no I/L/O/U).
 
-Optional: last character is a checksum; validate on device before fetch.
+**Issued slots:** 10 codes live only in the Cloudflare Worker secret `FAMILY_CODES`. They are not in this repo, not in the PWA bundle, and the app cannot mint new ones.
+
+- Worker: code not in the secret → 403 `unknown_family` (fail closed if the secret is empty)
+- Client: join-only. No “Luo perhe-koodi”.
+- Deep link: `https://pelipaiva.pages.dev/?perhe={issued-code}`
+
+Possession of an issued code = membership. Do not commit values.
 
 ---
 
