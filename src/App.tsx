@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, ensureStoragePersistence } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
@@ -12,12 +12,24 @@ import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
 import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
 import { MatchdayEvent, SportType } from './types/matchday';
 import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
-import { FamilyShareModal } from './components/FamilyShareModal';
-import { SmartImportModal } from './components/SmartImportModal';
-import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
-import { AskCopilotModal } from './components/AskCopilotModal';
-import { FamilyManageModal } from './components/FamilyManageModal';
+import { CalendarImportModal } from './components/CalendarImportModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
+
+const SmartImportModal = lazy(() =>
+  import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
+);
+const FamilyLogisticsModal = lazy(() =>
+  import('./components/FamilyLogisticsModal').then((m) => ({ default: m.FamilyLogisticsModal }))
+);
+const AskCopilotModal = lazy(() =>
+  import('./components/AskCopilotModal').then((m) => ({ default: m.AskCopilotModal }))
+);
+const FamilyShareModal = lazy(() =>
+  import('./components/FamilyShareModal').then((m) => ({ default: m.FamilyShareModal }))
+);
+const FamilyManageModal = lazy(() =>
+  import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
+);
 import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
@@ -574,10 +586,11 @@ export const App: React.FC = () => {
             await handleImportCalendar(playerName, teamName, sport, url);
           }}
         />
+        <Suspense fallback={null}>
         <SmartImportModal
           isOpen={isSmartImportOpen}
           onClose={() => setIsSmartImportOpen(false)}
-          existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+          existingPlayers={playerNames}
           onImportClassic={handleImportCalendar}
         />
         <CalendarImportModal
@@ -596,6 +609,7 @@ export const App: React.FC = () => {
           profiles={profiles}
           onDataImported={() => setActiveProfileId('all')}
         />
+        </Suspense>
       </>
     );
   }
@@ -850,10 +864,11 @@ export const App: React.FC = () => {
       </main>
 
       {/* Smart Multi-Tab AI Importer (WhatsApp, Excel, Sheets, OCR) */}
+      <Suspense fallback={null}>
       <SmartImportModal
         isOpen={isSmartImportOpen}
         onClose={() => setIsSmartImportOpen(false)}
-        existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+        existingPlayers={playerNames}
         onImportClassic={handleImportCalendar}
       />
 
@@ -912,6 +927,7 @@ export const App: React.FC = () => {
         profiles={profiles}
         onDataImported={() => {}}
       />
+      </Suspense>
     </div>
   );
 };

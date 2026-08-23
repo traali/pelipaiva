@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { ExtractedSportsEvent, extractDateFromFinnishText, extractTimesFromFinnishText, extractVenueFromFinnishText } from './messageParserNLP';
 import { SportType, EventType } from '../../types/matchday';
 
@@ -175,11 +174,12 @@ export function parsePastedSpreadsheetText(
 /**
  * Parses binary Excel (.xlsx / .xls) buffer into events.
  */
-export function parseExcelFileBuffer(
+export async function parseExcelFileBuffer(
   buffer: ArrayBuffer,
   sport: SportType = 'football',
   defaultPlayer = 'Maija'
-): ParsedTableResult {
+): Promise<ParsedTableResult> {
+  const XLSX = await import('xlsx');
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {

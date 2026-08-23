@@ -1,4 +1,4 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { ArrivalRules, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import type { CarpoolLeg, FamilyConflict } from './types';
 import { formatFiTime, helsinkiDateISO } from './time';
@@ -24,7 +24,8 @@ function canShareWithNext(ev: MatchdayEvent, next: MatchdayEvent | undefined): b
 export function carpoolAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  conflicts: FamilyConflict[]
+  conflicts: FamilyConflict[],
+  arrivalRules: ArrivalRules[] = []
 ): CarpoolLeg[] {
   const sorted = [...events].sort(
     (a, b) => new Date(a.warmupTime).getTime() - new Date(b.warmupTime).getTime()
@@ -36,7 +37,10 @@ export function carpoolAgent(
     const ev = sorted[i]!;
     const profile = childOf(ev, profiles);
     const childName = profile?.playerName || 'Lapsi';
-    const { departureTime } = calculateDepartureCountdown(ev);
+    const { departureTime } = calculateDepartureCountdown(
+      ev,
+      arrivalRules.find((r) => r.profileId === ev.profileId)
+    );
     const next = sorted[i + 1];
     const sameVenueNext = canShareWithNext(ev, next);
     const shareWith = sameVenueNext ? childOf(next!, profiles)?.playerName : undefined;

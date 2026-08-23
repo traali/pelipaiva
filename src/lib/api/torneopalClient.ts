@@ -58,15 +58,15 @@ function namesMatch(a: string, b: string): boolean {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
-function finnishIso(dateStr: string, timeStr: string): string {
+function finnishIso(dateStr: string, timeStr: string): string | null {
   const date = str(dateStr);
   const time = str(timeStr) || "12:00:00";
-  if (!date) return new Date().toISOString();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const hhmm = time.length === 5 ? `${time}:00` : time;
   const offset = isFinnishSummerTime(date) ? "+03:00" : "+02:00";
   const iso = `${date}T${hhmm}${offset}`;
   const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : iso;
+  return Number.isNaN(parsed.getTime()) ? null : iso;
 }
 
 function isFinnishSummerTime(dateStr: string): boolean {
@@ -230,7 +230,9 @@ export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
   teamName: string
-): OfficialLeagueFixture {
+): OfficialLeagueFixture | null {
+  const startTime = finnishIso(str(match.date), str(match.time));
+  if (!startTime) return null;
   const home = str(match.team_A_name);
   const away = str(match.team_B_name);
   const statusRaw = str(match.status).toLowerCase();
@@ -246,7 +248,6 @@ export function mapFixture(
   const awayScore = str(match.fs_B) === "" ? undefined : num(match.fs_B);
   const lat = num(match.venue_lat);
   const lng = num(match.venue_lon);
-  const startTime = finnishIso(str(match.date), str(match.time));
   const durationMin = num(match.playing_time_min) || 90;
   const endTime = new Date(new Date(startTime).getTime() + durationMin * 60 * 1000).toISOString();
   const matchId = str(match.match_id);
@@ -368,9 +369,9 @@ export async function fetchTorneopalTeamData(
       : Promise.resolve(null),
   ]);
 
-  const fixtures = (Array.isArray(matchesJson?.matches) ? matchesJson!.matches : []).map((m) =>
-    mapFixture(m, parsed, teamName)
-  );
+  const fixtures = (Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [])
+    .map((m) => mapFixture(m, parsed, teamName))
+    .filter((f): f is NonNullable<typeof f> => Boolean(f));
   const group = groupJson?.group || {};
   const teamRows = Array.isArray(group.teams) ? (group.teams as Record<string, unknown>[]) : [];
   const standings = teamRows.map(mapStanding).filter((r) => r.teamName);

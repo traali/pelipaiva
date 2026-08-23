@@ -1,6 +1,5 @@
 import { PitchSurface, VenueInfo } from '../../types/matchday';
 import { db } from '../storage/db';
-import { proxiedUrl } from '../api/proxyUrl';
 
 export const NATIONAL_FIELD_ALIASES: Record<
   string,
@@ -333,7 +332,7 @@ export async function resolveSportsVenue(
     try {
       const lipasUrl =
         'https://api.lipas.fi/v2/sports-sites?city-codes=91,49,92&type-codes=1110,1340,1350&page-size=200';
-      const res = await fetch(proxiedUrl(lipasUrl), { headers: { Accept: 'application/json' } });
+      const res = await fetch(lipasUrl, { headers: { Accept: 'application/json' } });
       if (res.ok) {
         const payload = await res.json();
         const items: Record<string, unknown>[] = Array.isArray(payload?.items) ? payload.items : [];
@@ -374,7 +373,7 @@ export async function resolveSportsVenue(
 
     try {
       const pUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(rawVenueString)}&type=unit`;
-      const pRes = await fetch(proxiedUrl(pUrl));
+      const pRes = await fetch(pUrl);
       if (pRes.ok) {
         const pJson = await pRes.json();
         const results: Array<Record<string, unknown>> = pJson.results || [];

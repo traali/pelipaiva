@@ -78,9 +78,9 @@ describe('torneopal match params', () => {
       espoo,
       'TOPOLA'
     );
-    expect(fixture.matchNumber).toBe('1055');
-    expect(fixture.stage).toBe('alku');
-    expect(fixture.score).toBe('9–45');
-    expect(fixture.isHome).toBe(false);
+    expect(fixture?.matchNumber).toBe('1055');
+    expect(fixture?.stage).toBe('alku');
+    expect(fixture?.score).toBe('9–45');
+    expect(fixture?.isHome).toBe(false);
   });
 });

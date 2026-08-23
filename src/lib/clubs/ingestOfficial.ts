@@ -13,6 +13,20 @@ import {
   isUglyTeamName
 } from './exampleTournaments';
 
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  if (items.length === 0) return [];
+  const out: R[] = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      out[idx] = await fn(items[idx]!);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 export async function ingestOfficialForProfile(opts: {
   profileId: string;
   playerName: string;
@@ -51,8 +65,7 @@ export async function ingestOfficialForProfile(opts: {
     ? officialData.fixtures.filter((f) => f.status !== 'cancelled')
     : officialData.fixtures;
 
-  const events: MatchdayEvent[] = [];
-  for (const fixture of fixtures) {
+  const events: MatchdayEvent[] = await mapPool(fixtures, 4, async (fixture) => {
     const venue = await resolveSportsVenue(fixture.venueName, {
       lat: fixture.venueLat,
       lng: fixture.venueLng,
@@ -96,8 +109,11 @@ export async function ingestOfficialForProfile(opts: {
       matchEvent.weather = weather;
       matchEvent.parking = parking;
     }
-    matchEvent.briefing = generateMatchdayBriefing(matchEvent, events);
-    events.push(matchEvent);
+    return matchEvent;
+  });
+
+  for (const ev of events) {
+    ev.briefing = generateMatchdayBriefing(ev, events);
   }
 
   if (events.length > 0) {

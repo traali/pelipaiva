@@ -1,9 +1,13 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { ArrivalRules, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import type { TournamentBlock } from './types';
 import { formatFiTime, helsinkiDateISO } from './time';
 
-export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile[]): TournamentBlock[] {
+export function tournamentAgent(
+  events: MatchdayEvent[],
+  profiles: PlayerProfile[],
+  arrivalRules: ArrivalRules[] = []
+): TournamentBlock[] {
   const groups = new Map<string, MatchdayEvent[]>();
 
   for (const ev of events) {
@@ -36,7 +40,10 @@ export function tournamentAgent(events: MatchdayEvent[], profiles: PlayerProfile
             (new Date(sorted[1]!.startTime).getTime() - new Date(first.endTime).getTime()) / 60000
           )
         : 0;
-    const { departureTime } = calculateDepartureCountdown(first);
+    const { departureTime } = calculateDepartureCountdown(
+      first,
+      arrivalRules.find((r) => r.profileId === first.profileId)
+    );
 
     blocks.push({
       id: `tn-${first.id}`,

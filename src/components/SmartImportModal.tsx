@@ -89,7 +89,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
     if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
       const buffer = await file.arrayBuffer();
-      const res = parseExcelFileBuffer(buffer, selectedSport, selectedPlayer);
+      const res = await parseExcelFileBuffer(buffer, selectedSport, selectedPlayer);
       setExtractedTableEvents(res.events);
       setActiveTab('table');
     } else if (file.type.startsWith('image/')) {

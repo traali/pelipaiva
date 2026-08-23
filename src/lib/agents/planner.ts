@@ -15,6 +15,15 @@ import {
   sportsWeekendRange
 } from './time';
 
+function helsinkiWallLabel(isoDate: string): string {
+  return new Date(`${isoDate}T12:00:00Z`).toLocaleDateString('fi-FI', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
+  });
+}
+
 function childName(event: MatchdayEvent, profiles: PlayerProfile[]): string {
   return profiles.find((p) => p.id === event.profileId)?.playerName || 'Lapsi';
 }
@@ -38,11 +47,7 @@ function buildDayStrips(
       .filter((e) => helsinkiDateISO(new Date(e.startTime)) === date)
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     const weekday = formatFiWeekday(date);
-    const label = new Date(`${date}T12:00:00+03:00`).toLocaleDateString('fi-FI', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'numeric'
-    });
+    const label = helsinkiWallLabel(date);
     const isPastDay = date < todayISO;
     const isToday = date === todayISO;
 
@@ -103,9 +108,9 @@ export function runMissionControlGraph(
     nextEvent && !graphEvents.some((e) => e.id === nextEvent.id) ? [...graphEvents, nextEvent] : graphEvents;
 
   const conflicts = conflictAgent(specialistEvents, profiles);
-  const carpool = carpoolAgent(specialistEvents, profiles, conflicts);
+  const carpool = carpoolAgent(specialistEvents, profiles, conflicts, arrivalRules);
   const talkoo = volunteerAgent(specialistEvents, profiles);
-  const tournaments = tournamentAgent(events, profiles);
+  const tournaments = tournamentAgent(events, profiles, arrivalRules);
   const kitByEventId = kitAgent(specialistEvents, profiles);
 
   const fridayISO = helsinkiDateISO(weekend.start);

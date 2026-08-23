@@ -1,7 +1,6 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { ExtractedSportsEvent, parseFreeformSportsMessage } from './messageParserNLP';
-import { parseExcelFileBuffer, parsePastedSpreadsheetText } from './tableAndExcelParser';
-import { parseScheduleImage } from './ocrImageParser';
+import { parsePastedSpreadsheetText } from './tableAndExcelParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
@@ -215,7 +214,24 @@ export function queryFamilySchedule(
 
 export {
   parseFreeformSportsMessage,
-  parsePastedSpreadsheetText,
-  parseExcelFileBuffer,
-  parseScheduleImage
+  parsePastedSpreadsheetText
 };
+
+export async function parseExcelFileBuffer(
+  buffer: ArrayBuffer,
+  sport: Parameters<typeof import('./tableAndExcelParser').parseExcelFileBuffer>[1] = 'football',
+  defaultPlayer = 'Maija'
+) {
+  const mod = await import('./tableAndExcelParser');
+  return mod.parseExcelFileBuffer(buffer, sport, defaultPlayer);
+}
+
+export async function parseScheduleImage(
+  imageSource: File | Blob | string,
+  sport: Parameters<typeof import('./ocrImageParser').parseScheduleImage>[1] = 'football',
+  defaultPlayer = 'Maija',
+  onProgress?: import('./ocrImageParser').OcrProgressCallback
+) {
+  const mod = await import('./ocrImageParser');
+  return mod.parseScheduleImage(imageSource, sport, defaultPlayer, onProgress);
+}

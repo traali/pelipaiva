@@ -4,26 +4,6 @@ export interface Env {
   FAMILY_CODES?: string;
 }
 
-export interface SyncPayload {
-  syncKey: string;
-  updatedAt: string;
-  events: Array<{
-    id: string;
-    sport: string;
-    homeTeam: string;
-    awayTeam: string;
-    startTime: string;
-    warmupTime: string;
-    venue: {
-      name: string;
-      surface?: string;
-    };
-    briefing?: {
-      recommendedDepartureTime?: string;
-    };
-  }>;
-}
-
 export interface FamilyRosterRow {
   id: string;
   playerName: string;
@@ -252,7 +232,7 @@ export default {
           teamName: p.teamName?.trim().slice(0, 60) || 'Joukkue',
           sport: p.sport || 'football',
           colorHex: p.colorHex || '#10b981',
-          calendarUrl: p.calendarUrl || '',
+          calendarUrl: String(p.calendarUrl || '').slice(0, 400),
           associationUrl: p.associationUrl || undefined,
           associationType: p.associationType || undefined,
           teamId: p.teamId || undefined
@@ -302,86 +282,7 @@ export default {
       });
     }
 
-    // 1. Sync Snapshot from Local PWA (TTL 7 days)
-    if (url.pathname.startsWith('/api/sync/') && request.method === 'PUT') {
-      const syncKey = url.pathname.replace('/api/sync/', '');
-      if (!syncKey || syncKey.length < 16) {
-        return new Response(JSON.stringify({ error: 'Invalid sync key' }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      const body = (await request.json()) as SyncPayload;
-      await env.MATCHDAY_KV.put(`sync:${syncKey}`, JSON.stringify(body), {
-        expirationTtl: 604800 // 7 days in seconds
-      });
-      return new Response(JSON.stringify({ success: true, message: 'Snapshot synced' }), {
-        headers: corsHeaders
-      });
-    }
-
-    // 2. Google Nest Hub Voice / Display Briefing Webhook
-    if (url.pathname === '/api/nest/brief') {
-      const syncKey = url.searchParams.get('key');
-      if (!syncKey) {
-        return new Response(
-          JSON.stringify({
-            fulfillmentResponse: {
-              messages: [
-                {
-                  text: {
-                    text: [
-                      'Avaa Pelipäivä-sovellus puhelimellasi ja yhdistä keittiönäyttö asetuksista.'
-                    ]
-                  }
-                }
-              ]
-            }
-          }),
-          { headers: corsHeaders }
-        );
-      }
-
-      const dataStr = await env.MATCHDAY_KV.get(`sync:${syncKey}`);
-      if (!dataStr) {
-        return new Response(
-          JSON.stringify({
-            fulfillmentResponse: {
-              messages: [{ text: { text: ['Tälle päivälle ei löytynyt merkittyjä otteluita.'] } }]
-            }
-          }),
-          { headers: corsHeaders }
-        );
-      }
-
-      const data = JSON.parse(dataStr) as SyncPayload;
-      const todaysEvent = data.events?.[0];
-
-      if (!todaysEvent) {
-        return new Response(
-          JSON.stringify({
-            fulfillmentResponse: {
-              messages: [{ text: { text: ['Ei otteluita tänään. Nauti vapaapäivästä!'] } }]
-            }
-          }),
-          { headers: corsHeaders }
-        );
-      }
-
-      const voiceMessage = `Tänään on ${todaysEvent.sport}ottelu: ${todaysEvent.homeTeam} vastaan ${todaysEvent.awayTeam} kentällä ${todaysEvent.venue?.name}. Suositeltu lähtöaika kotoa on klo ${todaysEvent.briefing?.recommendedDepartureTime || '17:00'}.`;
-
-      return new Response(
-        JSON.stringify({
-          fulfillmentResponse: {
-            messages: [{ text: { text: [voiceMessage] } }]
-          }
-        }),
-        { headers: corsHeaders }
-      );
-    }
-
-    // 3. CORS proxy for ICS, FMI, LIPAS, hel.fi, association HTML — not an open proxy.
+    // CORS proxy for ICS, FMI, LIPAS, hel.fi, association HTML — not an open proxy.
     if (url.pathname === '/api/proxy/ics') {
       const targetUrl = url.searchParams.get('url');
       if (!targetUrl || !isAllowedProxyTarget(targetUrl)) {

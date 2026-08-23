@@ -143,24 +143,24 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
     teamId: '34013',
     competitionId: 'EräViikingit_0005',
     categoryId: '2546',
-    note: 'Tapanilan Mosahalli · KW Memorial (torneopal-subdomain)',
+    note: 'Arena Center Myllypuro · KW Memorial',
     source: 'torneopal',
     fixtures: [
       {
         id: 'kw1',
         home: 'EräViikingit',
-        away: 'Oilers',
+        away: 'Oilers NG White',
         start: weekendAt(0, 9, 0),
-        venueName: 'Tapanilan Mosahalli',
+        venueName: 'Arena Center Myllypuro Kenttä 6',
         venueCity: 'Helsinki',
         status: 'upcoming'
       },
       {
         id: 'kw2',
-        home: 'EräViikingit',
-        away: 'Classic',
+        home: 'RSS Panthers',
+        away: 'EräViikingit',
         start: weekendAt(0, 11, 15),
-        venueName: 'Tapanilan Mosahalli',
+        venueName: 'Arena Center Myllypuro Kenttä 6',
         venueCity: 'Helsinki',
         status: 'upcoming'
       },
@@ -168,8 +168,8 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'kw3',
         home: 'EräViikingit',
         away: 'Indians',
-        start: weekendAt(0, 14, 30),
-        venueName: 'Tapanilan Mosahalli',
+        start: weekendAt(0, 14, 50),
+        venueName: 'Arena Center Myllypuro Kenttä 6',
         venueCity: 'Helsinki',
         status: 'upcoming'
       }
