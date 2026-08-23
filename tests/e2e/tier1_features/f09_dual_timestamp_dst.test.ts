@@ -4,8 +4,9 @@ import { loadIcsFixture } from '../../helpers/fixtureLoader';
 
 describe('Feature 9: Dual Timestamp & Daylight Saving Time Disentanglement', () => {
   it('should disentangle warmup DTSTART (14:15) vs explicit kickoff in description (Kickoff klo 15:00)', () => {
-    const dtStart = new Date('2026-05-16T11:15:00.000Z'); // 14:15 EEST
-    const dtEnd = new Date('2026-05-16T13:30:00.000Z');
+    const dtStart = new Date('2026-05-16T12:00:00.000Z');
+    dtStart.setHours(14, 15, 0, 0);
+    const dtEnd = new Date(dtStart.getTime() + 135 * 60000);
     const title = 'HJK T13 vs EPS';
     const description = 'Paikalle Bubuun. Kickoff klo 15:00. Varusteet sininen peliasu.';
 
