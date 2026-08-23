@@ -111,7 +111,7 @@ export const EXTRA_PROFILES: PlayerProfile[] = [
   {
     id: 'profile-topola-aada',
     playerName: 'Aada',
-    teamName: 'TOPOLA · Girls 2015 Fun',
+    teamName: 'TOPOLA',
     sport: 'basketball',
     primaryColor: 'syaani',
     calendarUrl: 'https://espooliikkuutournament.fi/team/203621',
@@ -123,7 +123,7 @@ export const EXTRA_PROFILES: PlayerProfile[] = [
   {
     id: 'profile-kw-eemil',
     playerName: 'Eemil',
-    teamName: 'EräViikingit · KW Memorial',
+    teamName: 'EräViikingit',
     sport: 'floorball',
     primaryColor: 'tummansininen',
     secondaryColor: 'punainen',

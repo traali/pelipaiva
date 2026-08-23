@@ -19,8 +19,28 @@ import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { RainRadarCurve } from './RainRadarCurve';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
-import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 import { Edit3 } from 'lucide-react';
+import type { PitchSurface } from '../types/matchday';
+
+function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
+  if (indoor) return 'Sisähalli';
+  switch (surface) {
+    case 'artificial_turf_3g':
+      return 'Tekonurmi 3G';
+    case 'sand_artificial_turf':
+      return 'Hiekkatekonurmi';
+    case 'natural_grass':
+      return 'Luonnonnurmi';
+    case 'indoor_parquet':
+      return 'Parketti';
+    case 'indoor_synthetic':
+      return 'Sisäalusta';
+    case 'gravel':
+      return 'Hiekka';
+    default:
+      return 'Kenttä';
+  }
+}
 
 interface MatchdayCardProps {
   event: MatchdayEvent;
@@ -55,8 +75,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   });
 
   const isTraining = event.isTraining || event.eventType === 'training';
-  const hasStats = !isTraining && (event.stats !== undefined || event.awayTeam.length > 0);
-  const stats = hasStats ? event.stats || generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport) : undefined;
+  const stats = !isTraining ? event.stats : undefined;
 
   const getSportBadge = () => {
     switch (event.sport) {
@@ -196,7 +215,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <span>
                 {isTraining
                   ? `Kokoontuminen klo ${formattedWarmup} • Treeni klo ${formattedKickoff}`
-                  : `Alkulämpö klo ${formattedWarmup} • Kickoff klo ${formattedKickoff}`}
+                  : `Alkulämpö klo ${formattedWarmup} · klo ${formattedKickoff}`}
               </span>
             </div>
           )}
@@ -224,7 +243,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />
             <span className="truncate">{localVenue.name}</span>
             <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
-              {localVenue.isIndoor ? 'Sisähalli' : localVenue.surface.replace(/_/g, ' ')}
+              {surfaceLabel(localVenue.surface, localVenue.isIndoor)}
             </span>
             <button
               type="button"

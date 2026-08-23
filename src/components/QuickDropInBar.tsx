@@ -234,7 +234,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                     <div className="flex items-center gap-3 text-[11px] text-text-secondary flex-wrap">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3 text-pitch" />
-                        <span>Kickoff klo {previewEvent.kickoffTime} (Alkulämpö {previewEvent.warmupTime})</span>
+                        <span>Aloitus klo {previewEvent.kickoffTime} (Alkulämpö {previewEvent.warmupTime})</span>
                       </span>
                       <span className="flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-radar" />

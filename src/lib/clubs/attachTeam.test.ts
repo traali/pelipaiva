@@ -29,6 +29,22 @@ describe('attachTeam', () => {
     expect(hit?.id).toBe('p1');
   });
 
+  it('keeps Helsinki Cup distinct from the same team league page', () => {
+    expect(
+      teamSourceKey('https://tulospalvelu.palloliitto.fi/team/185085/info')
+    ).not.toBe(
+      teamSourceKey(
+        'https://tulospalvelu.palloliitto.fi/team/185085/info?season=hc2026&category=B13-8'
+      )
+    );
+    const hit = findExistingTeamProfile(
+      [simo],
+      'Simo',
+      'https://tulospalvelu.palloliitto.fi/team/185085/info?season=hc2026&category=B13-8'
+    );
+    expect(hit).toBeUndefined();
+  });
+
   it('allows a different cup/team on the same child', () => {
     const hit = findExistingTeamProfile(
       [simo],

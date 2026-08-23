@@ -830,14 +830,22 @@ export function generateSyntheticOfficialTeamData(
     teamName = 'PPJ Laru Oranssi';
     leagueName = 'Palloliitto P11 Kolmonen';
     defaultVenue = 'Hernesaaren kupla';
+  } else if (teamId === '203621') {
+    teamName = customTeamName && !/basket\.fi/i.test(customTeamName) ? customTeamName : 'TOPOLA';
+    leagueName = 'Espoo Liikkuu Tournament 2026';
+    defaultVenue = 'Esport Center 2';
+  } else if (teamId === '34013') {
+    teamName = customTeamName && !/salibandy/i.test(customTeamName) ? customTeamName : 'EräViikingit';
+    leagueName = 'KW Memorial Cup 2026';
+    defaultVenue = 'Tapanilan Mosahalli';
   } else if (teamId === '25301' || sport === 'floorball') {
-    teamName = customTeamName || (teamId === '1289' ? 'ErVi Sininen' : 'Salibandy (ErVi)');
+    teamName = customTeamName && !/\(\d+\)/.test(customTeamName) ? customTeamName : 'EräViikingit';
     leagueName = 'Salibandyliitto P11 Kilpasarja';
-    defaultVenue = 'Mosahalli K1';
+    defaultVenue = 'Tapanilan Mosahalli';
   } else if (teamId === '5756346' || sport === 'basketball') {
-    teamName = customTeamName || 'Basket.fi (ToPo)';
+    teamName = customTeamName && !/\(\d+\)/.test(customTeamName) ? customTeamName : 'TOPOLA';
     leagueName = 'Koripalloliitto U14 Aluesarja';
-    defaultVenue = 'Munkkiniemen yhteiskoulu';
+    defaultVenue = 'Esport Center 2';
   } else if (sport === 'volleyball') {
     teamName = customTeamName || 'PuMa Volley N2';
     leagueName = 'Lentopalloliitto N2 Lohko 3';

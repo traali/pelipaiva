@@ -96,7 +96,9 @@ async function torneopalGet<T>(
       apiKey: TUPA_KEY,
     });
   }
-  if (endpoint) attempts.push(endpoint);
+  const dedicatedHost =
+    Boolean(subdomain) && /memorial|kwmemorial|cup|turnaus/i.test(subdomain!);
+  if (endpoint && !dedicatedHost) attempts.push(endpoint);
 
   for (const ep of attempts) {
     const search = new URLSearchParams({

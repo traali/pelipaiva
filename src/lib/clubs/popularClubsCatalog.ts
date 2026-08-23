@@ -167,7 +167,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'sininen',
     colorHex: '#2563eb',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
+    sampleTeamUrl: 'https://kwmemorialcup26.torneopal.fi/taso/joukkue.php?joukkue=34013&turnaus=Er%C3%A4Viikingit_0005&sarja=2546',
     popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'P11 Itä', 'P14 Sininen']
   },
   {
@@ -235,7 +235,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
+    sampleTeamUrl: 'https://espooliikkuutournament.fi/team/203621',
     popularAgeGroups: ['U14 Pojat', 'U13 Tytöt', 'U12 Pojat', 'Edustus']
   },
   {
@@ -257,7 +257,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/',
     popularAgeGroups: ['U14 Pojat Stadi', 'U13 Tytöt Pakila', 'U12 Pojat Malmi']
   },
   {
@@ -268,7 +268,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1e40af',
-    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/',
     popularAgeGroups: ['U14 Pojat', 'U13 Tytöt Sininen', 'U12 Pojat Valkoinen']
   },
   {
