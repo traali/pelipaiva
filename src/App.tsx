@@ -33,7 +33,7 @@ import {
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
-import { exampleTournamentFromUrl, isCupName } from './lib/clubs/exampleTournaments';
+import { exampleTournamentFromUrl, isCupName, mergeOfficialWithCupFallback, isUglyTeamName } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile } from './lib/clubs/attachTeam';
 
@@ -126,7 +126,7 @@ export const App: React.FC = () => {
     eventsQuery !== undefined &&
     !rawEvents.some((e) => e.id === 'demo-elt-aada-1');
 
-  // Seed user default teams (PPJ 185085, 185083, 185086, Salibandy 25301, Basket 5756346)
+  // Seed family demo: PPJ league sides + Helsinki Cup / Espoo Liikkuu / KW Memorial
   const handleStartDemo = async () => {
     setIsSeeding(true);
     try {
@@ -136,52 +136,41 @@ export const App: React.FC = () => {
     const defaultProfiles = [
       {
         id: 'profile-ppj-185085',
-        playerName: 'Maija',
-        teamName: 'PPJ Laru Sininen (185085)',
+        playerName: 'Simo',
+        teamName: 'PPJ/Laru sin',
         sport: 'football' as SportType,
         primaryColor: 'sininen',
         secondaryColor: 'valkoinen',
         calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
+        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
+        associationType: 'palloliitto' as const,
+        teamId: '185085',
         colorHex: '#3b82f6'
-      },
-      {
-        id: 'profile-salibandy-25301',
-        playerName: 'Maija',
-        teamName: 'Salibandy (25301)',
-        sport: 'floorball' as SportType,
-        primaryColor: 'keltainen',
-        secondaryColor: 'musta',
-        calendarUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
-        colorHex: '#eab308'
       },
       {
         id: 'profile-ppj-185083',
         playerName: 'Eemil',
-        teamName: 'PPJ Laru Valkoinen (185083)',
+        teamName: 'PPJ/Laru mus',
         sport: 'football' as SportType,
         primaryColor: 'valkoinen',
         secondaryColor: 'sininen',
         calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
+        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
+        associationType: 'palloliitto' as const,
+        teamId: '185083',
         colorHex: '#64748b'
-      },
-      {
-        id: 'profile-basket-5756346',
-        playerName: 'Eemil',
-        teamName: 'Basket.fi (5756346)',
-        sport: 'basketball' as SportType,
-        primaryColor: 'punainen',
-        secondaryColor: 'valkoinen',
-        calendarUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
-        colorHex: '#ef4444'
       },
       {
         id: 'profile-ppj-185086',
         playerName: 'Ville',
-        teamName: 'PPJ Laru Oranssi (185086)',
+        teamName: 'PPJ/Laru oran',
         sport: 'football' as SportType,
         primaryColor: 'oranssi',
         secondaryColor: 'musta',
         calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
+        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
+        associationType: 'palloliitto' as const,
+        teamId: '185086',
         colorHex: '#f97316'
       }
     ];
@@ -203,32 +192,20 @@ export const App: React.FC = () => {
     const demoEventsConfig = [
       {
         profileId: 'profile-ppj-185085',
-        title: 'PPJ Laru Sin vs KäPa Barca',
-        homeTeam: 'PPJ Laru Sin',
-        awayTeam: 'KäPa Barca',
+        title: 'PPJ/Laru sin vs KäPa',
+        homeTeam: 'PPJ/Laru sin',
+        awayTeam: 'KäPa',
         sport: 'football' as SportType,
         venueName: 'Väinämöisen kenttä (Väiski)',
         startTime: `${todayStr}T16:30:00+03:00`,
         endTime: `${todayStr}T18:00:00+03:00`,
         warmupTime: `${todayStr}T15:45:00+03:00`,
-        duty: '☕ Kahviovuoro klo 16:00 - 18:00 (Maija)'
-      },
-      {
-        profileId: 'profile-salibandy-25301',
-        title: 'ErVi vs Oilers Black',
-        homeTeam: 'ErVi',
-        awayTeam: 'Oilers Black',
-        sport: 'floorball' as SportType,
-        venueName: 'Tapanilan Mosahalli',
-        startTime: `${todayStr}T18:00:00+03:00`,
-        endTime: `${todayStr}T19:30:00+03:00`,
-        warmupTime: `${todayStr}T17:15:00+03:00`,
-        duty: '⏱️ Toimitsijavuoro (Kirjuri)'
+        duty: 'Kahviovuoro klo 16:00 - 18:00'
       },
       {
         profileId: 'profile-ppj-185083',
-        title: 'PPJ Laru Valk vs FC Honka',
-        homeTeam: 'PPJ Laru Valk',
+        title: 'PPJ/Laru mus vs FC Honka',
+        homeTeam: 'PPJ/Laru mus',
         awayTeam: 'FC Honka',
         sport: 'football' as SportType,
         venueName: 'Tapiolan Urheilupuisto TN 2',
@@ -237,21 +214,9 @@ export const App: React.FC = () => {
         warmupTime: `${tmrwStr}T13:45:00+03:00`
       },
       {
-        profileId: 'profile-basket-5756346',
-        title: 'ToPo vs HNMKY',
-        homeTeam: 'ToPo',
-        awayTeam: 'HNMKY',
-        sport: 'basketball' as SportType,
-        venueName: 'Töölön Kisahalli (Kisis)',
-        startTime: `${tmrwStr}T12:00:00+03:00`,
-        endTime: `${tmrwStr}T13:30:00+03:00`,
-        warmupTime: `${tmrwStr}T11:15:00+03:00`,
-        duty: '⏱️ Kellomies'
-      },
-      {
         profileId: 'profile-ppj-185086',
-        title: 'PPJ Laru Oranssi vs VJS',
-        homeTeam: 'PPJ Laru Oranssi',
+        title: 'PPJ/Laru oran vs VJS',
+        homeTeam: 'PPJ/Laru oran',
         awayTeam: 'VJS',
         sport: 'football' as SportType,
         venueName: 'Puotilan Tekonurmi (Bubu)',
@@ -384,28 +349,48 @@ export const App: React.FC = () => {
 
     try {
       const parsedAssoc = parseAssociationUrl(url);
-
+      let officialData: Awaited<ReturnType<typeof extractOfficialTeamData>> | null = null;
       if (parsedAssoc) {
-        // Fetch fixtures directly from Torneopal / Palloliitto / Salibandy / Basket.fi
-        const officialData = await extractOfficialTeamData(parsedAssoc, {
-          customTeamName: teamName
-        });
+        try {
+          officialData = await extractOfficialTeamData(parsedAssoc, {
+            customTeamName: cup?.teamName || teamName,
+            fallbackToSynthetic: false
+          });
+        } catch (err) {
+          console.warn('Official fetch failed, using cup fallback if any', err);
+        }
+      }
 
-        // Store official fixtures in Dexie
+      officialData = mergeOfficialWithCupFallback(cup, officialData);
+
+      if (officialData && officialData.fixtures.length > 0) {
         for (const fix of officialData.fixtures) {
           await db.officialFixtures.put(fix);
         }
 
+        const resolvedName =
+          officialData.teamName && !isUglyTeamName(officialData.teamName)
+            ? officialData.teamName
+            : cup?.teamName || teamName;
+
         await db.profiles.update(profileId, {
-          teamName: officialData.teamName || teamName,
-          teamId: parsedAssoc.teamId,
-          associationType: parsedAssoc.association,
+          teamName: resolvedName,
+          teamId: parsedAssoc?.teamId || cup?.teamId,
+          associationType: parsedAssoc?.association,
           associationUrl: url
         });
 
         const eventsToInsert: MatchdayEvent[] = [];
-        for (const fixture of officialData.fixtures) {
-          const venue = await resolveSportsVenue(fixture.venueName);
+        const cupish = Boolean(cup) || isCupName(officialData.leagueName);
+        const fixtures = cupish
+          ? officialData.fixtures.filter((f) => f.status !== 'cancelled')
+          : officialData.fixtures;
+        for (const fixture of fixtures) {
+          const venue = await resolveSportsVenue(fixture.venueName, {
+            lat: fixture.venueLat,
+            lng: fixture.venueLng,
+            city: fixture.venueCity
+          });
           const startTime = fixture.startTime || new Date().toISOString();
           const endTime =
             fixture.endTime || new Date(new Date(startTime).getTime() + 90 * 60 * 1000).toISOString();
@@ -413,34 +398,29 @@ export const App: React.FC = () => {
 
           const isHome =
             fixture.isHome ??
-            (fixture.homeTeam.toLowerCase().includes(teamName.toLowerCase()) ||
+            (fixture.homeTeam.toLowerCase().includes((resolvedName || teamName).toLowerCase()) ||
               fixture.homeTeam.toLowerCase().includes(playerName.toLowerCase()));
 
-          const matchStats = generateOrResolveMatchStats(
-            fixture.homeTeam,
-            fixture.awayTeam,
-            parsedAssoc.sport
-          );
-
+          const thisCup = cupish || isCupName(fixture.leagueName);
           const matchEvent: MatchdayEvent = {
-            id: `fixture-${fixture.id || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            id: `fixture-${profileId}-${fixture.id}`,
             profileId,
             title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
-            eventType: isCupName(fixture.leagueName) ? 'tournament' : 'match',
+            eventType: thisCup ? 'tournament' : 'match',
             isTraining: false,
-            sport: parsedAssoc.sport,
+            sport: officialData.sport || parsedAssoc?.sport || sport,
             homeTeam: fixture.homeTeam,
             awayTeam: fixture.awayTeam,
             isHomeMatch: isHome,
             startTime,
             endTime,
             warmupTime,
-            tournamentName: fixture.leagueName,
+            tournamentName: thisCup ? fixture.leagueName || officialData.leagueName : undefined,
             venue,
             officialFixtureId: fixture.id,
             reconciliationStatus: 'auto_matched',
             confidenceScore: 1.0,
-            stats: matchStats
+            stats: thisCup ? undefined : generateOrResolveMatchStats(fixture.homeTeam, fixture.awayTeam, officialData.sport)
           };
 
           const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
@@ -454,7 +434,7 @@ export const App: React.FC = () => {
         for (const ev of eventsToInsert) {
           await db.events.put(ev);
         }
-      } else {
+      } else if (!parsedAssoc) {
         // Standard iCal feed from Nimenhuuto, MyClub, Jopox
         const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
         const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;

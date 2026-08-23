@@ -336,7 +336,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
                     <div className="text-sm font-bold text-text-primary">{extractedMessageEvent.title}</div>
                     <div className="text-xs text-text-secondary">
-                      📍 {extractedMessageEvent.venueHint} • ⏰ Kickoff klo {extractedMessageEvent.kickoffTime} (Alkulämpö {extractedMessageEvent.warmupTime})
+                      📍 {extractedMessageEvent.venueHint} • ⏰ Aloitus klo {extractedMessageEvent.kickoffTime} (Alkulämpö {extractedMessageEvent.warmupTime})
                     </div>
 
                     {extractedMessageEvent.kitColor && (

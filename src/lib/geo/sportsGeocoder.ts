@@ -59,6 +59,8 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'esport center': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport center 2': { name: 'Esport Center 2', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport tapiola': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'munkkiniemen yhteiskoulu': { name: 'Munkkiniemen yhteiskoulu', lat: 60.1965, lng: 24.8758, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'munkka': { name: 'Munkkiniemen yhteiskoulu', lat: 60.1965, lng: 24.8758, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'mosahalli': { name: 'Tapanilan Mosahalli', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'mosahalli 1': { name: 'Tapanilan Mosahalli 1', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'mosahalli 2': { name: 'Tapanilan Mosahalli 2', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },

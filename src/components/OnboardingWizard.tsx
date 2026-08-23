@@ -62,11 +62,11 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
     association: 'Palloliitto',
     colorHex: '#f97316'
   },
-  ...EXAMPLE_TOURNAMENTS.filter((cup) => cup.id !== 'hc2026-ppj-sin').map((cup) => ({
+  ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
     sport: cup.sport,
     url: cup.url,
-    association: cup.source === 'football-stats' ? 'Helsinki Cup' : cup.name,
+    association: cup.name,
     colorHex: cup.colorHex
   }))
 ];
