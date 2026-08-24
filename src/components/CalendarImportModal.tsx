@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Calendar, Plus, ShieldCheck, HelpCircle, Trophy } from 'lucide-react';
+import { X, Calendar, Plus, ShieldCheck, HelpCircle, Trophy, Filter, Check } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
 import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
@@ -8,6 +8,8 @@ import { searchPopularClubs } from '../lib/clubs/popularClubsCatalog';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import { TeamColorPicker } from './TeamColorPicker';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
+import { extractFeedCategories, detectSquadGroups } from '../lib/calendar/icsParser';
+import { DEFAULT_PROXY_URL } from '../lib/api/proxyUrl';
 
 interface CalendarImportModalProps {
   isOpen: boolean;
@@ -17,7 +19,8 @@ interface CalendarImportModalProps {
     teamName: string,
     sport: SportType,
     icsUrl: string,
-    colorHex?: string
+    colorHex?: string,
+    squadFilters?: string[]
   ) => Promise<void>;
   initialSport?: SportType;
   initialTeamUrl?: string;
@@ -45,6 +48,9 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
   const [showGuide, setShowGuide] = useState(false);
   const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
   const [playerHint, setPlayerHint] = useState('');
+  const [detectedCategories, setDetectedCategories] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isDiscoveringCategories, setIsDiscoveringCategories] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -55,9 +61,52 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
     setColorHex(pickNextTeamColor([]).hex);
     setShowGuide(false);
     setPlayerHint('');
+    setDetectedCategories([]);
+    setSelectedCategories([]);
     setIsLoading(false);
     setImportError(null);
   }, [isOpen, initialPlayerName, initialTeamName, initialSport, initialTeamUrl]);
+
+  // Dynamically discover categories from the pasted calendar feed
+  useEffect(() => {
+    if (
+      !icsUrl ||
+      (!icsUrl.includes('.ics') &&
+        !icsUrl.includes('ical') &&
+        !icsUrl.includes('nimenhuuto') &&
+        !icsUrl.includes('myclub') &&
+        !icsUrl.includes('jopox'))
+    ) {
+      setDetectedCategories([]);
+      setSelectedCategories([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsDiscoveringCategories(true);
+      try {
+        const raw = icsUrl.trim().replace(/^webcal:/i, 'https:');
+        const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
+        const res = await fetch(target);
+        if (res.ok) {
+          const text = await res.text();
+          const cats = extractFeedCategories(text);
+          const squads = detectSquadGroups(text).map((s) => s.squadName);
+          const combined = Array.from(new Set([...cats, ...squads]));
+          if (combined.length > 0) {
+            setDetectedCategories(combined);
+            setSelectedCategories(combined);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not auto-discover categories:', err);
+      } finally {
+        setIsDiscoveringCategories(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [icsUrl]);
 
   const handleUrlChange = (val: string) => {
     setIcsUrl(val);
@@ -81,7 +130,11 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
     setIsLoading(true);
     setImportError(null);
     try {
-      await onImport(name.trim(), team, nextSport, url, hex);
+      const filters =
+        detectedCategories.length > 0 && selectedCategories.length < detectedCategories.length
+          ? selectedCategories
+          : undefined;
+      await onImport(name.trim(), team, nextSport, url, hex, filters);
       onClose();
     } catch (err) {
       console.error(err);
@@ -335,6 +388,56 @@ export const CalendarImportModal: React.FC<CalendarImportModalProps> = ({
                     <div>Torneopal / KW Memorial: *.torneopal.fi/taso/joukkue.php</div>
                     <div>Kalenterit: Nimenhuuto, MyClub, Jopox (.ics)</div>
                   </motion.div>
+                )}
+
+                {isDiscoveringCategories && (
+                  <p className="mt-2 text-[11px] text-text-muted flex items-center gap-1.5 animate-pulse">
+                    <Filter className="h-3 w-3 text-pitch" />
+                    Tunnistetaan kalenterin ryhmiä ja luokkia…
+                  </p>
+                )}
+
+                {detectedCategories.length > 0 && (
+                  <div className="mt-3 rounded-2xl border border-border-subtle bg-surface-elevated/70 p-3.5 shadow-sm">
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                        <Filter className="h-3.5 w-3.5 text-pitch" />
+                        Tapahtumaluokat / Ryhmät
+                      </label>
+                      <span className="text-[11px] font-semibold text-text-muted">
+                        {selectedCategories.length === detectedCategories.length
+                          ? 'Kaikki mukana'
+                          : `${selectedCategories.length}/${detectedCategories.length} valittu`}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-text-secondary mb-2.5">
+                      Valitse mitä ryhmiä tälle lapselle tuodaan kalenterista:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {detectedCategories.map((cat) => {
+                        const isSelected = selectedCategories.includes(cat);
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategories((prev) =>
+                                prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+                              );
+                            }}
+                            className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold transition-all flex items-center gap-1 ${
+                              isSelected
+                                ? 'bg-pitch text-text-inverse shadow-xs'
+                                : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
+                            }`}
+                          >
+                            {isSelected && <Check className="h-3 w-3" />}
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
 
                 <p className="mt-1.5 flex items-center gap-1 text-[11px] text-text-muted">

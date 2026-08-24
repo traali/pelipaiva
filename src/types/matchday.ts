@@ -417,6 +417,7 @@ export interface PlayerProfile {
   teamId?: string;
   clubId?: string;
   squadName?: string;
+  squadFilters?: string[];
   lastOfficialSyncAt?: string;
 }
 

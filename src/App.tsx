@@ -347,7 +347,8 @@ export const App: React.FC = () => {
     teamName: string,
     sport: SportType,
     url: string,
-    colorHex?: string
+    colorHex?: string,
+    squadFilters?: string[]
   ) => {
     const existing = await db.profiles.toArray();
     const cup = exampleTournamentFromUrl(url);
@@ -371,7 +372,8 @@ export const App: React.FC = () => {
         sport,
         primaryColor: swatch.label,
         calendarUrl: url,
-        colorHex: swatch.hex
+        colorHex: swatch.hex,
+        squadFilters
       });
     } else {
       await db.profiles.add({
@@ -381,7 +383,8 @@ export const App: React.FC = () => {
         sport,
         primaryColor: swatch.label,
         calendarUrl: url,
-        colorHex: swatch.hex
+        colorHex: swatch.hex,
+        squadFilters
       });
     }
 
@@ -392,7 +395,8 @@ export const App: React.FC = () => {
         teamName: cup?.teamName || teamName,
         sport,
         url,
-        includeWeather: true
+        includeWeather: true,
+        squadFilters
       });
 
       if (imported === 0) {

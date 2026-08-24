@@ -159,6 +159,7 @@ export async function ingestIcsForProfile(opts: {
   sport: SportType;
   url: string;
   database?: PelipaivaDB;
+  squadFilters?: string[];
 }): Promise<number> {
   const database = opts.database || db;
   const raw = opts.url.trim().replace(/^webcal:/i, 'https:');
@@ -167,7 +168,13 @@ export async function ingestIcsForProfile(opts: {
   if (!res.ok) return 0;
   const text = await res.text();
   if (!text || text.length < 20) return 0;
-  const parsed = await parseICSFeed(text, opts.profileId, opts.sport, opts.teamName);
+  const parsed = await parseICSFeed(
+    text,
+    opts.profileId,
+    opts.sport,
+    opts.teamName,
+    opts.squadFilters
+  );
   const withMeta: MatchdayEvent[] = [];
   for (const ev of parsed) {
     const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
@@ -194,6 +201,7 @@ export async function ingestSourceForProfile(opts: {
   url: string;
   database?: PelipaivaDB;
   includeWeather?: boolean;
+  squadFilters?: string[];
 }): Promise<number> {
   const parsedAssoc = parseAssociationUrl(opts.url);
   const cup = exampleTournamentFromUrl(opts.url);

@@ -478,7 +478,8 @@ export async function parseICSFeed(
   icsContent: string,
   profileId: string,
   sport: SportType = 'football',
-  defaultTeamName?: string
+  defaultTeamName?: string,
+  squadFilters?: string[]
 ): Promise<MatchdayEvent[]> {
   const events: MatchdayEvent[] = [];
 
@@ -496,6 +497,18 @@ export async function parseICSFeed(
       const location = event.location || 'Töölön Pallokenttä';
       const description = event.description || '';
       const category = (vevent.getFirstPropertyValue('categories') as string) || '';
+
+      // If custom squad/category filters are specified, filter out non-matching events
+      if (squadFilters && squadFilters.length > 0) {
+        const fullText = `${title} ${category} ${description}`.toLowerCase();
+        const matchesFilter = squadFilters.some((f) => {
+          const fl = f.toLowerCase();
+          return category.toLowerCase().includes(fl) || fullText.includes(fl);
+        });
+        if (!matchesFilter) {
+          continue;
+        }
+      }
 
       // Timezone-safe JS dates from ICAL
       const startDate = event.startDate ? event.startDate.toJSDate() : new Date();
