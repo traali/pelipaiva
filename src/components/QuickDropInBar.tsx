@@ -65,8 +65,8 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
       }
 
       const parsed = parseFreeformSportsMessage(trimmed, selectedPlayer);
-      setPreviewEvent(parsed);
-      setSelectedSport(parsed.sport);
+      setPreviewEvent(parsed.confidenceScore >= 0.5 ? parsed : null);
+      if (parsed.confidenceScore >= 0.5) setSelectedSport(parsed.sport);
     } else {
       setPreviewEvent(null);
       setFamilyJoinCode(null);

@@ -1059,8 +1059,8 @@ export async function fetchOfficialTeamData(
 // ============================================================================
 
 /**
- * Generates or extracts full league and matchday stats for a given fixture,
- * supporting Volleyball (Sets), Basketball (Points), Floorball (Goals), and Football.
+ * Test-only invented magazine. Production ingest never calls this.
+ * Live cards use buildMatchStatsFromOfficial.
  */
 export function generateOrResolveMatchStats(
   homeTeam: string,

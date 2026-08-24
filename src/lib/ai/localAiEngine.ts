@@ -37,7 +37,13 @@ export async function convertExtractedToMatchdayEvent(
   profileId: string,
   _playerName = 'Pelaaja'
 ): Promise<MatchdayEvent> {
-  const venue = await resolveSportsVenue(extracted.venueHint);
+  if (!extracted.dateStr || !extracted.kickoffTime) {
+    throw new Error('Viestistä puuttuu päivä tai kellonaika');
+  }
+  if (extracted.confidenceScore < 0.5) {
+    throw new Error('Viestiä ei tunnistettu otteluksi');
+  }
+  const venue = await resolveSportsVenue(extracted.venueHint || 'Kenttä ilmoitetaan');
 
   const offset = getFinnishTimezoneOffset(new Date(`${extracted.dateStr}T12:00:00Z`));
   const startTime = new Date(`${extracted.dateStr}T${extracted.kickoffTime}:00${offset}`).toISOString();
@@ -68,7 +74,7 @@ export async function convertExtractedToMatchdayEvent(
 
   const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
   const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
-  matchEvent.weather = weather;
+  if (weather) matchEvent.weather = weather;
   matchEvent.parking = parking;
   matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
 

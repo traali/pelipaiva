@@ -56,6 +56,7 @@ describe('torneopal match params', () => {
     expect(kwParams.start_date).toBeUndefined();
     expect(kwParams.competition_id).toBe('EräViikingit_0005');
     expect(kwParams.category_id).toBe('2546');
+    expect(kwParams.per_page).toBe('100');
 
     const leagueParams = buildGetMatchesParams(league);
     expect(leagueParams.start_date).toBeDefined();

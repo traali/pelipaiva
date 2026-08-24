@@ -89,8 +89,7 @@ export function extractDateFromFinnishText(text: string, baseDate = new Date()):
     }
   }
 
-  // Default to today
-  return now.toISOString().split('T')[0] || '2026-08-24';
+  return '';
 }
 
 /**
@@ -137,7 +136,9 @@ export function extractTimesFromFinnishText(text: string): {
     }
   }
 
-  if (!kickoff) kickoff = '15:00';
+  if (!kickoff) {
+    return { kickoff: '', warmup: warmup || '', end: end || '' };
+  }
   if (!end) {
     const [hStr = '15', mStr = '00'] = kickoff.split(':');
     const h = Number(hStr);
@@ -192,7 +193,7 @@ export function extractVenueFromFinnishText(text: string): string {
     }
   }
 
-  return 'Töölön Pallokenttä 1 (Bollis)';
+  return '';
 }
 
 /**
@@ -348,10 +349,18 @@ export function parseFreeformSportsMessage(
 
   const title =
     eventType === 'training'
-      ? `Harjoitukset @ ${venueHint}`
+      ? `Harjoitukset @ ${venueHint || 'kenttä ilmoitetaan'}`
       : awayTeam === 'Harjoitusottelu'
-        ? `Harjoitusottelu @ ${venueHint}`
+        ? `Harjoitusottelu @ ${venueHint || 'kenttä ilmoitetaan'}`
         : `${homeTeam} vs ${awayTeam}`;
+
+  let confidenceScore = 0.15;
+  if (dateStr) confidenceScore += 0.3;
+  if (times.kickoff) confidenceScore += 0.25;
+  if (awayTeam !== 'Vastustaja' && homeTeam !== 'Oma joukkue') confidenceScore += 0.25;
+  else if (eventType === 'training' && (venueHint || times.kickoff)) confidenceScore += 0.2;
+  if (venueHint) confidenceScore += 0.1;
+  if (confidenceScore > 0.98) confidenceScore = 0.98;
 
   return {
     title,
@@ -368,6 +377,6 @@ export function parseFreeformSportsMessage(
     kitColor,
     volunteerDuties,
     rawNotes: rawText.trim(),
-    confidenceScore: 0.95
+    confidenceScore
   };
 }

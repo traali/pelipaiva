@@ -79,6 +79,14 @@ Lisätiedot: Peliasuna sininen pelipaita. Kahviovuoro: Maijan vanhemmat.`;
       expect(result.warmupTime).toBe('13:45');
       expect(result.venueHint).toContain('Tapiola');
     });
+
+    it('does not invent Vastustaja @ 15:00 / Bollis from garbage paste', () => {
+      const result = parseFreeformSportsMessage('ok kiitos!', 'Maija');
+      expect(result.confidenceScore).toBeLessThan(0.5);
+      expect(result.kickoffTime).toBe('');
+      expect(result.awayTeam === 'Vastustaja' || result.confidenceScore < 0.5).toBe(true);
+      expect(result.venueHint).not.toContain('Bollis');
+    });
   });
 
   describe('2. Excel & Google Sheets Table Ingestion', () => {

@@ -108,7 +108,7 @@ export async function ingestOfficialForProfile(opts: {
     if (opts.includeWeather !== false) {
       const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
       const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
-      matchEvent.weather = weather;
+      if (weather) matchEvent.weather = weather;
       matchEvent.parking = parking;
     }
     return matchEvent;
@@ -119,6 +119,12 @@ export async function ingestOfficialForProfile(opts: {
   }
 
   if (events.length > 0) {
+    const keep = new Set(events.map((e) => e.id));
+    const existing = await database.events.where("profileId").equals(opts.profileId).toArray();
+    const stale = existing
+      .filter((e) => e.id.startsWith(`fixture-${opts.profileId}-`) && !keep.has(e.id))
+      .map((e) => e.id);
+    if (stale.length > 0) await database.events.bulkDelete(stale);
     await database.events.bulkPut(events);
   }
 
@@ -152,7 +158,8 @@ export async function ingestIcsForProfile(opts: {
   for (const ev of parsed) {
     const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
     const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-    const fullEv: MatchdayEvent = { ...ev, weather, parking };
+    const fullEv: MatchdayEvent = { ...ev, parking };
+    if (weather) fullEv.weather = weather;
     fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
     withMeta.push(fullEv);
   }

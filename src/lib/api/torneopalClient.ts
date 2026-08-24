@@ -106,7 +106,7 @@ export function shouldTryAssociationEndpoint(subdomain?: string): boolean {
 }
 
 export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<string, string> {
-  const params: Record<string, string> = { team_id: parsed.teamId };
+  const params: Record<string, string> = { team_id: parsed.teamId, per_page: "100" };
   if (!looksLikeCupRequest(parsed)) {
     const todayIso = helsinkiDateISO();
     params.start_date = addHelsinkiDays(todayIso, -21);
@@ -119,17 +119,28 @@ export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<stri
   return params;
 }
 
+function federationEndpoint(
+  association: AssociationType,
+  sport?: SportType
+): { base: string; apiKey: string; referer: string } | undefined {
+  if (association === "salibandy" || sport === "floorball") return ENDPOINTS.salibandy;
+  if (association === "palloliitto" || sport === "football") return ENDPOINTS.palloliitto;
+  if (association === "basket" || sport === "basketball") return ENDPOINTS.basket;
+  return ENDPOINTS.torneopal;
+}
+
 async function torneopalGet<T>(
   association: AssociationType,
   method: string,
   params: Record<string, string>,
-  subdomain?: string
+  subdomain?: string,
+  sport?: SportType
 ): Promise<T | null> {
-  const endpoint = ENDPOINTS[association];
   type Attempt = { base: string; apiKey: string; referer: string };
   const attempts: Attempt[] = [];
   const seen = new Set<string>();
-  const push = (ep: Attempt) => {
+  const push = (ep: Attempt | undefined) => {
+    if (!ep) return;
     const k = `${ep.base}|${ep.apiKey}`;
     if (seen.has(k)) return;
     seen.add(k);
@@ -139,14 +150,23 @@ async function torneopalGet<T>(
   if (subdomain) {
     const base = `https://${subdomain}.torneopal.fi/taso/rest`;
     const referer = `https://${subdomain}.torneopal.fi/`;
-    // football-stats: Accept json/{key} + Referer. Cup hosts reject the Tupa
-    // key ("no access") but accept the sport federation key.
-    push({ base, apiKey: TUPA_KEY, referer });
-    push({ base, apiKey: SALIBANDY_KEY, referer });
-    push({ base, apiKey: PALL_KEY, referer });
+    // Cup hosts 403 without Referer (browser cannot set it). Federation
+    // hosts accept the same team id for the matching sport without Referer.
+    if (sport === "floorball" || association === "salibandy") {
+      push({ base, apiKey: SALIBANDY_KEY, referer });
+      push({ base, apiKey: TUPA_KEY, referer });
+      push({ base, apiKey: PALL_KEY, referer });
+    } else if (sport === "football" || association === "palloliitto") {
+      push({ base, apiKey: PALL_KEY, referer });
+      push({ base, apiKey: TUPA_KEY, referer });
+      push({ base, apiKey: SALIBANDY_KEY, referer });
+    } else {
+      push({ base, apiKey: TUPA_KEY, referer });
+      push({ base, apiKey: SALIBANDY_KEY, referer });
+      push({ base, apiKey: PALL_KEY, referer });
+    }
   }
-  const dedicatedHost = !shouldTryAssociationEndpoint(subdomain);
-  if (endpoint && !dedicatedHost) push(endpoint);
+  push(federationEndpoint(association, sport));
 
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) {
@@ -163,6 +183,7 @@ async function torneopalGet<T>(
           Accept: `json/${ep.apiKey}`,
           Referer: ep.referer,
         },
+        referrerPolicy: "origin",
         signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) continue;
@@ -379,32 +400,42 @@ async function collectCupGroupMatches(
     parsed.association,
     "getGroups",
     { competition_id: competitionId, category_id: categoryId },
-    parsed.subdomain
+    parsed.subdomain,
+    parsed.sport
   );
   const groups = Array.isArray(groupsJson?.groups) ? groupsJson!.groups : [];
   const rows: Record<string, unknown>[] = [];
-  for (const g of groups) {
-    const full = await torneopalGet<TorneopalGroupPayload>(
-      parsed.association,
-      "getGroup",
-      {
-        competition_id: competitionId,
-        category_id: categoryId,
-        group_id: str(g.group_id),
-        matches: "1",
-      },
-      parsed.subdomain
+  const chunks: Record<string, unknown>[][] = [];
+  for (let i = 0; i < groups.length; i += 4) chunks.push(groups.slice(i, i + 4));
+  for (const chunk of chunks) {
+    const found = await Promise.all(
+      chunk.map((g) =>
+        torneopalGet<TorneopalGroupPayload>(
+          parsed.association,
+          "getGroup",
+          {
+            competition_id: competitionId,
+            category_id: categoryId,
+            group_id: str(g.group_id),
+            matches: "1",
+          },
+          parsed.subdomain,
+          parsed.sport
+        )
+      )
     );
-    const matches = full?.group?.matches;
-    if (!Array.isArray(matches)) continue;
-    for (const m of matches as Record<string, unknown>[]) {
-      if (
-        namesMatch(str(m.team_A_name), teamName) ||
-        namesMatch(str(m.team_B_name), teamName) ||
-        str(m.team_A_id) === parsed.teamId ||
-        str(m.team_B_id) === parsed.teamId
-      ) {
-        rows.push(m);
+    for (const full of found) {
+      const matches = full?.group?.matches;
+      if (!Array.isArray(matches)) continue;
+      for (const m of matches as Record<string, unknown>[]) {
+        if (
+          namesMatch(str(m.team_A_name), teamName) ||
+          namesMatch(str(m.team_B_name), teamName) ||
+          str(m.team_A_id) === parsed.teamId ||
+          str(m.team_B_id) === parsed.teamId
+        ) {
+          rows.push(m);
+        }
       }
     }
   }
@@ -418,7 +449,8 @@ export async function fetchTorneopalTeamData(
     parsed.association,
     "getTeam",
     { team_id: parsed.teamId },
-    parsed.subdomain
+    parsed.subdomain,
+    parsed.sport
   );
   const team = teamJson?.team;
   if (!team) return null;
@@ -443,7 +475,7 @@ export async function fetchTorneopalTeamData(
   });
 
   const [matchesJson, groupJson] = await Promise.all([
-    torneopalGet<TorneopalMatchesPayload>(parsed.association, "getMatches", matchParams, parsed.subdomain),
+    torneopalGet<TorneopalMatchesPayload>(parsed.association, "getMatches", matchParams, parsed.subdomain, parsed.sport),
     currentGroup
       ? torneopalGet<TorneopalGroupPayload>(
           parsed.association,
@@ -454,7 +486,8 @@ export async function fetchTorneopalTeamData(
             group_id: str(currentGroup.group_id),
             matches: "1",
           },
-          parsed.subdomain
+          parsed.subdomain,
+          parsed.sport
         )
       : Promise.resolve(null),
   ]);
@@ -479,6 +512,7 @@ export async function fetchTorneopalTeamData(
   const standings = teamRows.map(mapStanding).filter((r) => r.teamName);
   const roster = mapRoster(team, teamName);
   const leagueName =
+    (keepCupIds && (fixtures[0]?.leagueName || str(group.competition_name))) ||
     str(currentGroup?.competition_name) ||
     str(group.competition_name) ||
     str(primary?.competition_name) ||
