@@ -376,6 +376,7 @@ export function detectSquadGroups(icsContent: string): { squadName: string; even
     'Vihreä',
     'Kilpa',
     'Haaste',
+    'Haastaja',
     'Harraste',
     'Akatemia',
     'Edustus',
@@ -397,10 +398,11 @@ export function detectSquadGroups(icsContent: string): { squadName: string; even
 
     for (const vevent of vevents) {
       const event = new ICAL.Event(vevent);
-      const fullText = `${event.summary || ''} ${event.description || ''}`;
+      const cat = (vevent.getFirstPropertyValue('categories') as string) || '';
+      const fullText = `${event.summary || ''} ${cat} ${event.description || ''}`;
 
       for (const squad of squadKeywords) {
-        // Match word boundaries: e.g. "Sininen" or "T1"
+        // Match word boundaries: e.g. "Sininen" or "Kilpa" or "Haastaja"
         const regex = new RegExp(`\\b${squad}\\b`, 'i');
         if (regex.test(fullText)) {
           counts[squad] = (counts[squad] || 0) + 1;
@@ -417,7 +419,32 @@ export function detectSquadGroups(icsContent: string): { squadName: string; even
 }
 
 /**
- * Filters an ICS string feed down to events belonging to a specific squad.
+ * Extracts all unique categories found in an ICS feed (e.g. Nimenhuuto, Google Calendar).
+ */
+export function extractFeedCategories(icsContent: string): string[] {
+  const categories = new Set<string>();
+  try {
+    const jcalData = ICAL.parse(icsContent);
+    const vcalendar = new ICAL.Component(jcalData);
+    const vevents = vcalendar.getAllSubcomponents('vevent');
+
+    for (const vevent of vevents) {
+      const cat = vevent.getFirstPropertyValue('categories') as string | undefined;
+      if (cat) {
+        cat.split(',').forEach((c) => {
+          const trimmed = c.trim();
+          if (trimmed) categories.add(trimmed);
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Failed to extract feed categories', e);
+  }
+  return Array.from(categories);
+}
+
+/**
+ * Filters an ICS string feed down to events belonging to a specific squad or category.
  */
 export function splitICSBySquad(icsContent: string, squadName: string): string {
   try {
@@ -429,7 +456,8 @@ export function splitICSBySquad(icsContent: string, squadName: string): string {
 
     for (const vevent of vevents) {
       const event = new ICAL.Event(vevent);
-      const fullText = `${event.summary || ''} ${event.description || ''}`;
+      const cat = (vevent.getFirstPropertyValue('categories') as string) || '';
+      const fullText = `${event.summary || ''} ${cat} ${event.description || ''}`;
       if (!regex.test(fullText)) {
         vcalendar.removeSubcomponent(vevent);
       }
@@ -467,6 +495,7 @@ export async function parseICSFeed(
       const title = event.summary || 'Tuntematon tapahtuma';
       const location = event.location || 'Töölön Pallokenttä';
       const description = event.description || '';
+      const category = (vevent.getFirstPropertyValue('categories') as string) || '';
 
       // Timezone-safe JS dates from ICAL
       const startDate = event.startDate ? event.startDate.toJSDate() : new Date();
@@ -474,7 +503,10 @@ export async function parseICSFeed(
         ? event.endDate.toJSDate()
         : new Date(startDate.getTime() + 90 * 60 * 1000);
 
-      const isTraining = isTrainingEvent(title, description);
+      const isTraining =
+        category.toLowerCase().includes('treenit') ||
+        category.toLowerCase().includes('harjoitus') ||
+        isTrainingEvent(title, description);
       const parsedTitle = parseMatchTitle(title, defaultTeamName);
 
       const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
