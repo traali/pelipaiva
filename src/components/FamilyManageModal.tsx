@@ -6,7 +6,8 @@ import {
   Plus,
   Trash2,
   Share2,
-  PlusCircle
+  PlusCircle,
+  Pencil
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { PlayerProfile } from '../types/matchday';
@@ -18,6 +19,7 @@ interface FamilyManageModalProps {
   onClose: () => void;
   profiles: PlayerProfile[];
   onOpenImportForPlayer: (playerName: string) => void;
+  onEditProfile: (profile: PlayerProfile) => void;
   onOpenFamilyShare: () => void;
   onOpenOnboardingWizard: () => void;
 }
@@ -27,6 +29,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   onClose,
   profiles,
   onOpenImportForPlayer,
+  onEditProfile,
   onOpenFamilyShare,
   onOpenOnboardingWizard
 }) => {
@@ -188,14 +191,24 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteProfile(p.id)}
-                          className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
-                          title="Poista joukkue"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => { onEditProfile(p); }}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-pitch hover:bg-pitch/10 cursor-pointer"
+                            title="Muokkaa joukkuetta / kategoriat"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProfile(p.id)}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
+                            title="Poista joukkue"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       {colorForId === p.id && (
                         <div className="px-2.5 pb-2.5">

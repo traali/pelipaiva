@@ -6,7 +6,7 @@ import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { CalendarImportModal } from './components/CalendarImportModal';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { MatchdayEvent, SportType } from './types/matchday';
+import { MatchdayEvent, SportType, PlayerProfile } from './types/matchday';
 import { Sparkles, Smartphone, LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
@@ -428,6 +428,17 @@ export const App: React.FC = () => {
 
   const openAddTeam = (playerName?: string) => {
     setImportDefaults({ playerName });
+    setIsImportModalOpen(true);
+  };
+
+  const openEditProfile = (profile: PlayerProfile) => {
+    setImportDefaults({
+      playerName: profile.playerName,
+      name: profile.teamName,
+      sport: profile.sport,
+      url: profile.calendarUrl || profile.associationUrl || ''
+    });
+    setIsFamilyManageOpen(false);
     setIsImportModalOpen(true);
   };
 
@@ -886,6 +897,7 @@ export const App: React.FC = () => {
           setIsFamilyManageOpen(false);
           openAddTeam(playerName);
         }}
+        onEditProfile={(profile) => openEditProfile(profile)}
         onOpenFamilyShare={() => {
           setIsFamilyManageOpen(false);
           setIsFamilyShareOpen(true);
