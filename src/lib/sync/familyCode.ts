@@ -11,6 +11,11 @@ export function normalizeFamilyCode(code: string): string {
   return clean;
 }
 
+export function generateFamilyCode(): string {
+  const pick = () => CROCKFORD_ALPHABET[Math.floor(Math.random() * CROCKFORD_ALPHABET.length)];
+  return `${Array.from({ length: 5 }, pick).join('')}-${pick()}`;
+}
+
 export function isValidFamilyCode(code?: string): boolean {
   if (!code) return false;
   return FAMILY_CODE_REGEX.test(normalizeFamilyCode(code));

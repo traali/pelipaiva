@@ -157,7 +157,7 @@ export default {
       if (limited) return limited;
 
       const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
-      if (issued.size === 0 || !issued.has(code)) {
+      if (issued.size > 0 && !issued.has(code)) {
         return new Response(JSON.stringify({ error: 'unknown_family' }), {
           status: 403,
           headers: corsHeaders
