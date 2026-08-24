@@ -17,12 +17,13 @@ Start here:
 1. **[AUDIT_2026-08-24T1408_ox-alpha_canonical-priority-merge-of-three-council-audits.md](./AUDIT_2026-08-24T1408_ox-alpha_canonical-priority-merge-of-three-council-audits.md)** — ⭐ canonical entry point: all findings from every audit merged, deduplicated, strictly priority-ordered (P0→P3) with What/Cause/Proof/Fix per finding
 2. [AUDIT.md](./AUDIT.md) — APIs, Dexie, gaps
 3. [AUDIT_2026-08-24T1405_ox-alpha_external-api-lifecycle-failure-audit.md](./AUDIT_2026-08-24T1405_ox-alpha_external-api-lifecycle-failure-audit.md) — **external API lifecycle & failure-mode audit**: 12-integration catalog + 11 findings (1 CRITICAL / 3 HIGH / 7 MEDIUM) with cause, line-level proof, and fix; remediation priority table
-4. [AUDIT_2026-08-24_ox-alpha.md](./AUDIT_2026-08-24_ox-alpha.md) — full 20-agent council audit: 25 findings (F-01…F-25) with root causes, line-level proofs, fact-check verdicts, vote tally, and P0–P3 remediation roadmap
-5. [AUDIT_2026-08-24T1358_ox-alpha_20nation-council-review.md](./AUDIT_2026-08-24T1358_ox-alpha_20nation-council-review.md) — 20-nation council review (Session I dirty tree → Session II main): verdicts TRUE/FALSE/OVERBLOWN, resolved-items table
-6. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
-7. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
-8. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
-9. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — family bus (WhatsApp + KV roster)
-10. [FAMILY_CODES_OPS.md](./FAMILY_CODES_OPS.md) — **operators: issued codes, Cloudflare secret, rotate**
-11. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
-12. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2
+4. [AUDIT_2026-08-24T1407_ox-alpha_priority-order-findings-and-fixes.md](./AUDIT_2026-08-24T1407_ox-alpha_priority-order-findings-and-fixes.md) — **actionable audit in strict priority order (P0→P3)**: cause, line-level proof, and concrete fix for all 25 council findings (F-01…F-25)
+5. [AUDIT_2026-08-24_ox-alpha.md](./AUDIT_2026-08-24_ox-alpha.md) — full 20-agent council audit: 25 findings (F-01…F-25) with root causes, line-level proofs, fact-check verdicts, vote tally, and P0–P3 remediation roadmap
+6. [AUDIT_2026-08-24T1358_ox-alpha_20nation-council-review.md](./AUDIT_2026-08-24T1358_ox-alpha_20nation-council-review.md) — 20-nation council review (Session I dirty tree → Session II main): verdicts TRUE/FALSE/OVERBLOWN, resolved-items table
+7. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
+8. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
+9. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
+10. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — family bus (WhatsApp + KV roster)
+11. [FAMILY_CODES_OPS.md](./FAMILY_CODES_OPS.md) — **operators: issued codes, Cloudflare secret, rotate**
+12. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
+13. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2
