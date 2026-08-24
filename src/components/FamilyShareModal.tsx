@@ -22,7 +22,6 @@ import {
   isValidFamilyCode,
   normalizeFamilyCode
 } from '../lib/sync/familyCloud';
-import { generateFamilyCode } from '../lib/sync/familyCode';
 import { generateJoinWhatsApp } from '../lib/sync/familyWhatsApp';
 
 interface FamilyShareModalProps {
@@ -81,23 +80,6 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     } else {
       setStatusMessage('Perhettä ei löytynyt tai verkkovirhe');
       setTimeout(() => setStatusMessage(null), 2500);
-    }
-  };
-
-  const handleCreateCode = async () => {
-    const newCode = generateFamilyCode();
-    setIsSyncing(true);
-    const res = await syncFamilyRosterCycle(newCode, db);
-    setIsSyncing(false);
-    if (res.success) {
-      setFamilyCode(newCode);
-      setLastSynced(new Date().toISOString());
-      setStatusMessage('Oma perhe-koodi luotu!');
-      onDataImported();
-      setTimeout(() => setStatusMessage(null), 3000);
-    } else {
-      setStatusMessage('Perheen luonti epäonnistui – yritä uudelleen');
-      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
@@ -337,33 +319,10 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    {/* Create own code */}
-                    <div className="p-4 rounded-2xl bg-pitch/10 border border-pitch/25 flex flex-col gap-2.5">
-                      <div className="text-xs font-bold text-pitch">Luo oma perhe-koodi</div>
-                      <p className="text-xs text-text-muted">
-                        Luo uusi perhe-koodi tähän laitteeseen. Jaa koodi muille puhelinille niin kalenteri synkronoituu automaattisesti.
-                      </p>
-                      <motion.button
-                        whileTap={{ scale: 0.97 }}
-                        type="button"
-                        onClick={handleCreateCode}
-                        disabled={isSyncing}
-                        className="w-full py-2.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer disabled:opacity-50 shadow-md shadow-pitch/20"
-                      >
-                        {isSyncing ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Key className="w-3.5 h-3.5" />
-                        )}
-                        <span>{isSyncing ? 'Luodaan…' : 'Luo perhe-koodi'}</span>
-                      </motion.button>
-                    </div>
-
-                    {/* Or join existing */}
                     <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5">
-                      <div className="text-xs font-bold text-text-primary">Tai liity olemassaolevaan perheeseen</div>
+                      <div className="text-xs font-bold text-text-primary">Liity perhe-koodilla</div>
                       <p className="text-xs text-text-muted">
-                        Syötä perheeltä saamasi koodi:
+                        Syötä perheeltä tai ylläpidolta saamasi koodi:
                       </p>
                       <div className="flex items-center gap-2">
                         <input
@@ -379,7 +338,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                           type="button"
                           onClick={handleJoinWithCode}
                           disabled={isSyncing || !inputCode.trim()}
-                          className="py-2 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-bold hover:border-pitch cursor-pointer disabled:opacity-50"
+                          className="py-2 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer disabled:opacity-50"
                         >
                           Liity
                         </button>
