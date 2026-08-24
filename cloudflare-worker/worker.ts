@@ -124,12 +124,26 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+    // Origin-scoped CORS (M-12): echo only known first-party origins. The
+    // proxy is consumed same-origin by the PWA; non-browser callers are
+    // unaffected by CORS either way.
+    const allowedOrigins = new Set([
+      'https://pelipaiva.pages.dev',
+      'https://pelipaiva.fi',
+      'https://www.pelipaiva.fi',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
+    ]);
+    const requestOrigin = request.headers.get('Origin');
+    const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, If-Match, X-Pelipaiva-Rev',
       'Content-Type': 'application/json'
     };
+    if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+      corsHeaders['Access-Control-Allow-Origin'] = requestOrigin;
+      corsHeaders['Vary'] = 'Origin';
+    }
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
@@ -176,7 +190,15 @@ export default {
           });
         }
 
-        const data = JSON.parse(dataStr) as FamilyRosterV1;
+        let data: FamilyRosterV1;
+        try {
+          data = JSON.parse(dataStr) as FamilyRosterV1;
+        } catch {
+          return new Response(JSON.stringify({ error: 'corrupt_data' }), {
+            status: 500,
+            headers: corsHeaders
+          });
+        }
         return new Response(dataStr, {
           headers: {
             ...corsHeaders,
@@ -206,24 +228,41 @@ export default {
           });
         }
 
+        // Validate profile entries (V42)
+        for (const p of body.profiles) {
+          if (p === null || p === undefined) {
+            return new Response(JSON.stringify({ error: 'null_profile_entry' }), { status: 400, headers: corsHeaders });
+          }
+          if (p.colorHex && !/^#[0-9a-fA-F]{6}$/.test(p.colorHex)) {
+            p.colorHex = '#3b82f6'; // sanitize to default
+          }
+        }
+
         const existingStr = await env.MATCHDAY_KV.get(kvKey);
         let currentRev = 0;
         if (existingStr) {
-          const existing = JSON.parse(existingStr) as FamilyRosterV1;
-          currentRev = existing.rev || 0;
-          const ifMatch =
-            request.headers.get('If-Match')?.replace(/"/g, '') ||
-            request.headers.get('X-Pelipaiva-Rev');
+          let existing: FamilyRosterV1 | null = null;
+          try {
+            existing = JSON.parse(existingStr) as FamilyRosterV1;
+          } catch {
+            // Corrupted existing data — allow overwrite with rev 1
+          }
+          if (existing) {
+            currentRev = existing.rev || 0;
+            const ifMatch =
+              request.headers.get('If-Match')?.replace(/"/g, '') ||
+              request.headers.get('X-Pelipaiva-Rev');
 
-          // Existing key: missing or stale If-Match → 409 (never silent overwrite)
-          if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
-            return new Response(
-              JSON.stringify({ error: 'rev_conflict', currentRev }),
-              {
-                status: 409,
-                headers: corsHeaders
-              }
-            );
+            // Existing key: missing or stale If-Match → 409 (never silent overwrite)
+            if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
+              return new Response(
+                JSON.stringify({ error: 'rev_conflict', currentRev }),
+                {
+                  status: 409,
+                  headers: corsHeaders
+                }
+              );
+            }
           }
         }
 
@@ -269,8 +308,27 @@ export default {
         );
       }
 
-      // DELETE /api/family/:code
+      // DELETE /api/family/:code — destructive, so require the same
+      // optimistic-concurrency proof as PUT when the slot has live data (M-12).
       if (request.method === 'DELETE') {
+        const existingStr = await env.MATCHDAY_KV.get(kvKey);
+        if (existingStr) {
+          let currentRev = 0;
+          try {
+            currentRev = (JSON.parse(existingStr) as FamilyRosterV1).rev || 0;
+          } catch {
+            currentRev = 0;
+          }
+          const ifMatch =
+            request.headers.get('If-Match')?.replace(/"/g, '') ||
+            request.headers.get('X-Pelipaiva-Rev');
+          if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
+            return new Response(JSON.stringify({ error: 'rev_conflict', currentRev }), {
+              status: 409,
+              headers: corsHeaders
+            });
+          }
+        }
         await env.MATCHDAY_KV.delete(kvKey);
         return new Response(JSON.stringify({ success: true, message: 'Family roster deleted' }), {
           headers: corsHeaders

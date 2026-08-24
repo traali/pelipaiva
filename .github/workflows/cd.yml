@@ -43,5 +43,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: 'cloudflare-worker'
-          wranglerVersion: '4.24.0'
+          wranglerVersion: '4.124.0'
           command: deploy

@@ -3,12 +3,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, MapPin, Check } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { db } from '../lib/storage/db';
-import { VenueInfo } from '../types/matchday';
+import { VenueInfo, PitchSurface } from '../types/matchday';
 
 interface VenueCorrectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentVenue: VenueInfo;
+  /** Event whose persisted venue must be corrected — a pin alone never
+   *  survives remount and never moves navigation (M-32/V58). */
+  eventId?: string;
   onSaved: (updatedVenue: VenueInfo) => void;
 }
 
@@ -16,6 +19,7 @@ export const VenueCorrectionModal: React.FC<VenueCorrectionModalProps> = ({
   isOpen,
   onClose,
   currentVenue,
+  eventId,
   onSaved
 }) => {
   const [venueName, setVenueName] = useState(currentVenue.name);
@@ -27,13 +31,20 @@ export const VenueCorrectionModal: React.FC<VenueCorrectionModalProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const normalizedQuery = currentVenue.name.toLowerCase().trim();
+    // Key the pin by the geocoder's own normalization so lookups actually hit
+    // (the old lowercase/trim key never matched and pins were dead data).
+    const normalizedQuery = currentVenue.name
+      .toLowerCase()
+      .replace(/[.,\-\/()]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     const finalName = fieldNumber.trim() ? `${venueName.trim()} (${fieldNumber.trim()})` : venueName.trim();
     const updated: VenueInfo = {
       ...currentVenue,
       name: finalName,
       isIndoor,
-      surface
+      surface,
+      isApproximateLocation: false
     };
 
     // Save to local IndexedDB venuePins store
@@ -46,6 +57,14 @@ export const VenueCorrectionModal: React.FC<VenueCorrectionModalProps> = ({
       surface: updated.surface,
       savedAt: new Date().toISOString()
     });
+
+    // Persist the correction onto the event itself so navigation and remounts
+    // use it — the pin alone evaporated on reload (M-32).
+    if (eventId) {
+      await db.events
+        .update(eventId, { venue: updated })
+        .catch((err) => console.warn('[VENUE_CORRECTION] event update failed:', err));
+    }
 
     setIsSaved(true);
     onSaved(updated);
@@ -125,7 +144,7 @@ export const VenueCorrectionModal: React.FC<VenueCorrectionModalProps> = ({
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Alusta</label>
                   <select
                     value={surface}
-                    onChange={(e) => setSurface(e.target.value as any)}
+                    onChange={(e) => setSurface(e.target.value as PitchSurface)}
                     className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch"
                   >
                     <option value="artificial_turf_3g">Tekonurmi (3G/4G)</option>

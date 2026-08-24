@@ -87,7 +87,7 @@ export function calculateDepartureCountdown(
 
   const drivingEstimateMins = arrivalRules?.defaultDrivingEstimateMinutes ?? 20;
   const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? 10;
-  const walkingMins = event.parking?.walkingTimeMinutes || 3;
+  const walkingMins = event.parking?.walkingTimeMinutes ?? 3;
   const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
 
   // Kickoff time

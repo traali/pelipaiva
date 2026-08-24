@@ -17,6 +17,7 @@ import { springTactile } from '../lib/motion/springs';
 import { PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
 import { exportFamilyBackup, importFamilyBackup, generateSharePayload } from '../lib/sync/familyShare';
+import { ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
 import {
   syncFamilyRosterCycle,
   isValidFamilyCode,
@@ -118,20 +119,29 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
           : ''
       : '';
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     if (!shareUrl) return;
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
+    // Await + catch: clipboard permission denial must not report success (M-08/V56).
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+    } catch {
+      setStatusMessage('Kopiointi estetty — valitse linkki ja kopioi käsin.');
+    }
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleCopyWhatsAppMessage = () => {
+  const handleCopyWhatsAppMessage = async () => {
     const msg = familyCode
       ? generateJoinWhatsApp(familyCode)
       : `Tässä on meidän perheen Pelipäivä-kalenteri:\n${shareUrl}\n\nAvaa linkki puhelimellasi niin joukkueet synkronoituvat!`;
     if (!msg) return;
-    navigator.clipboard.writeText(msg);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(msg);
+      setCopied(true);
+    } catch {
+      setStatusMessage('Kopiointi estetty — valitse viesti ja kopioi käsin.');
+    }
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -166,7 +176,33 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       const text = await file.text();
       const data = JSON.parse(text);
       const res = await importFamilyBackup(data);
-      setStatusMessage(`Tuotu onnistuneesti: ${res.profilesCount} joukkuetta, ${res.rulesCount} sääntöä!`);
+
+      // Spec (FAMILY_SYNC_FINAL Phase 0): file import must trigger hydration —
+      // each phone fetches fixtures itself from tulospalvelu. Without this the
+      // restored phone shows rosters with an empty dashboard forever (M-30/D-II).
+      let hydratedCount = 0;
+      for (const p of data.profiles ?? []) {
+        const url = p.associationUrl || p.calendarUrl;
+        if (!url) continue;
+        try {
+          const n = await ingestSourceForProfile({
+            profileId: p.id,
+            playerName: p.playerName,
+            teamName: p.teamName,
+            sport: p.sport,
+            url
+          });
+          hydratedCount += n > 0 ? 1 : 0;
+        } catch {
+          // Per-profile failure must not abort the rest of the restore.
+        }
+      }
+
+      setStatusMessage(
+        `Tuotu onnistuneesti: ${res.profilesCount} joukkuetta, ${res.rulesCount} sääntöä${
+          hydratedCount > 0 ? `, ottelut haettu ${hydratedCount} joukkueelle` : ''
+        }!`
+      );
       onDataImported();
       setTimeout(() => {
         setStatusMessage(null);
@@ -393,7 +429,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
             {activeTab === 'backup' && (
               <div className="flex flex-col gap-4">
                 <p className="text-xs text-text-secondary">
-                  Tallenna kaikki joukkueesi, sääntösi ja kenttäpinnauksesi tiedostoksi uuden puhelimen käyttöönottoa tai selaimen tyhjennystä varten:
+                  Tallenna joukkueasetukset (roster, säännöt, kenttäpinnat) tiedostoksi. Ottelut haetaan uudelleen tulospalvelusta puhelimeen palautuksen yhteydessä — varmuuskopio ei sisällä ottelutietoja:
                 </p>
 
                 <button

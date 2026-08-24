@@ -35,6 +35,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   const [familyJoinCode, setFamilyJoinCode] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Sync active player if profile changes
   useEffect(() => {
@@ -93,6 +94,10 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveSuccess(false);
         onEventCreated?.();
       }, 1000);
+    } else {
+      // Failure must never be silent (M-09): surface the reason.
+      setSaveError(res.error || 'Liittyminen epäonnistui. Tarkista koodi ja verkko.');
+      setTimeout(() => setSaveError(''), 4000);
     }
   };
 
@@ -140,6 +145,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveSuccess(false);
         onEventCreated?.();
       }, 1000);
+    } catch (err: any) {
+      setSaveError(err?.message || 'Tallennus epäonnistui');
+      setTimeout(() => setSaveError(''), 4000);
     } finally {
       setIsSaving(false);
     }
@@ -329,6 +337,12 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                   <div className="p-2 rounded-xl bg-pitch/20 border border-pitch text-pitch text-xs font-bold flex items-center gap-1.5 animate-bounce">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Tallennettu onnistuneesti pelaajalle {selectedPlayer}!</span>
+                  </div>
+                )}
+
+                {saveError && (
+                  <div className="p-2 rounded-xl bg-red-500/20 border border-red-500 text-red-400 text-xs font-bold flex items-center gap-1.5">
+                    <span>⚠️ {saveError}</span>
                   </div>
                 )}
               </div>

@@ -114,7 +114,7 @@ Yhdistää puhekieliset nimitykset virallisiin LIPAS.fi-paikkatietoihin:
 
 ### 5.1 Liittämisalgoritmi (`reconciliationEngine.ts`)
 Ottelut yhdistetään kalenterin ja liigan välillä seuraavin säännöin:
-1. **Päivämäärätarkistus:** Tapahtuman ja virallisen ottelun on oltava samana päivänä ($\pm 24\text{h}$).
+1. **Päivämäärätarkistus:** Tapahtuman ja virallisen ottelun on oltava samana **Helsinki-local** kalenteripäivänä (UTC-avaimet ohittivät klo 00.00–02.59 tapahtumat; korjattu `reconciliationEngine.ts`).
 2. **Aikaikkuna:** Kalenterin ja ottelun aikaero saa olla enintään $\pm 180\text{ min}$ (3 tuntia).
 3. **Vastustajan Samankaltaisuus (Dice-Sørensen bigram-kerroin & Oppimisaliakset):**
    - Verrataan kalenterin vastustajatokeneita liigan vastustajatietoon hyödyntäen seuranimien alias-sanakirjaa (`HJK`, `KäPa`, `GrIFK`, `ErVi`, `TiPS`, `VJS`, `Honka`, `Ilves`, `TPS`, `EPS`, `PPJ`, `PK-35`, `ÅIFK` jne.) sekä laitteen oppimia `customAliases`-merkintöjä.

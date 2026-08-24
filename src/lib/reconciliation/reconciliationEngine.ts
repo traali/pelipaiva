@@ -6,6 +6,17 @@ import {
 } from '../../types/matchday';
 import { calculateTeamSimilarity } from './teamNameMatcher';
 
+/** Helsinki-local calendar-day key — UTC keys mis-bucketed 00:00–02:59 FI events
+ *  against the ±180 min tolerance window (M-19/V6, SPEC §5.1 "same day" is local). */
+function helsinkiDayKey(d: Date): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d);
+}
+
 /**
  * Computes explicit mismatch diagnostics between a calendar event and an official league fixture.
  */
@@ -73,13 +84,13 @@ export function reconcileCalendarWithOfficial(
     }
 
     const eventDate = new Date(event.startTime);
-    const eventDayKey = `${eventDate.getUTCFullYear()}-${eventDate.getUTCMonth()}-${eventDate.getUTCDate()}`;
+    const eventDayKey = helsinkiDayKey(eventDate);
 
     const candidates: { fixture: OfficialLeagueFixture; score: number }[] = [];
 
     for (const fixture of officialFixtures) {
       const fixDate = new Date(fixture.startTime);
-      const fixDayKey = `${fixDate.getUTCFullYear()}-${fixDate.getUTCMonth()}-${fixDate.getUTCDate()}`;
+      const fixDayKey = helsinkiDayKey(fixDate);
 
       // Date must match or be within 24h
       if (eventDayKey !== fixDayKey) continue;

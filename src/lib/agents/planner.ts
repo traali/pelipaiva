@@ -12,6 +12,7 @@ import {
   formatFiTime,
   formatFiWeekday,
   helsinkiDateISO,
+  helsinkiOffsetForDateISO,
   sportsWeekRange
 } from './time';
 
@@ -39,7 +40,8 @@ function buildDayStrips(
   now = new Date()
 ): WeekendDayStrip[] {
   const todayISO = helsinkiDateISO(now);
-  const dow = new Date(`${todayISO}T12:00:00+03:00`).getDay(); // 0 Sun, 1 Mon...
+  // EET/EEST-aware offset — hardcoded +03:00 mis-derived weekdays after fall-back (M-51).
+  const dow = new Date(`${todayISO}T12:00:00${helsinkiOffsetForDateISO(todayISO)}`).getDay(); // 0 Sun, 1 Mon...
   const isWeekday = dow >= 1 && dow <= 4;
   const fridayISO = addHelsinkiDays(todayISO, dow === 0 ? -2 : 5 - dow);
   const days = isWeekday
@@ -100,7 +102,7 @@ export function detectDifficultDays(
 
   for (const [date, dayEvents] of eventsByDate.entries()) {
     const weekday = formatFiWeekday(date);
-    const label = new Date(`${date}T12:00:00+03:00`).toLocaleDateString('fi-FI', {
+    const label = new Date(`${date}T12:00:00${helsinkiOffsetForDateISO(date)}`).toLocaleDateString('fi-FI', {
       weekday: 'short',
       day: 'numeric',
       month: 'numeric'

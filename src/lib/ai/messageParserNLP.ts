@@ -143,7 +143,7 @@ export function extractTimesFromFinnishText(text: string): {
     const [hStr = '15', mStr = '00'] = kickoff.split(':');
     const h = Number(hStr);
     const m = Number(mStr);
-    const endH = (h + 1).toString().padStart(2, '0');
+    const endH = ((h + 1) % 24).toString().padStart(2, '0');
     end = `${endH}:${m.toString().padStart(2, '0')}`;
   }
 

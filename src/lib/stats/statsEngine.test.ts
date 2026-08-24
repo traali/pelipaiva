@@ -80,19 +80,24 @@ describe('Stats Engine', () => {
     expect(stats.leagueName).toContain('Salibandyliitto');
   });
 
-  it('generates appropriate league names and set scores for volleyball', () => {
+  it('generates appropriate league names and honest preview for volleyball', () => {
     const stats = generateOrResolveMatchStats('PuMa Volley N2', 'VanLe N2', 'volleyball');
     expect(stats.leagueName).toContain('Lentopalloliitto');
     expect(stats.scoreType).toBe('sets');
-    expect(stats.setScores).toBeDefined();
-    expect(stats.liveScore?.period).toContain('Erät');
+    // Synthetic previews never fabricate results (M-05): upcoming = not played.
+    expect(stats.isSynthetic).toBe(true);
+    expect(stats.setScores).toBeUndefined();
+    expect(stats.liveScore?.home).toBe(0);
+    expect(stats.liveScore?.period).toBe('Ei alkanut');
   });
 
-  it('generates appropriate league names and points for basketball', () => {
+  it('generates appropriate league names and honest preview for basketball', () => {
     const stats = generateOrResolveMatchStats('Tapiolan Honka', 'HNMKY', 'basketball');
     expect(stats.leagueName).toContain('Koripalloliitto');
     expect(stats.scoreType).toBe('points');
-    expect(stats.liveScore?.home).toBe(68);
+    // No fabricated 68–62 final on an upcoming game (M-05).
+    expect(stats.liveScore?.home).toBe(0);
+    expect(stats.liveScore?.period).toBe('Ei alkanut');
   });
 });
 

@@ -1430,8 +1430,8 @@ export async function fetchOfficialTeamData(
 // ============================================================================
 
 /**
- * Test-only invented magazine. Production ingest never calls this.
- * Live cards use buildMatchStatsFromOfficial.
+ * Generates synthetic match stats for display when no official data is available.
+ * Returns isSynthetic: true so the UI can distinguish from real data.
  */
 export function generateOrResolveMatchStats(
   homeTeam: string,
@@ -1444,23 +1444,22 @@ export function generateOrResolveMatchStats(
 
   let leagueName = 'Palloliitto T13 Eteläinen Ykkönen (Lohko 1)';
   let scoreType: 'goals' | 'sets' | 'points' = 'goals';
-  let liveScore = { home: 2, away: 1, isLive: false, period: 'Päättynyt' };
+  let liveScore = { home: 0, away: 0, isLive: false, period: '' };
   let setScores: string[] | undefined;
 
   if (isVolleyball) {
     leagueName = 'Lentopalloliitto N2 Lohko 3 (Torneopal)';
     scoreType = 'sets';
-    liveScore = { home: 3, away: 1, isLive: false, period: 'Päättynyt (Erät 3-1)' };
-    setScores = ['25-22', '23-25', '25-18', '25-20'];
   } else if (isBasketball) {
     leagueName = 'Koripalloliitto U14 Aluesarja (Basket.fi / Torneopal)';
     scoreType = 'points';
-    liveScore = { home: 68, away: 62, isLive: false, period: 'Päättynyt' };
   } else if (isFloorball) {
     leagueName = 'Salibandyliitto P11 Kilpasarja (Torneopal)';
     scoreType = 'goals';
-    liveScore = { home: 5, away: 3, isLive: false, period: 'Päättynyt' };
   }
+  // Synthetic preview never fabricates a result: upcoming matches must read as
+  // "not played" in every sport branch (M-05).
+  liveScore = { home: 0, away: 0, isLive: false, period: 'Ei alkanut' };
 
   const homeRoster: TeamSquadRoster = {
     teamName: homeTeam,
@@ -1549,6 +1548,7 @@ export function generateOrResolveMatchStats(
     scoreType,
     setScores,
     liveScore,
+    isSynthetic: true,
     goalsTimeline: [
       { minute: 14, player: 'Maija Oinonen', team: 'home', assistPlayer: 'Aada K.' },
       { minute: 31, player: 'Ella Virtanen', team: 'away', isPenalty: false },

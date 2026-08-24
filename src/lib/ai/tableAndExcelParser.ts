@@ -179,6 +179,14 @@ export async function parseExcelFileBuffer(
   sport: SportType = 'football',
   defaultPlayer = 'Maija'
 ): Promise<ParsedTableResult> {
+  // Size cap before parse: xlsx@0.18.5 (npm registry's last CE release) has
+  // public prototype-pollution/ReDoS advisories on untrusted input; the
+  // vendor's fixed versions are distributed off-registry. Cap + local-only
+  // blast radius is the interim mitigation until a vendored upgrade lands.
+  const MAX_BYTES = 2 * 1024 * 1024;
+  if (buffer.byteLength > MAX_BYTES) {
+    return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
+  }
   const XLSX = await import('xlsx');
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheetName = workbook.SheetNames[0];

@@ -37,13 +37,15 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
   const [currentFrameIndex, setCurrentFrameIndex] = useState(frames.length - 1);
   const [isPlaying, setIsPlaying] = useState(true);
 
-  // Refresh timestamps every 60s
+  // Refresh timestamps every 60s — only while the modal is actually open
+  // (M-24/V48: the interval previously ran for every mounted card, forever).
   useEffect(() => {
+    if (!isOpen) return;
     const timer = setInterval(() => {
       setFrames(getImageryLoopTimestamps());
     }, 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isOpen]);
 
   // Animation Loop Timer
   useEffect(() => {

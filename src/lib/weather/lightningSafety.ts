@@ -18,6 +18,8 @@ export function compute30_30Rule(
   let nearestStrikeKm: number | undefined;
   let strikesWithin30kmCount = 0;
   let mostRecentStrikeWithin10kmTimeMs: number | undefined;
+  // Recency reference for the WATCH tier: newest strike within the 30 km scan.
+  let mostRecentStrikeWithin30kmTimeMs: number | undefined;
 
   for (const strike of strikes) {
     const strikePoint: [number, number] = [strike.lng, strike.lat];
@@ -27,6 +29,10 @@ export function compute30_30Rule(
       strikesWithin30kmCount++;
       if (nearestStrikeKm === undefined || distKm < nearestStrikeKm) {
         nearestStrikeKm = distKm;
+      }
+      const strikeTimeMs30 = new Date(strike.timeIso).getTime();
+      if (!mostRecentStrikeWithin30kmTimeMs || strikeTimeMs30 > mostRecentStrikeWithin30kmTimeMs) {
+        mostRecentStrikeWithin30kmTimeMs = strikeTimeMs30;
       }
     }
 
@@ -41,7 +47,9 @@ export function compute30_30Rule(
   // Evaluate 30/30 Rule
   if (mostRecentStrikeWithin10kmTimeMs) {
     const elapsedMinutes = (referenceTimeMs - mostRecentStrikeWithin10kmTimeMs) / 60000;
-    if (elapsedMinutes < 30) {
+    // Clamp negatives: a future-dated strike (clock skew) previously produced a
+    // negative elapsed that passed the < 30 test (M-13/V4).
+    if (elapsedMinutes >= 0 && elapsedMinutes < 30) {
       const remainingMinutes = Math.ceil(30 - elapsedMinutes);
       return {
         status: 'danger',
@@ -55,7 +63,15 @@ export function compute30_30Rule(
     }
   }
 
-  if (nearestStrikeKm && nearestStrikeKm <= 20) {
+  // `!= null` (not truthiness): a strike at exactly 0 km was skipped before,
+  // and the WATCH tier now honors a 30-minute recency on the newest ≤30 km
+  // strike — stale fronts no longer trigger WATCH (M-13/V4/V5).
+  if (
+    nearestStrikeKm != null &&
+    nearestStrikeKm <= 20 &&
+    mostRecentStrikeWithin30kmTimeMs &&
+    referenceTimeMs - mostRecentStrikeWithin30kmTimeMs <= 30 * 60 * 1000
+  ) {
     return {
       status: 'watch',
       nearestStrikeKm: Math.round(nearestStrikeKm * 10) / 10,

@@ -27,7 +27,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   onNavigate
 }) => {
   const [showKit, setShowKit] = useState(false);
-  const { departureTime, countdownMinutes } = calculateDepartureCountdown(event);
+  // Respect the child's configured arrival rules — the bare call ignored them (M-41/V49).
+  const { departureTime, countdownMinutes } = calculateDepartureCountdown(event, profile?.arrivalRules);
   
   const kickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
     hour: '2-digit',

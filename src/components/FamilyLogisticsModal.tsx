@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Car, AlertTriangle, CheckCircle2, Share2, Copy, MapPin, User } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
@@ -19,9 +19,11 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
   profiles
 }) => {
   const [copied, setCopied] = useState(false);
-  const plan = isOpen
-    ? planFamilyLogistics(events, profiles)
-    : {
+  // Memoized: the mission graph is heavy and this modal re-renders on every
+  // internal interaction while open (M-63/V63).
+  const plan = useMemo(() => {
+    if (!isOpen) {
+      return {
         date: '',
         hasConflicts: false,
         conflictDetails: [] as string[],
@@ -29,10 +31,17 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
         summaryNarrative: '',
         whatsAppShareText: ''
       };
+    }
+    return planFamilyLogistics(events, profiles);
+  }, [events, profiles, isOpen]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(plan.whatsAppShareText);
-    setCopied(true);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(plan.whatsAppShareText);
+      setCopied(true);
+    } catch {
+      // Permission denied — leave silently non-copied rather than lie (M-08).
+    }
     setTimeout(() => setCopied(false), 2000);
   };
 

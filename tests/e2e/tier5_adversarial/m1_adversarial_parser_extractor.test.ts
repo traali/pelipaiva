@@ -51,13 +51,14 @@ describe('Adversarial Stress Suite — M1 URL Parser & HTML Extractor', () => {
 
         for (const url of spoofedUrls) {
           const result = parseAssociationUrl(url);
-          // none of these should resolve to attacker domains
-          if (result) {
-            expect(result.canonicalUrl).not.toContain('attacker.com');
-            expect(result.canonicalUrl).not.toContain('evil.com');
-            expect(result.canonicalUrl).not.toContain('lentopallo-torneopal.fi');
-            expect(result.canonicalUrl).not.toContain('attacker-torneopal.fi');
-          }
+          // Two-directional: either the parser rejects outright (null) or the
+          // resolved canonical URL provably stays on a legitimate host. The
+          // old `if (result)` guard silently skipped every assertion (M-36/V22).
+          if (result === null) continue;
+          expect(result.canonicalUrl).not.toContain('attacker.com');
+          expect(result.canonicalUrl).not.toContain('evil.com');
+          expect(result.canonicalUrl).not.toContain('lentopallo-torneopal.fi');
+          expect(result.canonicalUrl).not.toContain('attacker-torneopal.fi');
         }
       });
 

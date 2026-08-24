@@ -332,7 +332,10 @@ export async function resolveSportsVenue(
     try {
       const lipasUrl =
         'https://api.lipas.fi/v2/sports-sites?city-codes=91,49,92&type-codes=1110,1340,1350&page-size=200';
-      const res = await fetch(lipasUrl, { headers: { Accept: 'application/json' } });
+      const res = await fetch(lipasUrl, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(5000)
+      });
       if (res.ok) {
         const payload = await res.json();
         const items: Record<string, unknown>[] = Array.isArray(payload?.items) ? payload.items : [];
@@ -373,7 +376,7 @@ export async function resolveSportsVenue(
 
     try {
       const pUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(rawVenueString)}&type=unit`;
-      const pRes = await fetch(pUrl);
+      const pRes = await fetch(pUrl, { signal: AbortSignal.timeout(5000) });
       if (pRes.ok) {
         const pJson = await pRes.json();
         const results: Array<Record<string, unknown>> = pJson.results || [];
@@ -409,6 +412,9 @@ export async function resolveSportsVenue(
     name: rawVenueString || 'Tuntematon kenttä',
     normalizedName: normalized,
     coordinates: { lat: 60.1872, lng: 24.9248 },
+    // Flag the unverifiable fallback so UI can show "Sijainti arvioitu"
+    // instead of presenting Helsinki as fact (M-15/V21).
+    isApproximateLocation: true,
     isIndoor: indoorGuess,
     surface: indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g',
     hasFloodlights: true

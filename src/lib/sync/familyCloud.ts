@@ -2,6 +2,7 @@ import { db, PelipaivaDB } from '../storage/db';
 import { PlayerProfile, SportType } from '../../types/matchday';
 import { generateStableProfileId } from '../clubs/attachTeam';
 import { ingestSourceForProfile } from '../clubs/ingestOfficial';
+import { swatchForHex } from '../sport/teamColors';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 
 export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
@@ -45,7 +46,9 @@ export async function fetchFamilyRoster(
     method: 'GET',
     headers: {
       Accept: 'application/json'
-    }
+    },
+    // Hard ceiling — a stalled Worker connection must never hang the join/sync (M-14).
+    signal: AbortSignal.timeout(10_000)
   });
 
   if (res.status === 404) return null;
@@ -96,7 +99,9 @@ export async function pushFamilyRoster(
     const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}`, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(roster)
+      body: JSON.stringify(roster),
+      // Hard ceiling — a stalled Worker connection must never hang sync (M-14).
+      signal: AbortSignal.timeout(10_000)
     });
 
     if (res.status === 409) {
@@ -175,10 +180,18 @@ export function mergeRosters(
         playerName: rp.playerName,
         teamName: rp.teamName,
         sport: rp.sport,
-        primaryColor: 'sininen',
+        // KV roster intentionally carries colorHex only (FINAL §4.1, kit =
+        // family truth); 'sininen' is just the local display-label fallback.
+        primaryColor: rp.colorHex ? swatchForHex(rp.colorHex).label : 'sininen',
         calendarUrl: rp.calendarUrl,
         associationUrl: rp.associationUrl,
-        associationType: rp.associationType as any,
+        associationType:
+          rp.associationType === 'palloliitto' ||
+          rp.associationType === 'salibandy' ||
+          rp.associationType === 'basket' ||
+          rp.associationType === 'torneopal'
+            ? rp.associationType
+            : undefined,
         teamId: rp.teamId,
         colorHex: rp.colorHex || '#3b82f6'
       });
@@ -290,8 +303,16 @@ export async function syncFamilyRosterCycle(
   const cleanCode = normalizeFamilyCode(familyCode);
 
   try {
-    // 1. Load local profiles
-    const localProfiles = await databaseInstance.profiles.toArray();
+    // 1. Load local profiles — demo rows must never leak into a real family
+    // roster (M-08/N2). Demo ids are seeded by handleStartDemo.
+    const isDemoProfileId = (id: string) =>
+      id.startsWith('profile-ppj-') ||
+      id.startsWith('profile-topola-') ||
+      id.startsWith('profile-kw-') ||
+      id === 'profile-hjk-demo';
+    const localProfiles = (await databaseInstance.profiles.toArray()).filter(
+      (p) => !isDemoProfileId(p.id)
+    );
     const syncRecord = await databaseInstance.syncState.get('family');
     const localTombstonesStr = localStorage.getItem(`pelipaiva_tombstones_${cleanCode}`);
     const localTombstones: TombstoneRecord[] = localTombstonesStr ? JSON.parse(localTombstonesStr) : [];

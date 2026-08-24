@@ -89,7 +89,7 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
 
   const shown = cycle[cursor] || snapshot.nextEvent;
   const profile = shown ? profiles.find((p) => p.id === shown.profileId) : undefined;
-  const depart = shown ? calculateDepartureCountdown(shown) : undefined;
+  const depart = shown ? calculateDepartureCountdown(shown, profile?.arrivalRules) : undefined;
   const temp = shown?.weather?.isForecastLongRange ? undefined : shown?.weather?.temperatureC;
 
   return (

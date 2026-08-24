@@ -43,7 +43,7 @@ Critic loop: `src/lib/agents/familyMission.test.ts` (overlap, indoor shoes, talk
 
 - Core logic must work **offline**.
 - A parent should be able to **audit** why the app said “kaksi kuskia”.
-- Product constraint: no LLM in the product. Copilot is a keyword matcher over Dexie (`queryFamilySchedule`).
+- Product constraint: no cloud LLM and no server-side inference. Copilot is deterministic keyword/NLP reasoning over Dexie (`queryFamilySchedule`); when the browser exposes Chrome's on-device Gemini Nano (`window.ai`), `localAiEngine` upgrades answers locally — still zero network, zero product API keys.
 
 ## Files
 

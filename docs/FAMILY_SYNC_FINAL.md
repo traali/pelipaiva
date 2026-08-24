@@ -44,7 +44,7 @@ Taken from v1.1. Only these enter the build.
 | Drop | Why |
 | --- | --- |
 | 30-day tombstone GC | KV TTL is 7 days; the whole record dies first |
-| Dual `If-Match` + `X-Pelipaiva-Rev` | This Worker is the only hop. Quote `If-Match` if you want. Stop there. |
+| Dual `If-Match` + `X-Pelipaiva-Rev` | This Worker is the only hop. Quote `If-Match` if you want. Stop there. *(Implementation note 2026-08-24: the Worker still accepts legacy `X-Pelipaiva-Rev` as a fallback header for older clients — treat it as deprecated, not removed.)* |
 | `localColorHex` vs family color | Kit is family truth. Last-write-wins on `colorHex`. |
 
 | Optional | Why |
@@ -144,7 +144,7 @@ DELETE /api/family/:code
 
 On 409: GET → union by id → apply tombstones → rev+1 → PUT.
 
-Client: PUT debounce 1.5s after add/update/delete. GET on focus + every 30s while visible. Pause in background.
+Client: PUT debounce 1.5s after add/update/delete. GET on focus + every 180s while visible (raised from the drafted 30s so one phone stays under Worker GET:20/15min). Pause in background. All family fetches carry a 10 s AbortSignal timeout; DELETE requires If-Match when the slot holds data (Worker enforces).
 
 ---
 

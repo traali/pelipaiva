@@ -61,6 +61,12 @@ export async function fetchFmiMatchWeather(
   if (hit) return hit;
   const pending = fetchFmiMatchWeatherUncached(coords, startTimeIso, endTimeIso, proxyUrl);
   weatherMemo.set(key, pending);
+  // Never negative-cache a failure: a transient FMI blip must be retryable
+  // on the next refresh (M-06/V19).
+  pending.catch(() => {
+    const cached = weatherMemo.get(key);
+    if (cached === pending) weatherMemo.delete(key);
+  });
   return pending;
 }
 
@@ -78,7 +84,8 @@ async function fetchFmiMatchWeatherUncached(
   const targetUrl = proxyUrl ? `${proxyUrl}?url=${encodeURIComponent(fmiQueryUrl)}` : fmiQueryUrl;
 
   try {
-    const res = await fetch(targetUrl);
+    // Hard ceiling so a stalled FMI/proxy connection can never hang a refresh (M-14).
+    const res = await fetch(targetUrl, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`FMI fetch failed with status ${res.status}`);
     const xmlText = await res.text();
 
@@ -98,7 +105,6 @@ async function fetchFmiMatchWeatherUncached(
     let windGust = Number.NaN;
     let rainMmh = 0.0;
     let humidity = 70;
-    let rainProb = 0;
 
     if (typeof doubleList === 'string') {
       const lines = doubleList.trim().split(/\r?\n|\s{2,}/);
@@ -129,7 +135,7 @@ async function fetchFmiMatchWeatherUncached(
     let turfCondition: 'dry' | 'slick' | 'frozen' | 'snowy' = 'dry';
     if (temperature < -1) {
       turfCondition = 'frozen';
-    } else if (rainMmh > 0.3 || rainProb > 45) {
+    } else if (rainMmh > 0.3) {
       turfCondition = 'slick';
     }
 
@@ -138,12 +144,12 @@ async function fetchFmiMatchWeatherUncached(
       feelsLikeC: feelsLike,
       windSpeedMs: Math.round(windSpeed * 10) / 10,
       windGustMs: Math.round(windGust * 10) / 10,
-      rainProbabilityPercent: rainProb,
+      // FMI point forecast does not expose a probability here — omit rather
+      // than report a fabricated constant (M-06).
       precipitationMmh: Math.round(rainMmh * 10) / 10,
-      rainTimeline: [
-        { time: startTimeIso, precipitationMmh: rainMmh },
-        { time: endTimeIso, precipitationMmh: Math.round(rainMmh * 1.2 * 10) / 10 }
-      ],
+      // Single measured timestep only; the old ×1.2 second point was invented
+      // data rendered as a measurement by RainRadarCurve.
+      rainTimeline: [{ time: startTimeIso, precipitationMmh: rainMmh }],
       turfCondition
     };
   } catch (error) {

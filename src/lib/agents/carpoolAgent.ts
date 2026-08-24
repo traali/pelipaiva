@@ -45,7 +45,6 @@ export function carpoolAgent(
     let driverSlot: CarpoolLeg['driverSlot'] = 'kuski-1';
     if (sameVenueNext) driverSlot = 'yhteiskyyti';
     else if (isConflicted && i > 0) driverSlot = 'kuski-2';
-    else if (i > 0 && !isConflicted) driverSlot = 'kuski-1';
 
     const kickoff = formatFiTime(ev.startTime);
     legs.push({

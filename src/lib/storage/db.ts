@@ -436,6 +436,7 @@ export async function clearAllDatabaseData(targetDb: PelipaivaDB = db): Promise<
     targetDb.teamRosters.clear(),
     targetDb.arrivalRules.clear(),
     targetDb.venuePins.clear(),
-    targetDb.syncState.clear()
+    targetDb.syncState.clear(),
+    targetDb.customAliases.clear()
   ]);
 }

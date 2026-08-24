@@ -92,7 +92,7 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                   </h3>
                   <p className="text-xs text-text-muted flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-pitch animate-pulse" />
-                    100% Laitekohtainen tekoäly & aikataulujärki
+                    Laitekohtainen tekoäly & aikataulujärki
                   </p>
                 </div>
               </div>

@@ -98,8 +98,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     let resolved = stats;
     if (!resolved && !isTraining) {
       resolved = generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport);
+      // Synthetic previews stay ephemeral: never persisted as if they were
+      // federation data (M-05 / anti-synthetic constitution).
       setStats(resolved);
-      db.events.update(event.id, { stats: resolved }).catch(console.warn);
     }
     setIsStatsModalOpen(true);
   };
@@ -329,7 +330,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />
-            <span className="truncate">{venue.name}</span>
+            <span className="truncate">
+              {venue.name}
+              {event.venue.isApproximateLocation && (
+                <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti arvioitu)</span>
+              )}
+            </span>
             <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
               {surfaceLabel(venue.surface, venue.isIndoor)}
             </span>
@@ -570,6 +576,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         isOpen={isVenueModalOpen}
         onClose={() => setIsVenueModalOpen(false)}
         currentVenue={localVenue}
+        eventId={event.id}
         onSaved={(updated) => setLocalVenue(updated)}
       />
     </>

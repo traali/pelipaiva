@@ -114,7 +114,7 @@ export const RainRadarCurve: React.FC<RainRadarCurveProps> = ({
         </motion.button>
 
         <div className="flex items-center justify-between text-[11px] text-text-secondary mt-2.5">
-          <span>Sateen todennäköisyys: {weather.rainProbabilityPercent}%</span>
+          <span>{weather.rainProbabilityPercent != null ? `Sateen todennäköisyys: ${weather.rainProbabilityPercent}%` : 'Sademäärä: mm'}</span>
           <span
             className={`font-semibold capitalize ${
               weather.turfCondition === 'frozen'

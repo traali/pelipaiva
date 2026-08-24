@@ -16,6 +16,9 @@ export type PitchSurface =
   | 'natural_grass'
   | 'indoor_parquet'
   | 'indoor_synthetic'
+  | 'indoor_turf'
+  | 'sand'
+  | 'ice'
   | 'gravel';
 
 export type FootwearRecommendation =
@@ -40,6 +43,8 @@ export interface VenueInfo {
   isIndoor: boolean;
   surface: PitchSurface;
   hasFloodlights: boolean;
+  /** True when coordinates are the Helsinki fallback, not a verified venue (M-15). */
+  isApproximateLocation?: boolean;
   lipasId?: number;
   isUserPinned?: boolean;
 }
@@ -54,7 +59,8 @@ export interface WeatherCondition {
   feelsLikeC: number;
   windSpeedMs: number;
   windGustMs: number;
-  rainProbabilityPercent: number;
+  /** Omitted when the upstream forecast provides no probability (never fabricated). */
+  rainProbabilityPercent?: number;
   precipitationMmh: number;
   rainTimeline: RainDataPoint[];
   turfCondition: 'dry' | 'slick' | 'frozen' | 'snowy';
@@ -184,6 +190,8 @@ export interface FullMatchStats {
   standingsTable: StandingRow[];
   topScorers: TopScorer[];
   headToHeadHistory: HeadToHeadMatch[];
+  /** True when this object is deterministic preview fiction, not federation data. Never persist. */
+  isSynthetic?: boolean;
   commonOpponents: CommonOpponentComparison[];
   squadRosters: {
     home: TeamSquadRoster;

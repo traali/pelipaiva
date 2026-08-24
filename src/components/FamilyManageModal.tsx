@@ -36,6 +36,10 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
   const [colorForId, setColorForId] = useState<string | null>(null);
+  const [undoState, setUndoState] = useState<{
+    message: string;
+    undoAction: () => Promise<void>;
+  } | null>(null);
 
   // Group profiles by player name
   const playerGroups = React.useMemo(() => {
@@ -47,13 +51,6 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
     }
     return Array.from(map.entries());
   }, [profiles]);
-
-  if (!isOpen) return null;
-
-  const [undoState, setUndoState] = useState<{
-    message: string;
-    undoAction: () => Promise<void>;
-  } | null>(null);
 
   const recordTombstones = async (deletedIds: string[]) => {
     const sync = await db.syncState.get('family');
@@ -69,6 +66,20 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
     }
   };
 
+  // Undo must retract the tombstone too, or the restored profile is
+  // re-deleted on every other family device (M-17/N4).
+  const removeTombstones = async (ids: string[]) => {
+    const sync = await db.syncState.get('family');
+    if (sync && sync.syncKey) {
+      const key = `pelipaiva_tombstones_${sync.syncKey}`;
+      const existingStr = localStorage.getItem(key);
+      const list: Array<{ id: string; deletedAt: string }> = existingStr ? JSON.parse(existingStr) : [];
+      const idSet = new Set(ids);
+      localStorage.setItem(key, JSON.stringify(list.filter((t) => !idSet.has(t.id))));
+      await db.syncState.update('family', { pendingUpload: true });
+    }
+  };
+
   const handleDeleteProfile = async (profileId: string) => {
     const targetProfile = profiles.find((p) => p.id === profileId);
     if (!targetProfile) return;
@@ -80,8 +91,11 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
       await db.events.delete(ev.id);
     }
 
+    // Record the tombstone immediately — if the tab closes before the 5 s
+    // undo window elapses, the deletion previously never propagated (M-17/N4).
+    await recordTombstones([profileId]);
+
     const timer = setTimeout(() => {
-      recordTombstones([profileId]);
       setUndoState(null);
     }, 5000);
 
@@ -89,6 +103,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
       message: `Joukkue ${targetProfile.teamName} poistettu.`,
       undoAction: async () => {
         clearTimeout(timer);
+        await removeTombstones([profileId]);
         await db.profiles.put(targetProfile);
         for (const ev of eventsToDelete) {
           await db.events.put(ev);
@@ -110,8 +125,9 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
       }
     }
 
+    await recordTombstones(ids);
+
     const timer = setTimeout(() => {
-      recordTombstones(ids);
       setUndoState(null);
     }, 5000);
 
@@ -119,6 +135,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
       message: `Pelaaja ${name} ja kaikki joukkueet poistettu.`,
       undoAction: async () => {
         clearTimeout(timer);
+        await removeTombstones(ids);
         for (const p of childProfiles) {
           await db.profiles.put(p);
         }
@@ -147,6 +164,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>

@@ -31,7 +31,7 @@ import { db } from '../lib/storage/db';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
-import { searchPopularClubs } from '../lib/clubs/popularClubsCatalog';
+import { searchPopularClubs, type ClubPreset } from '../lib/clubs/popularClubsCatalog';
 import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
 import { TeamColorPicker } from './TeamColorPicker';
 
@@ -92,24 +92,36 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
   const [showGuide, setShowGuide] = useState(false);
   const [clubSearchQuery, setClubSearchQuery] = useState('');
+  const [clubMatches, setClubMatches] = useState<ClubPreset[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Handle escape key
+  // Handle escape key — never abandon an in-flight save/import (M-45/V61)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !isSaving && !isOcrProcessing) {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, isSaving, isOcrProcessing, onClose]);
 
   // Sync initial props when opened (only on open transition)
   const prevIsOpen = useRef(false);
+  // Deferred close timers must die with the modal, or they fire post-close (M-45/N13).
+  const closeTimersRef = useRef<number[]>([]);
+  useEffect(() => {
+    const timers = closeTimersRef;
+    return () => {
+      for (const t of timers.current) window.clearTimeout(t);
+      timers.current = [];
+    };
+  }, []);
+  // Explicit feedback when a parse produces nothing — silence is a failure (M-09/H7).
+  const [parseNotice, setParseNotice] = useState('');
   useEffect(() => {
     if (isOpen && !prevIsOpen.current) {
       setSelectedPlayer(initialPlayerName || existingPlayers[0] || 'Maija');
@@ -143,6 +155,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     setErrorMessage('');
     const results = parseMultipleSportsMessages(trimmed, selectedPlayer);
     setExtractedMessageEvents(results);
+    setParseNotice(
+      results.length === 0
+        ? 'Mitään ei tunnistettu. Varmista että viestissä on päivä ja kellonaika (esim. "ti 17.4 klo 18.30") ja vastustaja.'
+        : ''
+    );
     if (results.length > 0 && results[0]?.sport) {
       setSelectedSport(results[0].sport);
     }
@@ -154,6 +171,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     setErrorMessage('');
     const res = parsePastedSpreadsheetText(pastedTableText, selectedSport, selectedPlayer);
     setExtractedTableEvents(res.events);
+    setParseNotice(
+      res.events.length === 0
+        ? 'Taulukosta ei löytynyt otteluita. Vaadi sarakkeita: päivä, kellonaika, vastustaja, kenttä.'
+        : ''
+    );
   };
 
   // Excel / Image file upload
@@ -185,6 +207,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         setOcrProgress(p.progress);
       });
       setOcrExtractedEvents(res.freeformEvents);
+      setParseNotice(
+        res.freeformEvents.length === 0
+          ? 'Kuvasta ei tunnistettu otteluita. Kuvakaappauksen tulee näyttää ajat ja vastustajat selkeästi.'
+          : ''
+      );
       setActiveTab('ocr');
     } catch (err) {
       console.error(err);
@@ -231,11 +258,13 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
       }
 
       setSuccessMessage(`Tallennettu ${usable.length} ottelua pelaajalle ${selectedPlayer}!`);
-      setTimeout(() => {
+      closeTimersRef.current.push(
+        window.setTimeout(() => {
         setSuccessMessage('');
         onEventsImported?.();
         onClose();
-      }, 1100);
+      }, 1100)
+      );
     } catch (err: any) {
       setErrorMessage(err?.message || 'Tallennus epäonnistui');
     } finally {
@@ -271,11 +300,13 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         }
       }
       setSuccessMessage(`Joukkue tuotu onnistuneesti pelaajalle ${who}!`);
-      setTimeout(() => {
+      closeTimersRef.current.push(
+        window.setTimeout(() => {
         setSuccessMessage('');
         onEventsImported?.();
         onClose();
-      }, 1000);
+      }, 1000)
+      );
     } catch (err: any) {
       setErrorMessage(err?.message || 'Nouto epäonnistui. Tarkista verkko tai linkin muoto.');
     } finally {
@@ -507,21 +538,39 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                     value={clubSearchQuery}
                     placeholder="Kirjoita seuran nimi..."
                     onChange={(e) => {
+                      // Suggest only — nothing fills the form until the user
+                      // explicitly taps a result (M-27: silent autofill imported
+                      // the wrong club's season under a child's name).
                       const q = e.target.value;
                       setClubSearchQuery(q);
-                      if (q.trim().length > 1) {
-                        const found = searchPopularClubs(q);
-                        if (found.length > 0) {
-                          const top = found[0]!;
-                          setClassicTeamName(top.name);
-                          setSelectedSport(top.sport);
-                          setClassicUrl(top.sampleTeamUrl);
-                          setColorHex(top.colorHex);
-                        }
-                      }
+                      setClubMatches(q.trim().length > 1 ? searchPopularClubs(q).slice(0, 5) : []);
                     }}
                     className="w-full rounded-xl border border-pitch/30 bg-pitch/10 px-3.5 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-pitch focus:outline-none"
                   />
+                  {clubMatches.length > 0 && (
+                    <div className="mt-1.5 flex flex-col gap-1" role="listbox" aria-label="Seuraehdotukset">
+                      {clubMatches.map((club) => (
+                        <button
+                          key={club.id}
+                          type="button"
+                          role="option"
+                          aria-selected={false}
+                          onClick={() => {
+                            setClassicTeamName(club.name);
+                            setSelectedSport(club.sport);
+                            setClassicUrl(club.sampleTeamUrl);
+                            setColorHex(club.colorHex);
+                            setClubMatches([]);
+                            setClubSearchQuery('');
+                          }}
+                          className="text-left p-2 rounded-lg bg-surface-elevated border border-border-subtle hover:border-pitch/50 text-[11px] text-text-primary cursor-pointer"
+                        >
+                          <span className="font-bold">{club.name}</span>
+                          <span className="text-text-secondary"> · {club.city}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleClassicSubmit} className="flex flex-col gap-3">
@@ -630,6 +679,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                   <span>Jäsennä ottelutiedot tekoälyllä</span>
                 </button>
 
+                {parseNotice && (
+                  <p role="status" className="p-2.5 rounded-xl bg-whistle/15 border border-whistle/40 text-[11px] font-semibold text-text-primary">
+                    {parseNotice}
+                  </p>
+                )}
+
                 <div aria-live="polite">
                   {extractedMessageEvents.length > 0 && (
                     <div className="mt-3 p-4 rounded-2xl bg-surface border border-pitch/40 flex flex-col gap-2.5">
@@ -706,6 +761,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                   <span>Jäsennä taulukon ottelut</span>
                 </button>
 
+                {parseNotice && (
+                  <p role="status" className="p-2.5 rounded-xl bg-whistle/15 border border-whistle/40 text-[11px] font-semibold text-text-primary">
+                    {parseNotice}
+                  </p>
+                )}
+
                 <div aria-live="polite">
                   {extractedTableEvents.length > 0 && (
                     <div className="mt-3 flex flex-col gap-2">
@@ -779,6 +840,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                         </div>
                       </div>
                     </div>
+                  )}
+                  {!isOcrProcessing && parseNotice && (
+                    <p role="status" className="mt-3 p-2.5 rounded-xl bg-whistle/15 border border-whistle/40 text-[11px] font-semibold text-text-primary">
+                      {parseNotice}
+                    </p>
                   )}
 
                   {ocrExtractedEvents.length > 0 && (

@@ -4,7 +4,7 @@ export { conflictAgent } from './conflictAgent';
 export { carpoolAgent } from './carpoolAgent';
 export { volunteerAgent } from './volunteerAgent';
 export { tournamentAgent } from './tournamentAgent';
-export { sportsWeekendRange, helsinkiDateISO, formatFiTime } from './time';
+export { helsinkiDateISO, formatFiTime } from './time';
 export type {
   MissionControlSnapshot,
   FamilyConflict,

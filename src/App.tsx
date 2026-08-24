@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, deleteOfficialTeamData, ensureStoragePersistence } from './lib/storage/db';
+import { db, deleteOfficialTeamData, ensureStoragePersistence, clearAllDatabaseData } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
 import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { AmbientView } from './components/AmbientView';
@@ -143,6 +143,16 @@ export const App: React.FC = () => {
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);
             window.history.replaceState({}, document.title, window.location.pathname);
+          } else {
+            // FAMILY_CODES_OPS §7 mandates these client messages; the code
+            // stays in the URL so a fix/retry is possible (M-28).
+            const msg =
+              res.error === 'unknown_family'
+                ? 'Koodi ei ole voimassa. Tarkista koodi perheeltä.'
+                : res.error === 'rate_limited'
+                ? 'Liian monta yritystä — odota hetki ja yritä uudelleen.'
+                : 'Verkkovirhe — tarkista yhteys ja yritä uudelleen.';
+            window.alert(`Perheeseen liittyminen epäonnistui: ${msg}`);
           }
         })();
       }
@@ -188,6 +198,7 @@ export const App: React.FC = () => {
     );
   // Seed family demo from live tulospalvelu — no invented KäPa/Honka cards.
   const handleStartDemo = async () => {
+    if (!window.confirm('Tämä tyhjentää nykyiset tiedot ja lataa esimerkkikauden. Jatketaanko?')) return;
     setIsSeeding(true);
     try {
     await db.profiles.clear();
@@ -276,8 +287,8 @@ export const App: React.FC = () => {
   };
 
   const handleClearData = async () => {
-    await db.profiles.clear();
-    await db.events.clear();
+    if (!window.confirm('Haluatko varmasti tyhjentää kaikki tiedot?')) return;
+    await clearAllDatabaseData();
     setActiveProfileId('all');
     setIsOnboardingActive(true);
   };
@@ -297,9 +308,19 @@ export const App: React.FC = () => {
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [rawEvents, activeProfileId, profiles]);
 
+  const [clockTick, setClockTick] = useState(0);
+
+  // Re-run the mission-control graph once a minute so departure countdowns
+  // track the wall clock instead of freezing at last data change (M-40/V62).
+  useEffect(() => {
+    const t = setInterval(() => setClockTick((v) => v + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
   const snapshot = useMemo(
     () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules),
-    [rawEvents, profiles, arrivalRules]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick intentionally restarts the graph each minute
+    [rawEvents, profiles, arrivalRules, clockTick]
   );
 
   const otherCardsEvents = useMemo(
@@ -489,9 +510,15 @@ export const App: React.FC = () => {
     if (!ev) return;
 
     if (decision === 'use_official' && ev.mismatchFlags) {
+      // Adopt only from machine-readable official data — never from a display
+      // string, and never stamp the override when nothing was adopted (M-42/V59).
+      const officialIso = ev.mismatchFlags.officialStartTimeIso;
+      if (!officialIso) {
+        return handleResolveMismatch(eventId, 'keep_calendar');
+      }
       const updated: MatchdayEvent = {
         ...ev,
-        startTime: ev.mismatchFlags.officialStartTime || ev.startTime,
+        startTime: officialIso,
         venue: {
           ...ev.venue,
           name: ev.mismatchFlags.officialVenueName || ev.venue.name
@@ -521,7 +548,19 @@ export const App: React.FC = () => {
   };
 
   if (isAmbientMode) {
-    return <AmbientView events={filteredEvents} profiles={profiles} />;
+    return (
+      <AmbientView
+        events={filteredEvents}
+        profiles={profiles}
+        onExit={() => {
+          setIsAmbientMode(false);
+          // Strip a deep-linked ambient param so reload doesn't re-trap (M-29).
+          if (typeof window !== 'undefined' && (window.location.search.includes('ambient') || window.location.pathname === '/ambient')) {
+            window.history.replaceState({}, document.title, '/');
+          }
+        }}
+      />
+    );
   }
 
   if (isSeeding) {
@@ -732,7 +771,16 @@ export const App: React.FC = () => {
                 {isOverviewExpanded && (
                   <div className="p-3 pt-1 border-t border-border-subtle/50 flex flex-col gap-3">
                     {snapshot.days.length > 0 && (
-                      <WeekendStrip days={snapshot.days} weekendLabel={snapshot.weekendLabel} />
+                      <WeekendStrip
+                        days={snapshot.days}
+                        weekendLabel={snapshot.weekendLabel}
+                        onSelectEvent={(eventId) => {
+                          // Wire the previously-dead strip buttons (M-44):
+                          // select the event so it opens the stats modal.
+                          const ev = rawEvents.find((e) => e.id === eventId);
+                          if (ev && !ev.isTraining) setSelectedStatsEvent(ev);
+                        }}
+                      />
                     )}
                     <TalkooBoard talkoo={snapshot.talkoo} />
                     <TournamentWeekendPanel blocks={snapshot.tournaments} />
@@ -923,13 +971,8 @@ export const App: React.FC = () => {
               playerLog: log,
               score: updatedScore || selectedStatsEvent.score
             };
-            if (!selectedStatsEvent.stats) {
-              updates.stats = generateOrResolveMatchStats(
-                selectedStatsEvent.homeTeam,
-                selectedStatsEvent.awayTeam,
-                selectedStatsEvent.sport
-              );
-            }
+            // Persist only the player's own log/score — never the synthetic
+            // preview stats (M-05).
             await db.events.update(selectedStatsEvent.id, updates).catch(console.warn);
             setSelectedStatsEvent((prev) => (prev ? { ...prev, ...updates } : null));
           }}

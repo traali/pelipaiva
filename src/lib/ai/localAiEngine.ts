@@ -277,7 +277,7 @@ export async function queryFamilyScheduleWithLLM(
             'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta.'
         });
         const context = `Kalenterin tiedot: ${JSON.stringify(
-          events.slice(0, 5).map((e) => ({
+          events.slice(0, 15).map((e) => ({
             peli: e.title,
             aika: e.startTime,
             paikka: e.venue.name,
@@ -289,12 +289,13 @@ export async function queryFamilyScheduleWithLLM(
           return {
             answer: response.trim(),
             relevantEvents: fallback.relevantEvents,
-            confidence: 0.98
+            // Honest confidence: on-device model output, not a fabricated 0.98.
+            confidence: 0.75
           };
         }
       }
-    } catch {
-      // Fallback silently to deterministic reasoning
+    } catch (err) {
+      console.warn('[PELIPAIVA:COPILOT] Gemini path failed, using deterministic fallback:', err);
     }
   }
 

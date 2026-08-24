@@ -31,12 +31,12 @@ export const ThemeToggle: React.FC = () => {
       whileTap={{ scale: 0.94 }}
       transition={springTactile.snappy}
       onClick={() => setIsDark(!isDark)}
-      aria-label={isDark ? 'Vaihda tulitukseen' : 'Vaihda yötilaan'}
-      title={isDark ? 'Tulitus' : 'Yö'}
+      aria-label={isDark ? 'Vaihda päivätilaan' : 'Vaihda yötilaan'}
+      title={isDark ? 'Päivä' : 'Yö'}
       className="touch-target inline-flex items-center gap-1.5 rounded-md border border-border-strong bg-surface-elevated px-2.5 text-text-primary"
     >
       {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-      <span className="hidden text-xs font-semibold sm:inline">{isDark ? 'Yö' : 'Tulitus'}</span>
+      <span className="hidden text-xs font-semibold sm:inline">{isDark ? 'Yö' : 'Päivä'}</span>
     </motion.button>
   );
 };

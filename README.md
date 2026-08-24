@@ -96,7 +96,7 @@ npm run dev
 ## 🧪 Testing & Verification
 
 ```bash
-# Run Vitest test suites (13 tests in ~250ms)
+# Run Vitest test suites (45 files / 400+ tests)
 npm test
 ```
 

@@ -14,12 +14,11 @@ Pelipäivä is **not a calendar**. It is the Finnish parent’s match-morning co
 | Association HTML | `/api/proxy/ics?url=` (Palloliitto, tulospalvelu.fi, salibandy.fi, basket.fi, `*.torneopal.fi`) | `officialFixtures`, `leagueStandings`, `teamRosters` | Match cards, stats modal, reconciliation |
 | ICS feed | same proxy, allowlisted nimenhuuto / myclub / jopox | `events` | Hub, briefing |
 | FMI weather | proxy → `opendata.fmi.fi` | `events.weather` | Nappisvahti, kit extras, rain curve |
-| Helsinki parking | city WFS / signs (client via proxy where needed) | `events.parking` + `intel.engineVersion` | ParkkiSakko, Kiekkokello |
+| Helsinki parking | keyword-matched lot names + Tieliikennelaki disc rules (`parkingEaseEngine`) | `events.parking` | ParkkiSakko, Kiekkokello |
 | LIPAS geocode | fallback after 100+ slang aliases | `venuePins` if user corrects | Venue, indoor/surface |
-| Family share | Worker `/api/sync` PUT KV 7d (live Pages) / QR payload in this port | `profiles` | FamilyShareModal |
-| Nest Hub brief | `/api/nest/brief` on live Worker | — | Ambient |
+| Family share | Worker `/api/family/:code` PUT KV 7d (issued codes; see FAMILY_CODES_OPS) | `profiles` roster | FamilyShareModal |
 
-**This sandbox:** ICS/association fetch goes through `src/routes/api/proxy/ics.ts` + `proxiedUrl()`. No backend DB, no auth, no product LLM.
+**Note:** the historical `/api/nest/brief`, `/api/sync/:key` and `src/routes/api/proxy/ics.ts` paths no longer exist; ICS/association fetch goes through the Worker `/api/proxy/ics` + `proxiedUrl()`. No backend DB, no auth. Copilot is deterministic keyword/NLP reasoning with an *optional* on-device Gemini Nano upgrade when the browser exposes it (see localAiEngine).
 
 ## Data flow (calendar → briefing)
 

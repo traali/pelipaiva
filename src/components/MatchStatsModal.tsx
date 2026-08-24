@@ -214,14 +214,25 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
 
                 {/* Score / Live Clock */}
                 <div className="flex flex-col items-center">
-                  <div className="text-3xl md:text-4xl font-black font-tabular tracking-tight text-text-primary flex items-center justify-center gap-2">
-                    <span className="text-pitch">{stats.liveScore?.home ?? 0}</span>
-                    <span className="text-text-muted text-xl font-normal">-</span>
-                    <span className="text-radar">{stats.liveScore?.away ?? 0}</span>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
-                    {stats.liveScore?.period || 'Päättynyt'}
-                  </span>
+                  {stats.isSynthetic ? (
+                    <>
+                      <span className="text-2xl md:text-3xl font-black text-text-secondary">vs</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
+                        Ei tuloksia vielä
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl md:text-4xl font-black font-tabular tracking-tight text-text-primary flex items-center justify-center gap-2">
+                        <span className="text-pitch">{stats.liveScore?.home ?? 0}</span>
+                        <span className="text-text-muted text-xl font-normal">-</span>
+                        <span className="text-radar">{stats.liveScore?.away ?? 0}</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
+                        {stats.liveScore?.period || 'Päättynyt'}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {/* Away Team */}
@@ -870,16 +881,18 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 <p className="text-xs text-text-secondary leading-relaxed">
                   {stats.scoutAnalysis}
                 </p>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-surface-base/60 border border-border-subtle text-xs">
-                  <span>Kotijoukkueen kuntopuntari:</span>
-                  <span className="font-bold text-pitch">7 Voittoa peräkkäin 🔥</span>
-                </div>
+                {!stats.isSynthetic && (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-surface-base/60 border border-border-subtle text-xs">
+                    <span>Kotijoukkueen kuntopuntari:</span>
+                    <span className="font-bold text-pitch">7 Voittoa peräkkäin 🔥</span>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Modal Footer */}
             <div className="mt-5 pt-3 border-t border-border-subtle flex items-center justify-between text-[11px] text-text-muted">
-              <span>Lähde: Palloliitto Tulospalvelu / Torneopal</span>
+              <span>{stats.isSynthetic ? 'Arvioitu esikatselu — ei virallista lähdettä' : 'Lähde: Palloliitto Tulospalvelu / Torneopal'}</span>
               <button
                 onClick={onClose}
                 className="px-4 py-1.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-bold hover:border-pitch cursor-pointer"

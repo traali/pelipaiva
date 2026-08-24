@@ -1,7 +1,7 @@
 import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import type { TournamentBlock } from './types';
-import { formatFiTime, helsinkiDateISO } from './time';
+import { helsinkiDateISO } from './time';
 
 export function tournamentAgent(
   events: MatchdayEvent[],
@@ -75,10 +75,4 @@ export function tournamentAgent(
   }
 
   return blocks.sort((a, b) => new Date(a.firstKickoff).getTime() - new Date(b.firstKickoff).getTime());
-}
-
-export function tournamentLeaveHint(block: TournamentBlock): string {
-  const first = formatFiTime(block.firstKickoff);
-  const last = formatFiTime(block.lastEnd);
-  return `${block.childName}: ${block.matchCount} peliä ${first}–${last}. Lähde klo ${block.leaveBy}.`;
 }

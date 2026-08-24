@@ -173,7 +173,13 @@ async function torneopalGet<T>(
     if (v) clean[k] = v;
   }
 
+  // Overall deadline: 4 endpoints × 10 s each could hang ingest ~40 s. Cap the
+  // whole attempt sequence at 25 s so refresh/join UIs stay responsive (M-25/V45).
+  const deadline = Date.now() + 25_000;
+
   for (const ep of attempts) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 500) break;
     const search = new URLSearchParams(clean);
     const url = `${ep.base}/${method}?${search.toString()}`;
 
@@ -184,7 +190,7 @@ async function torneopalGet<T>(
           Referer: ep.referer,
         },
         referrerPolicy: "origin",
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(Math.min(10000, remaining)),
       });
       if (!res.ok) continue;
       const text = await res.text();
