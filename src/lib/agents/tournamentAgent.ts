@@ -6,7 +6,8 @@ import { formatFiTime, helsinkiDateISO } from './time';
 export function tournamentAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  arrivalRules: ArrivalRules[] = []
+  arrivalRules: ArrivalRules[] = [],
+  now?: Date
 ): TournamentBlock[] {
   const groups = new Map<string, MatchdayEvent[]>();
 
@@ -21,6 +22,7 @@ export function tournamentAgent(
     groups.set(key, list);
   }
 
+  const lookbackMs = now ? now.getTime() - 2 * 3600 * 1000 : null;
   const blocks: TournamentBlock[] = [];
   for (const [, list] of groups) {
     const matches = list.filter((e) => !e.isTraining && e.eventType !== 'meeting');
@@ -33,6 +35,12 @@ export function tournamentAgent(
     );
     const first = sorted[0]!;
     const last = sorted[sorted.length - 1]!;
+
+    // Exclude if all matches in this tournament block have already ended
+    if (lookbackMs !== null && new Date(last.endTime).getTime() < lookbackMs) {
+      continue;
+    }
+
     const profile = profiles.find((p) => p.id === first.profileId);
     const recovery =
       sorted.length >= 2

@@ -12,7 +12,7 @@ import {
   formatFiTime,
   formatFiWeekday,
   helsinkiDateISO,
-  sportsWeekendRange
+  sportsWeekRange
 } from './time';
 
 function helsinkiWallLabel(isoDate: string): string {
@@ -35,10 +35,10 @@ function colorOf(event: MatchdayEvent, profiles: PlayerProfile[]): string {
 function buildDayStrips(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  fridayISO: string,
+  mondayISO: string,
   now = new Date()
 ): WeekendDayStrip[] {
-  const days = [0, 1, 2].map((offset) => addHelsinkiDays(fridayISO, offset));
+  const days = [0, 1, 2, 3, 4, 5, 6].map((offset) => addHelsinkiDays(mondayISO, offset));
   const todayISO = helsinkiDateISO(now);
   const nowMs = now.getTime();
 
@@ -63,9 +63,10 @@ function buildDayStrips(
         childName: childName(e, profiles),
         colorHex: colorOf(e, profiles),
         sport: e.sport,
-        title: e.isTraining ? e.title : `${e.homeTeam} vs ${e.awayTeam || '—'}`,
+        title: e.isTraining ? (e.title || 'Harjoitukset') : `${e.homeTeam} vs ${e.awayTeam || '—'}`,
         venueName: e.venue.name,
         isTalkoo: Boolean(e.volunteerDuty),
+        isTraining: Boolean(e.isTraining || e.eventType === 'training'),
         isPast: new Date(e.endTime).getTime() < nowMs
       }))
     };
@@ -80,10 +81,7 @@ function byStart(a: MatchdayEvent, b: MatchdayEvent): number {
  * Deterministic family mission-control graph.
  * Planner runs specialists in a fixed order — no LLM, no network.
  *
- * nextEvent / leave-by come from the full upcoming calendar so a Wednesday
- * match is never starved by a Saturday fixture. The Fri–Sun strip stays
- * weekend-only. Specialists run on "now → end of this sports weekend"
- * (plus nextEvent if it falls later) so midweek conflicts still surface.
+ * Covers games, tournaments, and training/practices across the full 7-day sports week.
  */
 export function runMissionControlGraph(
   events: MatchdayEvent[],
@@ -91,7 +89,7 @@ export function runMissionControlGraph(
   now: Date = new Date(),
   arrivalRules: ArrivalRules[] = []
 ): MissionControlSnapshot {
-  const weekend = sportsWeekendRange(now);
+  const week = sportsWeekRange(now);
   const lookbackMs = now.getTime() - 2 * 3600 * 1000;
   const rulesFor = (profileId: string) => arrivalRules.find((r) => r.profileId === profileId);
 
@@ -101,20 +99,20 @@ export function runMissionControlGraph(
   const nextPlayer = nextEvent ? profiles.find((p) => p.id === nextEvent.profileId) : undefined;
   const depart = nextEvent ? calculateDepartureCountdown(nextEvent, rulesFor(nextEvent.profileId)) : undefined;
 
-  const windowEvents = eventsInRange(events, weekend.start, weekend.end).sort(byStart);
+  const windowEvents = eventsInRange(events, week.start, week.end).sort(byStart);
 
-  const graphEvents = upcoming.filter((e) => new Date(e.startTime).getTime() <= weekend.end.getTime());
+  const graphEvents = upcoming.filter((e) => new Date(e.startTime).getTime() <= week.end.getTime());
   const specialistEvents =
     nextEvent && !graphEvents.some((e) => e.id === nextEvent.id) ? [...graphEvents, nextEvent] : graphEvents;
 
   const conflicts = conflictAgent(specialistEvents, profiles);
   const carpool = carpoolAgent(specialistEvents, profiles, conflicts, arrivalRules);
   const talkoo = volunteerAgent(specialistEvents, profiles);
-  const tournaments = tournamentAgent(events, profiles, arrivalRules);
+  const tournaments = tournamentAgent(events, profiles, arrivalRules, now);
   const kitByEventId = kitAgent(specialistEvents, profiles);
 
-  const fridayISO = helsinkiDateISO(weekend.start);
-  const days = buildDayStrips(windowEvents, profiles, fridayISO, now);
+  const mondayISO = helsinkiDateISO(week.start);
+  const days = buildDayStrips(windowEvents, profiles, mondayISO, now);
 
   const conflictLine =
     conflicts.length === 0
@@ -123,17 +121,17 @@ export function runMissionControlGraph(
 
   const summary =
     windowEvents.length === 0 && !nextEvent
-      ? 'Ei merkittyjä otteluita tälle urheiluviikonlopulle.'
+      ? 'Ei merkittyjä otteluita tai harjoituksia tälle viikolle.'
       : windowEvents.length === 0 && nextEvent
         ? `Seuraava: ${childName(nextEvent, profiles)} ${formatFiTime(nextEvent.startTime)} · ${nextEvent.venue.name}. ${conflictLine}`
-        : `${windowEvents.length} tapahtumaa ${weekend.label}. ${conflictLine} ${talkoo.recommendation}`;
+        : `${windowEvents.length} tapahtumaa ${week.label}. ${conflictLine} ${talkoo.recommendation}`;
 
   const ambientLine = nextEvent
     ? `${childName(nextEvent, profiles)} · lähde klo ${depart?.departureTime} · ${nextEvent.venue.name}`
     : 'Ei seuraavaa peliä.';
 
   const whatsAppShareText = [
-    `PELIPÄIVÄ ${weekend.label}`,
+    `PELIPÄIVÄ ${week.label}`,
     'Kyytisuunnitelma',
     ...carpool.map(
       (l) =>
@@ -149,7 +147,7 @@ export function runMissionControlGraph(
 
   return {
     generatedAt: now.toISOString(),
-    weekendLabel: weekend.label,
+    weekendLabel: week.label,
     nextEvent,
     nextPlayer,
     leaveBy: depart?.departureTime,

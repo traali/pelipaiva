@@ -100,10 +100,10 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'elt1',
         home: 'EBT',
         away: 'TOPOLA',
-        start: '2026-08-22T09:45:00+03:00',
+        start: weekendAt(6, 9, 45),
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
-        status: 'played',
+        status: 'upcoming',
         homeScore: 6,
         awayScore: 52
       },
@@ -111,10 +111,10 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'elt2',
         home: 'TOPOLA',
         away: 'Jymy',
-        start: '2026-08-22T15:00:00+03:00',
+        start: weekendAt(6, 15, 0),
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
-        status: 'played',
+        status: 'upcoming',
         homeScore: 55,
         awayScore: 6
       },
@@ -122,10 +122,10 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'elt3',
         home: 'TOPOLA',
         away: 'Helmi Basket/Valkoinen',
-        start: '2026-08-23T10:30:00+03:00',
+        start: weekendAt(0, 10, 30),
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
-        status: 'played',
+        status: 'upcoming',
         homeScore: 21,
         awayScore: 14
       }
