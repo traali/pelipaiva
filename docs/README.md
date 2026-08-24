@@ -15,10 +15,12 @@ This expansion keeps the original local-first contract (Dexie, zero-auth, GDPR, 
 Start here:
 
 1. [AUDIT.md](./AUDIT.md) — APIs, Dexie, gaps
-2. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
-3. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
-4. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
-5. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — family bus (WhatsApp + KV roster)
-6. [FAMILY_CODES_OPS.md](./FAMILY_CODES_OPS.md) — **operators: issued codes, Cloudflare secret, rotate**
-7. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
-8. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2
+2. [AUDIT_2026-08-24T1405_ox-alpha_external-api-lifecycle-failure-audit.md](./AUDIT_2026-08-24T1405_ox-alpha_external-api-lifecycle-failure-audit.md) — **external API lifecycle & failure-mode audit**: 12-integration catalog + 11 findings (1 CRITICAL / 3 HIGH / 7 MEDIUM) with cause, line-level proof, and fix; remediation priority table
+3. [AUDIT_2026-08-24_ox-alpha.md](./AUDIT_2026-08-24_ox-alpha.md) — full 20-agent council audit: 25 findings (F-01…F-25) with root causes, line-level proofs, fact-check verdicts, vote tally, and P0–P3 remediation roadmap
+4. [USE_CASES.md](./USE_CASES.md) — parent-value backlog
+5. [ARCHITECTURE.md](./ARCHITECTURE.md) — runtime graph
+6. [AGENT_GRAPH.md](./AGENT_GRAPH.md) — build-time specialists
+7. [FAMILY_SYNC_FINAL.md](./FAMILY_SYNC_FINAL.md) — family bus (WhatsApp + KV roster)
+8. [FAMILY_CODES_OPS.md](./FAMILY_CODES_OPS.md) — **operators: issued codes, Cloudflare secret, rotate**
+9. [FAMILY_SYNC_ARCHITECTURE.md](./FAMILY_SYNC_ARCHITECTURE.md) — v1.0 product draft (superseded for build)
+10. [FAMILY_SYNC_ENHANCEMENTS.md](./FAMILY_SYNC_ENHANCEMENTS.md) — v1.1 notes; cut list is in FINAL §2
