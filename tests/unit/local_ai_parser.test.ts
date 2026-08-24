@@ -103,6 +103,14 @@ Mustat paidat päälle. Kahviovuoro klo 12-14.`;
       expect(results[2]?.awayTeam).toContain('VJS');
       expect(results[2]?.venueHint).toContain('Väinämöisen');
     });
+
+    it('does not invent Vastustaja @ 15:00 / Bollis from garbage paste', () => {
+      const result = parseFreeformSportsMessage('ok kiitos!', 'Maija');
+      expect(result.confidenceScore).toBeLessThan(0.5);
+      expect(result.kickoffTime).toBe('');
+      expect(result.awayTeam === 'Vastustaja' || result.confidenceScore < 0.5).toBe(true);
+      expect(result.venueHint).not.toContain('Bollis');
+    });
   });
 
   describe('2. Excel & Google Sheets Table Ingestion', () => {

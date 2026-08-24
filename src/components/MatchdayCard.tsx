@@ -76,17 +76,20 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
   const relatedConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
 
+  const venue = isVenueModalOpen ? localVenue : event.venue;
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
   const isPast =
     new Date(event.endTime) <= new Date() || currentScore !== undefined;
   const formattedKickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Europe/Helsinki'
   });
   const formattedWarmup = new Date(event.warmupTime).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Europe/Helsinki'
   });
 
   const isTraining = event.isTraining || event.eventType === 'training';
@@ -326,14 +329,14 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />
-            <span className="truncate">{localVenue.name}</span>
+            <span className="truncate">{venue.name}</span>
             <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
-              {surfaceLabel(localVenue.surface, localVenue.isIndoor)}
+              {surfaceLabel(venue.surface, venue.isIndoor)}
             </span>
             <button
               type="button"
               onClick={() => setIsVenueModalOpen(true)}
-              aria-label={`Korjaa kentän tietoja: ${localVenue.name}`}
+              aria-label={`Korjaa kentän tietoja: ${venue.name}`}
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-2 -mr-2 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
             >
               <Edit3 className="w-3.5 h-3.5" />

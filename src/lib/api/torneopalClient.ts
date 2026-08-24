@@ -11,29 +11,35 @@ import type {
   TeamSquadRoster,
   TopScorer,
 } from "../../types/matchday";
-import { proxiedUrl } from "./proxyUrl";
+import { helsinkiDateISO, addHelsinkiDays } from "../agents/time";
 
 /** Public SPA keys used by official tulospalvelu frontends. */
 const TUPA_KEY = "tpqgz8ddy2rt9w8xuyxr";
+const PALL_KEY = "4h7dznqdxwtp3hsfdyf5r793uahfxy7x";
+const SALIBANDY_KEY = "zsn3anknxzcfzc23k53jqdcd4pymutsf";
 
 const ENDPOINTS: Partial<
-  Record<AssociationType, { base: string; apiKey: string }>
+  Record<AssociationType, { base: string; apiKey: string; referer: string }>
 > = {
   palloliitto: {
     base: "https://spl.torneopal.fi/taso/rest",
-    apiKey: "4h7dznqdxwtp3hsfdyf5r793uahfxy7x",
+    apiKey: PALL_KEY,
+    referer: "https://tulospalvelu.palloliitto.fi/",
   },
   salibandy: {
     base: "https://salibandy-api.torneopal.net/taso/rest",
-    apiKey: "zsn3anknxzcfzc23k53jqdcd4pymutsf",
+    apiKey: SALIBANDY_KEY,
+    referer: "https://tulospalvelu.salibandy.fi/",
   },
   basket: {
     base: "https://tupa.api.torneopal.com/taso/rest",
     apiKey: TUPA_KEY,
+    referer: "https://www.basket.fi/",
   },
   torneopal: {
     base: "https://tupa.api.torneopal.com/taso/rest",
     apiKey: TUPA_KEY,
+    referer: "https://tupa.torneopal.fi/",
   },
 };
 
@@ -59,15 +65,15 @@ function namesMatch(a: string, b: string): boolean {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
-function finnishIso(dateStr: string, timeStr: string): string {
+function finnishIso(dateStr: string, timeStr: string): string | null {
   const date = str(dateStr);
   const time = str(timeStr) || "12:00:00";
-  if (!date) return new Date().toISOString();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const hhmm = time.length === 5 ? `${time}:00` : time;
   const offset = isFinnishSummerTime(date) ? "+03:00" : "+02:00";
   const iso = `${date}T${hhmm}${offset}`;
   const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : iso;
+  return Number.isNaN(parsed.getTime()) ? null : iso;
 }
 
 function isFinnishSummerTime(dateStr: string): boolean {
@@ -82,46 +88,115 @@ function isFinnishSummerTime(dateStr: string): boolean {
   return t >= lastSunMarch.getTime() && t < lastSunOct.getTime();
 }
 
+export function isTorneopalCompetitionId(raw?: string): boolean {
+  if (!raw) return false;
+  return /^[a-z0-9][a-z0-9-]{1,24}$/i.test(raw);
+}
+
+export function looksLikeCupRequest(parsed: ParsedAssociationUrl): boolean {
+  const blob = [parsed.canonicalUrl, parsed.seasonId, parsed.subdomain, parsed.leagueId]
+    .filter(Boolean)
+    .join(" ");
+  return /cup|turnaus|tournament|memorial|hc20|esli|kwmemorial|espooliikkuu/i.test(blob);
+}
+
+export function shouldTryAssociationEndpoint(subdomain?: string): boolean {
+  if (!subdomain) return true;
+  return !/memorial|kwmemorial|cup|turnaus/i.test(subdomain);
+}
+
+export function buildGetMatchesParams(parsed: ParsedAssociationUrl): Record<string, string> {
+  const params: Record<string, string> = { team_id: parsed.teamId, per_page: "100" };
+  if (!looksLikeCupRequest(parsed)) {
+    const todayIso = helsinkiDateISO();
+    params.start_date = addHelsinkiDays(todayIso, -21);
+    params.end_date = addHelsinkiDays(todayIso, 90);
+  }
+  if (parsed.seasonId) params.competition_id = parsed.seasonId;
+  if (parsed.leagueId && (/^\d+$/.test(parsed.leagueId) || looksLikeCupRequest(parsed))) {
+    params.category_id = parsed.leagueId;
+  }
+  return params;
+}
+
+function federationEndpoint(
+  association: AssociationType,
+  sport?: SportType
+): { base: string; apiKey: string; referer: string } | undefined {
+  if (association === "salibandy" || sport === "floorball") return ENDPOINTS.salibandy;
+  if (association === "palloliitto" || sport === "football") return ENDPOINTS.palloliitto;
+  if (association === "basket" || sport === "basketball") return ENDPOINTS.basket;
+  return ENDPOINTS.torneopal;
+}
+
 async function torneopalGet<T>(
   association: AssociationType,
   method: string,
   params: Record<string, string>,
-  subdomain?: string
+  subdomain?: string,
+  sport?: SportType
 ): Promise<T | null> {
-  const endpoint = ENDPOINTS[association];
-  const attempts: Array<{ base: string; apiKey: string }> = [];
+  type Attempt = { base: string; apiKey: string; referer: string };
+  const attempts: Attempt[] = [];
+  const seen = new Set<string>();
+  const push = (ep: Attempt | undefined) => {
+    if (!ep) return;
+    const k = `${ep.base}|${ep.apiKey}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    attempts.push(ep);
+  };
+
   if (subdomain) {
-    attempts.push({
-      base: `https://${subdomain}.torneopal.fi/taso/rest`,
-      apiKey: TUPA_KEY,
-    });
+    const base = `https://${subdomain}.torneopal.fi/taso/rest`;
+    const referer = `https://${subdomain}.torneopal.fi/`;
+    // Cup hosts 403 without Referer (browser cannot set it). Federation
+    // hosts accept the same team id for the matching sport without Referer.
+    if (sport === "floorball" || association === "salibandy") {
+      push({ base, apiKey: SALIBANDY_KEY, referer });
+      push({ base, apiKey: TUPA_KEY, referer });
+      push({ base, apiKey: PALL_KEY, referer });
+    } else if (sport === "football" || association === "palloliitto") {
+      push({ base, apiKey: PALL_KEY, referer });
+      push({ base, apiKey: TUPA_KEY, referer });
+      push({ base, apiKey: SALIBANDY_KEY, referer });
+    } else {
+      push({ base, apiKey: TUPA_KEY, referer });
+      push({ base, apiKey: SALIBANDY_KEY, referer });
+      push({ base, apiKey: PALL_KEY, referer });
+    }
   }
-  if (endpoint) attempts.push(endpoint);
+  push(federationEndpoint(association, sport));
+
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v) clean[k] = v;
+  }
 
   for (const ep of attempts) {
-    const search = new URLSearchParams({
-      api_key: ep.apiKey,
-      ...params,
-    });
+    const search = new URLSearchParams(clean);
     const url = `${ep.base}/${method}?${search.toString()}`;
 
     try {
-      const res = await fetch(proxiedUrl(url), {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(4000),
+      const res = await fetch(url, {
+        headers: {
+          Accept: `json/${ep.apiKey}`,
+          Referer: ep.referer,
+        },
+        referrerPolicy: "origin",
+        signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) continue;
       const text = await res.text();
-      if (!text) continue;
+      if (!text || text === "no access" || text.startsWith("Not allowed")) continue;
       let json: T & { call?: { status?: string } };
       try {
         json = JSON.parse(text) as T & { call?: { status?: string } };
       } catch {
         continue;
       }
-      if (json && typeof json === "object" && json.call?.status && json.call.status !== "ok") {
-        continue;
-      }
+      if (!json || typeof json !== "object") continue;
+      if (json.call?.status && json.call.status !== "ok") continue;
       return json;
     } catch (err) {
       console.warn("[PELIPAIVA:TORNEOPAL]", method, err);
@@ -140,6 +215,10 @@ interface TorneopalMatchesPayload {
 
 interface TorneopalGroupPayload {
   group?: Record<string, unknown>;
+}
+
+interface TorneopalGroupsPayload {
+  groups?: Record<string, unknown>[];
 }
 
 function isActivePlayer(player: Record<string, unknown>): boolean {
@@ -202,11 +281,13 @@ function pickCurrentGroup(groups: Record<string, unknown>[]): Record<string, unk
   );
 }
 
-function mapFixture(
+export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
   teamName: string
-): OfficialLeagueFixture {
+): OfficialLeagueFixture | null {
+  const startTime = finnishIso(str(match.date), str(match.time));
+  if (!startTime) return null;
   const home = str(match.team_A_name);
   const away = str(match.team_B_name);
   const statusRaw = str(match.status).toLowerCase();
@@ -222,7 +303,6 @@ function mapFixture(
   const awayScore = str(match.fs_B) === "" ? undefined : num(match.fs_B);
   const lat = num(match.venue_lat);
   const lng = num(match.venue_lon);
-  const startTime = finnishIso(str(match.date), str(match.time));
   const durationMin = num(match.playing_time_min) || 90;
   const endTime = new Date(new Date(startTime).getTime() + durationMin * 60 * 1000).toISOString();
   const matchId = str(match.match_id);
@@ -252,9 +332,9 @@ function mapFixture(
     awayScore,
     officialMatchUrl: parsed.canonicalUrl,
     matchId,
+    round: str(match.round_name) || str(match.round_id) || undefined,
+    stage: str(match.stage_name) || str(match.stage) || str(match.group_name) || undefined,
     matchNumber: str(match.match_number) || undefined,
-    stage: str(match.stage) || str(match.group_name) || str(match.category_name) || undefined,
-    round: str(match.round_name) || undefined,
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -310,6 +390,58 @@ function mapTopScorers(group: Record<string, unknown>): TopScorer[] {
     .map((p, i) => ({ ...p, rank: i + 1 }));
 }
 
+async function collectCupGroupMatches(
+  parsed: ParsedAssociationUrl,
+  competitionId: string,
+  categoryId: string,
+  teamName: string
+): Promise<Record<string, unknown>[]> {
+  const groupsJson = await torneopalGet<TorneopalGroupsPayload>(
+    parsed.association,
+    "getGroups",
+    { competition_id: competitionId, category_id: categoryId },
+    parsed.subdomain,
+    parsed.sport
+  );
+  const groups = Array.isArray(groupsJson?.groups) ? groupsJson!.groups : [];
+  const rows: Record<string, unknown>[] = [];
+  const chunks: Record<string, unknown>[][] = [];
+  for (let i = 0; i < groups.length; i += 4) chunks.push(groups.slice(i, i + 4));
+  for (const chunk of chunks) {
+    const found = await Promise.all(
+      chunk.map((g) =>
+        torneopalGet<TorneopalGroupPayload>(
+          parsed.association,
+          "getGroup",
+          {
+            competition_id: competitionId,
+            category_id: categoryId,
+            group_id: str(g.group_id),
+            matches: "1",
+          },
+          parsed.subdomain,
+          parsed.sport
+        )
+      )
+    );
+    for (const full of found) {
+      const matches = full?.group?.matches;
+      if (!Array.isArray(matches)) continue;
+      for (const m of matches as Record<string, unknown>[]) {
+        if (
+          namesMatch(str(m.team_A_name), teamName) ||
+          namesMatch(str(m.team_B_name), teamName) ||
+          str(m.team_A_id) === parsed.teamId ||
+          str(m.team_B_id) === parsed.teamId
+        ) {
+          rows.push(m);
+        }
+      }
+    }
+  }
+  return rows;
+}
+
 export async function fetchTorneopalTeamData(
   parsed: ParsedAssociationUrl
 ): Promise<OfficialTeamData | null> {
@@ -317,65 +449,73 @@ export async function fetchTorneopalTeamData(
     parsed.association,
     "getTeam",
     { team_id: parsed.teamId },
-    parsed.subdomain
+    parsed.subdomain,
+    parsed.sport
   );
   const team = teamJson?.team;
   if (!team) return null;
 
   const teamName = str(team.team_name) || `Joukkue ${parsed.teamId}`;
   const groups = Array.isArray(team.groups) ? (team.groups as Record<string, unknown>[]) : [];
-  const currentGroup = pickCurrentGroup(groups);
+  const categories = Array.isArray(team.categories) ? (team.categories as Record<string, unknown>[]) : [];
+  const primary = (team.primary_category as Record<string, unknown> | undefined) || categories[0];
+  let currentGroup = pickCurrentGroup(groups);
+  const keepCupIds = looksLikeCupRequest(parsed);
+  const competitionId = keepCupIds && parsed.seasonId
+    ? parsed.seasonId
+    : str(currentGroup?.competition_id) || parsed.seasonId || str(primary?.competition_id);
+  const categoryId = keepCupIds && parsed.leagueId
+    ? parsed.leagueId
+    : str(currentGroup?.category_id) || parsed.leagueId || str(primary?.category_id);
 
-  const isCup =
-    Boolean(parsed.seasonId && /cup|turnaus|memorial|tournament|hc2026|esli/i.test(parsed.seasonId)) ||
-    Boolean(parsed.subdomain && /cup|turnaus|memorial|tournament|espooliikkuu/i.test(parsed.subdomain)) ||
-    Boolean(parsed.canonicalUrl && /cup|turnaus|memorial|tournament|espooliikkuu/i.test(parsed.canonicalUrl));
-
-  const matchParams: Record<string, string> = {
-    team_id: parsed.teamId,
-  };
-
-  if (!isCup) {
-    const today = new Date();
-    const start = new Date(today.getTime() - 21 * 86400000).toISOString().slice(0, 10);
-    const end = new Date(today.getTime() + 90 * 86400000).toISOString().slice(0, 10);
-    matchParams.start_date = start;
-    matchParams.end_date = end;
-  }
-
-  // Pass competition_id only if clean alphanumeric id (not display slug like EräViikingit_0005)
-  if (parsed.seasonId && /^[a-z0-9]+$/i.test(parsed.seasonId) && !parsed.seasonId.includes('_')) {
-    matchParams.competition_id = parsed.seasonId;
-  }
-  // Pass category_id if numeric (e.g. sarja=2546)
-  if (parsed.leagueId && /^\d+$/i.test(parsed.leagueId)) {
-    matchParams.category_id = parsed.leagueId;
-  }
+  const matchParams = buildGetMatchesParams({
+    ...parsed,
+    seasonId: competitionId || parsed.seasonId,
+    leagueId: categoryId || parsed.leagueId
+  });
 
   const [matchesJson, groupJson] = await Promise.all([
-    torneopalGet<TorneopalMatchesPayload>(parsed.association, "getMatches", matchParams, parsed.subdomain),
+    torneopalGet<TorneopalMatchesPayload>(parsed.association, "getMatches", matchParams, parsed.subdomain, parsed.sport),
     currentGroup
       ? torneopalGet<TorneopalGroupPayload>(
           parsed.association,
           "getGroup",
           {
-            competition_id: str(currentGroup.competition_id) || parsed.seasonId || "",
-            category_id: str(currentGroup.category_id) || parsed.leagueId || "",
+            competition_id: competitionId,
+            category_id: categoryId,
             group_id: str(currentGroup.group_id),
+            matches: "1",
           },
-          parsed.subdomain
+          parsed.subdomain,
+          parsed.sport
         )
       : Promise.resolve(null),
   ]);
 
-  const fixtures = (matchesJson?.matches || []).map((m) => mapFixture(m, parsed, teamName));
+  let rawMatches = Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [];
+  if (rawMatches.length === 0 && looksLikeCupRequest(parsed) && competitionId && categoryId) {
+    rawMatches = await collectCupGroupMatches(parsed, competitionId, categoryId, teamName);
+  } else if (Array.isArray(groupJson?.group?.matches) && rawMatches.length === 0) {
+    rawMatches = groupJson!.group!.matches as Record<string, unknown>[];
+  }
+
+  let fixtures = rawMatches
+    .map((m) => mapFixture(m, parsed, teamName))
+    .filter((f): f is NonNullable<typeof f> => Boolean(f))
+    .filter((f) => new Date(f.startTime).getUTCFullYear() >= 2024);
+  if (looksLikeCupRequest(parsed)) {
+    const cupRows = fixtures.filter((f) => /turnaus|tournament|cup|memorial/i.test(f.leagueName));
+    if (cupRows.length) fixtures = cupRows;
+  }
   const group = groupJson?.group || {};
   const teamRows = Array.isArray(group.teams) ? (group.teams as Record<string, unknown>[]) : [];
   const standings = teamRows.map(mapStanding).filter((r) => r.teamName);
   const roster = mapRoster(team, teamName);
   const leagueName =
+    (keepCupIds && (fixtures[0]?.leagueName || str(group.competition_name))) ||
     str(currentGroup?.competition_name) ||
     str(group.competition_name) ||
+    str(primary?.competition_name) ||
     str(currentGroup?.category_name) ||
     str(group.category_name) ||
     fixtures[0]?.leagueName ||
@@ -392,8 +532,8 @@ export async function fetchTorneopalTeamData(
     roster: roster.players.length > 0 ? roster : undefined,
     divisionRosters: roster.players.length > 0 ? { [teamName]: roster } : undefined,
     topScorers: mapTopScorers(group),
-    competitionId: str(currentGroup?.competition_id) || undefined,
-    categoryId: str(currentGroup?.category_id) || undefined,
+    competitionId: competitionId || undefined,
+    categoryId: categoryId || undefined,
     groupId: str(currentGroup?.group_id) || undefined,
     sourceUrl: parsed.canonicalUrl,
     fetchedAt: new Date().toISOString(),

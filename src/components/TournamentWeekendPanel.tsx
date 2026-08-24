@@ -25,6 +25,12 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
     setExpandedBlocks((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const uniqueTournamentNames = new Set(blocks.map((b) => b.name));
+  const badgeLabel =
+    uniqueTournamentNames.size === blocks.length
+      ? `${blocks.length} ${blocks.length === 1 ? 'turnauspäivä' : 'turnauspäivää'}`
+      : `${uniqueTournamentNames.size} turnausta (${blocks.length} turnauspäivää)`;
+
   return (
     <section aria-label="Turnauspäivät ja -aikataulut" className="mb-4 rounded-2xl border border-border-subtle bg-surface-elevated p-4 shadow-card">
       <div className="mb-3 flex items-center justify-between">
@@ -35,7 +41,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
           <h2 className="text-sm font-bold text-text-primary">Turnaukset & otteluohjelma</h2>
         </div>
         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface text-text-secondary border border-border-subtle">
-          {blocks.length} {blocks.length === 1 ? 'turnaus' : 'turnausta'}
+          {badgeLabel}
         </span>
       </div>
 
@@ -43,6 +49,12 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
         {blocks.map((b) => {
           const isExpanded = expandedBlocks[b.id] ?? true;
           const matches = b.matches || [];
+          const dayLabel = new Date(b.firstKickoff).toLocaleDateString('fi-FI', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'numeric',
+            timeZone: 'Europe/Helsinki'
+          });
 
           return (
             <div
@@ -68,6 +80,9 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                       }}
                     >
                       {b.childName}
+                    </span>
+                    <span className="text-[11px] font-semibold text-text-muted capitalize">
+                      {dayLabel}
                     </span>
                     <h3 className="text-sm font-bold text-text-primary truncate">
                       {b.name}
@@ -120,7 +135,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                       const start = new Date(m.startTime);
                       const end = new Date(m.endTime);
                       const dayLabel = start.toLocaleDateString('fi-FI', { weekday: 'short', day: 'numeric', month: 'numeric' });
-                      const timeStr = `${start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}–${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                      const timeStr = `${start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' })}–${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' })}`;
                       const isPast = end.getTime() < Date.now();
                       const isCurrent = start.getTime() <= Date.now() && Date.now() <= end.getTime();
 

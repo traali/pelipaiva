@@ -35,12 +35,14 @@ interface OnboardingWizardProps {
     sport: SportType,
     url: string
   ) => Promise<{ success: boolean; error?: string } | void>;
+  onRemoveTeam?: (playerName: string, url?: string) => Promise<void>;
   onFinishOnboarding?: () => void;
   existingProfilesCount?: number;
 }
 
 const PRESET_TORNEOPAL_TEAMS: Array<{
   name: string;
+  teamName: string;
   sport: SportType;
   url: string;
   association: string;
@@ -48,6 +50,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
 }> = [
   {
     name: 'PPJ/Laru sin · P13 Kolmonen',
+    teamName: 'PPJ/Laru sin',
     sport: 'football',
     url: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
     association: 'Palloliitto',
@@ -55,6 +58,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
   },
   {
     name: 'PPJ/Laru mus · P13 Vitonen',
+    teamName: 'PPJ/Laru mus',
     sport: 'football',
     url: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
     association: 'Palloliitto',
@@ -62,6 +66,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
   },
   {
     name: 'PPJ/Laru oran · P13 Vitonen',
+    teamName: 'PPJ/Laru oran',
     sport: 'football',
     url: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
     association: 'Palloliitto',
@@ -69,6 +74,7 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
   },
   ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
+    teamName: cup.teamName,
     sport: cup.sport,
     url: cup.url,
     association: cup.name,
@@ -81,6 +87,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onOpenFamilyShare,
   onOpenSmartImport,
   onQuickAddTeam,
+  onRemoveTeam,
   onFinishOnboarding,
   existingProfilesCount = 0
 }) => {
@@ -183,8 +190,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  const handleRemoveSource = (id: string) => {
-    setAddedSources((prev) => prev.filter((s) => s.id !== id));
+  const handleRemoveSource = (src: AddedSource) => {
+    setAddedSources((prev) => prev.filter((s) => s.id !== src.id));
+    void onRemoveTeam?.(src.playerName, src.url);
   };
 
   const handleAddNewPlayer = () => {
@@ -205,7 +213,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const totalSourcesCount = addedSources.length || existingProfilesCount;
 
   return (
-    <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 md:py-10 flex flex-col justify-between">
+    <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 pt-[max(1.5rem,env(safe-area-inset-top))] md:py-10 flex flex-col justify-between">
       <div className="max-w-xl mx-auto w-full space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -352,7 +360,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     className="mt-1 p-2.5 rounded-xl bg-pitch/10 text-pitch border border-pitch/25 text-xs font-bold flex items-center justify-center gap-2 hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4" />
-                    <span>Kokeile esimerkkidatalla (HJK, PPJ, Honka, TOPOLA)</span>
+                    <span>Kokeile esimerkkidatalla (PPJ, TOPOLA, Indians)</span>
                   </button>
                 </div>
               </div>
@@ -399,6 +407,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               {/* Ready Torneopal Teams */}
               <div className="space-y-1.5">
                 <div className="text-[11px] font-bold text-text-muted">Valmiit joukkueet:</div>
+                {isLoading && (
+                  <p className="text-xs text-pitch font-semibold">Haetaan otteluita tulospalvelusta…</p>
+                )}
+                {errorMessage && (
+                  <p className="text-xs text-stoppage font-semibold">{errorMessage}</p>
+                )}
                 {PRESET_TORNEOPAL_TEAMS.map((team) => {
                   const isAdded = currentPlayerSources.some((s) => s.name === team.name);
                   return (
@@ -516,7 +530,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       <span className="font-semibold text-text-primary">{src.name}</span>
                       <button
                         type="button"
-                        onClick={() => handleRemoveSource(src.id)}
+                        onClick={() => handleRemoveSource(src)}
                         className="text-text-muted hover:text-radar p-1 cursor-pointer"
                         title="Poista lähde"
                       >

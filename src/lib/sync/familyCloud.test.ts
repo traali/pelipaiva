@@ -40,6 +40,11 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).toContain('PUT: 5');
     expect(workerSrc).toContain('FAMILY_CODES');
     expect(workerSrc).toContain('unknown_family');
+    expect(workerSrc).toContain('isAllowedProxyTarget');
+    expect(workerSrc).toContain('api.lipas.fi');
+    expect(workerSrc).not.toContain('/api/sync/');
+    expect(workerSrc).not.toContain('/api/nest/brief');
+    expect(workerSrc).not.toMatch(/startsWith\('https:\/\/'\)/);
     expect(workerSrc).not.toMatch(/FAMILY_CODES\s*=\s*['\"][0-9A-HJKMNP-TV-Z]{5}-/);
   });
 

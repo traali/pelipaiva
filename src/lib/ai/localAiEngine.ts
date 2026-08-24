@@ -1,11 +1,11 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { ExtractedSportsEvent, parseFreeformSportsMessage, parseMultipleSportsMessages } from './messageParserNLP';
-import { parseExcelFileBuffer, parsePastedSpreadsheetText } from './tableAndExcelParser';
-import { parseScheduleImage } from './ocrImageParser';
+import { parsePastedSpreadsheetText } from './tableAndExcelParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
+import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
 
 export interface FamilyLogisticsPlan {
@@ -37,16 +37,19 @@ export async function convertExtractedToMatchdayEvent(
   profileId: string,
   _playerName = 'Pelaaja'
 ): Promise<MatchdayEvent> {
-  const venue = await resolveSportsVenue(extracted.venueHint);
+  if (!extracted.dateStr || !extracted.kickoffTime) {
+    throw new Error('Viestistä puuttuu päivä tai kellonaika');
+  }
+  if (extracted.confidenceScore < 0.5) {
+    throw new Error('Viestiä ei tunnistettu otteluksi');
+  }
+  const venue = await resolveSportsVenue(extracted.venueHint || 'Kenttä ilmoitetaan');
 
-  const formatHelsinkiIso = (timeStr: string) => {
-    const d = new Date(`${extracted.dateStr}T${timeStr}:00`);
-    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-  };
 
-  const startTime = formatHelsinkiIso(extracted.kickoffTime);
-  const endTime = formatHelsinkiIso(extracted.endTime);
-  const warmupTime = formatHelsinkiIso(extracted.warmupTime);
+  const offset = getFinnishTimezoneOffset(new Date(`${extracted.dateStr}T12:00:00Z`));
+  const startTime = new Date(`${extracted.dateStr}T${extracted.kickoffTime}:00${offset}`).toISOString();
+  const endTime = new Date(`${extracted.dateStr}T${extracted.endTime}:00${offset}`).toISOString();
+  const warmupTime = new Date(`${extracted.dateStr}T${extracted.warmupTime}:00${offset}`).toISOString();
 
   const isTraining = extracted.eventType === 'training';
 
@@ -72,7 +75,7 @@ export async function convertExtractedToMatchdayEvent(
 
   const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
   const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
-  matchEvent.weather = weather;
+  if (weather) matchEvent.weather = weather;
   matchEvent.parking = parking;
   matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
 
@@ -87,7 +90,9 @@ export function planFamilyLogistics(
   profiles: PlayerProfile[],
   targetDate?: string
 ): FamilyLogisticsPlan {
-  const now = targetDate ? new Date(`${targetDate}T12:00:00+03:00`) : new Date();
+  const now = targetDate
+    ? new Date(`${targetDate}T12:00:00${getFinnishTimezoneOffset(new Date(`${targetDate}T12:00:00Z`))}`)
+    : new Date();
   const snap = runMissionControlGraph(events, profiles, now);
   const date = targetDate || snap.weekendLabel;
 
@@ -129,22 +134,36 @@ export function queryFamilySchedule(
   const norm = query.toLowerCase().trim();
 
   // Child name detection (e.g. "Milloin Maijalla", "Aada", "Simo", "Lilli")
-  const matchedProfile = profiles.find((p) => {
+  const namedProfile = profiles.find((p) => {
     const firstName = p.playerName.split(' ')[0]?.toLowerCase();
     return firstName && firstName.length >= 3 && norm.includes(firstName);
-  });
+  }) || profiles.find((p) => p.playerName && norm.includes(p.playerName.toLowerCase()));
 
-  const targetEvents = matchedProfile
-    ? events.filter((e) => e.profileId === matchedProfile.id)
+  const scopedEvents = namedProfile
+    ? events.filter((e) => e.profileId === namedProfile.id)
     : events;
+
+  if (
+    norm.includes('kyyti') ||
+    norm.includes('kyydit') ||
+    norm.includes('kuski') ||
+    norm.includes('carpool')
+  ) {
+    const plan = planFamilyLogistics(scopedEvents, profiles);
+    return {
+      answer: plan.whatsAppShareText || plan.summaryNarrative,
+      relevantEvents: scopedEvents.slice(0, 8),
+      confidence: 0.9
+    };
+  }
 
   // 1. Volunteer duties query
   if (norm.includes('kahvio') || norm.includes('toimitsija') || norm.includes('vuoro') || norm.includes('kirjuri')) {
-    const dutyEvents = targetEvents.filter((e) => e.volunteerDuty && e.volunteerDuty.length > 0);
+    const dutyEvents = scopedEvents.filter((e) => e.volunteerDuty && e.volunteerDuty.length > 0);
     if (dutyEvents.length === 0) {
       return {
-        answer: matchedProfile
-          ? `Ei merkittyjä kahvio- tai toimitsijavuoroja pelaajan ${matchedProfile.playerName} otteluissa.`
+        answer: namedProfile
+          ? `Ei merkittyjä kahvio- tai toimitsijavuoroja pelaajan ${namedProfile.playerName} otteluissa.`
           : 'Sinulla ei ole merkittyjä kahvio- tai toimitsijavuoroja tulevissa otteluissa.',
         relevantEvents: [],
         confidence: 0.95
@@ -152,8 +171,13 @@ export function queryFamilySchedule(
     }
     const list = dutyEvents
       .map((e) => {
-        const d = new Date(e.startTime).toLocaleDateString('fi-FI', { weekday: 'short', day: 'numeric', month: 'numeric' });
-        return `• ${d} klo ${new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })} @ ${e.venue.name}: ${e.volunteerDuty}`;
+        const d = new Date(e.startTime).toLocaleDateString('fi-FI', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'numeric',
+          timeZone: 'Europe/Helsinki'
+        });
+        return `• ${d} klo ${new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' })} @ ${e.venue.name}: ${e.volunteerDuty}`;
       })
       .join('\n');
     return {
@@ -163,23 +187,33 @@ export function queryFamilySchedule(
     };
   }
 
-  // 2. Next game query
+  // Surface / Footwear before "milloin" so AG chips are not stolen by next-game.
+  if (norm.includes('kengät') || norm.includes('nappikset') || norm.includes('tekonurmi') || norm.includes('alusta')) {
+    const turfEvents = scopedEvents.filter((e) => e.venue.surface === 'artificial_turf_3g');
+    return {
+      answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
+      relevantEvents: turfEvents,
+      confidence: 0.9
+    };
+  }
+
+  // Next game query
   if (
     norm.includes('seuraava') ||
     norm.includes('milloin') ||
     norm.includes('huomenna') ||
     norm.includes('tuleva') ||
     norm.includes('peli') ||
-    matchedProfile != null
+    namedProfile != null
   ) {
-    const upcoming = targetEvents
+    const upcoming = scopedEvents
       .filter((e) => new Date(e.startTime) >= new Date())
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
     if (upcoming.length === 0) {
       return {
-        answer: matchedProfile
-          ? `Ei tulevia otteluita kalenterissa pelaajalle ${matchedProfile.playerName}.`
+        answer: namedProfile
+          ? `Ei tulevia otteluita kalenterissa pelaajalle ${namedProfile.playerName}.`
           : 'Ei tulevia otteluita kalenterissa.',
         relevantEvents: [],
         confidence: 0.9
@@ -189,9 +223,22 @@ export function queryFamilySchedule(
     const next = upcoming[0]!;
     const profile = profiles.find((p) => p.id === next.profileId);
     const childName = profile?.playerName || 'Pelaaja';
-    const dateStr = new Date(next.startTime).toLocaleDateString('fi-FI', { weekday: 'long', day: 'numeric', month: 'numeric' });
-    const timeStr = new Date(next.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
-    const warmupStr = new Date(next.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = new Date(next.startTime).toLocaleDateString('fi-FI', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'numeric',
+      timeZone: 'Europe/Helsinki'
+    });
+    const timeStr = new Date(next.startTime).toLocaleTimeString('fi-FI', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Helsinki'
+    });
+    const warmupStr = new Date(next.warmupTime).toLocaleTimeString('fi-FI', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Helsinki'
+    });
 
     return {
       answer: `Seuraava ottelu on ${childName}:lla ${dateStr} klo ${timeStr} (alkulämpö klo ${warmupStr}) kentällä ${next.venue.name}. Vastassa on ${next.awayTeam}.`,
@@ -200,45 +247,6 @@ export function queryFamilySchedule(
     };
   }
 
-  // 3. Surface / Footwear query
-  if (norm.includes('kengät') || norm.includes('nappikset') || norm.includes('tekonurmi') || norm.includes('alusta')) {
-    const turfEvents = events.filter((e) => e.venue.surface === 'artificial_turf_3g');
-    return {
-      answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
-      relevantEvents: turfEvents,
-      confidence: 0.9
-    };
-  }
-
-  // 4. Logistics & Carpooling query
-  if (
-    norm.includes('kyyti') ||
-    norm.includes('kuski') ||
-    norm.includes('aja') ||
-    norm.includes('kuljetus') ||
-    norm.includes('ristiriita') ||
-    norm.includes('auto')
-  ) {
-    const plan = planFamilyLogistics(events, profiles);
-    if (plan.departureSchedule.length === 0) {
-      return {
-        answer: 'Ei aktiivisia kyytitarpeita tai siirtymiä tulevalle viikonlopulle.',
-        relevantEvents: [],
-        confidence: 0.95
-      };
-    }
-    const schedule = plan.departureSchedule
-      .map((s) => `• Klo ${s.time}: Lähtö kohteeseen ${s.venueName} (${s.childName})`)
-      .join('\n');
-    const conflictNote = plan.hasConflicts
-      ? `\n\n⚠️ Huomio: ${plan.conflictDetails.join(' ')}`
-      : '\n\n✅ Ei logistiikkaristiriitoja kyydeissä.';
-    return {
-      answer: `Viikonlopun kuskisuunnitelma:\n${schedule}${conflictNote}`,
-      relevantEvents: events.slice(0, 3),
-      confidence: 0.95
-    };
-  }
 
   // Generic fallback
   return {
@@ -296,7 +304,24 @@ export async function queryFamilyScheduleWithLLM(
 export {
   parseFreeformSportsMessage,
   parseMultipleSportsMessages,
-  parsePastedSpreadsheetText,
-  parseExcelFileBuffer,
-  parseScheduleImage
+  parsePastedSpreadsheetText
 };
+
+export async function parseExcelFileBuffer(
+  buffer: ArrayBuffer,
+  sport: Parameters<typeof import('./tableAndExcelParser').parseExcelFileBuffer>[1] = 'football',
+  defaultPlayer = 'Maija'
+) {
+  const mod = await import('./tableAndExcelParser');
+  return mod.parseExcelFileBuffer(buffer, sport, defaultPlayer);
+}
+
+export async function parseScheduleImage(
+  imageSource: File | Blob | string,
+  sport: Parameters<typeof import('./ocrImageParser').parseScheduleImage>[1] = 'football',
+  defaultPlayer = 'Maija',
+  onProgress?: import('./ocrImageParser').OcrProgressCallback
+) {
+  const mod = await import('./ocrImageParser');
+  return mod.parseScheduleImage(imageSource, sport, defaultPlayer, onProgress);
+}

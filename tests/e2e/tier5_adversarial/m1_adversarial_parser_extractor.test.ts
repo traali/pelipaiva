@@ -676,7 +676,7 @@ describe('Adversarial Stress Suite — M1 URL Parser & HTML Extractor', () => {
     });
 
     it('normalizeAssociationUrl returns canonical link or null', () => {
-      expect(normalizeAssociationUrl('tulospalvelu.palloliitto.fi/team/123/fixtures?season=2026')).toBe('https://tulospalvelu.palloliitto.fi/team/123');
+      expect(normalizeAssociationUrl('tulospalvelu.palloliitto.fi/team/123/fixtures?season=2026')).toBe('https://tulospalvelu.palloliitto.fi/team/123?season=2026');
       expect(normalizeAssociationUrl('https://basket.fi/basket/sarjat/joukkue/?league_id=4&team_id=555&season=2026')).toBe('https://basket.fi/basket/sarjat/joukkue/?team_id=555');
       expect(normalizeAssociationUrl('invalid')).toBeNull();
     });

@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { ExtractedSportsEvent, extractDateFromFinnishText, extractTimesFromFinnishText, extractVenueFromFinnishText } from './messageParserNLP';
 import { SportType, EventType } from '../../types/matchday';
 
@@ -66,7 +65,7 @@ function detectColumnMapping(headers: string[]): {
 export function parseTableRows(
   rows: string[][],
   defaultSport: SportType = 'football',
-  _defaultPlayer = 'Maija'
+  defaultPlayer = 'Maija'
 ): ParsedTableResult {
   if (!rows || rows.length === 0) {
     return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
@@ -107,7 +106,7 @@ export function parseTableRows(
     const times = extractTimesFromFinnishText(timeRaw || '15:00');
     const venueHint = extractVenueFromFinnishText(venueRaw);
 
-    let homeTeam = 'HJK T13';
+    let homeTeam = defaultPlayer;
     let awayTeam = eventRaw.trim() || 'Vastustaja';
     let isHomeMatch = true;
 
@@ -175,11 +174,12 @@ export function parsePastedSpreadsheetText(
 /**
  * Parses binary Excel (.xlsx / .xls) buffer into events.
  */
-export function parseExcelFileBuffer(
+export async function parseExcelFileBuffer(
   buffer: ArrayBuffer,
   sport: SportType = 'football',
   defaultPlayer = 'Maija'
-): ParsedTableResult {
+): Promise<ParsedTableResult> {
+  const XLSX = await import('xlsx');
   const workbook = XLSX.read(buffer, { type: 'array' });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) {

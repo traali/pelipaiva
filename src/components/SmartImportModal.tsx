@@ -164,7 +164,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
     if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
       const buffer = await file.arrayBuffer();
-      const res = parseExcelFileBuffer(buffer, selectedSport, selectedPlayer);
+      const res = await parseExcelFileBuffer(buffer, selectedSport, selectedPlayer);
       setExtractedTableEvents(res.events);
       setActiveTab('table');
     } else if (file.type.startsWith('image/')) {
@@ -196,7 +196,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Save extracted events to IndexedDB
   const handleSaveEvents = async (eventsToSave: ExtractedSportsEvent[]) => {
-    if (eventsToSave.length === 0) return;
+    const usable = eventsToSave.filter((e) => e.confidenceScore >= 0.5 && e.dateStr && e.kickoffTime);
+    if (usable.length === 0) return;
     setIsSaving(true);
     setErrorMessage('');
 
@@ -214,8 +215,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
           id: profileId,
           playerName: selectedPlayer.trim() || 'Pelaaja',
           teamName:
-            eventsToSave[0]?.homeTeam && eventsToSave[0].homeTeam !== 'Oma joukkue'
-              ? eventsToSave[0].homeTeam
+            usable[0]?.homeTeam && usable[0].homeTeam !== 'Oma joukkue'
+              ? usable[0].homeTeam
               : `${selectedSport === 'floorball' ? 'Salibandy' : selectedSport === 'basketball' ? 'Koripallo' : 'Jalkapallo'}`,
           sport: selectedSport,
           primaryColor: swatch.label,
@@ -224,12 +225,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         });
       }
 
-      for (const extracted of eventsToSave) {
+      for (const extracted of usable) {
         const fullEvent = await convertExtractedToMatchdayEvent(extracted, profileId, selectedPlayer);
         await db.events.put(fullEvent);
       }
 
-      setSuccessMessage(`Tallennettu ${eventsToSave.length} ottelua pelaajalle ${selectedPlayer}!`);
+      setSuccessMessage(`Tallennettu ${usable.length} ottelua pelaajalle ${selectedPlayer}!`);
       setTimeout(() => {
         setSuccessMessage('');
         onEventsImported?.();
@@ -807,6 +808,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                 </div>
               </div>
             )}
+
 
             {/* Success Message Banner */}
             {successMessage && (

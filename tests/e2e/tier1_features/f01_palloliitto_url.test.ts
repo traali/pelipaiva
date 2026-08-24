@@ -26,7 +26,9 @@ describe('Feature 1: Palloliitto Team URL Parser', () => {
     expect(parsed?.seasonId).toBe('2026');
     expect(parsed?.leagueId).toBe('T13');
     expect(parsed?.tab).toBe('matches');
-    expect(parsed?.canonicalUrl).toBe('https://tulospalvelu.palloliitto.fi/team/60341');
+    expect(parsed?.canonicalUrl).toBe(
+      'https://tulospalvelu.palloliitto.fi/team/60341?season=2026&category=T13'
+    );
   });
 
   it('should handle protocol-less and http URLs with whitespace trimming', () => {

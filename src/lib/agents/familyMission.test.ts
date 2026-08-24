@@ -319,6 +319,6 @@ describe('runMissionControlGraph', () => {
     expect(snap.nextEvent?.id).toBe('wed');
     const stripIds = snap.days.flatMap((d) => d.events.map((e) => e.eventId));
     expect(stripIds).toContain('sat');
-    expect(stripIds).not.toContain('wed');
+    expect(stripIds).toContain('wed');
   });
 });

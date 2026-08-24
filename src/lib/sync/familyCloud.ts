@@ -1,8 +1,8 @@
 import { db, PelipaivaDB } from '../storage/db';
 import { PlayerProfile, SportType } from '../../types/matchday';
 import { generateStableProfileId } from '../clubs/attachTeam';
+import { ingestSourceForProfile } from '../clubs/ingestOfficial';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
-import { ingestOfficialForProfile } from '../clubs/ingestOfficial';
 
 export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
@@ -253,13 +253,15 @@ export async function hydrateRosterProfiles(
         try {
           const url = profile.associationUrl || profile.calendarUrl;
           if (!url) return;
-          await ingestOfficialForProfile({
+
+          await ingestSourceForProfile({
             profileId: profile.id,
-            url,
             playerName: profile.playerName,
             teamName: profile.teamName,
             sport: profile.sport,
-            dbInstance: databaseInstance as typeof db
+            url,
+            database: databaseInstance,
+            includeWeather: true
           });
         } catch (err) {
           console.warn(`[FAMILY_CLOUD] Hydration failed for ${profile.playerName}:`, err);

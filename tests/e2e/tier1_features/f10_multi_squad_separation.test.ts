@@ -69,4 +69,37 @@ END:VCALENDAR`;
     expect(kilpaOnly).toContain('Kilpa');
     expect(kilpaOnly).not.toContain('Haaste');
   });
+
+  it('should extract CATEGORIES tags from Nimenhuuto feeds (Treenit, Peli kilpa, Peli haastaja)', () => {
+    const nimenhuutoICS = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:Westend Indians P14: Treenit 15:15-17:15
+CATEGORIES:Treenit
+DTSTART:20260824T121500Z
+DTEND:20260824T141500Z
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Westend Indians P14: Mestareiden Cup
+CATEGORIES:Peli kilpa
+DTSTART:20260825T121500Z
+DTEND:20260825T141500Z
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Westend Indians P14: Sarjapeli
+CATEGORIES:Peli haastaja
+DTSTART:20260826T121500Z
+DTEND:20260826T141500Z
+END:VEVENT
+END:VCALENDAR`;
+
+    const squads = detectSquadGroups(nimenhuutoICS);
+    const names = squads.map((s) => s.squadName);
+    expect(names).toContain('Kilpa');
+    expect(names).toContain('Haastaja');
+
+    const kilpaOnly = splitICSBySquad(nimenhuutoICS, 'Kilpa');
+    expect(kilpaOnly).toContain('Peli kilpa');
+    expect(kilpaOnly).not.toContain('Peli haastaja');
+  });
 });

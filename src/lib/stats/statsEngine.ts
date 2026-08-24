@@ -179,6 +179,11 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
       const seasonId = searchParams.get('season') || searchParams.get('season_id') || undefined;
       const leagueId = searchParams.get('category') || searchParams.get('category_id') || searchParams.get('league') || searchParams.get('league_id') || searchParams.get('series') || undefined;
 
+      const q = new URLSearchParams();
+      if (seasonId) q.set('season', seasonId);
+      if (leagueId) q.set('category', leagueId);
+      const query = q.toString();
+
       return {
         sport: 'football',
         association: 'palloliitto',
@@ -186,7 +191,7 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
         tab,
         seasonId,
         leagueId,
-        canonicalUrl: `https://tulospalvelu.palloliitto.fi/team/${teamId}`
+        canonicalUrl: `https://tulospalvelu.palloliitto.fi/team/${teamId}${query ? `?${query}` : ''}`
       };
     }
     return null;
@@ -501,7 +506,7 @@ export function parseFinnishDateTime(dateStr: string, timeStr: string = '12:00')
 
   if (!dateParts) {
     const candidate = new Date(`${dateStr} ${timeStr}`);
-    return isNaN(candidate.getTime()) ? new Date().toISOString() : candidate.toISOString();
+    return isNaN(candidate.getTime()) ? '1970-01-01T00:00:00+02:00' : candidate.toISOString();
   }
 
   let day = parseInt(dateParts[1] || '1', 10);
@@ -724,6 +729,7 @@ export function parseTorneopalHtml(
 
         const matchId = matchCode.replace(/\D/g, '') || `${teamId}_${i}`;
         const startTime = parseFinnishDateTime(dateStr, timeStr);
+        if (startTime.startsWith('1970-01-01')) continue;
         const { venueName, fieldNumber } = extractVenueAndField(rawVenue);
 
         let status: 'upcoming' | 'played' | 'cancelled' | 'postponed' = 'upcoming';
@@ -822,7 +828,7 @@ export function parseTorneopalHtml(
             goalsAgainst,
             goalDifference: goalDiff,
             points,
-            form: ['W', 'W', 'D', 'W', 'L']
+            form: []
           });
         }
       }
@@ -1424,8 +1430,8 @@ export async function fetchOfficialTeamData(
 // ============================================================================
 
 /**
- * Generates or extracts full league and matchday stats for a given fixture,
- * supporting Volleyball (Sets), Basketball (Points), Floorball (Goals), and Football.
+ * Test-only invented magazine. Production ingest never calls this.
+ * Live cards use buildMatchStatsFromOfficial.
  */
 export function generateOrResolveMatchStats(
   homeTeam: string,

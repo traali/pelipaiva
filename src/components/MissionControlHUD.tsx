@@ -65,7 +65,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
               <span className="font-semibold text-floodlight">Lähde klo {leaveBy}</span>
             </p>
           ) : (
-            <p className="text-xs text-text-muted">{snapshot.weekendLabel}</p>
+            <p className="text-xs text-text-muted">{snapshot.summary || snapshot.weekendLabel}</p>
           )}
         </div>
 
@@ -124,7 +124,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                 />
                 <MenuItem
                   icon={<Share2 className="h-4 w-4" />}
-                  label="Jaa perheelle"
+                  label="Perhe-koodi"
                   onClick={() => {
                     onShare();
                     setMenuOpen(false);

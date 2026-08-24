@@ -113,6 +113,7 @@ export interface WeekendDayStrip {
     title: string;
     venueName: string;
     isTalkoo: boolean;
+    isTraining?: boolean;
     isPast?: boolean;
   }>;
 }

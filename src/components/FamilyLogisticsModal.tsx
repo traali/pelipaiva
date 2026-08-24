@@ -19,7 +19,16 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
   profiles
 }) => {
   const [copied, setCopied] = useState(false);
-  const plan = planFamilyLogistics(events, profiles);
+  const plan = isOpen
+    ? planFamilyLogistics(events, profiles)
+    : {
+        date: '',
+        hasConflicts: false,
+        conflictDetails: [] as string[],
+        departureSchedule: [],
+        summaryNarrative: '',
+        whatsAppShareText: ''
+      };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(plan.whatsAppShareText);

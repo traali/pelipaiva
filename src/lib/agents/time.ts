@@ -1,3 +1,5 @@
+import { getFinnishTimezoneOffset } from '../stats/statsEngine';
+
 /** Helsinki-local YYYY-MM-DD (sv-SE locale yields ISO date). */
 export function helsinkiDateISO(d: Date = new Date()): string {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -9,43 +11,106 @@ export function helsinkiDateISO(d: Date = new Date()): string {
 }
 
 export function formatFiTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('fi-FI', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Helsinki'
+  });
+}
+
+function helsinkiWall(isoDate: string, time = '12:00:00'): Date {
+  const offset = getFinnishTimezoneOffset(new Date(`${isoDate}T12:00:00Z`));
+  const hhmm = time.length === 5 ? `${time}:00` : time;
+  return new Date(`${isoDate}T${hhmm}${offset}`);
 }
 
 export function formatFiWeekday(isoDate: string): string {
-  const d = new Date(`${isoDate}T12:00:00+03:00`);
-  return d.toLocaleDateString('fi-FI', { weekday: 'short' });
+  return helsinkiWall(isoDate).toLocaleDateString('fi-FI', {
+    weekday: 'short',
+    timeZone: 'Europe/Helsinki'
+  });
 }
 
 export function addHelsinkiDays(isoDate: string, days: number): string {
-  const d = new Date(`${isoDate}T12:00:00+03:00`);
-  d.setDate(d.getDate() + days);
-  return helsinkiDateISO(d);
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const utc = Date.UTC(y || 2026, (m || 1) - 1, (d || 1) + days);
+  return new Date(utc).toISOString().slice(0, 10);
 }
 
-/** Friday 16:00 → Sunday night of the nearest sports weekend. */
+/** Monday 00:00 → Sunday 23:59 of current week (Helsinki). */
+export function sportsWeekRange(now: Date = new Date()): { start: Date; end: Date; label: string } {
+  const iso = helsinkiDateISO(now);
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+  const wd =
+    weekdayMap[
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Helsinki', weekday: 'short' }).format(now)
+    ] ?? 1;
+  const mondayOffset = wd === 0 ? -6 : 1 - wd;
+  const monday = addHelsinkiDays(iso, mondayOffset);
+  const sunday = addHelsinkiDays(monday, 6);
+  const start = helsinkiWall(monday, '00:00:00');
+  const end = helsinkiWall(sunday, '23:59:59');
+  const monLabel = helsinkiWall(monday).toLocaleDateString('fi-FI', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
+  });
+  const sunLabel = helsinkiWall(sunday).toLocaleDateString('fi-FI', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
+  });
+  return { start, end, label: `${monLabel} – ${sunLabel}` };
+}
+
+/** Friday 16:00 → Sunday night of the nearest sports weekend (Helsinki). */
 export function sportsWeekendRange(now: Date = new Date()): { start: Date; end: Date; label: string } {
   const iso = helsinkiDateISO(now);
-  const dow = new Date(`${iso}T12:00:00+03:00`).getDay(); // 0 Sun … 6 Sat
-  let fridayOffset = 5 - dow;
-  if (dow === 0) fridayOffset = -2;
-  if (dow === 6) fridayOffset = -1;
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6
+  };
+  const wd =
+    weekdayMap[
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Helsinki', weekday: 'short' }).format(now)
+    ] ?? 5;
+  let fridayOffset = 5 - wd;
+  if (wd === 0) fridayOffset = -2;
+  if (wd === 6) fridayOffset = -1;
   const friday = addHelsinkiDays(iso, fridayOffset);
   const sunday = addHelsinkiDays(friday, 2);
-  const start = new Date(`${friday}T16:00:00+03:00`);
-  const end = new Date(`${sunday}T23:59:59+03:00`);
-  const friLabel = new Date(`${friday}T12:00:00+03:00`).toLocaleDateString('fi-FI', {
+  const start = helsinkiWall(friday, '16:00:00');
+  const end = helsinkiWall(sunday, '23:59:59');
+  const friLabel = helsinkiWall(friday).toLocaleDateString('fi-FI', {
     weekday: 'short',
     day: 'numeric',
-    month: 'numeric'
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
   });
-  const sunLabel = new Date(`${sunday}T12:00:00+03:00`).toLocaleDateString('fi-FI', {
+  const sunLabel = helsinkiWall(sunday).toLocaleDateString('fi-FI', {
     weekday: 'short',
     day: 'numeric',
-    month: 'numeric'
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
   });
   return { start, end, label: `${friLabel} – ${sunLabel}` };
 }
+
 
 export function eventsInRange<T extends { startTime: string }>(
   events: T[],

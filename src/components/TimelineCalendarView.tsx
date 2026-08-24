@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
+import { helsinkiDateISO } from '../lib/agents/time';
+import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 
@@ -74,12 +76,13 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
     for (const ev of sorted) {
       const d = new Date(ev.startTime);
-      const key = d.toISOString().split('T')[0] || '';
+      const key = helsinkiDateISO(d);
       if (!map.has(key)) {
         const fiLabel = d.toLocaleDateString('fi-FI', {
           weekday: 'long',
           day: 'numeric',
-          month: 'numeric'
+          month: 'numeric',
+          timeZone: 'Europe/Helsinki'
         });
         const capitalized = fiLabel.charAt(0).toUpperCase() + fiLabel.slice(1);
         map.set(key, {
@@ -94,7 +97,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return Array.from(map.values());
   }, [events]);
 
-  const todayISO = new Date().toISOString().split('T')[0] || '';
+  const todayISO = helsinkiDateISO(new Date());
   const [selectedDayKey, setSelectedDayKey] = useState<string>(() => {
     const hasToday = groupedByDay.some((g) => g.dateStr === todayISO);
     if (hasToday) return todayISO;
@@ -154,14 +157,10 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 const profile = profileMap.get(ev.profileId);
                 const start = new Date(ev.startTime);
                 const end = new Date(ev.endTime);
-                const timeStr = `${start.toLocaleTimeString('fi-FI', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })} – ${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                const tz = { hour: '2-digit' as const, minute: '2-digit' as const, timeZone: 'Europe/Helsinki' };
+                const timeStr = `${start.toLocaleTimeString('fi-FI', tz)} – ${end.toLocaleTimeString('fi-FI', tz)}`;
 
                 const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
-                const sportIcon =
-                  ev.sport === 'football' ? '⚽' : ev.sport === 'floorball' ? '🏑' : '🏀';
 
                 return (
                   <motion.div
@@ -203,7 +202,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                             Turnaus
                           </span>
                         )}
-                        <span className="text-sm">{sportIcon}</span>
+                        <span className="text-[10px] font-bold text-text-muted">{sportLabelFi(ev.sport)}</span>
                       </div>
                     </div>
 
@@ -361,8 +360,13 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
               const end = new Date(ev.endTime);
               const timeStr = `${start.toLocaleTimeString('fi-FI', {
                 hour: '2-digit',
-                minute: '2-digit'
-              })} – ${end.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}`;
+                minute: '2-digit',
+                timeZone: 'Europe/Helsinki'
+              })} – ${end.toLocaleTimeString('fi-FI', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Europe/Helsinki'
+              })}`;
 
               return (
                 <div

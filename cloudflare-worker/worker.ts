@@ -4,26 +4,6 @@ export interface Env {
   FAMILY_CODES?: string;
 }
 
-export interface SyncPayload {
-  syncKey: string;
-  updatedAt: string;
-  events: Array<{
-    id: string;
-    sport: string;
-    homeTeam: string;
-    awayTeam: string;
-    startTime: string;
-    warmupTime: string;
-    venue: {
-      name: string;
-      surface?: string;
-    };
-    briefing?: {
-      recommendedDepartureTime?: string;
-    };
-  }>;
-}
-
 export interface FamilyRosterRow {
   id: string;
   playerName: string;
@@ -94,6 +74,50 @@ async function rateLimitFamily(
     })
   );
   return null;
+}
+
+function hostnameAllowed(host: string): boolean {
+  const h = host.toLowerCase();
+  if (h === 'nimenhuuto.com' || h.endsWith('.nimenhuuto.com')) return true;
+  if (h === 'myclub.fi' || h.endsWith('.myclub.fi')) return true;
+  if (h === 'jopox.fi' || h.endsWith('.jopox.fi')) return true;
+  if (h === 'opendata.fmi.fi' || h === 'openwms.fmi.fi') return true;
+  if (h === 'api.lipas.fi' || h === 'api.hel.fi') return true;
+  if (h === 'tulospalvelu.palloliitto.fi' || h === 'www.tulospalvelu.palloliitto.fi') return true;
+  if (h === 'tulospalvelu.salibandy.fi' || h === 'www.tulospalvelu.salibandy.fi') return true;
+  if (h === 'basket.fi' || h === 'www.basket.fi' || h === 'tulospalvelu.basket.fi') return true;
+  if (h === 'espooliikkuutournament.fi' || h === 'www.espooliikkuutournament.fi') return true;
+  if (h === 'tupa.api.torneopal.com' || h === 'salibandy-api.torneopal.net') return true;
+  if (h === 'spl.torneopal.fi' || h.endsWith('.torneopal.fi') || h.endsWith('.torneopal.net') || h.endsWith('.torneopal.com')) {
+    return true;
+  }
+  return false;
+}
+
+function isAssociationHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return (
+    h.includes('tulospalvelu.') ||
+    h.endsWith('basket.fi') ||
+    h.endsWith('torneopal.fi') ||
+    h.endsWith('torneopal.net') ||
+    h.endsWith('torneopal.com') ||
+    h.endsWith('espooliikkuutournament.fi')
+  );
+}
+
+function isAllowedProxyTarget(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:') return false;
+  if (parsed.username || parsed.password) return false;
+  if (parsed.port && parsed.port !== '443') return false;
+  if (/^[\d.]+$/.test(parsed.hostname) || parsed.hostname.includes(':')) return false;
+  return hostnameAllowed(parsed.hostname);
 }
 
 export default {
@@ -209,7 +233,7 @@ export default {
           teamName: p.teamName?.trim().slice(0, 60) || 'Joukkue',
           sport: p.sport || 'football',
           colorHex: p.colorHex || '#10b981',
-          calendarUrl: p.calendarUrl || '',
+          calendarUrl: String(p.calendarUrl || '').slice(0, 400),
           associationUrl: p.associationUrl || undefined,
           associationType: p.associationType || undefined,
           teamId: p.teamId || undefined
@@ -259,174 +283,46 @@ export default {
       });
     }
 
-    // 1. Sync Snapshot from Local PWA (TTL 7 days)
-    if (url.pathname.startsWith('/api/sync/') && request.method === 'PUT') {
-      const syncKey = url.pathname.replace('/api/sync/', '');
-      if (!syncKey || syncKey.length < 16) {
-        return new Response(JSON.stringify({ error: 'Invalid sync key' }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      const body = (await request.json()) as SyncPayload;
-      await env.MATCHDAY_KV.put(`sync:${syncKey}`, JSON.stringify(body), {
-        expirationTtl: 604800 // 7 days in seconds
-      });
-      return new Response(JSON.stringify({ success: true, message: 'Snapshot synced' }), {
-        headers: corsHeaders
-      });
-    }
-
-    // 2. Google Nest Hub Voice / Display Briefing Webhook
-    if (url.pathname === '/api/nest/brief') {
-      const syncKey = url.searchParams.get('key');
-      if (!syncKey) {
-        return new Response(
-          JSON.stringify({
-            fulfillmentResponse: {
-              messages: [
-                {
-                  text: {
-                    text: [
-                      'Avaa Pelipäivä-sovellus puhelimellasi ja yhdistä keittiönäyttö asetuksista.'
-                    ]
-                  }
-                }
-              ]
-            }
-          }),
-          { headers: corsHeaders }
-        );
-      }
-
-      const dataStr = await env.MATCHDAY_KV.get(`sync:${syncKey}`);
-      if (!dataStr) {
-        return new Response(
-          JSON.stringify({
-            fulfillmentResponse: {
-              messages: [{ text: { text: ['Tälle päivälle ei löytynyt merkittyjä otteluita.'] } }]
-            }
-          }),
-          { headers: corsHeaders }
-        );
-      }
-
-      const data = JSON.parse(dataStr) as SyncPayload;
-      const todaysEvent = data.events?.[0];
-
-      if (!todaysEvent) {
-        return new Response(
-          JSON.stringify({
-            fulfillmentResponse: {
-              messages: [{ text: { text: ['Ei otteluita tänään. Nauti vapaapäivästä!'] } }]
-            }
-          }),
-          { headers: corsHeaders }
-        );
-      }
-
-      const voiceMessage = `Tänään on ${todaysEvent.sport}ottelu: ${todaysEvent.homeTeam} vastaan ${todaysEvent.awayTeam} kentällä ${todaysEvent.venue?.name}. Suositeltu lähtöaika kotoa on klo ${todaysEvent.briefing?.recommendedDepartureTime || '17:00'}.`;
-
-      return new Response(
-        JSON.stringify({
-          fulfillmentResponse: {
-            messages: [{ text: { text: [voiceMessage] } }]
-          }
-        }),
-        { headers: corsHeaders }
-      );
-    }
-
-    // 3. Privacy-Preserving Streaming CORS Proxy for Association JSON, .ics & FMI Feeds
+    // CORS proxy for ICS, FMI, LIPAS, hel.fi, association HTML — not an open proxy.
     if (url.pathname === '/api/proxy/ics') {
       const targetUrl = url.searchParams.get('url');
-      if (!targetUrl) {
-        return new Response(JSON.stringify({ error: 'Missing url parameter' }), {
+      if (!targetUrl || !isAllowedProxyTarget(targetUrl)) {
+        return new Response(JSON.stringify({ error: 'Disallowed or missing URL parameter' }), {
           status: 400,
           headers: corsHeaders
         });
       }
 
-      let targetParsed: URL;
+      let feedRes: Response;
       try {
-        targetParsed = new URL(targetUrl);
+        feedRes = await fetch(targetUrl, {
+          redirect: 'follow',
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+            Accept: request.headers.get('Accept') || 'application/json,text/html,text/calendar,*/*',
+            Referer: new URL(targetUrl).origin + '/'
+          }
+        });
       } catch {
-        return new Response(JSON.stringify({ error: 'Invalid url parameter' }), {
-          status: 400,
+        return new Response(JSON.stringify({ error: 'upstream_fetch_failed' }), {
+          status: 502,
           headers: corsHeaders
         });
       }
-
-      const host = targetParsed.hostname.toLowerCase();
-      const isAllowed =
-        host === 'nimenhuuto.com' ||
-        host.endsWith('.nimenhuuto.com') ||
-        host === 'myclub.fi' ||
-        host.endsWith('.myclub.fi') ||
-        host === 'opendata.fmi.fi' ||
-        host === 'tulospalvelu.palloliitto.fi' ||
-        host === 'spl.torneopal.fi' ||
-        host === 'tulospalvelu.salibandy.fi' ||
-        host === 'salibandy-api.torneopal.net' ||
-        host === 'basket.fi' ||
-        host === 'www.basket.fi' ||
-        host === 'tulospalvelu.basket.fi' ||
-        host === 'espooliikkuutournament.fi' ||
-        host === 'www.espooliikkuutournament.fi' ||
-        host === 'tupa.api.torneopal.com' ||
-        host.endsWith('.torneopal.fi') ||
-        host.endsWith('.torneopal.net') ||
-        host === 'api.lipas.fi' ||
-        host === 'api.hel.fi';
-
-      if (!isAllowed) {
-        return new Response(JSON.stringify({ error: 'Host not allowed by proxy allowlist' }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      const outboundHeaders: Record<string, string> = {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        'Accept': request.headers.get('Accept') || 'application/json, text/html, text/calendar, */*',
-        'Referer': targetParsed.origin + '/'
-      };
-
-      const feedRes = await fetch(targetUrl, {
-        headers: outboundHeaders
-      });
-      const responseBody = await feedRes.text();
-
-      // For public association pages, enable 5-minute edge cache; private iCal feeds stay short
-      const isPublicAssociation =
-        host.includes('torneopal') ||
-        host.includes('palloliitto') ||
-        host.includes('salibandy') ||
-        host.includes('basket') ||
-        host.includes('espooliikkuu') ||
-        host.includes('lipas') ||
-        host.includes('hel.fi');
-
+      const body = await feedRes.text();
+      const host = new URL(targetUrl).hostname.toLowerCase();
+      const isPublicAssociation = isAssociationHost(host);
       const cacheControlHeader =
-        feedRes.status === 200 && isPublicAssociation
+        feedRes.ok && isPublicAssociation
           ? 'public, s-maxage=300, stale-while-revalidate=600'
-          : feedRes.status === 200
-            ? 'private, max-age=60'
-            : 'no-store, no-cache, must-revalidate';
+          : 'private, max-age=60';
 
-      const contentType =
-        feedRes.headers.get('Content-Type') ||
-        (targetUrl.endsWith('.json') || targetUrl.includes('/rest/') || targetUrl.includes('api.')
-          ? 'application/json; charset=utf-8'
-          : 'text/calendar; charset=utf-8');
-
-      return new Response(responseBody, {
+      return new Response(body, {
         status: feedRes.status,
         headers: {
           ...corsHeaders,
-          'Content-Type': contentType,
+          'Content-Type': feedRes.headers.get('Content-Type') || 'application/octet-stream',
           'Cache-Control': cacheControlHeader
         }
       });

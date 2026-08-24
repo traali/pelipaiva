@@ -1,44 +1,49 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, ensureStoragePersistence } from './lib/storage/db';
+import { db, deleteOfficialTeamData, ensureStoragePersistence } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
 import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { parseICSFeed } from './lib/calendar/icsParser';
-import { generateMatchdayBriefing } from './lib/ai/deterministicReasoner';
-import { calculateParkingEase } from './lib/parking/parkingEaseEngine';
-import { fetchFmiMatchWeather } from './lib/weather/fmiWeatherEngine';
-import { MatchdayEvent, SportType } from './types/matchday';
+import { MatchdayEvent, SportType, PlayerProfile } from './types/matchday';
 import { LayoutList, Calendar as CalendarIcon, TableProperties } from 'lucide-react';
-import { FamilyShareModal } from './components/FamilyShareModal';
-import { SmartImportModal } from './components/SmartImportModal';
-import { FamilyLogisticsModal } from './components/FamilyLogisticsModal';
-import { AskCopilotModal } from './components/AskCopilotModal';
-import { FamilyManageModal } from './components/FamilyManageModal';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { MatchStatsModal } from './components/MatchStatsModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
 import { DifficultDayAlert } from './components/DifficultDayAlert';
+import { DemoBanner } from './components/DemoBanner';
 import { WeekendStrip } from './components/WeekendStrip';
 import { HeroMatchCard } from './components/HeroMatchCard';
 import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
-import {
-  parseAssociationUrl,
-  generateOrResolveMatchStats
-} from './lib/stats/statsEngine';
-import { ingestOfficialForProfile } from './lib/clubs/ingestOfficial';
-import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
-import { EXTRA_PROFILES, buildWeekendShowcaseEvents } from './lib/matchday/seedWeekendExtras';
+import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
+import { generateOrResolveMatchStats } from './lib/stats/statsEngine';
+import { helsinkiDateISO } from './lib/agents/time';
+import { EXTRA_PROFILES } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
+
+const SmartImportModal = lazy(() =>
+  import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
+);
+const FamilyLogisticsModal = lazy(() =>
+  import('./components/FamilyLogisticsModal').then((m) => ({ default: m.FamilyLogisticsModal }))
+);
+const AskCopilotModal = lazy(() =>
+  import('./components/AskCopilotModal').then((m) => ({ default: m.AskCopilotModal }))
+);
+const FamilyShareModal = lazy(() =>
+  import('./components/FamilyShareModal').then((m) => ({ default: m.FamilyShareModal }))
+);
+const FamilyManageModal = lazy(() =>
+  import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
+);
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
@@ -97,8 +102,8 @@ export const App: React.FC = () => {
     // Initial sync
     runBackgroundSync();
 
-    // 30s interval
-    syncTimer = setInterval(runBackgroundSync, 30000);
+  // 30s interval → 3 min so one phone stays under Worker GET:20 / 15 min
+    syncTimer = setInterval(runBackgroundSync, 180000);
 
     const handleVisibility = () => {
       if (!document.hidden) {
@@ -133,8 +138,12 @@ export const App: React.FC = () => {
       const perheCode = params.get('perhe');
       if (perheCode) {
         (async () => {
-          await syncFamilyRosterCycle(perheCode, db);
-          window.history.replaceState({}, document.title, window.location.pathname);
+          const res = await syncFamilyRosterCycle(perheCode, db);
+          if (res.success) {
+            localStorage.setItem('pelipaiva_onboarding_done', 'true');
+            setIsOnboardingActive(false);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
         })();
       }
 
@@ -148,7 +157,8 @@ export const App: React.FC = () => {
               await db.profiles.put(profile);
             }
             await hydrateRosterProfiles(unpacked, db);
-            // Clean up URL query param
+            localStorage.setItem('pelipaiva_onboarding_done', 'true');
+            setIsOnboardingActive(false);
             window.history.replaceState({}, document.title, window.location.pathname);
           })();
         }
@@ -165,21 +175,18 @@ export const App: React.FC = () => {
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
   const eventsQuery = useLiveQuery(() => db.events.toArray(), []);
   const rawEvents = eventsQuery || [];
+  const arrivalRules = useLiveQuery(() => db.arrivalRules.toArray(), []) || [];
 
-  const isDemoActive = profiles.some(
-    (p) =>
-      p.id.startsWith('profile-ppj-') ||
-      p.id.startsWith('profile-topola-') ||
-      p.id.startsWith('profile-kw-') ||
-      p.id === 'profile-hjk-demo'
-  );
-  const needsDemoRefresh =
-    isDemoActive &&
-    !isSeeding &&
-    eventsQuery !== undefined &&
-    !rawEvents.some((e) => e.id === 'demo-elt-aada-1');
-
-  // Seed family demo: PPJ league sides + Helsinki Cup / Espoo Liikkuu / KW Memorial
+  const isDemoActive =
+    profiles.length > 0 &&
+    profiles.every(
+      (p) =>
+        p.id.startsWith('profile-ppj-') ||
+        p.id.startsWith('profile-topola-') ||
+        p.id.startsWith('profile-kw-') ||
+        p.id === 'profile-hjk-demo'
+    );
+  // Seed family demo from live tulospalvelu — no invented KäPa/Honka cards.
   const handleStartDemo = async () => {
     setIsSeeding(true);
     try {
@@ -235,94 +242,38 @@ export const App: React.FC = () => {
       await db.profiles.add(p);
     }
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0] || '2026-08-21';
-    const tmrw = new Date(now.getTime() + 86400000);
-    const tmrwStr = tmrw.toISOString().split('T')[0] || '2026-08-22';
-    const dayAfter = new Date(now.getTime() + 172800000);
-    const dayAfterStr = dayAfter.toISOString().split('T')[0] || '2026-08-23';
-
-    const demoEventsConfig = [
-      {
-        profileId: 'profile-ppj-185085',
-        title: 'PPJ/Laru sin vs KäPa',
-        homeTeam: 'PPJ/Laru sin',
-        awayTeam: 'KäPa',
-        sport: 'football' as SportType,
-        venueName: 'Väinämöisen kenttä (Väiski)',
-        startTime: `${todayStr}T16:30:00+03:00`,
-        endTime: `${todayStr}T18:00:00+03:00`,
-        warmupTime: `${todayStr}T15:45:00+03:00`,
-        duty: 'Kahviovuoro klo 16:00 - 18:00'
-      },
-      {
-        profileId: 'profile-ppj-185083',
-        title: 'PPJ/Laru mus vs FC Honka',
-        homeTeam: 'PPJ/Laru mus',
-        awayTeam: 'FC Honka',
-        sport: 'football' as SportType,
-        venueName: 'Tapiolan Urheilupuisto TN 2',
-        startTime: `${tmrwStr}T14:30:00+03:00`,
-        endTime: `${tmrwStr}T16:00:00+03:00`,
-        warmupTime: `${tmrwStr}T13:45:00+03:00`
-      },
-      {
-        profileId: 'profile-ppj-185086',
-        title: 'PPJ/Laru oran vs VJS',
-        homeTeam: 'PPJ/Laru oran',
-        awayTeam: 'VJS',
-        sport: 'football' as SportType,
-        venueName: 'Puotilan Tekonurmi (Bubu)',
-        startTime: `${dayAfterStr}T15:00:00+03:00`,
-        endTime: `${dayAfterStr}T16:30:00+03:00`,
-        warmupTime: `${dayAfterStr}T14:15:00+03:00`
-      }
-    ];
-
-    for (let i = 0; i < demoEventsConfig.length; i++) {
-      const cfg = demoEventsConfig[i]!;
-      const venue = await resolveSportsVenue(cfg.venueName);
-      const weather = await fetchFmiMatchWeather(venue.coordinates, cfg.startTime, cfg.endTime);
-      const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(cfg.startTime));
-      const stats = generateOrResolveMatchStats(cfg.homeTeam, cfg.awayTeam, cfg.sport);
-
-      const ev: MatchdayEvent = {
-        id: `demo-event-${i + 1}`,
-        profileId: cfg.profileId,
-        sport: cfg.sport,
-        eventType: 'match',
-        isTraining: false,
-        title: cfg.title,
-        homeTeam: cfg.homeTeam,
-        awayTeam: cfg.awayTeam,
-        isHomeMatch: true,
-        startTime: cfg.startTime,
-        endTime: cfg.endTime,
-        warmupTime: cfg.warmupTime,
-        venue,
-        volunteerDuty: cfg.duty,
-        weather,
-        parking,
-        stats,
-        reconciliationStatus: 'auto_matched',
-        confidenceScore: 0.95
-      };
-      ev.briefing = generateMatchdayBriefing(ev, [ev]);
-      await db.events.put(ev);
+    const seeded = [...defaultProfiles, ...EXTRA_PROFILES];
+    const ingested: number[] = [];
+    for (let i = 0; i < seeded.length; i += 2) {
+      const chunk = seeded.slice(i, i + 2);
+      const part = await Promise.all(
+        chunk.map((p) =>
+          ingestSourceForProfile({
+            profileId: p.id,
+            playerName: p.playerName,
+            teamName: p.teamName,
+            sport: p.sport,
+            url: p.associationUrl || p.calendarUrl,
+            includeWeather: false
+          }).catch((e) => {
+            console.warn('[DEMO_INGEST]', p.teamName, e);
+            return 0;
+          })
+        )
+      );
+      ingested.push(...part);
     }
-    for (const extra of buildWeekendShowcaseEvents()) {
-      await db.events.put(extra);
+    const total = ingested.reduce((a, b) => a + b, 0);
+    if (total === 0) {
+      await db.profiles.clear();
+      await db.events.clear();
+      return false;
     }
+    return true;
     } finally {
       setIsSeeding(false);
     }
   };
-
-  useEffect(() => {
-    if (needsDemoRefresh && !isSeeding) {
-      void handleStartDemo();
-    }
-  }, [needsDemoRefresh, isSeeding]);
 
   const handleClearData = async () => {
     await db.profiles.clear();
@@ -346,24 +297,9 @@ export const App: React.FC = () => {
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [rawEvents, activeProfileId, profiles]);
 
-  // Scoped profiles and events for Mission Control HUD & Hero Match Card
-  const activeProfiles = useMemo(() => {
-    if (activeProfileId === 'all') return profiles;
-    if (activeProfileId.startsWith('player:')) {
-      const pName = activeProfileId.replace('player:', '').toLowerCase();
-      return profiles.filter((p) => (p.playerName || '').toLowerCase() === pName);
-    }
-    return profiles.filter((p) => p.id === activeProfileId);
-  }, [profiles, activeProfileId]);
-
   const snapshot = useMemo(
-    () =>
-      runMissionControlGraph(
-        filteredEvents,
-        activeProfiles,
-        new Date()
-      ),
-    [filteredEvents, activeProfiles]
+    () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules),
+    [rawEvents, profiles, arrivalRules]
   );
 
   const otherCardsEvents = useMemo(
@@ -375,12 +311,13 @@ export const App: React.FC = () => {
     const map = new Map<string, { dateStr: string; label: string; events: MatchdayEvent[] }>();
     for (const ev of otherCardsEvents) {
       const d = new Date(ev.startTime);
-      const key = d.toISOString().split('T')[0] || '';
+      const key = helsinkiDateISO(d);
       if (!map.has(key)) {
         const fiLabel = d.toLocaleDateString('fi-FI', {
           weekday: 'long',
           day: 'numeric',
-          month: 'numeric'
+          month: 'numeric',
+          timeZone: 'Europe/Helsinki'
         });
         const capitalized = fiLabel.charAt(0).toUpperCase() + fiLabel.slice(1);
         map.set(key, { dateStr: key, label: capitalized, events: [] });
@@ -395,7 +332,8 @@ export const App: React.FC = () => {
     teamName: string,
     sport: SportType,
     url: string,
-    colorHex?: string
+    colorHex?: string,
+    squadFilters?: string[]
   ): Promise<{ success: boolean; count: number; error?: string }> => {
     const existing = await db.profiles.toArray();
     const cup = exampleTournamentFromUrl(url);
@@ -419,7 +357,8 @@ export const App: React.FC = () => {
         sport,
         primaryColor: swatch.label,
         calendarUrl: url,
-        colorHex: swatch.hex
+        colorHex: swatch.hex,
+        squadFilters
       });
     } else {
       await db.profiles.add({
@@ -429,44 +368,33 @@ export const App: React.FC = () => {
         sport,
         primaryColor: swatch.label,
         calendarUrl: url,
-        colorHex: swatch.hex
+        colorHex: swatch.hex,
+        squadFilters
       });
     }
 
     try {
-      const parsedAssoc = parseAssociationUrl(url);
-      const cup = exampleTournamentFromUrl(url);
-      let importedCount = 0;
+      const imported = await ingestSourceForProfile({
+        profileId,
+        playerName,
+        teamName: cup?.teamName || teamName,
+        sport,
+        url,
+        includeWeather: true,
+        squadFilters
+      });
 
-      if (parsedAssoc || cup) {
-        const result = await ingestOfficialForProfile({
-          profileId,
-          url,
-          playerName,
-          teamName,
-          sport,
-          dbInstance: db
-        });
-        importedCount = result.importedCount;
-      } else {
-        // Standard iCal feed from Nimenhuuto, MyClub, Jopox
-        const proxyUrl = 'https://pelipaiva-edge.sakkoja.workers.dev/api/proxy/ics';
-        const target = `${proxyUrl}?url=${encodeURIComponent(url)}`;
-        const res = await fetch(target);
-        if (!res.ok) {
-          throw new Error(`Kalenterin haku epäonnistui (HTTP ${res.status})`);
+      if (imported === 0) {
+        if (!reused) {
+          await db.profiles.delete(profileId);
         }
-        const text = await res.text();
-        const parsed = await parseICSFeed(text, profileId, sport);
-        for (const ev of parsed) {
-          const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-          const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-          const fullEv: MatchdayEvent = { ...ev, weather, parking };
-          fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
-          await db.events.put(fullEv);
-        }
-        importedCount = parsed.length;
+        return {
+          success: false,
+          count: 0,
+          error: 'Otteluita ei löytynyt tästä osoitteesta'
+        };
       }
+
 
       // Background Family Cloud Sync if active
       const syncRecord = await db.syncState.get('family');
@@ -477,15 +405,7 @@ export const App: React.FC = () => {
         );
       }
 
-      if (importedCount === 0 && !cup) {
-        return {
-          success: false,
-          count: 0,
-          error: 'Otteluita ei löytynyt annetusta linkistä. Tarkista osoite tai kokeile toista tuontitapaa.'
-        };
-      }
-
-      return { success: true, count: importedCount };
+      return { success: true, count: imported };
     } catch (err: any) {
       console.warn('Team / Calendar fetch error:', err);
       return {
@@ -503,6 +423,17 @@ export const App: React.FC = () => {
     setIsSmartImportOpen(true);
   };
 
+  const openEditProfile = (profile: PlayerProfile) => {
+    setImportDefaults({
+      playerName: profile.playerName,
+      name: profile.teamName,
+      sport: profile.sport,
+      url: profile.calendarUrl || profile.associationUrl || ''
+    });
+    setIsFamilyManageOpen(false);
+    setIsSmartImportOpen(true);
+  };
+
   const activePlayerName = activeProfileId.startsWith('player:')
     ? activeProfileId.replace('player:', '')
     : profiles.find((p) => p.id === activeProfileId)?.playerName;
@@ -510,15 +441,43 @@ export const App: React.FC = () => {
   const handleRefreshAll = async () => {
     setIsSyncing(true);
     try {
-      for (const ev of rawEvents) {
-        const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-        const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-        const updated: MatchdayEvent = { ...ev, weather, parking };
-        updated.briefing = generateMatchdayBriefing(updated, rawEvents);
-        await db.events.put(updated);
+      for (const p of profiles) {
+        const url = p.associationUrl || p.calendarUrl;
+        if (!url) continue;
+        await ingestSourceForProfile({
+          profileId: p.id,
+          playerName: p.playerName,
+          teamName: p.teamName,
+          sport: p.sport,
+          url,
+          includeWeather: true
+        }).catch((e) => console.warn('[REFRESH]', p.teamName, e));
       }
     } finally {
       setTimeout(() => setIsSyncing(false), 600);
+    }
+  };
+
+  const handleRemoveImportedTeam = async (playerName: string, url?: string) => {
+    const hit = profiles.find(
+      (p) =>
+        p.playerName === playerName &&
+        (!url || p.calendarUrl === url || p.associationUrl === url)
+    );
+    if (!hit) return;
+    await db.events.where('profileId').equals(hit.id).delete();
+    await db.profiles.delete(hit.id);
+    if (hit.teamId) {
+      await deleteOfficialTeamData(hit.teamId);
+    }
+    const sync = await db.syncState.get('family');
+    if (sync && sync.syncKey) {
+      const key = `pelipaiva_tombstones_${sync.syncKey}`;
+      const existingStr = localStorage.getItem(key);
+      const list: Array<{ id: string; deletedAt: string }> = existingStr ? JSON.parse(existingStr) : [];
+      list.push({ id: hit.id, deletedAt: new Date().toISOString() });
+      localStorage.setItem(key, JSON.stringify(list));
+      await db.syncState.update('family', { pendingUpload: true });
     }
   };
 
@@ -565,15 +524,25 @@ export const App: React.FC = () => {
     return <AmbientView events={filteredEvents} profiles={profiles} />;
   }
 
+  if (isSeeding) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-canvas px-6 text-center text-text-primary">
+        <p className="text-sm font-semibold text-pitch">Haetaan otteluita tulospalvelusta…</p>
+      </div>
+    );
+  }
+
   // If no profiles exist yet or onboarding is explicitly in progress, show the Interactive Onboarding Wizard
   if (profiles.length === 0 || isOnboardingActive) {
     return (
       <>
         <OnboardingWizard
-          onStartDemo={() => {
-            localStorage.setItem('pelipaiva_onboarding_done', 'true');
-            setIsOnboardingActive(false);
-            handleStartDemo();
+          onStartDemo={async () => {
+            const ok = await handleStartDemo();
+            if (ok) {
+              localStorage.setItem('pelipaiva_onboarding_done', 'true');
+              setIsOnboardingActive(false);
+            }
           }}
           onFinishOnboarding={() => {
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
@@ -589,7 +558,9 @@ export const App: React.FC = () => {
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
             return await handleImportCalendar(playerName, teamName, sport, url);
           }}
+          onRemoveTeam={handleRemoveImportedTeam}
         />
+        <Suspense fallback={null}>
         <SmartImportModal
           isOpen={isSmartImportOpen}
           onClose={() => {
@@ -597,11 +568,11 @@ export const App: React.FC = () => {
             setImportDefaults({});
           }}
           existingPlayers={playerNames}
+          onImportClassic={handleImportCalendar}
           initialSport={importDefaults.sport}
           initialTeamUrl={importDefaults.url}
           initialTeamName={importDefaults.name}
           initialPlayerName={importDefaults.playerName}
-          onImportClassic={handleImportCalendar}
         />
         <FamilyShareModal
           isOpen={isFamilyShareOpen}
@@ -609,6 +580,7 @@ export const App: React.FC = () => {
           profiles={profiles}
           onDataImported={() => setActiveProfileId('all')}
         />
+        </Suspense>
       </>
     );
   }
@@ -630,6 +602,12 @@ export const App: React.FC = () => {
       />
 
       <main className="mx-auto max-w-5xl px-4 pt-2">
+        {isDemoActive && (
+          <DemoBanner
+            onOpenImport={() => setIsSmartImportOpen(true)}
+            onClearDemo={handleClearData}
+          />
+        )}
         {/* Sticky Profile Filter & View Mode Switcher Header */}
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-xs">
           <div className="flex-1 min-w-0">
@@ -861,6 +839,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* Unified Smart Multi-Tab Importer (Federation URL, Cups, WhatsApp, Excel, OCR) */}
+      <Suspense fallback={null}>
       <SmartImportModal
         isOpen={isSmartImportOpen}
         onClose={() => {
@@ -900,6 +879,7 @@ export const App: React.FC = () => {
           setIsFamilyManageOpen(false);
           openAddTeam(playerName);
         }}
+        onEditProfile={(profile) => openEditProfile(profile)}
         onOpenFamilyShare={() => {
           setIsFamilyManageOpen(false);
           setIsFamilyShareOpen(true);
@@ -955,6 +935,7 @@ export const App: React.FC = () => {
           }}
         />
       )}
+      </Suspense>
     </div>
   );
 };

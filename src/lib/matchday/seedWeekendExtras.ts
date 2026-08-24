@@ -73,6 +73,7 @@ function ev(opts: {
   matchNumber?: string;
   score?: string;
   eventType?: MatchdayEvent['eventType'];
+  isHomeMatch?: boolean;
 }): MatchdayEvent {
   const mins = opts.eventType === 'tournament' ? 50 : 90;
   const end = new Date(opts.start.getTime() + mins * 60000);
@@ -86,7 +87,7 @@ function ev(opts: {
     title: opts.title,
     homeTeam: opts.home,
     awayTeam: opts.away,
-    isHomeMatch: true,
+    isHomeMatch: opts.isHomeMatch !== false,
     startTime: iso(opts.start),
     endTime: iso(end),
     warmupTime: iso(warmup),
@@ -275,7 +276,8 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       tournamentName: 'KW Memorial Cup 2026',
       stage: 'P14 Haastaja Lohko B',
       matchNumber: '221',
-      score: '4–9'
+      score: '4–9',
+      isHomeMatch: false
     }),
     ev({
       id: 'demo-kw-indians-3',
@@ -290,7 +292,8 @@ export function buildWeekendShowcaseEvents(): MatchdayEvent[] {
       tournamentName: 'KW Memorial Cup 2026',
       stage: 'Jatko-ottelut',
       matchNumber: '224',
-      score: '7–3'
+      score: '7–3',
+      isHomeMatch: false
     }),
     ev({
       id: 'demo-kw-indians-4',

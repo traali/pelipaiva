@@ -421,6 +421,7 @@ export interface PlayerProfile {
   clubId?: string;
   squadName?: string;
   arrivalRules?: ArrivalRules;
+  squadFilters?: string[];
   lastOfficialSyncAt?: string;
 }
 

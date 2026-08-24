@@ -22,6 +22,8 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
   const [isThinking, setIsThinking] = useState(false);
   const [result, setResult] = useState<CopilotQueryResult | null>(null);
 
+  const firstChild = profiles[0]?.playerName || 'lapsella';
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -32,9 +34,10 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+
   const sampleQuestions = [
     '☕ Onko minulla kahviovuoroa tällä viikolla?',
-    '⚽ Milloin Maijalla on seuraava peli?',
+    `⚽ Milloin on ${firstChild}:n seuraava peli?`,
     '👟 Milloin pelataan tekonurmella (AG)?',
     '🚗 Miten viikonlopun kyydit hoidetaan?'
   ];

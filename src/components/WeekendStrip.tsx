@@ -16,12 +16,12 @@ export const WeekendStrip: React.FC<WeekendStripProps> = ({ days, weekendLabel, 
   const title = isWeekendOnly ? 'Viikonloppu' : 'Lähipäivät & Treenit';
 
   return (
-    <section className="mb-4">
+    <section aria-label="Viikon ottelut ja harjoitukset" className="mb-4">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-bold text-text-primary">{title}</h2>
         <p className="text-xs font-medium text-text-muted">{weekendLabel}</p>
       </div>
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {days.map((day) => {
           const isPast = day.isPast;
           const isToday = day.isToday;
@@ -54,7 +54,7 @@ export const WeekendStrip: React.FC<WeekendStripProps> = ({ days, weekendLabel, 
               </div>
 
               {day.events.length === 0 ? (
-                <p className="text-xs text-text-muted py-2">Ei pelejä</p>
+                <p className="text-xs text-text-muted py-2">Ei tapahtumia</p>
               ) : (
                 <ul className="flex flex-col gap-1.5">
                   {day.events.map((ev) => (
@@ -74,11 +74,21 @@ export const WeekendStrip: React.FC<WeekendStripProps> = ({ days, weekendLabel, 
                           {ev.time}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-bold">
-                            {ev.childName}
+                          <span className="flex items-center gap-1.5 truncate text-xs font-bold">
+                            <span className="truncate">{ev.childName}</span>
+                            {ev.isTraining && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400">
+                                Treenit
+                              </span>
+                            )}
+                            {ev.isTalkoo && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400">
+                                Talkoo
+                              </span>
+                            )}
                           </span>
                           <span className="block truncate text-[11px] text-text-muted">
-                            {ev.venueName}
+                            {ev.title} · {ev.venueName}
                           </span>
                         </span>
                         <SportGlyph sport={ev.sport} className="h-3.5 w-3.5 shrink-0 text-text-muted" />

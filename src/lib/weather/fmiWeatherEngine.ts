@@ -47,13 +47,34 @@ export function calculateFeelsLike(tempC: number, windSpeedMs: number, humidityP
 /**
  * Fetches point weather from FMI Open Data (WFS Harmonie model) for match location and time.
  */
+const weatherMemo = new Map<string, Promise<WeatherCondition | null>>();
+
 export async function fetchFmiMatchWeather(
   coords: Coordinates,
   startTimeIso: string,
   endTimeIso: string,
   proxyUrl?: string
-): Promise<WeatherCondition> {
-  const fmiQueryUrl = `${FMI_CONFIG.wfsBaseUrl}?service=WFS&version=2.0.0&request=getFeature&storedquery_id=${FMI_CONFIG.queryForecast}&parameters=${FMI_CONFIG.forecastParams}&latlon=${coords.lat},${coords.lng}`;
+): Promise<WeatherCondition | null> {
+  const hourKey = startTimeIso.slice(0, 13);
+  const key = `${coords.lat.toFixed(3)},${coords.lng.toFixed(3)},${hourKey}`;
+  const hit = weatherMemo.get(key);
+  if (hit) return hit;
+  const pending = fetchFmiMatchWeatherUncached(coords, startTimeIso, endTimeIso, proxyUrl);
+  weatherMemo.set(key, pending);
+  return pending;
+}
+
+async function fetchFmiMatchWeatherUncached(
+  coords: Coordinates,
+  startTimeIso: string,
+  endTimeIso: string,
+  proxyUrl?: string
+): Promise<WeatherCondition | null> {
+  const kickoff = new Date(startTimeIso);
+  const end = new Date(endTimeIso);
+  const windowStart = new Date(kickoff.getTime() - 30 * 60 * 1000).toISOString();
+  const windowEnd = (Number.isNaN(end.getTime()) ? new Date(kickoff.getTime() + 90 * 60 * 1000) : end).toISOString();
+  const fmiQueryUrl = `${FMI_CONFIG.wfsBaseUrl}?service=WFS&version=2.0.0&request=getFeature&storedquery_id=${FMI_CONFIG.queryForecast}&parameters=${FMI_CONFIG.forecastParams}&latlon=${coords.lat},${coords.lng}&starttime=${encodeURIComponent(windowStart)}&endtime=${encodeURIComponent(windowEnd)}`;
   const targetUrl = proxyUrl ? `${proxyUrl}?url=${encodeURIComponent(fmiQueryUrl)}` : fmiQueryUrl;
 
   try {
@@ -72,12 +93,12 @@ export async function fetchFmiMatchWeather(
         'gml:DataBlock'
       ]?.['gml:doubleOrNilReasonTupleList'];
 
-    let temperature = 14.0;
-    let windSpeed = 4.5;
-    let windGust = 6.8;
+    let temperature = Number.NaN;
+    let windSpeed = Number.NaN;
+    let windGust = Number.NaN;
     let rainMmh = 0.0;
-    let humidity = 72;
-    let rainProb = 15;
+    let humidity = 70;
+    let rainProb = 0;
 
     if (typeof doubleList === 'string') {
       const lines = doubleList.trim().split(/\r?\n|\s{2,}/);
@@ -85,11 +106,11 @@ export async function fetchFmiMatchWeather(
         const tokens = lines[0].trim().split(/\s+/);
         // Order: Temperature (0), WindSpeedMS (1), WindGust (2), WindDirection (3), PrecipitationAmount (4), Pressure (5), Humidity (6), DewPoint (7), TotalCloudCover (8)
         if (tokens.length >= 5) {
-          const tempVal = parseFloat(tokens[0] ?? '14.0');
-          const windVal = parseFloat(tokens[1] ?? '4.5');
-          const gustVal = parseFloat(tokens[2] ?? '6.8');
-          const rainVal = parseFloat(tokens[4] ?? '0.0');
-          const humVal = tokens[6] ? parseFloat(tokens[6]) : 72;
+          const tempVal = parseFloat(tokens[0] ?? "");
+          const windVal = parseFloat(tokens[1] ?? "");
+          const gustVal = parseFloat(tokens[2] ?? "");
+          const rainVal = parseFloat(tokens[4] ?? "0");
+          const humVal = tokens[6] ? parseFloat(tokens[6]) : Number.NaN;
 
           if (!isNaN(tempVal)) temperature = tempVal;
           if (!isNaN(windVal)) windSpeed = windVal;
@@ -99,6 +120,8 @@ export async function fetchFmiMatchWeather(
         }
       }
     }
+
+    if (!Number.isFinite(temperature) || !Number.isFinite(windSpeed)) return null;
 
     const feelsLike = calculateFeelsLike(temperature, windSpeed, humidity);
 
@@ -124,19 +147,7 @@ export async function fetchFmiMatchWeather(
       turfCondition
     };
   } catch (error) {
-    console.warn('[PELIPAIVA:WEATHER] FMI weather fetch notice, using default estimate:', error);
-    return {
-      temperatureC: 14,
-      feelsLikeC: 12,
-      windSpeedMs: 4,
-      windGustMs: 6,
-      rainProbabilityPercent: 20,
-      precipitationMmh: 0,
-      rainTimeline: [
-        { time: startTimeIso, precipitationMmh: 0 },
-        { time: endTimeIso, precipitationMmh: 0 }
-      ],
-      turfCondition: 'dry'
-    };
+    console.warn('[PELIPAIVA:WEATHER] FMI weather fetch failed, omitting weather:', error);
+    return null;
   }
 }

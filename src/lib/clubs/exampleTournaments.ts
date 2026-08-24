@@ -100,10 +100,10 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'elt1',
         home: 'EBT',
         away: 'TOPOLA',
-        start: '2026-08-22T09:45:00+03:00',
+        start: weekendAt(6, 9, 45),
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
-        status: 'played',
+        status: 'upcoming',
         homeScore: 6,
         awayScore: 52
       },
@@ -111,10 +111,10 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'elt2',
         home: 'TOPOLA',
         away: 'Jymy',
-        start: '2026-08-22T15:00:00+03:00',
+        start: weekendAt(6, 15, 0),
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
-        status: 'played',
+        status: 'upcoming',
         homeScore: 55,
         awayScore: 6
       },
@@ -122,7 +122,7 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'elt3',
         home: 'TOPOLA',
         away: 'Helmi Basket/Valkoinen',
-        start: '2026-08-23T10:30:00+03:00',
+        start: weekendAt(0, 10, 30),
         venueName: 'Esport Center 2',
         venueCity: 'Espoo',
         status: 'played',
@@ -210,25 +210,24 @@ export function isCupName(name?: string): boolean {
   return /turnaus|tournament|cup|memorial|cupis|helsinki cup|espoo liikkuu|kw memorial/i.test(name);
 }
 
-/** League team 185085 is P13 Kolmonen — not Helsinki Cup unless ?season=hc2026 is present. */
 export function exampleTournamentFromUrl(url: string): ExampleTournament | undefined {
   const raw = url.trim().toLowerCase();
   if (!raw) return undefined;
-  if (raw.includes('espooliikkuutournament.fi') || (raw.includes('espooliikkuu') && raw.includes('203621'))) {
+  if (
+    (raw.includes('espooliikkuutournament.fi') || raw.includes('espooliikkuu')) &&
+    (/203621/.test(raw) || /topola/i.test(raw))
+  ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'esli2026-topola');
   }
   if (
-    raw.includes('kwmemorialcup26.torneopal.fi') ||
-    (raw.includes('kwmemorial') && raw.includes('34013')) ||
-    raw.includes('er%c3%a4viikingit_0005') ||
-    raw.includes('eräviikingit_0005')
+    (raw.includes('kwmemorial') || raw.includes('kwmc') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) &&
+    (/34013/.test(raw) || /99412/.test(raw) || /indians/i.test(raw))
   ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'kwm2026-indians');
   }
   if (
-    raw.includes('season=hc2026') ||
-    raw.includes('kausi=hc2026') ||
-    (raw.includes('tulospalvelu.palloliitto.fi') && raw.includes('185085') && raw.includes('hc2026'))
+    /185085/.test(raw) &&
+    (raw.includes('hc2026') || raw.includes('helsinki cup') || raw.includes('helsinkicup'))
   ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'hc2026-ppj-sin');
   }
@@ -288,7 +287,7 @@ export function officialFromExampleCup(cup: ExampleTournament): OfficialTeamData
   };
 }
 
-/** Prefer live cup matches; never mix in P13 Kolmonen / synthetic ToPo league. */
+/** Prefer live cup matches. Never replace real league rows with canned HJK/KäPa. */
 export function mergeOfficialWithCupFallback(
   cup: ExampleTournament | undefined,
   official: OfficialTeamData | null | undefined
@@ -307,5 +306,6 @@ export function mergeOfficialWithCupFallback(
       categoryId: official?.categoryId || cup.categoryId
     };
   }
+  if ((official?.fixtures || []).length > 0) return official ?? null;
   return officialFromExampleCup(cup);
 }

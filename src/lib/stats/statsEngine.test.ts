@@ -135,7 +135,7 @@ describe('Sports Association URL Parser', () => {
         tab: 'standings',
         seasonId: '2026',
         leagueId: '123',
-        canonicalUrl: 'https://tulospalvelu.palloliitto.fi/team/60521'
+        canonicalUrl: 'https://tulospalvelu.palloliitto.fi/team/60521?season=2026&category=123'
       });
     });
 
