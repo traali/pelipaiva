@@ -199,22 +199,24 @@ export function isCupName(name?: string): boolean {
   return /turnaus|tournament|cup|memorial|cupis|helsinki cup|espoo liikkuu|kw memorial/i.test(name);
 }
 
-/** League team 185085 is P13 Kolmonen — not Helsinki Cup. */
 export function exampleTournamentFromUrl(url: string): ExampleTournament | undefined {
   const raw = url.trim().toLowerCase();
   if (!raw) return undefined;
-  if (raw.includes('espooliikkuutournament.fi') && /\/team\/203621(?:\/|$|\?)/.test(raw)) {
+  if (
+    (raw.includes('espooliikkuutournament.fi') || raw.includes('espooliikkuu')) &&
+    (/203621/.test(raw) || /topola/i.test(raw))
+  ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'esli2026-topola');
   }
   if (
-    (raw.includes('kwmemorial') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) &&
-    /joukkue=34013(?:&|$)/.test(raw)
+    (raw.includes('kwmemorial') || raw.includes('kwmc') || raw.includes('er%c3%a4viikingit_0005') || raw.includes('eräviikingit_0005')) &&
+    (/34013/.test(raw) || /99412/.test(raw) || /indians/i.test(raw))
   ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'kwm2026-ervi');
   }
   if (
-    /\/team\/185085(?:\/|$|\?)/.test(raw) &&
-    (raw.includes('hc2026') || raw.includes('helsinki cup'))
+    /185085/.test(raw) &&
+    (raw.includes('hc2026') || raw.includes('helsinki cup') || raw.includes('helsinkicup'))
   ) {
     return EXAMPLE_TOURNAMENTS.find((t) => t.id === 'hc2026-ppj-sin');
   }
@@ -294,5 +296,5 @@ export function mergeOfficialWithCupFallback(
     };
   }
   if ((official?.fixtures || []).length > 0) return official ?? null;
-  return null;
+  return officialFromExampleCup(cup);
 }

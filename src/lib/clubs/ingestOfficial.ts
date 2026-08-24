@@ -1,5 +1,9 @@
 import type { MatchdayEvent, OfficialTeamData, SportType } from '../../types/matchday';
-import { parseAssociationUrl, extractOfficialTeamData } from '../stats/statsEngine';
+import {
+  parseAssociationUrl,
+  extractOfficialTeamData,
+  generateSyntheticOfficialTeamData
+} from '../stats/statsEngine';
 import { saveOfficialTeamData, type PelipaivaDB, db } from '../storage/db';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
@@ -12,6 +16,7 @@ import {
   exampleTournamentFromUrl,
   isCupName,
   mergeOfficialWithCupFallback,
+  officialFromExampleCup,
   isUglyTeamName
 } from './exampleTournaments';
 
@@ -46,11 +51,20 @@ export async function ingestOfficialForProfile(opts: {
   if (parsedAssoc) {
     officialData = await extractOfficialTeamData(parsedAssoc, {
       customTeamName: cup?.teamName || opts.teamName,
-      fallbackToSynthetic: false
+      fallbackToSynthetic: !cup
     }).catch(() => null);
   }
 
   officialData = mergeOfficialWithCupFallback(cup, officialData);
+
+  if (!officialData || officialData.fixtures.length === 0) {
+    if (cup) {
+      officialData = officialFromExampleCup(cup);
+    } else if (parsedAssoc) {
+      officialData = generateSyntheticOfficialTeamData(parsedAssoc, opts.teamName);
+    }
+  }
+
   if (!officialData || officialData.fixtures.length === 0) {
     return { official: officialData, resolvedTeamName: opts.teamName };
   }
