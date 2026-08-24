@@ -308,6 +308,8 @@ export interface MismatchFlags {
   timeMismatch?: boolean;
   timeDiffMinutes?: number;
   officialStartTime?: string;
+  /** Machine-resolvable official kickoff (ISO) so 1-tap adopt never ingests a display string. */
+  officialStartTimeIso?: string;
   calendarStartTime?: string;
   venueMismatch?: boolean;
   officialVenueName?: string;

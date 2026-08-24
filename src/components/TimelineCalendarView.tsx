@@ -161,14 +161,31 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 const timeStr = `${start.toLocaleTimeString('fi-FI', tz)} – ${end.toLocaleTimeString('fi-FI', tz)}`;
 
                 const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
+                // Honest affordance (M-44): only matches/tournaments open stats —
+                // trainings must not present as clickable. Interactive rows are
+                // keyboard-operable (role=button + Enter/Space).
+                const isInteractive = !ev.isTraining;
 
                 return (
                   <motion.div
                     key={ev.id}
-                    whileTap={{ scale: 0.99 }}
+                    whileTap={isInteractive ? { scale: 0.99 } : undefined}
                     transition={springTactile.gentle}
-                    onClick={() => onSelectEvent?.(ev)}
-                    className="p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle hover:border-pitch/40 transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs cursor-pointer"
+                    onClick={isInteractive ? () => onSelectEvent?.(ev) : undefined}
+                    role={isInteractive ? 'button' : undefined}
+                    tabIndex={isInteractive ? 0 : undefined}
+                    aria-disabled={isInteractive ? undefined : true}
+                    onKeyDown={
+                      isInteractive
+                        ? (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onSelectEvent?.(ev);
+                            }
+                          }
+                        : undefined
+                    }
+                    className={`p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle hover:border-pitch/40 transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${isInteractive ? 'cursor-pointer' : ''}`}
                   >
                     {/* Left color bar indicator for child */}
                     <div

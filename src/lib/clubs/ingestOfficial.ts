@@ -1,10 +1,14 @@
 import type { MatchdayEvent, OfficialTeamData, SportType } from '../../types/matchday';
 import {
   parseAssociationUrl,
-  extractOfficialTeamData,
-  generateSyntheticOfficialTeamData
+  extractOfficialTeamData
 } from '../stats/statsEngine';
-import { saveOfficialTeamData, type PelipaivaDB, db } from '../storage/db';
+import {
+  saveOfficialTeamData,
+  getOfficialFixtures,
+  type PelipaivaDB,
+  db
+} from '../storage/db';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
@@ -12,6 +16,10 @@ import { generateMatchdayBriefing } from '../ai/deterministicReasoner';
 import { buildMatchStatsFromOfficial, hasRenderableStats } from '../api/torneopalClient';
 import { parseICSFeed } from '../calendar/icsParser';
 import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
+import {
+  reconcileCalendarWithOfficial,
+  computeMismatchDiagnostics
+} from '../reconciliation/reconciliationEngine';
 import {
   exampleTournamentFromUrl,
   isCupName,
@@ -49,9 +57,11 @@ export async function ingestOfficialForProfile(opts: {
 
   let officialData: OfficialTeamData | null = null;
   if (parsedAssoc) {
+    // FAMILY_SYNC_FINAL §3 constitution: fallbackToSynthetic is false — a failed
+    // federation fetch must fail closed, never fabricate a season.
     officialData = await extractOfficialTeamData(parsedAssoc, {
       customTeamName: cup?.teamName || opts.teamName,
-      fallbackToSynthetic: !cup
+      fallbackToSynthetic: false
     }).catch(() => null);
   }
 
@@ -60,9 +70,9 @@ export async function ingestOfficialForProfile(opts: {
   if (!officialData || officialData.fixtures.length === 0) {
     if (cup) {
       officialData = officialFromExampleCup(cup);
-    } else if (parsedAssoc) {
-      officialData = generateSyntheticOfficialTeamData(parsedAssoc, opts.teamName);
     }
+    // No synthetic fallback for league teams: return null and let the caller
+    // surface an explicit "source unreachable" error to the user.
   }
 
   if (!officialData || officialData.fixtures.length === 0) {
@@ -184,6 +194,45 @@ export async function ingestIcsForProfile(opts: {
     fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
     withMeta.push(fullEv);
   }
+
+  // Reconciliation producer (REQ-10/REQ-11): when this profile also has a
+  // federation source, fuzzy-join the calendar events against its official
+  // fixtures and attach mismatch diagnostics so the 1-tap banner is reachable.
+  if (withMeta.length > 0) {
+    const profile = await database.profiles.get(opts.profileId);
+    if (profile?.teamId) {
+      const officialFixtures = await getOfficialFixtures(profile.teamId, database);
+      if (officialFixtures.length > 0) {
+        const aliasRows = await database.customAliases.toArray();
+        const aliasMap = new Map(aliasRows.map((a) => [a.pattern.toLowerCase().trim(), a.canonicalClub]));
+        const results = reconcileCalendarWithOfficial(withMeta, officialFixtures, aliasMap);
+        for (const ev of withMeta) {
+          const result = results.get(ev.id);
+          if (!result || result.status === 'unlinked' || !result.officialFixture) continue;
+          ev.reconciliationStatus = result.status;
+          ev.confidenceScore = result.confidenceScore;
+          ev.officialFixtureId = result.officialFixture.id;
+          const diag = computeMismatchDiagnostics(ev, result.officialFixture);
+          if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
+            ev.mismatchFlags = {
+              timeMismatch: diag.hasKickoffMismatch,
+              timeDiffMinutes: diag.timeDiffMinutes,
+              calendarStartTime: diag.calendarStartTime,
+              officialStartTime: diag.officialStartTime,
+              officialStartTimeIso: result.officialFixture.startTime,
+              venueMismatch: diag.hasVenueMismatch,
+              calendarVenueName: diag.calendarVenueName,
+              officialVenueName: diag.officialVenueName,
+              opponentMismatch: diag.hasOpponentMismatch,
+              calendarOpponent: diag.calendarOpponent,
+              officialOpponent: diag.officialOpponent
+            };
+          }
+        }
+      }
+    }
+  }
+
   if (withMeta.length > 0) await database.events.bulkPut(withMeta);
   await database.profiles.update(opts.profileId, {
     calendarUrl: opts.url,

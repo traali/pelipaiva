@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
 
+/* dark: utilities must follow the app's .dark class toggle, not the OS setting
+   (M-34/M2: ThemeToggle flips a class; without this variant the two desync). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-canvas: var(--nv-bg-canvas);
   --color-surface-base: var(--nv-bg-surface-base);

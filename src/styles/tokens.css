@@ -30,7 +30,10 @@
     --nv-stoppage-red: #b91c1c;
     --nv-stoppage-glow: rgba(185, 28, 28, 0.16);
     --nv-radar-cyan: #0e7490;
-    --nv-floodlight: #8a8000;
+    /* Daylight value darkened from #8a8000: 3.6:1 on canvas failed WCAG for the
+       10-12px departure hints it renders (M-34/M1). #6d6410 ≥ 4.8:1 on all
+       daylight surfaces. Dark theme keeps the high-luminance floodlight. */
+    --nv-floodlight: #6d6410;
     --nv-floodlight-fg: #0a0a0a;
 
     --nv-glass-blur: none;
