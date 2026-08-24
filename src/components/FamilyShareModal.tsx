@@ -16,7 +16,7 @@ import {
 import { springTactile } from '../lib/motion/springs';
 import { PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
-import { exportFamilyBackup, importFamilyBackup } from '../lib/sync/familyShare';
+import { exportFamilyBackup, importFamilyBackup, generateSharePayload } from '../lib/sync/familyShare';
 import {
   syncFamilyRosterCycle,
   isValidFamilyCode,
@@ -34,9 +34,10 @@ interface FamilyShareModalProps {
 export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   isOpen,
   onClose,
+  profiles = [],
   onDataImported
 }) => {
-  const [activeTab, setActiveTab] = useState<'code' | 'link' | 'backup'>('code');
+  const [activeTab, setActiveTab] = useState<'code' | 'link' | 'backup'>('link');
   const [familyCode, setFamilyCode] = useState<string>('');
   const [inputCode, setInputCode] = useState<string>('');
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -107,9 +108,15 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     }
   };
 
-  const shareUrl = typeof window !== 'undefined' && familyCode
-    ? `${window.location.origin}/?perhe=${familyCode}`
-    : '';
+  const directPayload = profiles && profiles.length > 0 ? generateSharePayload(profiles) : '';
+  const shareUrl =
+    typeof window !== 'undefined'
+      ? familyCode
+        ? `${window.location.origin}/?perhe=${familyCode}`
+        : directPayload
+          ? `${window.location.origin}/?share=${directPayload}`
+          : ''
+      : '';
 
   const handleCopyLink = () => {
     if (!shareUrl) return;
@@ -119,18 +126,25 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   };
 
   const handleCopyWhatsAppMessage = () => {
-    if (!familyCode) return;
-    const msg = generateJoinWhatsApp(familyCode);
+    const msg = familyCode
+      ? generateJoinWhatsApp(familyCode)
+      : `Tässä on meidän perheen Pelipäivä-kalenteri:\n${shareUrl}\n\nAvaa linkki puhelimellasi niin joukkueet synkronoituvat!`;
+    if (!msg) return;
     navigator.clipboard.writeText(msg);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShareWhatsApp = () => {
-    if (!familyCode) return;
-    const msg = generateJoinWhatsApp(familyCode);
-    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    if (familyCode) {
+      const msg = generateJoinWhatsApp(familyCode);
+      const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+    } else if (shareUrl) {
+      const msg = `Tässä on meidän perheen Pelipäivä-kalenteri:\n${shareUrl}\n\nAvaa linkki puhelimellasi niin joukkueet ja ottelut synkronoituvat heti!`;
+      const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+    }
   };
 
   const handleDownloadBackup = async () => {
@@ -339,26 +353,38 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
             {/* Tab 2: Jaa linkki */}
             {activeTab === 'link' && (
               <div className="flex flex-col gap-3 text-center">
-                {familyCode ? (
+                {shareUrl ? (
                   <>
                     <p className="text-xs text-text-secondary">
-                      Avaa tämä linkki toisessa puhelimessa liittyäksesi perheeseen yhdellä napautuksella:
+                      {familyCode
+                        ? 'Avaa tämä linkki toisessa puhelimessa liittyäksesi perheeseen yhdellä napautuksella:'
+                        : 'Jaa perheen joukkueet ja kalenterit toiseen puhelimeen:'}
                     </p>
                     <div className="p-3 rounded-xl bg-surface border border-border-strong font-mono text-xs text-text-primary break-all">
                       {shareUrl}
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="w-full py-2.5 px-4 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pitch/20 hover:brightness-110 cursor-pointer"
-                    >
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      <span>{copied ? 'Kopioitu leikepöydälle!' : 'Kopioi linkki'}</span>
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-pitch/20 hover:brightness-110 cursor-pointer"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span>{copied ? 'Kopioitu leikepöydälle!' : 'Kopioi linkki'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleShareWhatsApp}
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-[#25D366] text-white font-bold text-xs flex items-center justify-center gap-2 hover:brightness-105 cursor-pointer"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Jaa WhatsAppiin</span>
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <div className="py-6 text-center text-xs text-text-muted">
-                    Liity koodilla Perhe-koodi -välilehdeltä, niin jakolinkki syntyy.
+                    Lisää ensin vähintään yksi lapsi ja joukkue, niin perheen jakolinkki syntyy automaattisesti.
                   </div>
                 )}
               </div>
