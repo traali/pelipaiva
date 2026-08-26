@@ -12,7 +12,8 @@ import {
   Trophy,
   Dumbbell,
   Star,
-  Sparkles
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { MatchdayEvent, FullMatchStats, PlayerMatchLog } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
@@ -21,6 +22,7 @@ import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { RainRadarCurve } from './RainRadarCurve';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
+import { EventChatModal } from './EventChatModal';
 import { Edit3 } from 'lucide-react';
 import type { PitchSurface } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
@@ -57,6 +59,7 @@ interface MatchdayCardProps {
   conflicts?: FamilyConflict[];
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
+  onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
 }
 
 export const MatchdayCard: React.FC<MatchdayCardProps> = ({
@@ -66,10 +69,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   compact = false,
   conflicts,
   onNavigateToVenue,
-  onResolveMismatch
+  onResolveMismatch,
+  onEventUpdated
 }) => {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [localVenue, setLocalVenue] = useState(event.venue);
   const [stats, setStats] = useState<FullMatchStats | undefined>(event.stats);
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
@@ -544,6 +549,18 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <Share2 className="w-4 h-4" />
             </motion.button>
 
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.95 }}
+              transition={springTactile.snappy}
+              onClick={() => setIsChatOpen(true)}
+              aria-label="Päivitä tietoja chatin lailla"
+              title="Päivitä chatin lailla"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-pitch cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
+            >
+              <MessageSquare className="w-4 h-4 text-pitch" />
+            </motion.button>
+
             {isPast ? (
               <motion.button
                 whileHover={{ scale: 1.03 }}
@@ -599,6 +616,20 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           onSavePlayerLog={handleSavePlayerLog}
         />
       )}
+
+      {/* Event Chat / Direct Natural Language Update Modal */}
+      <EventChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        event={event}
+        onEventUpdated={async (updated) => {
+          if (updated.score) setCurrentScore(updated.score);
+          if (updated.playerLog) setPlayerLog(updated.playerLog);
+          if (updated.venue) setLocalVenue(updated.venue);
+          await db.events.put(updated).catch(console.warn);
+          onEventUpdated?.(updated);
+        }}
+      />
 
       {/* 1-Tap Venue Pin & Correction Modal */}
       <VenueCorrectionModal

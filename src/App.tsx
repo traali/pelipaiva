@@ -294,6 +294,13 @@ export const App: React.FC = () => {
     setIsOnboardingActive(true);
   };
 
+  const handleEventUpdated = async (updated: MatchdayEvent) => {
+    await db.events.put(updated).catch(console.warn);
+    if (selectedStatsEvent?.id === updated.id) {
+      setSelectedStatsEvent(updated);
+    }
+  };
+
   // Filter events by selected profile or player group
   const filteredEvents = useMemo(() => {
     return [...rawEvents]
@@ -852,6 +859,7 @@ export const App: React.FC = () => {
                                 );
                               }}
                               onOpenStats={() => setSelectedStatsEvent(event)}
+                              onEventUpdated={handleEventUpdated}
                             />
                           );
                         }
@@ -865,6 +873,7 @@ export const App: React.FC = () => {
                             compact
                             conflicts={snapshot.conflicts}
                             onResolveMismatch={handleResolveMismatch}
+                            onEventUpdated={handleEventUpdated}
                           />
                         );
                       })}

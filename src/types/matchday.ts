@@ -482,6 +482,14 @@ export interface PlayerMatchLog {
   loggedAt?: string;
 }
 
+export interface EventChatMessage {
+  id: string;
+  sender: 'user' | 'ai' | 'system';
+  text: string;
+  timestamp: string; // ISO 8601
+  appliedChanges?: string[];
+}
+
 export interface MatchdayEvent {
   id: string;
   profileId: string;
@@ -507,6 +515,11 @@ export interface MatchdayEvent {
   stats?: FullMatchStats;
   playerLog?: PlayerMatchLog;
   briefing?: MatchdayBriefing;
+
+  // Chat & direct user inputs (WhatsApp / NLP chat)
+  chatMessages?: EventChatMessage[];
+  hasWhatsAppUpdates?: boolean;
+  notes?: string;
 
   // Milestone 1 & 3 additions:
   officialFixtureId?: string;

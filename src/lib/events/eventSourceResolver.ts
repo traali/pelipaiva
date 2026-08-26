@@ -67,7 +67,7 @@ export function resolveEventSourceInfo(
     eventId.startsWith('ocr_') ||
     eventId.startsWith('wa_')
   ) {
-    sources.push('WhatsApp / Kuva');
+    sources.push('WhatsApp');
   } else if (
     calUrl &&
     calUrl.length > 5 &&
@@ -77,6 +77,11 @@ export function resolveEventSourceInfo(
     !calUrl.includes('salibandy')
   ) {
     sources.push('iCal-kalenteri');
+  }
+
+  // 3. User direct chat updates (WhatsApp / NLP chat input)
+  if (event.hasWhatsAppUpdates || (event.chatMessages && event.chatMessages.length > 0)) {
+    sources.push('WhatsApp');
   }
 
   // Deduplicate

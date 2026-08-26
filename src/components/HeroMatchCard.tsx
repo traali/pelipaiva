@@ -8,7 +8,8 @@ import {
   CloudRain,
   Trophy,
   ChevronRight,
-  Swords
+  Swords,
+  MessageSquare
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { MatchdayEvent, PlayerProfile, FullMatchStats } from '../types/matchday';
@@ -22,6 +23,7 @@ import { SportGlyph } from './SportGlyph';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
+import { EventChatModal } from './EventChatModal';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -30,6 +32,7 @@ interface HeroMatchCardProps {
   conflicts: FamilyConflict[];
   onNavigate?: () => void;
   onOpenStats?: () => void;
+  onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
 }
 
 export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
@@ -38,9 +41,11 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   kit,
   conflicts,
   onNavigate,
-  onOpenStats
+  onOpenStats,
+  onEventUpdated
 }) => {
   const [showKit, setShowKit] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const stats: FullMatchStats | null = useMemo(() => {
     if (event.isTraining) return null;
@@ -440,6 +445,16 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <span>Navigoi parkkiin ({event.parking?.lotName || event.venue.name})</span>
           </motion.button>
 
+          <button
+            type="button"
+            onClick={() => setIsChatOpen(true)}
+            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-border-strong bg-surface-elevated px-3.5 text-sm font-semibold text-text-primary hover:border-pitch cursor-pointer transition-all"
+            title="Päivitä tapahtuman tietoja chatin lailla"
+          >
+            <MessageSquare className="w-4 h-4 text-pitch" />
+            <span>Viestit & Chat</span>
+          </button>
+
           {kit && (
             <button
               type="button"
@@ -458,6 +473,17 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <KitChecklist plan={kit} eventId={event.id} compact />
           </div>
         )}
+
+        {/* Event Chat / Direct Natural Language Update Modal */}
+        <EventChatModal
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          event={event}
+          profile={profile}
+          onEventUpdated={(updated) => {
+            onEventUpdated?.(updated);
+          }}
+        />
       </div>
     </article>
   );
