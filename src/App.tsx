@@ -6,7 +6,7 @@ import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { MatchdayEvent, SportType, PlayerProfile } from './types/matchday';
-import { LayoutList, Calendar as CalendarIcon, TableProperties } from 'lucide-react';
+import { LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { MatchStatsModal } from './components/MatchStatsModal';
@@ -64,6 +64,7 @@ export const App: React.FC = () => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
+  const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
     url?: string;
@@ -323,9 +324,28 @@ export const App: React.FC = () => {
     [rawEvents, profiles, arrivalRules, clockTick]
   );
 
+  const nowMs = Date.now();
+  const pastEvents = useMemo(
+    () => filteredEvents.filter((e) => new Date(e.endTime).getTime() < nowMs - 60 * 60 * 1000),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredEvents, clockTick]
+  );
+  const upcomingEvents = useMemo(
+    () => filteredEvents.filter((e) => new Date(e.endTime).getTime() >= nowMs - 60 * 60 * 1000),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredEvents, clockTick]
+  );
+
+  const displayCardsEvents = useMemo(() => {
+    if (showPastEvents || upcomingEvents.length === 0) {
+      return filteredEvents;
+    }
+    return upcomingEvents;
+  }, [showPastEvents, upcomingEvents, filteredEvents]);
+
   const otherCardsEvents = useMemo(
-    () => filteredEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
-    [filteredEvents, snapshot.nextEvent?.id]
+    () => displayCardsEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
+    [displayCardsEvents, snapshot.nextEvent?.id]
   );
 
   const eventsGroupedByDay = useMemo(() => {
@@ -862,6 +882,28 @@ export const App: React.FC = () => {
                     </div>
                   </div>
                 ))}
+                {pastEvents.length > 0 && upcomingEvents.length > 0 && (
+                  <div className="pt-2 pb-6 flex flex-col items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPastEvents((v) => !v)}
+                      aria-expanded={showPastEvents}
+                      className="inline-flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-2xl border border-border-strong bg-surface-elevated text-xs font-bold text-text-secondary hover:text-text-primary hover:border-pitch transition-all cursor-pointer shadow-xs focus-visible:ring-2 focus-visible:ring-pitch"
+                    >
+                      <HistoryIcon className="w-4 h-4 text-pitch" />
+                      <span>
+                        {showPastEvents
+                          ? `Piilota aiemmat ottelut (${pastEvents.length})`
+                          : `Näytä aiemmat / menneet ottelut (${pastEvents.length})`}
+                      </span>
+                    </button>
+                    {!showPastEvents && (
+                      <span className="text-[11px] text-text-muted">
+                        {pastEvents.length} aiempaa ottelua piilotettu selkeyden vuoksi
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl border border-border-subtle bg-surface p-8 text-center my-4">

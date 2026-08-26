@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Plus, CheckCircle2, MapPin, Clock, Shirt, User, X } from 'lucide-react';
+import { Sparkles, Plus, CheckCircle2, MapPin, Clock, Shirt, User, X, Camera, Loader2 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
 import { parseFreeformSportsMessage, ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
@@ -11,6 +11,7 @@ import { pickNextTeamColor } from '../lib/sport/teamColors';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
 import { parseFamilyWhatsAppMessage } from '../lib/sync/familyWhatsApp';
 import { syncFamilyRosterCycle } from '../lib/sync/familyCloud';
+import { extractTextFromImage } from '../lib/ai/ocrImageParser';
 
 interface QuickDropInBarProps {
   existingPlayers: string[];
@@ -36,6 +37,38 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<string>('');
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsOcrLoading(true);
+    setIsExpanded(true);
+    setOcrStatus('Luetaan kuvaa tekoälyllä...');
+    try {
+      const extracted = await extractTextFromImage(file, (p) => {
+        if (p.status === 'recognizing text') {
+          setOcrStatus(`Tunnistetaan tekstiä (${Math.round(p.progress * 100)}%)...`);
+        }
+      });
+      if (extracted && extracted.trim().length > 0) {
+        setText(extracted.trim());
+        setOcrStatus('');
+      } else {
+        setSaveError('Kuvasta ei löytynyt luettavaa tekstiä.');
+        setTimeout(() => setSaveError(''), 4000);
+      }
+    } catch (err: any) {
+      setSaveError('Kuvan lukeminen epäonnistui.');
+      setTimeout(() => setSaveError(''), 4000);
+    } finally {
+      setIsOcrLoading(false);
+      setOcrStatus('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Sync active player if profile changes
   useEffect(() => {
@@ -173,6 +206,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
 
           {text && (
             <button
+              type="button"
               onClick={() => {
                 setText('');
                 setPreviewEvent(null);
@@ -182,6 +216,28 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
               <X className="w-3.5 h-3.5" />
             </button>
           )}
+
+          {/* Hidden File Input for Camera / Screenshot OCR */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+            id="quick-dropin-ocr-input"
+          />
+          <label
+            htmlFor="quick-dropin-ocr-input"
+            title="Lue otteluohjelma tai viesti kuvasta tekoälyllä"
+            className="p-1.5 px-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-pitch hover:border-pitch cursor-pointer shrink-0 transition-all flex items-center gap-1.5 text-xs font-bold"
+          >
+            {isOcrLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-pitch" />
+            ) : (
+              <Camera className="w-3.5 h-3.5 text-pitch" />
+            )}
+            <span className="text-[11px]">Kuva</span>
+          </label>
 
           {familyJoinCode && !saveSuccess && (
             <motion.button
@@ -221,6 +277,13 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
               className="overflow-hidden"
             >
               <div className="pt-3 mt-2 border-t border-border-subtle flex flex-col gap-2.5">
+                {/* OCR Loading Banner */}
+                {isOcrLoading && (
+                  <div className="p-2.5 rounded-xl bg-pitch/10 border border-pitch/30 text-pitch text-xs font-bold flex items-center gap-2 animate-pulse">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span>{ocrStatus || 'Luetaan kuvaa tekoälyllä...'}</span>
+                  </div>
+                )}
                 {/* Child & Sport Selector */}
                 <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
                   <div className="flex items-center gap-1.5 flex-wrap">
