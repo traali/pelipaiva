@@ -337,7 +337,7 @@ export const App: React.FC = () => {
   );
 
   const displayCardsEvents = useMemo(() => {
-    if (showPastEvents || upcomingEvents.length === 0) {
+    if (showPastEvents) {
       return filteredEvents;
     }
     return upcomingEvents;
@@ -870,7 +870,7 @@ export const App: React.FC = () => {
                     </div>
                   </section>
                 ))}
-                {pastEvents.length > 0 && upcomingEvents.length > 0 && (
+                {pastEvents.length > 0 && (
                   <div className="pt-2 pb-6 flex flex-col items-center gap-2">
                     <button
                       type="button"
@@ -894,9 +894,27 @@ export const App: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="rounded-2xl border border-border-subtle bg-surface p-8 text-center my-4">
-                <CalendarIcon className="mx-auto mb-2.5 h-8 w-8 text-text-muted" />
-                <h3 className="text-sm font-bold text-text-primary">Ei otteluita valitulla suodatuksella</h3>
+              <div className="rounded-3xl border border-border-subtle bg-surface p-8 text-center my-4 flex flex-col items-center gap-3">
+                <div className="p-3 rounded-2xl bg-surface-elevated text-text-muted">
+                  <CalendarIcon className="h-8 w-8" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-text-primary">Ei tulevia otteluita kalenterissa</h3>
+                  <p className="text-xs text-text-muted max-w-sm">
+                    Tulevia otteluita ei ole vielä julkaistu sarjajärjestelmässä tai kausi on päättynyt.
+                  </p>
+                </div>
+
+                {pastEvents.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPastEvents(true)}
+                    className="mt-2 inline-flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-2xl border border-border-strong bg-surface-elevated text-xs font-bold text-pitch hover:border-pitch transition-all cursor-pointer shadow-xs"
+                  >
+                    <HistoryIcon className="w-4 h-4" />
+                    <span>Katso menneet ottelut ({pastEvents.length} kpl)</span>
+                  </button>
+                )}
               </div>
             )}
           </>
