@@ -288,6 +288,12 @@ export async function hydrateRosterProfiles(
   }
 }
 
+// Single-flight in-memory mutex to prevent concurrent sync races for the same family code (M-16)
+const inFlightSyncs = new Map<
+  string,
+  Promise<{ success: boolean; roster?: FamilyRosterV1; error?: string }>
+>();
+
 /**
  * Executes a full synchronization cycle: GET -> merge -> hydrate -> PUT with 409 retry.
  */
@@ -301,7 +307,28 @@ export async function syncFamilyRosterCycle(
   }
 
   const cleanCode = normalizeFamilyCode(familyCode);
+  const existingInFlight = inFlightSyncs.get(cleanCode);
+  if (existingInFlight) {
+    return existingInFlight;
+  }
 
+  const syncPromise = (async () => {
+    try {
+      return await executeSyncFamilyRosterCycle(cleanCode, databaseInstance, baseUrl);
+    } finally {
+      inFlightSyncs.delete(cleanCode);
+    }
+  })();
+
+  inFlightSyncs.set(cleanCode, syncPromise);
+  return syncPromise;
+}
+
+async function executeSyncFamilyRosterCycle(
+  cleanCode: string,
+  databaseInstance: PelipaivaDB,
+  baseUrl: string
+): Promise<{ success: boolean; roster?: FamilyRosterV1; error?: string }> {
   try {
     // 1. Load local profiles — demo rows must never leak into a real family
     // roster (M-08/N2). Demo ids are seeded by handleStartDemo.

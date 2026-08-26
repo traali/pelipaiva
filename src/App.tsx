@@ -799,8 +799,13 @@ export const App: React.FC = () => {
                   onNavigate={() => {
                     const ev = snapshot.nextEvent;
                     if (!ev) return;
+                    const coords = ev.parking?.coordinates || ev.venue?.coordinates;
+                    const destination =
+                      coords?.lat != null && coords?.lng != null
+                        ? `${coords.lat},${coords.lng}`
+                        : encodeURIComponent(ev.venue?.name || 'Kenttä');
                     window.open(
-                      `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                      `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                       '_blank'
                     );
                   }}
@@ -875,12 +880,17 @@ export const App: React.FC = () => {
               conflicts={snapshot.conflicts}
               onSelectEvent={(ev) => setSelectedStatsEvent(ev)}
               onClearFilter={() => setActiveProfileId('all')}
-              onNavigate={(ev) =>
+              onNavigate={(ev) => {
+                const coords = ev.parking?.coordinates || ev.venue?.coordinates;
+                const destination =
+                  coords?.lat != null && coords?.lng != null
+                    ? `${coords.lat},${coords.lng}`
+                    : encodeURIComponent(ev.venue?.name || 'Kenttä');
                 window.open(
-                  `https://www.google.com/maps/dir/?api=1&destination=${ev.venue.coordinates.lat},${ev.venue.coordinates.lng}`,
+                  `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                   '_blank'
-                )
-              }
+                );
+              }}
             />
           </div>
         )}

@@ -58,8 +58,12 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const isWetOrCold = event.weather && (event.weather.precipitationMmh > 0.2 || (temp !== undefined && temp <= 3));
 
   // Prioritize parking coordinates for driving navigation over pitch center
-  const targetCoords = event.parking?.coordinates || event.venue.coordinates;
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`;
+  const targetCoords = event.parking?.coordinates || event.venue?.coordinates;
+  const destination =
+    targetCoords?.lat != null && targetCoords?.lng != null
+      ? `${targetCoords.lat},${targetCoords.lng}`
+      : encodeURIComponent(event.venue?.name || 'Kenttä');
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
 
   const jerseyColor = kit?.kitColors?.primary || profile?.colorHex || '#3b82f6';
   const jerseyText = event.isHomeMatch === false ? 'Vieraspaita (+ varapaita)' : 'Kotipeliasu (ykkönen)';

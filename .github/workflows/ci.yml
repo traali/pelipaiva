@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript Strict Verification
-        run: npx tsc --noEmit
+        run: npx tsc -p tsconfig.app.json --noEmit
 
       - name: Deterministic Logic Tests
         run: npx vitest run

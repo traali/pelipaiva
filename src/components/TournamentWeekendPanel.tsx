@@ -203,11 +203,15 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                                 aria-label={`Navigoi kentälle ${m.venue.name}`}
                                 onClick={() => {
                                   if (onNavigate) {
-                                    onNavigate(m.venue.coordinates);
+                                    onNavigate(m.venue?.coordinates || { lat: 60.1872, lng: 24.9248 });
                                   } else {
-                                    const coords = m.parking?.coordinates || m.venue.coordinates;
+                                    const coords = m.parking?.coordinates || m.venue?.coordinates;
+                                    const destination =
+                                      coords?.lat != null && coords?.lng != null
+                                        ? `${coords.lat},${coords.lng}`
+                                        : encodeURIComponent(m.venue?.name || 'Kenttä');
                                     window.open(
-                                      `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                                      `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                                       '_blank'
                                     );
                                   }

@@ -539,8 +539,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 onClick={
                   onNavigateToVenue ||
                   (() => {
-                    const targetCoords = event.parking?.coordinates || event.venue.coordinates;
-                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}`;
+                    const targetCoords = event.parking?.coordinates || event.venue?.coordinates;
+                    const destination =
+                      targetCoords?.lat != null && targetCoords?.lng != null
+                        ? `${targetCoords.lat},${targetCoords.lng}`
+                        : encodeURIComponent(event.venue?.name || 'Kenttä');
+                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
                     window.open(mapsUrl, '_blank');
                   })
                 }
