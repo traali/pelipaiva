@@ -425,18 +425,6 @@ export const App: React.FC = () => {
         squadFilters
       });
 
-      if (imported === 0) {
-        if (!reused) {
-          await db.profiles.delete(profileId);
-        }
-        return {
-          success: false,
-          count: 0,
-          error: 'Otteluita ei löytynyt tästä osoitteesta'
-        };
-      }
-
-
       // Background Family Cloud Sync if active
       const syncRecord = await db.syncState.get('family');
       if (syncRecord && syncRecord.syncKey) {
