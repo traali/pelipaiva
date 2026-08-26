@@ -88,6 +88,14 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
     association: 'Lentopallo.fi',
     colorHex: '#8b5cf6'
   },
+  {
+    name: 'Koripallo · Tulospalvelu (tiimi 5756346)',
+    teamName: 'Koripallojoukkue',
+    sport: 'basketball',
+    url: 'https://tulospalvelu.basket.fi/team/5756346/info',
+    association: 'Basket.fi',
+    colorHex: '#f59e0b'
+  },
   ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
     teamName: cup.teamName,

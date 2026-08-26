@@ -234,9 +234,9 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     shortName: 'Koripallo',
     city: 'Helsinki / Espoo',
     sport: 'basketball',
-    primaryColor: 'sininen',
-    colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://espooliikkuutournament.fi/team/203621',
+    primaryColor: 'oranssi',
+    colorHex: '#f59e0b',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
     popularAgeGroups: ['U14 Pojat', 'U13 Tytöt', 'U12 Pojat', 'Edustus']
   },
   {
@@ -258,7 +258,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://tulospalvelu.basket.fi/',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
     popularAgeGroups: ['U14 Pojat Stadi', 'U13 Tytöt Pakila', 'U12 Pojat Malmi']
   },
   {
@@ -269,7 +269,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'basketball',
     primaryColor: 'sininen',
     colorHex: '#1e40af',
-    sampleTeamUrl: 'https://tulospalvelu.basket.fi/',
+    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
     popularAgeGroups: ['U14 Pojat', 'U13 Tytöt Sininen', 'U12 Pojat Valkoinen']
   },
   {
