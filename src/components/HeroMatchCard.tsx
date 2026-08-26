@@ -24,28 +24,39 @@ import { getContrastTextColor } from '../lib/sport/teamColors';
 import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { EventChatModal } from './EventChatModal';
+import { EventMergeModal } from './EventMergeModal';
+import { MoreHorizontal } from 'lucide-react';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
+  allEvents?: MatchdayEvent[];
   profile?: PlayerProfile;
   kit?: SportKitPlan;
   conflicts: FamilyConflict[];
   onNavigate?: () => void;
   onOpenStats?: () => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
+  onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
+  onEventDeleted?: (deletedId: string) => void;
+  onEventHidden?: (hiddenId: string) => void;
 }
 
 export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   event,
+  allEvents = [],
   profile,
   kit,
   conflicts,
   onNavigate,
   onOpenStats,
-  onEventUpdated
+  onEventUpdated,
+  onEventMerged,
+  onEventDeleted,
+  onEventHidden
 }) => {
   const [showKit, setShowKit] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMergeOpen, setIsMergeOpen] = useState(false);
 
   const stats: FullMatchStats | null = useMemo(() => {
     if (event.isTraining) return null;
@@ -142,11 +153,22 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             </span>
           </div>
 
-          {isLive && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-[10px] bg-stoppage/20 text-stoppage border border-stoppage/30 animate-pulse">
-              ● Käynnissä
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {isLive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-[10px] bg-stoppage/20 text-stoppage border border-stoppage/30 animate-pulse">
+                ● Käynnissä
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsMergeOpen(true)}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated text-xs transition-colors cursor-pointer flex items-center gap-1"
+              title="Hallitse tapahtumaa (Yhdistä / Piilota / Poista)"
+              aria-label="Hallitse tapahtumaa"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Match / Training Title */}
@@ -479,9 +501,27 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
           event={event}
+          allEvents={allEvents}
           profile={profile}
           onEventUpdated={(updated) => {
             onEventUpdated?.(updated);
+          }}
+        />
+
+        {/* Event Management & Merge Modal (Yhdistä / Piilota / Poista) */}
+        <EventMergeModal
+          isOpen={isMergeOpen}
+          onClose={() => setIsMergeOpen(false)}
+          sourceEvent={event}
+          allEvents={allEvents}
+          onEventMerged={(merged, deletedId) => {
+            onEventMerged?.(merged, deletedId);
+          }}
+          onEventDeleted={(deletedId) => {
+            onEventDeleted?.(deletedId);
+          }}
+          onEventHidden={(hiddenId) => {
+            onEventHidden?.(hiddenId);
           }}
         />
       </div>

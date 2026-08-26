@@ -521,6 +521,10 @@ export interface MatchdayEvent {
   hasWhatsAppUpdates?: boolean;
   notes?: string;
 
+  // Visibility and merging controls
+  isHidden?: boolean;
+  mergedIntoEventId?: string;
+
   // Milestone 1 & 3 additions:
   officialFixtureId?: string;
   reconciliationStatus?: ReconciliationStatus;

@@ -13,11 +13,14 @@ import {
 import type { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { applyEventChatUpdate } from '../lib/ai/eventChatEngine';
 import { springTactile } from '../lib/motion/springs';
+import { EventMergeModal } from './EventMergeModal';
+import { Link2 } from 'lucide-react';
 
 interface EventChatModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: MatchdayEvent;
+  allEvents?: MatchdayEvent[];
   profile?: PlayerProfile;
   onEventUpdated: (updatedEvent: MatchdayEvent) => void;
 }
@@ -26,12 +29,14 @@ export const EventChatModal: React.FC<EventChatModalProps> = ({
   isOpen,
   onClose,
   event,
+  allEvents = [],
   profile,
   onEventUpdated
 }) => {
   const [inputText, setInputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [localEvent, setLocalEvent] = useState<MatchdayEvent>(event);
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -90,13 +95,25 @@ export const EventChatModal: React.FC<EventChatModalProps> = ({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-full hover:bg-surface text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsMergeModalOpen(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-border-subtle hover:border-pitch text-text-secondary hover:text-pitch text-[11px] font-bold cursor-pointer transition-colors"
+                title="Yhdistä tämä tapahtuma toiseen otteluun, piilota tai poista"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Yhdistä / Poista</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-full hover:bg-surface text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Current Event Summary Pills */}
@@ -194,6 +211,23 @@ export const EventChatModal: React.FC<EventChatModalProps> = ({
           </form>
         </motion.div>
       </div>
+
+      <EventMergeModal
+        isOpen={isMergeModalOpen}
+        onClose={() => setIsMergeModalOpen(false)}
+        sourceEvent={localEvent}
+        allEvents={allEvents}
+        onEventMerged={(merged) => {
+          onEventUpdated(merged);
+          onClose();
+        }}
+        onEventDeleted={() => {
+          onClose();
+        }}
+        onEventHidden={() => {
+          onClose();
+        }}
+      />
     </AnimatePresence>
   );
 };

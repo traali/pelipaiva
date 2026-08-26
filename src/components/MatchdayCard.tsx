@@ -51,8 +51,12 @@ function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   }
 }
 
+import { EventMergeModal } from './EventMergeModal';
+import { MoreHorizontal } from 'lucide-react';
+
 interface MatchdayCardProps {
   event: MatchdayEvent;
+  allEvents?: MatchdayEvent[];
   playerName?: string;
   colorHex?: string;
   compact?: boolean;
@@ -60,21 +64,29 @@ interface MatchdayCardProps {
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
+  onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
+  onEventDeleted?: (deletedId: string) => void;
+  onEventHidden?: (hiddenId: string) => void;
 }
 
 export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   event,
+  allEvents = [],
   playerName,
   colorHex,
   compact = false,
   conflicts,
   onNavigateToVenue,
   onResolveMismatch,
-  onEventUpdated
+  onEventUpdated,
+  onEventMerged,
+  onEventDeleted,
+  onEventHidden
 }) => {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [localVenue, setLocalVenue] = useState(event.venue);
   const [stats, setStats] = useState<FullMatchStats | undefined>(event.stats);
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
@@ -271,22 +283,33 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             })()}
           </div>
 
-          {/* Live or Kickoff Info */}
-          {isLive ? (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stoppage/15 text-stoppage border border-stoppage/30 text-xs font-bold animate-pulse">
-              <span className="h-2 w-2 rounded-full bg-stoppage" />
-              KÄYNNISSÄ
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
-              <Clock className="w-3.5 h-3.5 text-pitch" />
-              <span>
-                {isTraining
-                  ? `Kokoontuminen klo ${formattedWarmup} • Treeni klo ${formattedKickoff}`
-                  : `Alkulämpö klo ${formattedWarmup} · klo ${formattedKickoff}`}
-              </span>
-            </div>
-          )}
+          {/* Live or Kickoff Info & More Actions */}
+          <div className="flex items-center gap-2">
+            {isLive ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stoppage/15 text-stoppage border border-stoppage/30 text-xs font-bold animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-stoppage" />
+                KÄYNNISSÄ
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
+                <Clock className="w-3.5 h-3.5 text-pitch" />
+                <span>
+                  {isTraining
+                    ? `Kokoontuminen klo ${formattedWarmup} • Treeni klo ${formattedKickoff}`
+                    : `Alkulämpö klo ${formattedWarmup} · klo ${formattedKickoff}`}
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsMergeOpen(true)}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated text-xs transition-colors cursor-pointer"
+              title="Hallitse tapahtumaa (Yhdistä / Piilota / Poista)"
+              aria-label="Hallitse tapahtumaa"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Event Header (Matchup vs Training Title) */}
@@ -622,12 +645,30 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         event={event}
+        allEvents={allEvents}
         onEventUpdated={async (updated) => {
           if (updated.score) setCurrentScore(updated.score);
           if (updated.playerLog) setPlayerLog(updated.playerLog);
           if (updated.venue) setLocalVenue(updated.venue);
           await db.events.put(updated).catch(console.warn);
           onEventUpdated?.(updated);
+        }}
+      />
+
+      {/* Event Management & Merge Modal (Yhdistä / Piilota / Poista) */}
+      <EventMergeModal
+        isOpen={isMergeOpen}
+        onClose={() => setIsMergeOpen(false)}
+        sourceEvent={event}
+        allEvents={allEvents}
+        onEventMerged={(merged, deletedId) => {
+          onEventMerged?.(merged, deletedId);
+        }}
+        onEventDeleted={(deletedId) => {
+          onEventDeleted?.(deletedId);
+        }}
+        onEventHidden={(hiddenId) => {
+          onEventHidden?.(hiddenId);
         }}
       />
 

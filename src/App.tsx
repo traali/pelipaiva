@@ -305,6 +305,7 @@ export const App: React.FC = () => {
   const filteredEvents = useMemo(() => {
     return [...rawEvents]
       .filter((e) => {
+        if (e.isHidden) return false;
         if (activeProfileId === 'all') return true;
         if (activeProfileId.startsWith('player:')) {
           const pName = activeProfileId.replace('player:', '').toLowerCase();
@@ -844,6 +845,7 @@ export const App: React.FC = () => {
                             <HeroMatchCard
                               key={event.id}
                               event={event}
+                              allEvents={rawEvents}
                               profile={snapshot.nextPlayer || profile}
                               kit={snapshot.kitByEventId[event.id]}
                               conflicts={snapshot.conflicts}
@@ -868,6 +870,7 @@ export const App: React.FC = () => {
                           <MatchdayCard
                             key={event.id}
                             event={event}
+                            allEvents={rawEvents}
                             playerName={profile?.playerName}
                             colorHex={profile?.colorHex}
                             compact
