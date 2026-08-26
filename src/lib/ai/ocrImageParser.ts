@@ -15,6 +15,15 @@ export async function extractTextFromImage(
   onProgress?: OcrProgressCallback
 ): Promise<string> {
   const worker = await createWorker('eng+fin', 1, {
+    // Self-hosted assets (M-23/V29): worker script, SIMD LSTM wasm core and
+    // eng+fin traineddata ship from /tesseract/ so OCR no longer depends on
+    // unpkg/jsdelivr at runtime — restores the offline-first guarantee.
+    // Files land in the deploy via public/ but are excluded from SW precache
+    // (vite globIgnores) to keep install weight bounded.
+    workerPath: '/tesseract/worker.min.js',
+    corePath: '/tesseract',
+    langPath: '/tesseract',
+    gzip: false,
     logger: (m) => {
       if (onProgress && m.status && typeof m.progress === 'number') {
         onProgress({ status: m.status, progress: m.progress });

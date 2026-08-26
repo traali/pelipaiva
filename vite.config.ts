@@ -34,6 +34,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Tesseract assets are runtime-fetched on demand (OCR tab), not
+        // install-critical — precaching 14 MB would blow the budget (M-53).
+        globIgnores: ['**/tesseract/**'],
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true
