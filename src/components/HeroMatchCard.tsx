@@ -21,6 +21,7 @@ import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { SportGlyph } from './SportGlyph';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
+import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -49,6 +50,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
       event.sport || 'football'
     );
   }, [event.homeTeam, event.awayTeam, event.sport, event.isTraining]);
+
+  const sourceInfo = resolveEventSourceInfo(event, profile);
 
   // Respect the child's configured arrival rules — the bare call ignored them (M-41/V49).
   const { departureTime, countdownMinutes } = calculateDepartureCountdown(event, profile?.arrivalRules);
@@ -98,7 +101,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         style={{ background: profile?.colorHex || 'var(--nv-pitch-primary)' }}
       />
       <div className="p-4 pl-5 md:p-5 md:pl-6">
-        {/* Top Meta: Profile, Sport, Live status */}
+        {/* Top Meta: Profile, Sport, Date, and Data Source Provenance */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-text-secondary">
           <div className="flex flex-wrap items-center gap-2">
             {profile && (
@@ -119,6 +122,18 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             </span>
             <span className="text-text-muted">
               {dateLabel}
+            </span>
+
+            {/* Data Source Provenance Badge */}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                sourceInfo.isCombined
+                  ? 'bg-pitch/15 text-pitch border-pitch/30'
+                  : 'bg-surface-elevated text-text-secondary border-border-subtle'
+              }`}
+              title={sourceInfo.tooltipDetails}
+            >
+              <span>{sourceInfo.badgeText}</span>
             </span>
           </div>
 

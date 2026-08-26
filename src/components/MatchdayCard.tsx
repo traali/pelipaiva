@@ -26,6 +26,7 @@ import type { PitchSurface } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
+import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
@@ -246,6 +247,23 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 {event.volunteerDuty}
               </span>
             )}
+
+            {/* Data Source Provenance Badge */}
+            {(() => {
+              const sourceInfo = resolveEventSourceInfo(event);
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                    sourceInfo.isCombined
+                      ? 'bg-pitch/15 text-pitch border-pitch/30'
+                      : 'bg-surface-elevated text-text-secondary border-border-subtle'
+                  }`}
+                  title={sourceInfo.tooltipDetails}
+                >
+                  <span>{sourceInfo.badgeText}</span>
+                </span>
+              );
+            })()}
           </div>
 
           {/* Live or Kickoff Info */}
