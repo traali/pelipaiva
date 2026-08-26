@@ -22,7 +22,7 @@ const ENDPOINTS: Partial<
   Record<AssociationType, { base: string; apiKey: string; referer: string }>
 > = {
   palloliitto: {
-    base: "https://spl.torneopal.fi/taso/rest",
+    base: "https://spl.torneopal.net/taso/rest",
     apiKey: PALL_KEY,
     referer: "https://tulospalvelu.palloliitto.fi/",
   },
