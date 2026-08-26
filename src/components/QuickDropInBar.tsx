@@ -15,6 +15,7 @@ import { syncFamilyRosterCycle } from '../lib/sync/familyCloud';
 import { extractTextFromImage } from '../lib/ai/ocrImageParser';
 
 import { rankEventCandidatesForMessage, CandidateRankingResult } from '../lib/ai/eventCandidateRanker';
+import { sportLabelFi } from '../lib/sport/sportMeta';
 
 interface QuickDropInBarProps {
   existingPlayers: string[];
@@ -115,10 +116,17 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
           setSelectedPlayer(ranking.detectedPlayerName);
         }
 
+        // Auto-select detected sport if mentioned in text
+        if (ranking.detectedSport) {
+          setSelectedSport(ranking.detectedSport);
+        }
+
         // 2. Parse new event preview as fallback
         const parsed = parseFreeformSportsMessage(trimmed, resolvedPlayer);
         setPreviewEvent(parsed);
-        setSelectedSport(parsed.sport);
+        if (!ranking.detectedSport) {
+          setSelectedSport(parsed.sport);
+        }
       } catch (e) {
         console.warn('Failed to rank candidate events', e);
       }
@@ -371,11 +379,21 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                   className="w-full p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
                 />
 
-                {/* Auto-Detected Player Pill */}
-                {rankingResult?.detectedPlayerName && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pitch/10 border border-pitch/30 text-pitch text-xs font-bold">
-                    <span>✨</span>
-                    <span>Tunnistettu tekstistä pelaajalle: <strong>{rankingResult.detectedPlayerName}</strong></span>
+                {/* Auto-Detected Player & Sport Pills */}
+                {(rankingResult?.detectedPlayerName || rankingResult?.detectedSport) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {rankingResult.detectedPlayerName && (
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-pitch/10 border border-pitch/30 text-pitch text-xs font-bold">
+                        <span>👤</span>
+                        <span>Pelaaja: <strong>{rankingResult.detectedPlayerName}</strong></span>
+                      </div>
+                    )}
+                    {rankingResult.detectedSport && (
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs font-bold">
+                        <span>🏆</span>
+                        <span>Laji: <strong>{sportLabelFi(rankingResult.detectedSport)}</strong></span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -435,11 +453,25 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                                 </span>
                               </div>
 
-                              {cand.profile && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-elevated text-text-secondary shrink-0">
-                                  👤 {cand.profile.playerName}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-elevated text-text-secondary">
+                                  {cand.event.sport === 'floorball'
+                                    ? '🏑 Säbä'
+                                    : cand.event.sport === 'basketball'
+                                    ? '🏀 Koris'
+                                    : cand.event.sport === 'volleyball'
+                                    ? '🏐 Lentis'
+                                    : cand.event.sport === 'icehockey'
+                                    ? '🏒 Lätkä'
+                                    : '⚽ Futis'}
                                 </span>
-                              )}
+
+                                {cand.profile && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-elevated text-text-secondary">
+                                    👤 {cand.profile.playerName}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-2 text-[11px] text-text-secondary flex-wrap">

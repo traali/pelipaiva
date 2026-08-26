@@ -1,5 +1,6 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { MatchdayEvent, PlayerProfile, SportType } from '../../types/matchday';
 import { extractDateFromFinnishText, extractTimesFromFinnishText } from './messageParserNLP';
+import { sportLabelFi } from '../sport/sportMeta';
 
 export interface RankedEventCandidate {
   event: MatchdayEvent;
@@ -13,9 +14,36 @@ export interface RankedEventCandidate {
 export interface CandidateRankingResult {
   detectedPlayerName?: string;
   detectedProfile?: PlayerProfile;
+  detectedSport?: SportType;
   candidates: RankedEventCandidate[];
   isNewEventRecommended: boolean;
   newEventPreviewTitle: string;
+}
+
+/**
+ * Detects the sport from text keywords.
+ */
+export function detectSportFromText(text: string): SportType | undefined {
+  const norm = text.toLowerCase();
+  if (/\b(?:salibandy|säbä|sähly|floorball|reikäpallo|suojalasit)\b/i.test(norm)) {
+    return 'floorball';
+  }
+  if (/\b(?:koripallo|koris|basket|korisliiga|donkki)\b/i.test(norm)) {
+    return 'basketball';
+  }
+  if (/\b(?:lentopallo|lentis|volley|hihalyönti|sormilyönti)\b/i.test(norm)) {
+    return 'volleyball';
+  }
+  if (/\b(?:jääkiekko|lätkä|kiekko|hockey|luistimet|kypärä|leijonat)\b/i.test(norm)) {
+    return 'icehockey';
+  }
+  if (/\b(?:futsal)\b/i.test(norm)) {
+    return 'futsal';
+  }
+  if (/\b(?:futis|jalkapallo|nappikset|säärisuojat|viheriö|nurmi|tekonurmi|bollis|spl)\b/i.test(norm)) {
+    return 'football';
+  }
+  return undefined;
 }
 
 /**
@@ -96,6 +124,7 @@ export function rankEventCandidatesForMessage(
   const norm = message.toLowerCase().trim();
   const detectedProfile = detectPlayerFromText(message, profiles);
   const detectedPlayerName = detectedProfile?.playerName;
+  const detectedSport = detectSportFromText(message);
 
   const targetDateStr = extractDateFromFinnishText(message);
   const times = extractTimesFromFinnishText(message);
@@ -114,6 +143,18 @@ export function rankEventCandidatesForMessage(
     if (detectedProfile && event.profileId === detectedProfile.id) {
       score += 35;
       reasons.push(`Pelaaja: ${detectedProfile.playerName}`);
+    }
+
+    // 1.5 Sport match (+25 points if match, -35 points penalty if explicit mismatch)
+    if (detectedSport) {
+      if (event.sport === detectedSport) {
+        score += 25;
+        reasons.push(`Laji: ${sportLabelFi(event.sport)}`);
+      } else {
+        score -= 35;
+      }
+    } else if (eventProfile?.sport && event.sport === eventProfile.sport) {
+      score += 5;
     }
 
     // 2. Date match (+40 points for exact date, +15 for upcoming near match)
@@ -184,6 +225,7 @@ export function rankEventCandidatesForMessage(
   return {
     detectedPlayerName,
     detectedProfile,
+    detectedSport,
     candidates: scoredList,
     isNewEventRecommended,
     newEventPreviewTitle: norm.includes('treenit') ? 'Uudet harjoitukset' : 'Uusi ottelu'
