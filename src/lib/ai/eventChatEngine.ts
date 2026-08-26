@@ -69,6 +69,13 @@ export async function applyEventChatUpdate(
     appliedChanges.push(`Talkootehtävä asetettu: ${dutyText}`);
   }
 
+  // 3.5 Carpool / Kyyti notes (e.g. "simolla kyyti Ekiltä. lähtö ekin luota 15:30")
+  if (norm.includes('kyyti') || norm.includes('lähtö') || norm.includes('kyydit')) {
+    const kyytiNote = `🚗 Kyyti: ${message.trim()}`;
+    updated.notes = updated.notes ? `${updated.notes}\n${kyytiNote}` : kyytiNote;
+    appliedChanges.push(`Kyytitieto lisätty: ${message.trim()}`);
+  }
+
   // 4. Venue change (e.g. "kenttä vaihdettu: Bollis 2", "pelipaikka Talin halli", "kenttänä Pirkkola TN2")
   const venueMatch = message.match(/(?:kenttä|pelipaikka|sijainti|paikkana|kenttänä)\s*(?:vaihdettu|on|:)?\s*([A-Za-z0-9äöåÄÖÅ\s\-_/]{3,35})/i);
   if (venueMatch && venueMatch[1]) {

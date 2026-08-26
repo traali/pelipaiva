@@ -48,39 +48,31 @@ export function extractDateFromFinnishText(text: string, baseDate = new Date()):
 
   // Check for relative words
   const norm = text.toLowerCase();
-  if (norm.includes('tänään')) {
+  if (/\b(?:tänään|tämän\s+päivän)\b/i.test(norm)) {
     return now.toISOString().split('T')[0] || '2026-08-24';
   }
-  if (norm.includes('huomenna')) {
+  if (/\b(?:huomenna|huomisen|huomiseen|huomiselle)\b/i.test(norm)) {
     const tmrw = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     return tmrw.toISOString().split('T')[0] || '2026-08-25';
   }
-  if (norm.includes('ylihuomenna')) {
+  if (/\b(?:ylihuomenna|ylihuomisen|ylihuomiseen)\b/i.test(norm)) {
     const dayAfter = new Date(now.getTime() + 48 * 60 * 60 * 1000);
     return dayAfter.toISOString().split('T')[0] || '2026-08-26';
   }
 
-  // Weekdays (ma, ti, ke, to, pe, la, su)
-  const weekdays: Record<string, number> = {
-    maanantai: 1,
-    ma: 1,
-    tiistai: 2,
-    ti: 2,
-    keskiviikko: 3,
-    ke: 3,
-    torstai: 4,
-    to: 4,
-    perjantai: 5,
-    pe: 5,
-    lauantai: 6,
-    la: 6,
-    sunnuntai: 0,
-    su: 0
-  };
+  // Weekdays with inflections (-na, -n, -in, -lle, -ksi) and common typos
+  const weekdayPatterns: Array<{ day: number; pattern: RegExp }> = [
+    { day: 1, pattern: /\b(?:ma|maanantai(?:na|n|lle|ksi)?)\b/i },
+    { day: 2, pattern: /\b(?:ti|tiistai(?:na|n|lle|ksi)?)\b/i },
+    { day: 3, pattern: /\b(?:ke|keskiviikko(?:na|n|lle|ksi)?|keskiviikon|keskiviikona)\b/i },
+    { day: 4, pattern: /\b(?:to|torstai(?:na|n|lle|ksi)?|torstain)\b/i },
+    { day: 5, pattern: /\b(?:pe|perjantai(?:na|n|lle|ksi)?|perjatai(?:na|n|lle|ksi)?|perjatain?|perjantain)\b/i },
+    { day: 6, pattern: /\b(?:la|lauantai(?:na|n|lle|ksi)?|lavantai(?:na|n)?|lauantain)\b/i },
+    { day: 0, pattern: /\b(?:su|sunnuntai(?:na|n|lle|ksi)?|sunnustai(?:na|n)?|sunnuntain)\b/i }
+  ];
 
-  for (const [dayName, targetDay] of Object.entries(weekdays)) {
-    const regex = new RegExp(`\\b${dayName}(?:na)?\\b`, 'i');
-    if (regex.test(norm)) {
+  for (const { day: targetDay, pattern } of weekdayPatterns) {
+    if (pattern.test(norm)) {
       const currentDay = now.getDay();
       let diff = targetDay - currentDay;
       if (diff <= 0) diff += 7; // Next occurrence
