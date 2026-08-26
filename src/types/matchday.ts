@@ -78,6 +78,35 @@ export interface LightningSafetyAlert {
   alertMessage?: string;
 }
 
+export interface ParkingZoneSpot {
+  id: string;
+  name: string;
+  type: 'standard' | 'accessible' | 'ev' | 'street' | 'no_parking';
+  typeLabel: string;
+  capacityEstimated?: number;
+  restrictionText: string;
+  discRequired: boolean;
+  maxHours?: number;
+  walkingTimeMinutes: number;
+  isRecommended?: boolean;
+}
+
+export interface TrafficSignInfo {
+  code: string; // e.g. 'E2 (Pysäköintipaikka)', 'C38 (Pysäköintikieltoalue)', 'H12.1 (Pysäköintikiekko 4h)', 'H18 (Maksullinen)'
+  name: string;
+  description: string;
+  iconType: 'p_sign' | 'no_parking' | 'disc' | 'payment' | 'ev' | 'warning';
+}
+
+export interface FineRiskInfo {
+  riskLevel: 'low' | 'moderate' | 'high';
+  riskLabel: string; // e.g. '🔴 Korkea valvontariski', '🟡 Kohtalainen valvontariski'
+  standardFineAmountEur: number; // e.g. 60 or 80
+  fineType: string; // e.g. 'Kunnallinen pysäköintivirhemaksu (80 €) / Valvontamaksu'
+  criticalPitfalls: string[];
+  preventionChecklist: string[];
+}
+
 export interface ParkingInfo {
   easeScore: 'easy' | 'moderate' | 'tight';
   easeScoreValue: number; // 1 to 100
@@ -90,6 +119,12 @@ export interface ParkingInfo {
   walkingDistanceMeters: number;
   warnings: string[];
   mapsNavigationUrl: string;
+  // Rich Parking App features (Spots, Signs, Fine Risk):
+  spots?: ParkingZoneSpot[];
+  trafficSigns?: TrafficSignInfo[];
+  fineRisk?: FineRiskInfo;
+  easyParkZoneCode?: string;
+  parkManZoneCode?: string;
 }
 
 export interface MatchGoal {
