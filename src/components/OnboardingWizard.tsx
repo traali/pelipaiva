@@ -72,6 +72,14 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
     association: 'Palloliitto',
     colorHex: '#f97316'
   },
+  {
+    name: 'Salibandy · Tulospalvelu (tiimi 25301)',
+    teamName: 'ErVi Salibandy',
+    sport: 'floorball',
+    url: 'https://tulospalvelu.salibandy.fi/team/25301/info',
+    association: 'Salibandy.fi',
+    colorHex: '#0284c7'
+  },
   ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
     teamName: cup.teamName,

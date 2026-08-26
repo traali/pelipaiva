@@ -167,7 +167,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'sininen',
     colorHex: '#2563eb',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/',
+    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
     popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'KW Memorial']
   },
   {
@@ -178,7 +178,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'floorball',
     primaryColor: 'sininen',
     colorHex: '#1d4ed8',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/',
+    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
     popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'KW Memorial']
   },
   {
