@@ -378,6 +378,7 @@ export interface UserOverrideDecision {
 
 export interface MismatchDiagnostics {
   hasKickoffMismatch: boolean;
+  isWarmupOffset?: boolean;
   calendarStartTime: string;
   officialStartTime?: string;
   timeDiffMinutes?: number;

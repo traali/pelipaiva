@@ -28,6 +28,9 @@ export function computeMismatchDiagnostics(
   const offStart = new Date(officialFixture.startTime);
 
   const timeDiffMinutes = Math.round(Math.abs(offStart.getTime() - calStart.getTime()) / 60000);
+  
+  // MyClub events frequently start 30–60 min before official kickoff for gathering/warmup
+  const isIntentionalWarmupOffset = offStart.getTime() > calStart.getTime() && timeDiffMinutes >= 15 && timeDiffMinutes <= 75;
   const hasKickoffMismatch = timeDiffMinutes >= 5;
 
   const calTimeStr = calStart.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
@@ -48,6 +51,7 @@ export function computeMismatchDiagnostics(
 
   return {
     hasKickoffMismatch,
+    isWarmupOffset: isIntentionalWarmupOffset,
     calendarStartTime: calTimeStr,
     officialStartTime: offTimeStr,
     timeDiffMinutes,
@@ -121,8 +125,9 @@ export function reconcileCalendarWithOfficial(
       // Must have at least basic opponent similarity (>= 0.40) to be a valid candidate
       if (bestOppSim < 0.40) continue;
 
-      // Time score: 1.0 at 0 diff, dropping to 0.0 at 180 mins
-      const timeScore = Math.max(0, 1 - timeDiffMins / 180);
+      // Time score: 1.0 if calendar event is 15-75 min early (intentional coach warmup), or dropping from 1.0 to 0.0 across 180 min
+      const isIntentionalWarmup = fixDate.getTime() > eventDate.getTime() && timeDiffMins >= 15 && timeDiffMins <= 75;
+      const timeScore = isIntentionalWarmup ? 1.0 : Math.max(0, 1 - timeDiffMins / 180);
 
       // Overall confidence score
       const confidenceScore = Math.round((0.7 * bestOppSim + 0.3 * timeScore) * 100) / 100;
