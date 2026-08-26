@@ -14,6 +14,8 @@ import { parseFamilyWhatsAppMessage } from '../lib/sync/familyWhatsApp';
 import { syncFamilyRosterCycle } from '../lib/sync/familyCloud';
 import { extractTextFromImage } from '../lib/ai/ocrImageParser';
 
+import { rankEventCandidatesForMessage, CandidateRankingResult } from '../lib/ai/eventCandidateRanker';
+
 interface QuickDropInBarProps {
   existingPlayers: string[];
   activeProfilePlayerName?: string;
@@ -34,7 +36,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   );
   const [selectedSport, setSelectedSport] = useState<SportType>('football');
   const [previewEvent, setPreviewEvent] = useState<ExtractedSportsEvent | null>(null);
-  const [matchedExistingEvent, setMatchedExistingEvent] = useState<MatchdayEvent | null>(null);
+  const [rankingResult, setRankingResult] = useState<CandidateRankingResult | null>(null);
   const [familyJoinCode, setFamilyJoinCode] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -84,7 +86,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
     const trimmed = text.trim();
     if (trimmed.length <= 5) {
       setPreviewEvent(null);
-      setMatchedExistingEvent(null);
+      setRankingResult(null);
       setFamilyJoinCode(null);
       return;
     }
@@ -99,77 +101,42 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setFamilyJoinCode(null);
       }
 
-      // Check if text mentions an existing child name (or inflection)
-      const mentionedChild = existingPlayers.find((p) => {
-        const root = p.trim().toLowerCase();
-        return new RegExp(`\\b${root}(?:lla|llä|lle|n|ta|tä)?\\b`, 'i').test(trimmed);
-      });
-      const resolvedPlayer = mentionedChild || selectedPlayer;
-      if (mentionedChild && mentionedChild !== selectedPlayer) {
-        setSelectedPlayer(mentionedChild);
-      }
-
-      const parsed = parseFreeformSportsMessage(trimmed, resolvedPlayer);
-      setPreviewEvent(parsed);
-      setSelectedSport(parsed.sport);
-
-      // Check if an existing match exists for this player / date
       try {
         const events = await db.events.toArray();
         const profiles = await db.profiles.toArray();
-        const playerProfile = profiles.find(
-          (p) => p.playerName.toLowerCase() === resolvedPlayer.toLowerCase()
-        );
 
-        const targetDateStr = parsed.dateStr;
-        let match: MatchdayEvent | undefined;
+        // 1. Run local AI ranker to find matching candidate events from best to weakest
+        const ranking = rankEventCandidatesForMessage(trimmed, events, profiles);
+        setRankingResult(ranking);
 
-        if (targetDateStr) {
-          match = events.find((e) => {
-            if (e.isHidden) return false;
-            const isDateMatch = e.startTime.startsWith(targetDateStr);
-            if (!isDateMatch) return false;
-            if (playerProfile) return e.profileId === playerProfile.id;
-            return true;
-          });
+        // Auto-select detected player if mentioned in text
+        const resolvedPlayer = ranking.detectedPlayerName || selectedPlayer;
+        if (ranking.detectedPlayerName && ranking.detectedPlayerName !== selectedPlayer) {
+          setSelectedPlayer(ranking.detectedPlayerName);
         }
 
-        // If no match by exact date, but text is a note/kyyti/talkoot, match next upcoming event
-        if (
-          !match &&
-          (trimmed.toLowerCase().includes('kyyti') ||
-            trimmed.toLowerCase().includes('peliin') ||
-            trimmed.toLowerCase().includes('lähtö') ||
-            trimmed.toLowerCase().includes('talkoot') ||
-            trimmed.toLowerCase().includes('kahvio'))
-        ) {
-          const upcoming = events
-            .filter((e) => !e.isHidden && (!playerProfile || e.profileId === playerProfile.id))
-            .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-            .find((e) => new Date(e.startTime).getTime() >= Date.now() - 2 * 60 * 60 * 1000);
-          if (upcoming) match = upcoming;
-        }
-
-        setMatchedExistingEvent(match || null);
+        // 2. Parse new event preview as fallback
+        const parsed = parseFreeformSportsMessage(trimmed, resolvedPlayer);
+        setPreviewEvent(parsed);
+        setSelectedSport(parsed.sport);
       } catch (e) {
-        console.warn('Failed to lookup candidate event', e);
+        console.warn('Failed to rank candidate events', e);
       }
     }, 250);
 
     return () => clearTimeout(timer);
   }, [text, existingPlayers, selectedPlayer]);
 
-  const handleUpdateExistingMatch = async () => {
-    if (!matchedExistingEvent) return;
+  const handleUpdateSpecificMatch = async (targetEvent: MatchdayEvent) => {
     setIsSaving(true);
     try {
-      const { updatedEvent } = await applyEventChatUpdate(matchedExistingEvent, text);
+      const { updatedEvent } = await applyEventChatUpdate(targetEvent, text);
       await db.events.put(updatedEvent);
       setSaveSuccess(true);
       setTimeout(() => {
         setText('');
         setPreviewEvent(null);
-        setMatchedExistingEvent(null);
+        setRankingResult(null);
         setIsExpanded(false);
         setSaveSuccess(false);
         onEventCreated?.();
@@ -404,87 +371,137 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                   className="w-full p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
                 />
 
-                {/* Real-Time Preview: Matched Existing Event vs New Event */}
-                {matchedExistingEvent ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-3.5 rounded-2xl bg-surface border border-pitch shadow-sm flex flex-col gap-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-pitch">
-                        <Link2 className="w-4 h-4" />
-                        <span>Yhdistetään olemassa olevaan otteluun:</span>
-                      </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-pitch/15 text-pitch font-black">
-                        Löytyi ottelu!
+                {/* Auto-Detected Player Pill */}
+                {rankingResult?.detectedPlayerName && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pitch/10 border border-pitch/30 text-pitch text-xs font-bold">
+                    <span>✨</span>
+                    <span>Tunnistettu tekstistä pelaajalle: <strong>{rankingResult.detectedPlayerName}</strong></span>
+                  </div>
+                )}
+
+                {/* RANKED CANDIDATE MATCHES LIST (Best to Weakest) */}
+                {rankingResult && rankingResult.candidates.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-text-secondary">
+                      <span className="flex items-center gap-1">
+                        <Link2 className="w-3.5 h-3.5 text-pitch" />
+                        <span>AI:n löytämät ottelut (parhaasta heikompaan):</span>
+                      </span>
+                      <span className="text-text-muted">
+                        {rankingResult.candidates.length} ehdotus{rankingResult.candidates.length > 1 ? 'ta' : ''}
                       </span>
                     </div>
 
-                    {/* Matched Fixture Details */}
-                    <div className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle flex flex-col gap-1">
-                      <div className="text-xs font-black text-text-primary">
-                        {matchedExistingEvent.isTraining
-                          ? matchedExistingEvent.title
-                          : `${matchedExistingEvent.homeTeam} vs ${matchedExistingEvent.awayTeam}`}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-text-secondary flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-pitch" />
-                          <span>
-                            {new Date(matchedExistingEvent.startTime).toLocaleDateString('fi-FI', {
-                              weekday: 'short',
-                              day: 'numeric',
-                              month: 'numeric'
-                            })}{' '}
-                            klo{' '}
-                            {new Date(matchedExistingEvent.startTime).toLocaleTimeString('fi-FI', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              timeZone: 'Europe/Helsinki'
-                            })}
-                          </span>
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1 truncate max-w-[200px]">
-                          <MapPin className="w-3 h-3 text-radar" />
-                          <span className="truncate">{matchedExistingEvent.venue.name}</span>
-                        </span>
-                      </div>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      {rankingResult.candidates.map((cand, idx) => {
+                        const isTop = idx === 0;
+                        const candDate = new Date(cand.event.startTime).toLocaleDateString('fi-FI', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'numeric'
+                        });
+                        const candTime = new Date(cand.event.startTime).toLocaleTimeString('fi-FI', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'Europe/Helsinki'
+                        });
+
+                        return (
+                          <motion.div
+                            key={cand.event.id}
+                            initial={{ opacity: 0, y: 3 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 ${
+                              isTop
+                                ? 'bg-surface border-pitch shadow-sm shadow-pitch/10'
+                                : 'bg-surface/70 border-border-subtle hover:border-border-strong'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                                    cand.matchPercentage >= 80
+                                      ? 'bg-pitch/20 text-pitch border border-pitch/40'
+                                      : 'bg-whistle/20 text-whistle border border-whistle/40'
+                                  }`}
+                                >
+                                  {isTop ? '🥇 Paras osuma' : `${idx + 1}. Vaihtoehto`} ({cand.matchPercentage}%)
+                                </span>
+                                <span className="text-xs font-black text-text-primary truncate">
+                                  {cand.event.isTraining
+                                    ? cand.event.title
+                                    : `${cand.event.homeTeam} vs ${cand.event.awayTeam}`}
+                                </span>
+                              </div>
+
+                              {cand.profile && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-elevated text-text-secondary shrink-0">
+                                  👤 {cand.profile.playerName}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[11px] text-text-secondary flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-pitch" />
+                                <span>{candDate} klo {candTime}</span>
+                              </span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 truncate max-w-[220px]">
+                                <MapPin className="w-3 h-3 text-radar" />
+                                <span className="truncate">{cand.event.venue.name}</span>
+                              </span>
+                            </div>
+
+                            {/* AI Suggestion Narrative */}
+                            <div className="text-xs text-text-secondary bg-surface-elevated p-2 rounded-xl border border-border-subtle/80 flex flex-col gap-0.5">
+                              <div className="text-[10px] font-bold text-pitch uppercase tracking-wider">
+                                {cand.matchReason}
+                              </div>
+                              <div className="text-[11px] text-text-primary font-medium">
+                                {cand.suggestedActionText}
+                              </div>
+                            </div>
+
+                            <div className="pt-1 flex items-center justify-between border-t border-border-subtle/60">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateSpecificMatch(cand.event)}
+                                disabled={isSaving}
+                                className={`py-1.5 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all ${
+                                  isTop
+                                    ? 'bg-pitch text-text-inverse hover:brightness-110 shadow-pitch/20'
+                                    : 'bg-surface-elevated border border-border-strong text-text-primary hover:border-pitch hover:text-pitch'
+                                }`}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Yhdistä tähän otteluun</span>
+                              </button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fallback Option: Create As A Brand New Event */}
+                {previewEvent && (
+                  <div className="pt-2 border-t border-border-subtle/80">
+                    <div className="text-[11px] font-bold text-text-secondary mb-1.5 flex items-center gap-1">
+                      <span>✨</span>
+                      <span>
+                        {rankingResult && rankingResult.candidates.length > 0
+                          ? 'Tai luo kokonaan uusi erillinen tapahtuma:'
+                          : 'Luo uusi tapahtuma kalenteriin:'}
+                      </span>
                     </div>
 
-                    {/* What is being updated */}
-                    <div className="text-xs text-text-secondary bg-pitch/5 p-2 rounded-xl border border-pitch/20">
-                      💬 <strong>Lisätään ottelun tietoihin:</strong> {text}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1 border-t border-border-subtle gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={handleUpdateExistingMatch}
-                        disabled={isSaving}
-                        className="py-2 px-3.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center gap-1.5 hover:brightness-110 cursor-pointer shadow-sm shadow-pitch/20 transition-all"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Tallenna päivitys otteluun</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="text-[11px] text-text-muted hover:text-text-primary underline cursor-pointer py-1"
-                      >
-                        Luo erillisenä uutena tapahtumana
-                      </button>
-                    </div>
-                  </motion.div>
-                ) : (
-                  previewEvent && (
                     <motion.div
                       initial={{ opacity: 0, y: 3 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-3 rounded-xl bg-surface border border-pitch/40 flex flex-col gap-1.5"
+                      className="p-3 rounded-xl bg-surface border border-border-subtle flex flex-col gap-1.5"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs font-black text-text-primary">
@@ -530,14 +547,14 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                           type="button"
                           onClick={handleSave}
                           disabled={isSaving}
-                          className="py-1.5 px-3 rounded-lg bg-pitch text-text-inverse text-xs font-bold flex items-center gap-1 hover:brightness-110 cursor-pointer"
+                          className="py-1.5 px-3 rounded-lg bg-surface-elevated border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Tallenna tapahtuma</span>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-pitch" />
+                          <span>Tallenna uutena tapahtumana</span>
                         </button>
                       </div>
                     </motion.div>
-                  )
+                  </div>
                 )}
 
                 {saveSuccess && (
