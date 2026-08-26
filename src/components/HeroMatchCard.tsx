@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
-import { AlertTriangle, MapPin, Navigation, Thermometer, ShieldCheck, CloudRain } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import {
+  AlertTriangle,
+  MapPin,
+  Navigation,
+  Thermometer,
+  ShieldCheck,
+  CloudRain,
+  Trophy,
+  ChevronRight,
+  Swords
+} from 'lucide-react';
 import { motion } from 'motion/react';
-import type { MatchdayEvent, PlayerProfile } from '../types/matchday';
+import type { MatchdayEvent, PlayerProfile, FullMatchStats } from '../types/matchday';
 import type { FamilyConflict, SportKitPlan } from '../lib/agents';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
 import { sportLabelFi } from '../lib/sport/sportMeta';
@@ -10,6 +20,7 @@ import { KitChecklist } from './KitChecklist';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { SportGlyph } from './SportGlyph';
 import { getContrastTextColor } from '../lib/sport/teamColors';
+import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -17,6 +28,7 @@ interface HeroMatchCardProps {
   kit?: SportKitPlan;
   conflicts: FamilyConflict[];
   onNavigate?: () => void;
+  onOpenStats?: () => void;
 }
 
 export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
@@ -24,9 +36,20 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   profile,
   kit,
   conflicts,
-  onNavigate
+  onNavigate,
+  onOpenStats
 }) => {
   const [showKit, setShowKit] = useState(false);
+
+  const stats: FullMatchStats | null = useMemo(() => {
+    if (event.isTraining) return null;
+    return generateOrResolveMatchStats(
+      event.homeTeam || 'Oma joukkue',
+      event.awayTeam || 'Vastustaja',
+      event.sport || 'football'
+    );
+  }, [event.homeTeam, event.awayTeam, event.sport, event.isTraining]);
+
   // Respect the child's configured arrival rules — the bare call ignored them (M-41/V49).
   const { departureTime, countdownMinutes } = calculateDepartureCountdown(event, profile?.arrivalRules);
   
@@ -215,6 +238,133 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             </span>
           </div>
         ))}
+
+        {/* Interactive League Standings, Goals, Form & H2H Comparison */}
+        {!event.isTraining && (
+          <div className="mt-3.5 p-3 sm:p-3.5 rounded-2xl bg-surface-elevated/90 border border-border-strong/70 flex flex-col gap-2.5">
+            {/* Standings & Stats Header */}
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-border-subtle/70">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-pitch">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Sarjatilastot & ennakko</span>
+              </div>
+              {onOpenStats && (
+                <button
+                  type="button"
+                  onClick={onOpenStats}
+                  className="text-[11px] font-bold text-pitch hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>Avaa tilastot</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {stats && (
+              <div className="flex flex-col gap-2.5">
+                {/* Team Standings Comparison Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {/* Home Team */}
+                  <div className="p-2.5 rounded-xl bg-surface border border-border-subtle flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-text-primary truncate">
+                        {stats.homeStanding.rank}. {event.homeTeam}
+                      </span>
+                      <span className="font-black text-pitch px-1.5 py-0.5 rounded bg-pitch/15 text-[11px]">
+                        {stats.homeStanding.points}p
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-text-secondary flex items-center justify-between">
+                      <span>Saldo: {stats.homeStanding.won}V · {stats.homeStanding.drawn}T · {stats.homeStanding.lost}H</span>
+                      <span className="font-tabular">Maalit: {stats.homeStanding.goalsFor}–{stats.homeStanding.goalsAgainst}</span>
+                    </div>
+                    {stats.homeStanding.form && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[10px] text-text-muted">Kunto:</span>
+                        <div className="flex items-center gap-1">
+                          {stats.homeStanding.form.slice(-5).map((f, idx) => (
+                            <span
+                              key={idx}
+                              className={`px-1 py-0.5 rounded text-[9px] font-black ${
+                                f === 'W' ? 'bg-pitch text-text-inverse' : f === 'D' ? 'bg-whistle text-text-inverse' : 'bg-stoppage text-text-inverse'
+                              }`}
+                            >
+                              {f === 'W' ? 'V' : f === 'D' ? 'T' : 'H'}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Away Team */}
+                  <div className="p-2.5 rounded-xl bg-surface border border-border-subtle flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-text-primary truncate">
+                        {stats.awayStanding.rank}. {event.awayTeam || 'Vastustaja'}
+                      </span>
+                      <span className="font-black text-text-secondary px-1.5 py-0.5 rounded bg-surface-elevated text-[11px]">
+                        {stats.awayStanding.points}p
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-text-secondary flex items-center justify-between">
+                      <span>Saldo: {stats.awayStanding.won}V · {stats.awayStanding.drawn}T · {stats.awayStanding.lost}H</span>
+                      <span className="font-tabular">Maalit: {stats.awayStanding.goalsFor}–{stats.awayStanding.goalsAgainst}</span>
+                    </div>
+                    {stats.awayStanding.form && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[10px] text-text-muted">Kunto:</span>
+                        <div className="flex items-center gap-1">
+                          {stats.awayStanding.form.slice(-5).map((f, idx) => (
+                            <span
+                              key={idx}
+                              className={`px-1 py-0.5 rounded text-[9px] font-black ${
+                                f === 'W' ? 'bg-pitch text-text-inverse' : f === 'D' ? 'bg-whistle text-text-inverse' : 'bg-stoppage text-text-inverse'
+                              }`}
+                            >
+                              {f === 'W' ? 'V' : f === 'D' ? 'T' : 'H'}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Head-to-Head & Common Opponents Preview */}
+                {(stats.headToHeadHistory?.length > 0 || stats.commonOpponents?.length > 0) && (
+                  <div className="pt-1.5 border-t border-border-subtle/50 flex flex-col gap-1.5 text-[11px]">
+                    {stats.headToHeadHistory?.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-text-muted flex items-center gap-1">
+                          <Swords className="w-3 h-3 text-pitch" />
+                          <span>Aiemmat keskinäiset:</span>
+                        </span>
+                        {stats.headToHeadHistory.slice(0, 3).map((h2h, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md bg-surface text-text-primary border border-border-subtle font-medium"
+                          >
+                            {h2h.date ? new Date(h2h.date).toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' }) : ''} ({h2h.homeScore}–{h2h.awayScore})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {stats.commonOpponents && stats.commonOpponents.length > 0 && stats.commonOpponents[0] && (
+                      <div className="text-text-muted flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold">Sama vastustaja:</span>
+                        <span>
+                          {stats.commonOpponents[0].opponentName} (Oma: {stats.commonOpponents[0].homeResult.score} · Vastustaja: {stats.commonOpponents[0].awayResult.score})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ALWAYS VISIBLE GEAR GLANCE TWIN-PILL (Jersey + Shoes) */}
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">

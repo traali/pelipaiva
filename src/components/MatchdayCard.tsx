@@ -425,21 +425,28 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     <span>{isPast ? 'Ottelutilastot & Kirjaa suoritus' : 'Avaa sarjatilastot & ennakko'}</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5">
-                  {stats?.homeStanding.form ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-text-muted">Kunto:</span>
-                      <div className="flex items-center gap-0.5">
-                        {stats.homeStanding.form.slice(-3).map((f, idx) => (
-                          <span
-                            key={idx}
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5 flex-wrap">
+                  {stats ? (
+                    <>
+                      <span>
+                        {stats.homeStanding.won}V–{stats.homeStanding.drawn}T–{stats.homeStanding.lost}H (Maalit {stats.homeStanding.goalsFor}–{stats.homeStanding.goalsAgainst})
+                      </span>
+                      {stats.homeStanding.form && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-text-muted">Kunto:</span>
+                          <div className="flex items-center gap-0.5">
+                            {stats.homeStanding.form.slice(-3).map((f, idx) => (
+                              <span
+                                key={idx}
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <span className="flex items-center gap-1 text-pitch font-medium">
                       <Sparkles className="w-3 h-3" />

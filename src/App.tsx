@@ -851,6 +851,7 @@ export const App: React.FC = () => {
                                   '_blank'
                                 );
                               }}
+                              onOpenStats={() => setSelectedStatsEvent(event)}
                             />
                           );
                         }
