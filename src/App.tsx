@@ -343,14 +343,9 @@ export const App: React.FC = () => {
     return upcomingEvents;
   }, [showPastEvents, upcomingEvents, filteredEvents]);
 
-  const otherCardsEvents = useMemo(
-    () => displayCardsEvents.filter((e) => e.id !== snapshot.nextEvent?.id),
-    [displayCardsEvents, snapshot.nextEvent?.id]
-  );
-
   const eventsGroupedByDay = useMemo(() => {
     const map = new Map<string, { dateStr: string; label: string; events: MatchdayEvent[] }>();
-    for (const ev of otherCardsEvents) {
+    for (const ev of displayCardsEvents) {
       const d = new Date(ev.startTime);
       const key = helsinkiDateISO(d);
       if (!map.has(key)) {
@@ -366,7 +361,7 @@ export const App: React.FC = () => {
       map.get(key)!.events.push(ev);
     }
     return Array.from(map.values());
-  }, [otherCardsEvents]);
+  }, [displayCardsEvents]);
 
   const handleImportCalendar = async (
     playerName: string,
@@ -744,6 +739,17 @@ export const App: React.FC = () => {
 
         {viewMode === 'cards' ? (
           <>
+            {/* Quick Drop-In Bar & Photo OCR at Top */}
+            <QuickDropInBar
+              existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
+              activeProfilePlayerName={
+                activeProfileId.startsWith('player:')
+                  ? activeProfileId.replace('player:', '')
+                  : profiles.find((p) => p.id === activeProfileId)?.playerName
+              }
+              onEventCreated={() => {}}
+            />
+
             {snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
               <DifficultDayAlert
                 warnings={snapshot.difficultDays}
@@ -755,7 +761,7 @@ export const App: React.FC = () => {
             {(snapshot.days.some((d) => d.events.length > 0) ||
               snapshot.talkoo.shifts.length > 0 ||
               snapshot.tournaments.length > 0) && (
-              <div className="mb-4 rounded-2xl border border-border-subtle bg-surface-elevated/40 overflow-hidden">
+              <div className="mb-5 rounded-2xl border border-border-subtle bg-surface-elevated/40 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setIsOverviewExpanded((v) => !v)}
@@ -797,64 +803,58 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {snapshot.nextEvent && (
-              <div className="mb-4">
-                <HeroMatchCard
-                  event={snapshot.nextEvent}
-                  profile={snapshot.nextPlayer}
-                  kit={snapshot.kitByEventId[snapshot.nextEvent.id]}
-                  conflicts={snapshot.conflicts}
-                  onNavigate={() => {
-                    const ev = snapshot.nextEvent;
-                    if (!ev) return;
-                    const coords = ev.parking?.coordinates || ev.venue?.coordinates;
-                    const destination =
-                      coords?.lat != null && coords?.lng != null
-                        ? `${coords.lat},${coords.lng}`
-                        : encodeURIComponent(ev.venue?.name || 'Kenttä');
-                    window.open(
-                      `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                      '_blank'
-                    );
-                  }}
-                />
-              </div>
-            )}
-
-            <QuickDropInBar
-              existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
-              activeProfilePlayerName={
-                activeProfileId.startsWith('player:')
-                  ? activeProfileId.replace('player:', '')
-                  : profiles.find((p) => p.id === activeProfileId)?.playerName
-              }
-              onEventCreated={() => {}}
-            />
-
             {filteredEvents.length > 0 ? (
-              /* Cards Feed with Sticky Day Dividers */
+              /* Cards Feed with Structured Day Containers */
               <div className="flex flex-col gap-6 pb-4">
                 {eventsGroupedByDay.map((dayGroup) => (
-                  <div key={dayGroup.dateStr} className="flex flex-col gap-3">
-                    {/* Day Section Header */}
-                    <div className="py-2 px-3 rounded-2xl bg-surface-elevated/90 backdrop-blur-md border border-border-subtle flex items-center justify-between shadow-xs">
+                  <section
+                    key={dayGroup.dateStr}
+                    className="rounded-3xl border border-border-strong/70 bg-surface/60 backdrop-blur-sm p-3.5 sm:p-4.5 flex flex-col gap-3.5 shadow-sm"
+                  >
+                    {/* Day Section Header (Inside the Day Container) */}
+                    <div className="pb-2.5 border-b border-border-subtle flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="p-1 rounded-md bg-pitch/15 text-pitch">
-                          <CalendarIcon className="w-3.5 h-3.5" />
+                        <div className="p-1.5 rounded-xl bg-pitch/15 text-pitch">
+                          <CalendarIcon className="w-4 h-4" />
                         </div>
-                        <span className="text-xs font-black tracking-wide text-text-primary">
+                        <h2 className="text-sm font-black tracking-wide text-text-primary">
                           {dayGroup.label}
-                        </span>
+                        </h2>
                       </div>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface text-text-secondary border border-border-subtle">
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
                         {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
                       </span>
                     </div>
 
-                    {/* Day's Match Cards */}
+                    {/* Day's Match Cards (Enclosed inside this Day Container) */}
                     <div className="flex flex-col gap-3">
                       {dayGroup.events.map((event) => {
                         const profile = profiles.find((p) => p.id === event.profileId);
+                        const isFeaturedNext = event.id === snapshot.nextEvent?.id;
+
+                        if (isFeaturedNext) {
+                          return (
+                            <HeroMatchCard
+                              key={event.id}
+                              event={event}
+                              profile={snapshot.nextPlayer || profile}
+                              kit={snapshot.kitByEventId[event.id]}
+                              conflicts={snapshot.conflicts}
+                              onNavigate={() => {
+                                const coords = event.parking?.coordinates || event.venue?.coordinates;
+                                const destination =
+                                  coords?.lat != null && coords?.lng != null
+                                    ? `${coords.lat},${coords.lng}`
+                                    : encodeURIComponent(event.venue?.name || 'Kenttä');
+                                window.open(
+                                  `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+                                  '_blank'
+                                );
+                              }}
+                            />
+                          );
+                        }
+
                         return (
                           <MatchdayCard
                             key={event.id}
@@ -868,7 +868,7 @@ export const App: React.FC = () => {
                         );
                       })}
                     </div>
-                  </div>
+                  </section>
                 ))}
                 {pastEvents.length > 0 && upcomingEvents.length > 0 && (
                   <div className="pt-2 pb-6 flex flex-col items-center gap-2">
