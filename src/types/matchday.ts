@@ -101,6 +101,7 @@ export interface TrafficSignInfo {
 export interface FineRiskInfo {
   riskLevel: 'low' | 'moderate' | 'high';
   riskLabel: string; // e.g. '🔴 Korkea valvontariski', '🟡 Kohtalainen valvontariski'
+  riskRating1to10?: number; // 1 (safest) to 10 (highest trap/fine risk)
   standardFineAmountEur: number; // e.g. 60 or 80
   fineType: string; // e.g. 'Kunnallinen pysäköintivirhemaksu (80 €) / Valvontamaksu'
   criticalPitfalls: string[];

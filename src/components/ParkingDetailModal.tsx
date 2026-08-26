@@ -390,7 +390,7 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
                 {/* Fine Risk Score Card */}
                 {parking.fineRisk && (
                   <div
-                    className={`p-4 rounded-2xl border flex items-center justify-between ${
+                    className={`p-4 rounded-2xl border flex flex-col gap-3 ${
                       parking.fineRisk.riskLevel === 'high'
                         ? 'bg-stoppage/15 border-stoppage/40'
                         : parking.fineRisk.riskLevel === 'moderate'
@@ -398,17 +398,41 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
                         : 'bg-pitch/15 border-pitch/40'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <Flame className="w-5 h-5 shrink-0" />
-                      <div>
-                        <div className="text-sm font-black">{parking.fineRisk.riskLabel}</div>
-                        <div className="text-xs opacity-90">{parking.fineRisk.fineType}</div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Flame className="w-5 h-5 shrink-0" />
+                        <div>
+                          <div className="text-sm font-black">{parking.fineRisk.riskLabel}</div>
+                          <div className="text-xs opacity-90">{parking.fineRisk.fineType}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-black font-tabular">{parking.fineRisk.standardFineAmountEur} €</div>
+                        <div className="text-[10px] opacity-80 uppercase tracking-wider font-bold">Virhemaksu</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xl font-black font-tabular">{parking.fineRisk.standardFineAmountEur} €</div>
-                      <div className="text-[10px] opacity-80 uppercase tracking-wider font-bold">Virhemaksu</div>
-                    </div>
+
+                    {/* ParkkiS 1-10 Risk Rating Bar */}
+                    {parking.fineRisk.riskRating1to10 !== undefined && (
+                      <div className="pt-2 border-t border-current/20 flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <span>ParkkiS Sakkoindeksi:</span>
+                          <span className="font-tabular">{parking.fineRisk.riskRating1to10} / 10</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-surface/50 overflow-hidden flex">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              parking.fineRisk.riskRating1to10 >= 7
+                                ? 'bg-stoppage'
+                                : parking.fineRisk.riskRating1to10 >= 4
+                                ? 'bg-whistle'
+                                : 'bg-pitch'
+                            }`}
+                            style={{ width: `${parking.fineRisk.riskRating1to10 * 10}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

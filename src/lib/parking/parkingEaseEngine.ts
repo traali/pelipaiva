@@ -109,6 +109,7 @@ export function calculateParkingEase(
     const fineRisk: FineRiskInfo = {
       riskLevel: 'high',
       riskLabel: '🔴 Korkea valvontariski',
+      riskRating1to10: 8,
       standardFineAmountEur: 80,
       fineType: 'Helsingin kaupungin pysäköintivirhemaksu (80 €)',
       criticalPitfalls: [
@@ -243,6 +244,7 @@ export function calculateParkingEase(
     const fineRisk: FineRiskInfo = {
       riskLevel: isRushHour ? 'moderate' : 'low',
       riskLabel: isRushHour ? '🟡 Kohtalainen valvontariski' : '🟢 Matala valvontariski',
+      riskRating1to10: isRushHour ? 5 : 2,
       standardFineAmountEur: 60,
       fineType: 'Kunnallinen pysäköinninvalvonta / Yksityinen valvontamaksu (60–80 €)',
       criticalPitfalls: [
@@ -330,6 +332,7 @@ export function calculateParkingEase(
   const defaultFineRisk: FineRiskInfo = {
     riskLevel: 'moderate',
     riskLabel: '🟡 Kohtalainen valvontariski',
+    riskRating1to10: 4,
     standardFineAmountEur: 60,
     fineType: 'Pysäköinninvalvontamaksu (60 €)',
     criticalPitfalls: [
