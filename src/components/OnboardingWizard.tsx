@@ -80,6 +80,14 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
     association: 'Salibandy.fi',
     colorHex: '#0284c7'
   },
+  {
+    name: 'Lentopallo · Tulospalvelu (tiimi 57672)',
+    teamName: 'PuMa Lentopallo',
+    sport: 'volleyball',
+    url: 'https://tulospalvelu.lentopallo.fi/team/57672/info',
+    association: 'Lentopallo.fi',
+    colorHex: '#8b5cf6'
+  },
   ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
     teamName: cup.teamName,

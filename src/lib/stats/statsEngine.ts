@@ -277,7 +277,37 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
     return null;
   }
 
-  // 4. 🏐 Volleyball & Generic Torneopal (*.torneopal.fi)
+  // 4. 🏐 Volleyball: Lentopalloliitto Tulospalvelu (tulospalvelu.lentopallo.fi)
+  if (hostname === 'tulospalvelu.lentopallo.fi' || hostname === 'www.tulospalvelu.lentopallo.fi') {
+    const teamMatch = pathname.match(/^\/team\/(\d+)(?:\/([a-zA-Z0-9_-]+))?(?:\/.*)?$/i);
+    if (teamMatch && teamMatch[1]) {
+      const teamId = teamMatch[1]!;
+      const tab = searchParams.get('tab') || (teamMatch[2] ? String(teamMatch[2]) : undefined);
+      const seasonId = searchParams.get('season') || searchParams.get('season_id') || undefined;
+      const leagueId =
+        searchParams.get('series') ||
+        searchParams.get('series_id') ||
+        searchParams.get('category') ||
+        searchParams.get('category_id') ||
+        searchParams.get('league') ||
+        searchParams.get('league_id') ||
+        searchParams.get('sarja') ||
+        undefined;
+
+      return {
+        sport: 'volleyball',
+        association: 'torneopal',
+        teamId,
+        tab,
+        seasonId,
+        leagueId,
+        canonicalUrl: `https://tulospalvelu.lentopallo.fi/team/${teamId}`
+      };
+    }
+    return null;
+  }
+
+  // 5. 🏐 Volleyball & Generic Torneopal (*.torneopal.fi)
   if (hostname.endsWith('.torneopal.fi')) {
     const rawSubdomain = hostname.replace(/\.torneopal\.fi$/i, '').replace(/^www\./i, '');
     const subdomain = rawSubdomain || 'taso';

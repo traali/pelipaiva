@@ -626,6 +626,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                         <div>⚽ Palloliitto: tulospalvelu.palloliitto.fi/team/{'{id}'}</div>
                         <div>🏑 Salibandy: tulospalvelu.salibandy.fi/team/{'{id}'}</div>
                         <div>🏀 Basket.fi: basket.fi/.../?team_id={'{id}'}</div>
+                        <div>🏐 Lentopallo: tulospalvelu.lentopallo.fi/team/{'{id}'}</div>
                         <div>🏐 Torneopal: *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
                         <div>📅 Kalenterit: Nimenhuuto, MyClub, Jopox (.ics / webcal://)</div>
                       </div>

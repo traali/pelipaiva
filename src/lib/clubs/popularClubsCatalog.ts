@@ -297,6 +297,17 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
 
   // 🏐 Volleyball
   {
+    id: 'volleyball-default',
+    name: 'Lentopallojoukkue (Lentopalloliitto)',
+    shortName: 'Lentopallo',
+    city: 'Koko Suomi',
+    sport: 'volleyball',
+    primaryColor: 'violetti',
+    colorHex: '#8b5cf6',
+    sampleTeamUrl: 'https://tulospalvelu.lentopallo.fi/team/57672/info',
+    popularAgeGroups: ['C-tytöt', 'C-pojat', 'D-tytöt', 'B-tytöt']
+  },
+  {
     id: 'puma-volley',
     name: 'PuMa-Volley',
     shortName: 'PuMa',
@@ -304,7 +315,7 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     sport: 'volleyball',
     primaryColor: 'oranssi',
     colorHex: '#ea580c',
-    sampleTeamUrl: 'https://lentopallo.torneopal.fi/taso/joukkue.php?joukkue=30100',
+    sampleTeamUrl: 'https://tulospalvelu.lentopallo.fi/team/57672/info',
     popularAgeGroups: ['C-tytöt Tsemppi', 'C-pojat', 'D-tytöt Tiikerit', 'B-tytöt']
   },
   {
