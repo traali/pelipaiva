@@ -509,14 +509,15 @@ export async function parseICSFeed(
       const description = event.description || '';
       const category = (vevent.getFirstPropertyValue('categories') as string) || '';
 
-      // If custom squad/category filters are specified, filter out non-matching events
+      // squadFilters is now an EXCLUSION list — events matching any excluded category are skipped.
+      // Empty/undefined = show everything (including new unknown categories).
       if (squadFilters && squadFilters.length > 0) {
         const fullText = `${title} ${category} ${description}`.toLowerCase();
-        const matchesFilter = squadFilters.some((f) => {
+        const isExcluded = squadFilters.some((f) => {
           const fl = f.toLowerCase();
           return category.toLowerCase().includes(fl) || fullText.includes(fl);
         });
-        if (!matchesFilter) {
+        if (isExcluded) {
           continue;
         }
       }
