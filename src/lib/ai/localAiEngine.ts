@@ -40,9 +40,15 @@ export async function convertExtractedToMatchdayEvent(
   const effectiveDate = extracted.dateStr || new Date().toISOString().split('T')[0] || '2026-08-24';
   const effectiveKickoff = extracted.kickoffTime || '15:00';
   const effectiveEnd = extracted.endTime || '16:00';
-  const effectiveWarmup = extracted.warmupTime || '14:15';
+  const isSchool = extracted.sport === 'school' || extracted.eventType === 'school';
+  const isOther = extracted.sport === 'other' || extracted.eventType === 'other' || extracted.eventType === 'meeting';
 
-  const venue = await resolveSportsVenue(extracted.venueHint || 'Kenttä ilmoitetaan');
+  const effectiveWarmup = isSchool || isOther
+    ? effectiveKickoff
+    : extracted.warmupTime || '14:15';
+
+  const defaultVenueHint = isSchool ? 'Koulu' : isOther ? 'Paikka ilmoitetaan' : 'Kenttä ilmoitetaan';
+  const venue = await resolveSportsVenue(extracted.venueHint || defaultVenueHint);
 
   const offset = getFinnishTimezoneOffset(new Date(`${effectiveDate}T12:00:00Z`));
   const startTime = new Date(`${effectiveDate}T${effectiveKickoff}:00${offset}`).toISOString();
@@ -58,8 +64,8 @@ export async function convertExtractedToMatchdayEvent(
     eventType: extracted.eventType,
     isTraining,
     title: extracted.title,
-    homeTeam: extracted.homeTeam,
-    awayTeam: extracted.awayTeam,
+    homeTeam: extracted.homeTeam || (isSchool || isOther ? extracted.title : 'Oma joukkue'),
+    awayTeam: extracted.awayTeam || '',
     isHomeMatch: extracted.isHomeMatch,
     startTime,
     endTime,

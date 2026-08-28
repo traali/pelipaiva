@@ -197,9 +197,11 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           </div>
         </div>
 
-        {/* Match / Training Title */}
+        {/* Match / Training / School / Other Title */}
         <h2 className="text-xl font-bold tracking-tight text-text-primary md:text-2xl break-words">
-          {event.isTraining ? event.title : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
+          {event.isTraining || event.sport === 'school' || event.sport === 'other' || event.eventType === 'school' || event.eventType === 'meeting' || event.eventType === 'other' || !event.awayTeam
+            ? event.title
+            : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
         </h2>
         {(event.tournamentName || event.stage || event.matchNumber || event.score) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-text-secondary">
@@ -219,7 +221,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
           <span className="truncate font-medium">{event.venue.name}</span>
           <span className="text-xs text-text-muted">
-            • {event.venue.isIndoor ? 'Sisähalli' : 'Ulkokenttä'}
+            • {event.venue.isIndoor ? 'Sisätila' : 'Ulkokenttä'}
           </span>
         </div>
 
@@ -249,13 +251,17 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               {warmup}
             </span>
             <span className="text-[10px] text-text-muted mt-0.5">
-              Alkulämpö
+              {event.sport === 'school' || event.sport === 'other' || event.eventType === 'school' || event.eventType === 'meeting' || event.eventType === 'other'
+                ? 'Saapuminen'
+                : event.isTraining
+                ? 'Kokoontuminen'
+                : 'Alkulämpö'}
             </span>
           </div>
 
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1">
-              ⏱️ Aloitus
+              {event.sport === 'school' ? '🏫 Alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Treeni' : '⏱️ Aloitus'}
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-text-primary mt-0.5">
               {kickoff}

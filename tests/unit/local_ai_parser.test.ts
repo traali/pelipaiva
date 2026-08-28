@@ -115,6 +115,54 @@ Mustat paidat päälle. Kahviovuoro klo 12-14.`;
       expect(results[2]?.venueHint).toContain('Väinämöisen');
     });
 
+    it('parses real-world Wilma school schedule with classroom and exam', () => {
+      const wilmaSchedule = `13.05 all T 36 | Ke yMA1.7 yMA1 : 30.9.2026 MatematiikkaOpettaja Tuu (Paula Tuunanen)Kotitalouden koeTiedonhallintataidot`;
+      const result = parseFreeformSportsMessage(wilmaSchedule, 'Simo');
+
+      expect(result.sport).toBe('school');
+      expect(result.eventType).toBe('school');
+      expect(result.kickoffTime).toBe('13:05');
+      expect(result.warmupTime).toBe('13:05'); // No 45m sports warmup
+      expect(result.dateStr).toBe('2026-09-30');
+      expect(result.venueHint).toBe('Luokka T 36');
+      expect(result.title).toContain('Matematiikka');
+      expect(result.title).toContain('Kotitalous');
+      expect(result.homeTeam).toBe(''); // No fake sports teams
+      expect(result.awayTeam).toBe('');
+    });
+
+    it('parses school exam announcement in classroom', () => {
+      const examMsg = `Huomenna ruotsin sanakoe klo 09.15 luokassa B12.`;
+      const result = parseFreeformSportsMessage(examMsg, 'Eemil');
+
+      expect(result.sport).toBe('school');
+      expect(result.eventType).toBe('school');
+      expect(result.kickoffTime).toBe('09:15');
+      expect(result.warmupTime).toBe('09:15');
+      expect(result.venueHint).toContain('B12');
+      expect(result.title).toContain('Ruotsi');
+    });
+
+    it('parses dentist appointment and music hobby as other event', () => {
+      const dentistMsg = `Hammaslääkäri Simolle tiistaina 15.9. klo 14.30`;
+      const dentistRes = parseFreeformSportsMessage(dentistMsg, 'Simo');
+
+      expect(dentistRes.sport).toBe('other');
+      expect(dentistRes.eventType).toBe('other');
+      expect(dentistRes.kickoffTime).toBe('14:30');
+      expect(dentistRes.warmupTime).toBe('14:30');
+      expect(dentistRes.title).toContain('Hammaslääkäri');
+
+      const pianoMsg = `Pianotunti klo 17.00 - 17.45 Musiikkiopistolla`;
+      const pianoRes = parseFreeformSportsMessage(pianoMsg, 'Maija');
+
+      expect(pianoRes.sport).toBe('other');
+      expect(pianoRes.eventType).toBe('other');
+      expect(pianoRes.kickoffTime).toBe('17:00');
+      expect(pianoRes.endTime).toBe('17:45');
+      expect(pianoRes.title).toContain('Pianotunti');
+    });
+
     it('does not invent Vastustaja @ 15:00 / Bollis from garbage paste', () => {
       const result = parseFreeformSportsMessage('ok kiitos!', 'Maija');
       expect(result.confidenceScore).toBeLessThan(0.5);

@@ -354,20 +354,22 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                     />
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <span className="text-[11px] font-bold text-text-muted">Laji:</span>
-                    <select
-                      value={selectedSport}
-                      onChange={(e) => setSelectedSport(e.target.value as SportType)}
-                      className="px-2 py-0.5 rounded-md bg-surface border border-border-strong text-text-primary text-[11px] font-semibold focus:outline-none"
-                    >
-                      <option value="football">⚽ Futis</option>
-                      <option value="floorball">🏑 Säbä</option>
-                      <option value="basketball">🏀 Koris</option>
-                      <option value="volleyball">🏐 Lentis</option>
-                      <option value="icehockey">🏒 Lätkä</option>
-                    </select>
-                  </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-bold text-text-muted">Laji:</span>
+                      <select
+                        value={selectedSport}
+                        onChange={(e) => setSelectedSport(e.target.value as SportType)}
+                        className="px-2 py-0.5 rounded-md bg-surface border border-border-strong text-text-primary text-[11px] font-semibold focus:outline-none"
+                      >
+                        <option value="football">⚽ Futis</option>
+                        <option value="floorball">🏑 Säbä</option>
+                        <option value="basketball">🏀 Koris</option>
+                        <option value="volleyball">🏐 Lentis</option>
+                        <option value="icehockey">🏒 Lätkä</option>
+                        <option value="school">🏫 Koulu / Wilma</option>
+                        <option value="other">📌 Muu meno</option>
+                      </select>
+                    </div>
                 </div>
 
                 {/* Multiline textarea if user wants to paste large text */}
@@ -537,7 +539,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs font-black text-text-primary">
-                          <span className="text-pitch">✨</span>
+                          <span className="text-pitch">
+                            {previewEvent.sport === 'school' ? '🏫' : previewEvent.sport === 'other' ? '📌' : '✨'}
+                          </span>
                           <span>{previewEvent.title}</span>
                         </div>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-pitch/15 text-pitch font-bold">
@@ -548,12 +552,18 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                       <div className="flex items-center gap-3 text-[11px] text-text-secondary flex-wrap">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-pitch" />
-                          <span>Aloitus klo {previewEvent.kickoffTime} (Alkulämpö {previewEvent.warmupTime})</span>
+                          <span>
+                            {previewEvent.sport === 'school' || previewEvent.sport === 'other' || previewEvent.eventType === 'school' || previewEvent.eventType === 'meeting' || previewEvent.eventType === 'other'
+                              ? `Klo ${previewEvent.kickoffTime}${previewEvent.endTime ? ` – ${previewEvent.endTime}` : ''}`
+                              : `Aloitus klo ${previewEvent.kickoffTime} (Alkulämpö ${previewEvent.warmupTime})`}
+                          </span>
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-radar" />
-                          <span>{previewEvent.venueHint}</span>
-                        </span>
+                        {previewEvent.venueHint && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-radar" />
+                            <span>{previewEvent.venueHint}</span>
+                          </span>
+                        )}
                       </div>
 
                       {previewEvent.kitColor && (

@@ -111,10 +111,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   });
 
   const isTraining = event.isTraining || event.eventType === 'training';
+  const isSchool = event.sport === 'school' || event.eventType === 'school';
+  const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
 
   const handleOpenStats = () => {
     let resolved = stats;
-    if (!resolved && !isTraining) {
+    if (!resolved && !isTraining && !isSchool && !isOther) {
       resolved = generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport);
       // Synthetic previews stay ephemeral: never persisted as if they were
       // federation data (M-05 / anti-synthetic constitution).
@@ -136,6 +138,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
   const getSportBadge = () => {
     switch (event.sport) {
+      case 'school':
+        return '🏫 Koulu';
+      case 'other':
+        return '📌 Muu meno';
       case 'volleyball':
         return '🏐 Lentopallo';
       case 'basketball':
@@ -149,7 +155,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
       case 'futsal':
         return '👟 Futsal';
       default:
-        return isTraining ? '🏃‍♂️ Harjoitukset' : '🏅 Ottelu';
+        return isSchool ? '🏫 Koulu' : isOther ? '📌 Muu meno' : isTraining ? '🏃‍♂️ Harjoitukset' : '🏅 Ottelu';
     }
   };
 
@@ -308,7 +314,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
                 <Clock className="w-3.5 h-3.5 text-pitch" />
                 <span>
-                  {isTraining
+                  {isSchool || isOther
+                    ? `Klo ${formattedKickoff}`
+                    : isTraining
                     ? `Kokoontuminen klo ${formattedWarmup} • Treeni klo ${formattedKickoff}`
                     : `Alkulämpö klo ${formattedWarmup} · klo ${formattedKickoff}`}
                 </span>
@@ -326,7 +334,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         </div>
 
-        {/* Event Header (Matchup vs Training Title) */}
+        {/* Event Header (Matchup vs Training / School / Other Title) */}
         <div className="mb-4">
           {(event.tournamentName || event.stage || event.matchNumber) && (
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -349,7 +357,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </div>
           )}
 
-          {isTraining ? (
+          {isTraining || isSchool || isOther || !event.awayTeam ? (
             <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary break-words">
               {event.title}
             </h2>

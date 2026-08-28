@@ -25,6 +25,12 @@ export interface CandidateRankingResult {
  */
 export function detectSportFromText(text: string): SportType | undefined {
   const norm = text.toLowerCase();
+  if (/\b(?:koulu|koulupäivä|oppitunti|koe|matematiikka|kotitalous|äidinkieli|ruotsi|englanti|fysiikka|kemia|historia|uskonto|tiedonhallinta|wilma|läksyt|opettaja|luokka|luokassa|koululla|vanhempainilta|kehityskeskustelu|kouluretki|luokkaretki|esikoulu|eskari|päiväkoti)\b/i.test(norm) || /\byMA\d|\bÄI\d|\bENA\d|\bRUB\d|\bFY\d|\bKE\d/i.test(text)) {
+    return 'school';
+  }
+  if (/\b(?:hammaslääkäri|lääkäri|neuvola|terveydenhoitaja|optikko|partio|soittotunti|pianotunti|kitaratunti|viulutunti|bänditreenit|kuoro|synttärit|syntymäpäivä|kerho|sirkus|tanssitunti|baletti|ratsastus|uimakoulu)\b/i.test(norm)) {
+    return 'other';
+  }
   if (/\b(?:salibandy|säbä|sähly|floorball|reikäpallo|suojalasit)\b/i.test(norm)) {
     return 'floorball';
   }

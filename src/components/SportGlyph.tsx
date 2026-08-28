@@ -1,9 +1,11 @@
 import React from 'react';
 import {
+  Calendar,
   CircleDot,
   Dumbbell,
   Footprints,
   Goal,
+  GraduationCap,
   Snowflake,
   Target,
   Trophy,
@@ -33,6 +35,10 @@ export const SportGlyph: React.FC<SportGlyphProps> = ({ sport, className = 'w-4 
       return <Footprints className={className} />;
     case 'dumbbell':
       return <Dumbbell className={className} />;
+    case 'school':
+      return <GraduationCap className={className} />;
+    case 'calendar':
+      return <Calendar className={className} />;
     default:
       return <Trophy className={className} />;
   }

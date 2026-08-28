@@ -167,20 +167,53 @@ export function extractVenueFromFinnishText(text: string): string {
     }
   }
 
-  // Check common venue patterns: "Bollis 2 kentällä", "kentällä X", "@ X", "paikkana X", "Väiskillä", "Sahara tn", "koululla"
+  // Check classroom / school room in school context only
+  const isSchoolContext = /koe|oppitunti|koulu|wilma|matematiik|kotitalou|äidinkiel|opettaja|luokka|yMA/i.test(text);
+  if (isSchoolContext) {
+    const classMatch = text.match(/\b(?:luokassa|tilassa|salissa|luokka|tila)\s+([A-ZÄÖÅa-zäöå0-9-]{1,10})\b/i);
+    if (classMatch && classMatch[1]) {
+      const r = classMatch[1].trim();
+      if (!r.toLowerCase().includes('klo') && !r.toLowerCase().includes('on') && !r.toLowerCase().includes('retk')) {
+        return `Luokka ${r}`;
+      }
+    }
+    const roomMatch = text.match(/\b([A-Z]\s*\d{1,3})\b/);
+    if (roomMatch && roomMatch[1]) {
+      return `Luokka ${roomMatch[1].replace(/\s+/g, ' ')}`;
+    }
+  }
+
+  // Check common venue patterns: "Tapiola 2 kentällä", "Lauttasaaren peruskoululla", "@ Väiski"
   const venuePatterns = [
     /([a-zA-Z0-9äöåÄÖÅ\s-]{2,30})\s+(?:koululla|koulu|ruokalassa|ruokala|auditoriossa|auditorio|luokassa|opistolla|opisto)/i,
     /([a-zA-Z0-9äöåÄÖÅ\s-]{2,25})\s+(?:kentällä|kenttä|areenalla|areena|hallilla|halli|nurmella|nurmi|tekonurmella|tekonurmi|sali|liikuntasali)/i,
     /(?:kenttänä|kentällä|paikkana|pelipaikka|paikka|pelataan|tilassa)\s*(?:on|:)?\s*([a-zA-Z0-9äöåÄÖÅ\s-]{3,30}?)(?:\s+(?:klo|lauantaina|sunnuntaina|kokoontuminen|$))/i,
-    /@\s*([a-zA-Z0-9äöåÄÖÅ\s-]{3,25})/i,
-    /([a-zA-Z0-9äöåÄÖÅ\s-]+(?:koulu|lukio|opisto|halli|areena|tekonurmi|nurmi|kenttä|tn|kupla|center|sali))/i
+    /@\s*([a-zA-Z0-9äöåÄÖÅ\s-]{3,25}?)(?:\r?\n|$)/i,
+    /\b([A-ZÄÖÅa-zäöå0-9-]+(?:\s+[A-ZÄÖÅa-zäöå0-9-]+){0,2}\s+(?:koulu|lukio|opisto|halli|areena|tekonurmi|nurmi|kenttä|tn|kupla|center|sali))\b/i
   ];
 
   for (const pattern of venuePatterns) {
     const m = text.match(pattern);
     if (m && m[1]) {
-      const cand = m[1].trim();
-      if (cand.length > 2 && !cand.toLowerCase().includes('klo') && !cand.toLowerCase().includes('muistutus') && !cand.toLowerCase().includes('futistreenit')) {
+      let cand = m[1].trim();
+      cand = cand.replace(/^(?:peli|ottelu|tapahtuma|sarjapeli|treenit|harjoitukset|matsi)\s+/i, '').trim();
+      const lower = cand.toLowerCase();
+      // Exclude false positives from non-venue Finnish words
+      const isBogus =
+        lower === 'peli' ||
+        lower === 'ottelu' ||
+        lower === 'harjoitukset' ||
+        lower.includes('klo') ||
+        lower.includes('muistutus') ||
+        lower.includes('futistreenit') ||
+        lower.includes('tiedonhallinta') ||
+        lower.includes('hallinto') ||
+        lower.includes('hallitus') ||
+        lower.includes('kotitalous') ||
+        lower.includes('matematiikka') ||
+        lower.includes('koe');
+
+      if (cand.length > 2 && !isBogus) {
         return cand;
       }
     }
@@ -372,7 +405,7 @@ export function parseMultipleSportsMessages(
       if (globalDateHint && parsed.dateStr === '2026-08-24') {
         parsed.dateStr = globalDateHint;
       }
-      if (globalVenueHint && parsed.venueHint === 'Töölön Pallokenttä 1 (Bollis)') {
+      if (globalVenueHint && (!parsed.venueHint || parsed.venueHint === 'Töölön Pallokenttä 1 (Bollis)' || parsed.venueHint === globalDateHint)) {
         parsed.venueHint = globalVenueHint;
       }
       if (globalKitColor && !parsed.kitColor) {
@@ -395,9 +428,39 @@ function parseSingleFreeformBlock(
 ): ExtractedSportsEvent {
   const norm = normalizeText(rawText);
 
-  // 1. Sport
+  // 1. Sport / Category
   let sport: SportType = 'football';
-  if (norm.includes('salibandy') || norm.includes('säbä') || norm.includes('floorball')) {
+  let isSchool = false;
+  let isOtherEvent = false;
+
+  // Other appointment / hobby patterns (checked first to prioritize specific appointments over general subjects)
+  const otherKeywords = [
+    'hammaslääkäri', 'lääkäri', 'terveydenhoitaja', 'neuvola', 'fysioterapia', 'optikko',
+    'soittotunti', 'pianotunti', 'kitaratunti', 'viulutunti', 'bänditreenit', 'kuoro', 'laulutunti',
+    'musiikkiopisto', 'kuviskoulu', 'kuvataidekoulu', 'teatteri', 'sirkus',
+    'tanssitunti', 'baletti', 'showtanssi', 'ratsastus', 'partio', 'partiokokous',
+    'uimakoulu', 'synttärit', 'syntymäpäivä', 'kaverisynttärit', 'shakki', 'koodikerho'
+  ];
+
+  // School detection patterns
+  const schoolKeywords = [
+    'matematiikka', 'kotitalous', 'äidinkieli', 'suomen kieli', 'englanti', 'ruotsi',
+    'fysiikka', 'kemia', 'biologia', 'maantieto', 'historia', 'yhteiskuntaoppi',
+    'uskonto', 'elämänkatsomustieto', 'kuvataide', 'käsityö', 'musiikki', 'opinto-ohjaus',
+    'tiedonhallinta', 'tiedonhallintataidot', 'tietotekniikka',
+    'koe', 'kokeet', 'sanis', 'sanakoe', 'pistari', 'tentti', 'välikoe',
+    'oppitunti', 'koulupäivä', 'lukujärjestys', 'wilma', 'läksyt', 'luokassa', 'koululla',
+    'kouluretki', 'luokkaretki', 'leirikoulu', 'taksvärkki', 'tet-harjoittelu', 'tet',
+    'päiväkoti', 'eskari', 'esikoulu', 'varhaiskasvatus', 'iltapäiväkerho'
+  ];
+
+  if (otherKeywords.some((k) => norm.includes(k))) {
+    sport = 'other';
+    isOtherEvent = true;
+  } else if (schoolKeywords.some((k) => norm.includes(k)) || /\byMA\d|\bÄI\d|\bENA\d|\bRUB\d|\bFY\d|\bKE\d/i.test(rawText)) {
+    sport = 'school';
+    isSchool = true;
+  } else if (norm.includes('salibandy') || norm.includes('säbä') || norm.includes('floorball')) {
     sport = 'floorball';
   } else if (norm.includes('koripallo') || norm.includes('koris') || norm.includes('basket')) {
     sport = 'basketball';
@@ -409,72 +472,133 @@ function parseSingleFreeformBlock(
     sport = 'futsal';
   }
 
-  // 2. Event Type & School / Wilma Support
+  // 2. Event Type
   let eventType: EventType = 'match';
-  let meetingTypeTitle = '';
-  if (norm.includes('treenit') || norm.includes('harjoitukset') || norm.includes('fysiikka') || norm.includes('lajivuoro')) {
+  let customTitle = '';
+
+  if (isSchool) {
+    eventType = 'school';
+    // Build descriptive title from school subjects/exam
+    const detectedSubjects: string[] = [];
+    if (/matematiikka|yma/i.test(rawText)) detectedSubjects.push('Matematiikka');
+    if (/kotitalou/i.test(rawText)) detectedSubjects.push('Kotitalous');
+    if (/äidinkiel/i.test(rawText)) detectedSubjects.push('Äidinkieli');
+    if (/englann|ena/i.test(rawText)) detectedSubjects.push('Englanti');
+    if (/ruotsi|rub/i.test(rawText)) detectedSubjects.push('Ruotsi');
+    if (/fysiik/i.test(rawText)) detectedSubjects.push('Fysiikka');
+    if (/kemia/i.test(rawText)) detectedSubjects.push('Kemia');
+    if (/biologi/i.test(rawText)) detectedSubjects.push('Biologia');
+    if (/maantie/i.test(rawText)) detectedSubjects.push('Maantieto');
+    if (/historia/i.test(rawText)) detectedSubjects.push('Historia');
+    if (/uskonto/i.test(rawText)) detectedSubjects.push('Uskonto');
+    if (/kuvataide|kuvis/i.test(rawText)) detectedSubjects.push('Kuvataide');
+    if (/käsityö/i.test(rawText)) detectedSubjects.push('Käsityö');
+    if (/musiikki/i.test(rawText)) detectedSubjects.push('Musiikki');
+    if (/tiedonhallinta/i.test(rawText)) detectedSubjects.push('Tiedonhallinta');
+
+    const isExam = /\b(?:koe|kokeet|sanis|tentti|välikoe)\b/i.test(rawText);
+    if (detectedSubjects.length > 0) {
+      customTitle = `${detectedSubjects.join(' & ')}${isExam ? ' (Koe)' : ''}`;
+    } else if (isExam) {
+      customTitle = 'Koulukoe';
+    } else if (norm.includes('vanhempainilta')) {
+      eventType = 'meeting';
+      customTitle = 'Vanhempainilta';
+    } else if (norm.includes('kehityskeskustelu')) {
+      eventType = 'meeting';
+      customTitle = 'Kehityskeskustelu';
+    } else if (norm.includes('retki')) {
+      customTitle = 'Kouluretki';
+    } else {
+      customTitle = 'Koulupäivä / Oppitunti';
+    }
+  } else if (isOtherEvent) {
+    eventType = 'other';
+    if (norm.includes('hammaslääkäri')) customTitle = 'Hammaslääkäri';
+    else if (norm.includes('lääkäri')) customTitle = 'Lääkäriaika';
+    else if (norm.includes('neuvola')) customTitle = 'Neuvola';
+    else if (norm.includes('synttärit') || norm.includes('syntymäpäivä')) customTitle = 'Synttärit';
+    else if (norm.includes('pianotunti')) customTitle = 'Pianotunti';
+    else if (norm.includes('kitaratunti')) customTitle = 'Kitaratunti';
+    else if (norm.includes('soittotunti')) customTitle = 'Soittotunti';
+    else if (norm.includes('bändi')) customTitle = 'Bänditreenit';
+    else if (norm.includes('kuoro')) customTitle = 'Kuoroharjoitukset';
+    else if (norm.includes('partio')) customTitle = 'Partio';
+    else if (norm.includes('sirkus')) customTitle = 'Sirkusharjoitukset';
+    else if (norm.includes('tanssi') || norm.includes('baletti')) customTitle = 'Tanssitunti';
+    else if (norm.includes('ratsastus')) customTitle = 'Ratsastustunti';
+    else if (norm.includes('uimakoulu') || norm.includes('uinti')) customTitle = 'Uimakoulu / Uinti';
+    else customTitle = 'Muu meno';
+  } else if (norm.includes('treenit') || norm.includes('harjoitukset') || norm.includes('fysiikka') || norm.includes('lajivuoro')) {
     eventType = 'training';
   } else if (norm.includes('turnaus') || norm.includes('turnausottelu') || norm.includes('pelitapahtuma')) {
     eventType = 'tournament';
   } else if (norm.includes('vanhempainilta')) {
     eventType = 'meeting';
-    meetingTypeTitle = 'Vanhempainilta';
-    sport = 'other';
+    customTitle = 'Vanhempainilta';
+    sport = 'school';
   } else if (norm.includes('kehityskeskustelu')) {
     eventType = 'meeting';
-    meetingTypeTitle = 'Kehityskeskustelu';
-    sport = 'other';
+    customTitle = 'Kehityskeskustelu';
+    sport = 'school';
   } else if (norm.includes('konsertti') || norm.includes('esiintyminen')) {
     eventType = 'meeting';
-    meetingTypeTitle = 'Konsertti / Esiintyminen';
+    customTitle = 'Konsertti / Esiintyminen';
     sport = 'other';
   } else if (norm.includes('juhla') || norm.includes('kevätjuhla') || norm.includes('joulujuhla')) {
     eventType = 'meeting';
-    meetingTypeTitle = 'Koulun juhla';
-    sport = 'other';
-  } else if (norm.includes('palaveri') || norm.includes('kokous') || norm.includes('wilma')) {
+    customTitle = 'Koulun juhla';
+    sport = 'school';
+  } else if (norm.includes('palaveri') || norm.includes('kokous')) {
     eventType = 'meeting';
-    meetingTypeTitle = 'Koulun tilaisuus / Kokous';
+    customTitle = 'Kokous';
     sport = 'other';
   }
 
   // 3. Teams & Opponent
-  let homeTeam = 'Oma joukkue';
-  let awayTeam = 'Vastustaja';
+  let homeTeam = isSchool || isOtherEvent ? '' : 'Oma joukkue';
+  let awayTeam = isSchool || isOtherEvent ? '' : 'Vastustaja';
   let isHomeMatch = true;
-  if (/\bvieras(?:peli|ottelu)?\b|\baway\b/.test(norm) || /\s@\s/.test(rawText)) {
-    isHomeMatch = false;
-  }
-
-  const vsLine = rawText.split(/\r?\n/).find((l) => /\b(?:vs\.?|vastaan)\b/i.test(l));
-  if (vsLine) {
-    const parts = vsLine.split(/\b(?:vs\.?|vastaan)\b/i);
-    if (parts[0] && parts[1]) {
-      let candHome = parts[0].trim();
-      for (let i = 0; i < 3; i++) {
-        candHome = candHome
-          .replace(/^(?:tapahtuma|sarjapeli|ottelu|peli|matsi|harjoituspeli|harkkapeli|turnaus|\b(?:la|su|pe|ma|ti|ke|to)\b|klo|kello)[:\s-]+/i, '')
-          .trim();
-      }
-      let candAway = parts[1]
-        .replace(/\s+(?:klo|alkaa|kentällä|@|paikalla|kokoontuminen).*$/i, '')
-        .trim();
-
-      if (candHome && !candHome.toLowerCase().includes('klo') && !/^\d{1,2}[:.]\d{2}$/.test(candHome) && candHome.length >= 2) {
-        homeTeam = candHome;
-      }
-      if (candAway && !candAway.toLowerCase().includes('klo') && candAway.length >= 2) {
-        awayTeam = candAway;
-      }
+  if (!isSchool && !isOtherEvent) {
+    if (/\bvieras(?:peli|ottelu)?\b|\baway\b/.test(norm) || /\s@\s/.test(rawText)) {
+      isHomeMatch = false;
     }
-  } else if (norm.includes('harkkapeli') || norm.includes('harjoitusottelu') || norm.includes('harjoituspeli')) {
-    homeTeam = 'Oma joukkue';
-    awayTeam = 'Harjoitusottelu';
+
+    const vsLine = rawText.split(/\r?\n/).find((l) => /\b(?:vs\.?|vastaan)\b/i.test(l));
+    if (vsLine) {
+      const parts = vsLine.split(/\b(?:vs\.?|vastaan)\b/i);
+      if (parts[0] && parts[1]) {
+        let candHome = parts[0].trim();
+        for (let i = 0; i < 3; i++) {
+          candHome = candHome
+            .replace(/^(?:tapahtuma|sarjapeli|ottelu|peli|matsi|harjoituspeli|harkkapeli|turnaus|\b(?:la|su|pe|ma|ti|ke|to)\b|klo|kello)[:\s-]+/i, '')
+            .trim();
+        }
+        let candAway = parts[1]
+          .replace(/\s+(?:klo|alkaa|kentällä|@|paikalla|kokoontuminen).*$/i, '')
+          .trim();
+
+        if (candHome && !candHome.toLowerCase().includes('klo') && !/^\d{1,2}[:.]\d{2}$/.test(candHome) && candHome.length >= 2) {
+          homeTeam = candHome;
+        }
+        if (candAway && !candAway.toLowerCase().includes('klo') && candAway.length >= 2) {
+          awayTeam = candAway;
+        }
+      }
+    } else if (norm.includes('harkkapeli') || norm.includes('harjoitusottelu') || norm.includes('harjoituspeli')) {
+      homeTeam = 'Oma joukkue';
+      awayTeam = 'Harjoitusottelu';
+    }
   }
 
   // 4. Date & Times
   const dateStr = extractDateFromFinnishText(rawText);
   const times = extractTimesFromFinnishText(rawText);
+
+  // For school and non-sport events, warmupTime defaults to kickoffTime (no 45min warmup)
+  if (isSchool || isOtherEvent || eventType === 'meeting') {
+    times.warmup = times.kickoff;
+  }
 
   // 5. Venue
   const venueHint = extractVenueFromFinnishText(rawText);
@@ -483,21 +607,31 @@ function parseSingleFreeformBlock(
   const volunteerDuties = extractVolunteerDutiesFromText(rawText);
   const kitColor = extractKitColorFromText(rawText);
 
-  const title =
-    eventType === 'training'
-      ? `Harjoitukset @ ${venueHint || 'kenttä ilmoitetaan'}`
-      : eventType === 'meeting'
-        ? `${meetingTypeTitle || 'Vanhempainilta'} @ ${venueHint || 'koulu'}`
-        : awayTeam === 'Harjoitusottelu'
-          ? `Harjoitusottelu @ ${venueHint || 'kenttä ilmoitetaan'}`
-          : `${homeTeam} vs ${awayTeam}`;
+  let title = '';
+  if (customTitle) {
+    title = venueHint ? `${customTitle} @ ${venueHint}` : customTitle;
+  } else if (eventType === 'training') {
+    title = `Harjoitukset @ ${venueHint || 'kenttä ilmoitetaan'}`;
+  } else if (eventType === 'meeting') {
+    title = `${customTitle || 'Koulun tilaisuus'} @ ${venueHint || 'koulu'}`;
+  } else if (awayTeam === 'Harjoitusottelu') {
+    title = `Harjoitusottelu @ ${venueHint || 'kenttä ilmoitetaan'}`;
+  } else {
+    title = `${homeTeam} vs ${awayTeam}`;
+  }
 
   let confidenceScore = 0.15;
   if (dateStr) confidenceScore += 0.3;
   if (times.kickoff) confidenceScore += 0.25;
-  if (awayTeam !== 'Vastustaja' && homeTeam !== 'Oma joukkue') confidenceScore += 0.25;
-  else if (eventType === 'training' && (venueHint || times.kickoff)) confidenceScore += 0.2;
-  else if (eventType === 'meeting' && (venueHint || times.kickoff)) confidenceScore += 0.3;
+  if (isSchool || isOtherEvent) {
+    confidenceScore += 0.25;
+  } else if (awayTeam !== 'Vastustaja' && homeTeam !== 'Oma joukkue') {
+    confidenceScore += 0.25;
+  } else if (eventType === 'training' && (venueHint || times.kickoff)) {
+    confidenceScore += 0.2;
+  } else if (eventType === 'meeting' && (venueHint || times.kickoff)) {
+    confidenceScore += 0.3;
+  }
   if (venueHint) confidenceScore += 0.1;
   if (confidenceScore > 0.98) confidenceScore = 0.98;
 

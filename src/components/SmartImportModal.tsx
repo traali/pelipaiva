@@ -704,7 +704,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                           <div key={idx} className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-xs">
                             <div className="font-bold text-text-primary">{ev.title}</div>
                             <div className="text-[11px] text-text-secondary mt-0.5">
-                              📍 {ev.venueHint} • ⏰ Klo {ev.kickoffTime} (Alkulämpö {ev.warmupTime})
+                              📍 {ev.venueHint || (ev.sport === 'school' ? 'Koulu' : 'Paikka ilmoitetaan')} • ⏰ {ev.sport === 'school' || ev.sport === 'other' || ev.eventType === 'school' || ev.eventType === 'meeting' || ev.eventType === 'other' ? `Klo ${ev.kickoffTime}` : `Klo ${ev.kickoffTime} (Alkulämpö ${ev.warmupTime})`}
                             </div>
                             {ev.volunteerDuties.length > 0 && (
                               <div className="text-[11px] text-whistle font-semibold mt-0.5">

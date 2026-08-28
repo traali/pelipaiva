@@ -78,12 +78,16 @@ export function calculateDepartureCountdown(
 } {
   const isTraining = event.isTraining || event.eventType === 'training';
   const isTournament = event.eventType === 'tournament';
+  const isSchool = event.sport === 'school' || event.eventType === 'school';
+  const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
   const isHome = event.isHomeMatch;
 
   // Resolve warmup offset
-  let warmupOffset = isTraining ? 15 : (isHome ? 45 : 60);
+  let warmupOffset = isSchool || isOther ? 5 : isTraining ? 15 : (isHome ? 45 : 60);
   if (arrivalRules) {
-    if (isTraining) {
+    if (isSchool || isOther) {
+      warmupOffset = 5;
+    } else if (isTraining) {
       warmupOffset = arrivalRules.warmupOffsetsMinutes?.training ?? arrivalRules.warmupOffsetTrainingMinutes ?? 15;
     } else if (isTournament) {
       warmupOffset = arrivalRules.warmupOffsetsMinutes?.tournament ?? arrivalRules.warmupOffsetTournamentMinutes ?? 30;
@@ -128,13 +132,14 @@ export function calculateDepartureCountdown(
   const totalOffsetMins = warmupOffset + transitTravelMins + departureBufferMins + parkingWalkMins + dutyBufferMins;
   const leaveHomeDate = new Date(kickoffDate.getTime() - totalOffsetMins * 60 * 1000);
 
+  const now = new Date();
+  const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - now.getTime()) / 60000));
+
   const departureTime = leaveHomeDate.toLocaleTimeString('fi-FI', {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Europe/Helsinki'
   });
-
-  const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - Date.now()) / 60000));
 
   return {
     departureTime,
@@ -144,6 +149,14 @@ export function calculateDepartureCountdown(
   };
 }
 
+/**
+ * Deterministic Reasoning Engine: Produces a rich briefing packet with:
+ * 1. Conflict warnings across family members
+ * 2. Optimal footwear advice based on pitch surface + weather physics
+ * 3. Clothing advice for player and spectator
+ * 4. Dynamic departure time
+ * 5. Pre-formatted WhatsApp summary
+ */
 export function generateMatchdayBriefing(
   event: MatchdayEvent,
   allDayEvents: MatchdayEvent[] = [],
@@ -153,6 +166,8 @@ export function generateMatchdayBriefing(
   const isOutdoor = !venue.isIndoor;
   const temp = weather?.temperatureC ?? 15;
   const rain = weather?.precipitationMmh ?? 0;
+  const isSchool = event.sport === 'school' || event.eventType === 'school';
+  const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
 
   // 1. Conflict Detection across family profiles
   let conflictWarning: string | undefined;
@@ -167,36 +182,50 @@ export function generateMatchdayBriefing(
   });
 
   if (overlapping.length > 0 && overlapping[0]) {
-    conflictWarning = `⚠️ AIKATAULURUUHKI: Peli menee päällekkäin tapahtuman "${overlapping[0].title}" kanssa!`;
+    conflictWarning = `⚠️ AIKATAULURUUHKI: Menee päällekkäin tapahtuman "${overlapping[0].title}" kanssa!`;
   }
 
   // 2. Footwear & Gear Advice
-  const { footwear, reason: footwearReason } = determineFootwear(
-    venue.surface,
-    temp,
-    rain,
-    venue.isIndoor
-  );
-
+  let footwear: FootwearRecommendation = 'INDOOR_NON_MARKING';
+  let footwearReason = 'Normaali vaatetus ja kengät.';
   let clothingAdvice = '';
   let spectatorGear = 'Normaali säänmukainen vaatetus.';
 
-  if (isOutdoor) {
-    if (temp < 6) {
-      clothingAdvice = 'Pelaajalle tekninen aluskerrasto, pipo ja ohuet pelihanskat.';
-      spectatorGear = 'Kylmä katsomossa! Toppatakki, istuinalusta, lämpimät kengät ja termospullo.';
-    } else if (temp < 13) {
-      clothingAdvice = 'Pitkähihainen aluspaita tai lämmittelytakki suositeltava.';
-    } else {
-      clothingAdvice = 'Normaali lyhythihainen peliasu + vaihtopaita.';
-    }
-
-    if (rain > 0.5) {
-      spectatorGear += ' 🌧️ Muista sateenvarjo ja vedenpitävät kengät.';
-    }
+  if (isSchool) {
+    footwearReason = 'Koulukengät / sisäkengät.';
+    clothingAdvice = 'Tavalliset kouluvaatteet ja reppu.';
+    spectatorGear = 'Säänmukainen vaatetus.';
+  } else if (isOther) {
+    footwearReason = 'Säänmukaiset jalkineet.';
+    clothingAdvice = 'Tapahtuman mukainen asustus.';
+    spectatorGear = 'Säänmukainen vaatetus.';
   } else {
-    clothingAdvice = 'Normaali sisäpelivarustus + juomapullo ja suojalasit (säbä).';
-    spectatorGear = 'Sisähallissa tarkenee kevyemmällä vaatetuksella.';
+    const footRes = determineFootwear(
+      venue.surface,
+      temp,
+      rain,
+      venue.isIndoor
+    );
+    footwear = footRes.footwear;
+    footwearReason = footRes.reason;
+
+    if (isOutdoor) {
+      if (temp < 6) {
+        clothingAdvice = 'Pelaajalle tekninen aluskerrasto, pipo ja ohuet pelihanskat.';
+        spectatorGear = 'Kylmä katsomossa! Toppatakki, istuinalusta, lämpimät kengät ja termospullo.';
+      } else if (temp < 13) {
+        clothingAdvice = 'Pitkähihainen aluspaita tai lämmittelytakki suositeltava.';
+      } else {
+        clothingAdvice = 'Normaali lyhythihainen peliasu + vaihtopaita.';
+      }
+
+      if (rain > 0.5) {
+        spectatorGear += ' 🌧️ Muista sateenvarjo ja vedenpitävät kengät.';
+      }
+    } else {
+      clothingAdvice = 'Normaali sisäpelivarustus + juomapullo ja suojalasit (säbä).';
+      spectatorGear = 'Sisähallissa tarkenee kevyemmällä vaatetuksella.';
+    }
   }
 
   if (volunteerDuty) {
@@ -207,15 +236,29 @@ export function generateMatchdayBriefing(
   const { departureTime, countdownMinutes } = calculateDepartureCountdown(event, arrivalRules);
 
   // 4. WhatsApp Template
-  const postMatchWhatsApp = `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}. Seuraava peli: [PVM].`;
+  const startTimeFormatted = new Date(event.startTime).toLocaleTimeString('fi-FI', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Helsinki'
+  });
+
+  const postMatchWhatsApp = isSchool || isOther
+    ? `📌 Muistutus: ${event.title} klo ${startTimeFormatted} (${venue.name}).`
+    : `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}. Seuraava peli: [PVM].`;
+
+  const emoji = isSchool ? '🏫' : isOther ? '📌' : '⚽';
 
   return {
-    scoutSummary: `⚽ ${event.title} @ ${venue.name} (${venue.surface.replace(/_/g, ' ')}).`,
+    scoutSummary: `${emoji} ${event.title} @ ${venue.name}${venue.surface && venue.surface !== 'indoor_parquet' ? ` (${venue.surface.replace(/_/g, ' ')})` : ''}.`,
     gearAndPackingAdvice: {
       clothing: clothingAdvice,
       footwear,
       footwearReason,
-      kitRecommendation: event.isHomeMatch
+      kitRecommendation: isSchool
+        ? 'Koulureppu & tarvikkeet'
+        : isOther
+        ? 'Säänmukaiset varusteet'
+        : event.isHomeMatch
         ? 'Kotipeliasu (ykköspaita)'
         : 'Vieraspeliasu + varapaita kassiin',
       spectatorGear

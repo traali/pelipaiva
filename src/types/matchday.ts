@@ -6,9 +6,10 @@ export type SportType =
   | 'icehockey'
   | 'futsal'
   | 'training'
+  | 'school'
   | 'other';
 
-export type EventType = 'match' | 'training' | 'tournament' | 'meeting' | 'other';
+export type EventType = 'match' | 'training' | 'tournament' | 'meeting' | 'school' | 'other';
 
 export type PitchSurface =
   | 'artificial_turf_3g'

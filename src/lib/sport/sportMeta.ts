@@ -16,8 +16,12 @@ export function sportLabelFi(sport: SportType): string {
       return 'Futsal';
     case 'training':
       return 'Harjoitus';
+    case 'school':
+      return 'Koulu';
+    case 'other':
+      return 'Muu meno';
     default:
-      return 'Ottelu';
+      return 'Tapahtuma';
   }
 }
 
@@ -29,6 +33,8 @@ export type SportIconName =
   | 'snowflake'
   | 'footprints'
   | 'dumbbell'
+  | 'school'
+  | 'calendar'
   | 'trophy';
 
 export function sportIconName(sport: SportType): SportIconName {
@@ -47,6 +53,10 @@ export function sportIconName(sport: SportType): SportIconName {
       return 'footprints';
     case 'training':
       return 'dumbbell';
+    case 'school':
+      return 'school';
+    case 'other':
+      return 'calendar';
     default:
       return 'trophy';
   }
