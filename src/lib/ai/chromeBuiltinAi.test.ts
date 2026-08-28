@@ -2,14 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   checkChromeAiCapabilities,
   parseWithGeminiNano,
-  parseSportsMessageHybrid
+  reasonWithGeminiNano,
+  parseSportsMessageHybrid,
+  LlmContextGuide
 } from './chromeBuiltinAi';
 
 describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
   const originalWindow = global.window;
 
   beforeEach(() => {
-    // Reset window
     vi.restoreAllMocks();
   });
 
@@ -42,20 +43,25 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
 
   it('should parse freeform sports text using Gemini Nano session', async () => {
     const mockPromptResponse = JSON.stringify({
-      title: 'PPJ Laru vs HJK Sininen',
-      eventType: 'match',
-      sport: 'football',
-      homeTeam: 'PPJ Laru',
-      awayTeam: 'HJK Sininen',
-      isHomeMatch: true,
-      dateStr: '2026-09-12',
-      kickoffTime: '14:30',
-      warmupTime: '13:45',
-      endTime: '16:00',
-      venueHint: 'Ruukinlahden tekonurmi',
-      kitColor: 'Sininen',
-      volunteerDuties: ['Kahvio klo 13:30-15:00'],
-      confidenceScore: 0.96
+      action: 'create_new',
+      detectedPlayerName: 'Simo',
+      changesSummary: 'Uusi ottelu: PPJ Laru vs HJK Sininen',
+      extractedEvent: {
+        title: 'PPJ Laru vs HJK Sininen',
+        eventType: 'match',
+        sport: 'football',
+        homeTeam: 'PPJ Laru',
+        awayTeam: 'HJK Sininen',
+        isHomeMatch: true,
+        dateStr: '2026-09-12',
+        kickoffTime: '14:30',
+        warmupTime: '13:45',
+        endTime: '16:00',
+        venueHint: 'Ruukinlahden tekonurmi',
+        kitColor: 'Sininen',
+        volunteerDuties: ['Kahvio klo 13:30-15:00'],
+        confidenceScore: 0.96
+      }
     });
 
     const mockSession = {
@@ -89,6 +95,78 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
     expect(mockSession.destroy).toHaveBeenCalled();
   });
 
+  it('should reason over existing events to update an existing match when context is provided', async () => {
+    const mockDecisionResponse = JSON.stringify({
+      action: 'update_existing',
+      targetEventId: 'ev-simo-101',
+      detectedPlayerName: 'Simo',
+      changesSummary: 'Aikaistetaan kokoontumista klo 13:30 ja lisätään Maijan kahviovuoro',
+      extractedEvent: {
+        title: 'PPJ/Laru sin vs FC Honka',
+        eventType: 'match',
+        sport: 'football',
+        homeTeam: 'PPJ/Laru sin',
+        awayTeam: 'FC Honka',
+        isHomeMatch: true,
+        dateStr: '2026-08-29',
+        kickoffTime: '14:45',
+        warmupTime: '13:30',
+        venueHint: 'Ruukinlahden tekonurmi',
+        volunteerDuties: ['Maija kahviossa klo 13:15-15:30'],
+        confidenceScore: 0.98
+      }
+    });
+
+    const mockSession = {
+      prompt: vi.fn().mockResolvedValue(mockDecisionResponse),
+      destroy: vi.fn()
+    };
+
+    (global as any).window = {
+      ai: {
+        languageModel: {
+          capabilities: vi.fn().mockResolvedValue({ available: 'readily' }),
+          create: vi.fn().mockResolvedValue(mockSession)
+        }
+      }
+    };
+
+    const context: LlmContextGuide = {
+      knownProfiles: [
+        { id: 'p1', playerName: 'Simo', sport: 'football', teamName: 'PPJ Laru 2013' },
+        { id: 'p2', playerName: 'Lilli', sport: 'cheerleading', teamName: 'HAC Juniorit' }
+      ],
+      upcomingEvents: [
+        {
+          id: 'ev-simo-101',
+          profileId: 'p1',
+          playerName: 'Simo',
+          title: 'PPJ/Laru sin vs FC Honka',
+          dateStr: '2026-08-29',
+          startTime: '14:45',
+          warmupTime: '14:00',
+          venueName: 'Ruukinlahden tekonurmi',
+          homeTeam: 'PPJ/Laru sin',
+          awayTeam: 'FC Honka'
+        }
+      ]
+    };
+
+    const decision = await reasonWithGeminiNano(
+      'Hei Simon huomiseen peliin muutos: kokoontuminen aikaistuu klo 13.30 ja Maija hoitaa kahvion.',
+      context,
+      'Simo'
+    );
+
+    expect(decision).toBeDefined();
+    expect(decision?.action).toBe('update_existing');
+    expect(decision?.targetEventId).toBe('ev-simo-101');
+    expect(decision?.detectedPlayerName).toBe('Simo');
+    expect(decision?.changesSummary).toContain('Maija');
+    expect(decision?.extractedEvent.warmupTime).toBe('13:30');
+    expect(decision?.extractedEvent.volunteerDuties).toEqual(['Maija kahviossa klo 13:15-15:30']);
+  });
+
   it('should use fast deterministic NLP for high-confidence messages without calling LLM', async () => {
     const mockCreate = vi.fn();
     (global as any).window = {
@@ -100,7 +178,6 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
       }
     };
 
-    // Very clear, standard structured message
     const text = 'Peli: HJK vs Honka lauantaina 24.8.2026 klo 15.00 Bubu kentällä. Kokoontuminen 14.15.';
     const res = await parseSportsMessageHybrid(text, 'Eero');
 
@@ -111,19 +188,25 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
 
   it('should escalate to Gemini Nano when fast NLP confidence is low and Gemini Nano is available', async () => {
     const mockPromptResponse = JSON.stringify({
-      title: 'Koulun syysjuhla & esitys',
-      eventType: 'school',
-      sport: 'school',
-      homeTeam: 'Koulu',
-      awayTeam: '',
-      isHomeMatch: true,
-      dateStr: '2026-10-05',
-      kickoffTime: '18:00',
-      warmupTime: '17:30',
-      endTime: '19:30',
-      venueHint: 'Lauttasaaren ala-asteen juhlasali',
-      volunteerDuties: ['Tuolien järjestely'],
-      confidenceScore: 0.95
+      action: 'create_new',
+      detectedPlayerName: 'Lilli',
+      changesSummary: 'Uusi peli Espoossa',
+      extractedEvent: {
+        title: 'Peli Espoossa',
+        eventType: 'match',
+        sport: 'football',
+        homeTeam: 'Oma joukkue',
+        awayTeam: 'Espoo',
+        isHomeMatch: false,
+        dateStr: '2026-10-05',
+        kickoffTime: '18:00',
+        warmupTime: '17:30',
+        endTime: '19:30',
+        venueHint: 'Espoonlahden urheilupuisto',
+        kitColor: 'Musta',
+        volunteerDuties: [],
+        confidenceScore: 0.95
+      }
     });
 
     const mockSession = {
@@ -140,7 +223,6 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
       }
     };
 
-    // Unstructured text with informal phrasing where fast NLP regex confidence is low (< 0.80)
     const messyText = 'Peli ensi viikolla Espoossa, ottakaa mustat paidat ja nappikset.';
     const res = await parseSportsMessageHybrid(messyText, 'Lilli');
 

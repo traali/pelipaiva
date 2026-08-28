@@ -14,6 +14,37 @@ export interface HybridParseResult {
   enrichedByLlm?: boolean;
 }
 
+export interface LlmContextGuide {
+  knownProfiles?: Array<{
+    id: string;
+    playerName: string;
+    sport: string;
+    teamName: string;
+  }>;
+  upcomingEvents?: Array<{
+    id: string;
+    profileId: string;
+    playerName: string;
+    title: string;
+    dateStr: string;
+    startTime: string;
+    warmupTime?: string;
+    venueName?: string;
+    homeTeam: string;
+    awayTeam: string;
+  }>;
+}
+
+export interface LlmReasoningDecision {
+  action: 'update_existing' | 'create_new';
+  targetEventId?: string;
+  detectedPlayerName?: string;
+  changesSummary: string;
+  extractedEvent: ExtractedSportsEvent;
+  confidenceScore: number;
+  engineUsed: 'fast_nlp' | 'chrome_gemini_nano';
+}
+
 /**
  * Checks if the browser provides built-in AI (e.g. Chrome's Gemini Nano via the W3C Prompt API).
  */
@@ -39,53 +70,92 @@ export async function checkChromeAiCapabilities(): Promise<ChromeAiCapabilities>
   }
 }
 
-const SYSTEM_PROMPT = `Olet suomalaisen junioriurheilun ja kouluelämän tapahtumien jäsennin.
-Tehtäväsi on purkaa annetusta viestistä (WhatsApp, Wilma, MyClub, sähköposti) tapahtuman tiedot ja palauttaa VAIN validi JSON-objekti ilman markdown-muotoilua.
+/**
+ * Generates the system prompt tailored with family roster and calendar context.
+ */
+function buildContextAwareSystemPrompt(context?: LlmContextGuide): string {
+  let prompt = `Olet Pelipäivän älykäs tekoälyassistentti suomalaisille urheiluperheille.
+Tehtäväsi on analysoida käyttäjän syöttämä viesti (WhatsApp, Wilma, MyClub, sähköposti), vertailla sitä perheen olemassa oleviin tapahtumiin ja palauttaa VAIN validi JSON-objekti ilman markdown-muotoilua.
 
-JSON-skeema:
+OHJEET PÄÄTTELYYN:
+1. KENELLE (Kohdehenkilö):
+   - Selvitä kenen perheen lapsen/pelaajan tapahtumasta on kyse (esim. "Simon peli", "Lillille", "Eeron harkat").
+   - Jos nimeä ei mainita, valitse todennäköisin pelaaja lajin tai joukkueen perusteella.
+
+2. ONKO TAPAHTUMA JO OLEMASSA VAI UUSI:
+   - Jos viesti viittaa selvästi johonkin alla listatuista olemassa olevista tapahtumista (esim. ajan muutos, paikan muutos, ottelun lopputulos, talkoovuoro, kyytijärjestely tai peruutus), aseta action = "update_existing" ja targetEventId kyseisen tapahtuman ID:ksi.
+   - Jos viesti kertoo kokonaan uudesta tapahtumasta, aseta action = "create_new".
+
+3. TIETOJEN PURKU:
+   - Päivämäärä (YYYY-MM-DD), aloitusaika (HH:MM), kokoontumisaika (HH:MM), loppuaika (HH:MM)
+   - Paikka (kenttä, halli, koulu), peliasun väri (esim. Sininen / Valkoinen)
+   - Talkoovuorot (esim. Kahviovuoro, Toimitsijavuoro)
+   - Tulos (esim. "4-2") tai peruutustieto.
+
+JSON-SKEEEMA:
 {
-  "title": string,
-  "eventType": "match" | "training" | "tournament" | "meeting" | "school" | "other",
-  "sport": "football" | "floorball" | "ice_hockey" | "basketball" | "volleyball" | "cheerleading" | "handball" | "ringette" | "futsal" | "pesapallo" | "school" | "other",
-  "homeTeam": string,
-  "awayTeam": string,
-  "isHomeMatch": boolean,
-  "dateStr": string (YYYY-MM-DD),
-  "kickoffTime": string (HH:MM),
-  "warmupTime": string (HH:MM),
-  "endTime": string (HH:MM),
-  "venueHint": string,
-  "kitColor": string,
-  "volunteerDuties": string[],
-  "confidenceScore": number (0.0 - 1.0)
+  "action": "update_existing" | "create_new",
+  "targetEventId": string (vain jos action on "update_existing"),
+  "detectedPlayerName": string,
+  "changesSummary": string (lyhyt suomenkielinen tiivistelmä mitä muutetaan tai lisätään),
+  "extractedEvent": {
+    "title": string,
+    "eventType": "match" | "training" | "tournament" | "meeting" | "school" | "other",
+    "sport": "football" | "floorball" | "ice_hockey" | "basketball" | "volleyball" | "cheerleading" | "handball" | "ringette" | "futsal" | "pesapallo" | "school" | "other",
+    "homeTeam": string,
+    "awayTeam": string,
+    "isHomeMatch": boolean,
+    "dateStr": string (YYYY-MM-DD),
+    "kickoffTime": string (HH:MM),
+    "warmupTime": string (HH:MM),
+    "endTime": string (HH:MM),
+    "venueHint": string,
+    "kitColor": string,
+    "volunteerDuties": string[],
+    "confidenceScore": number (0.0 - 1.0)
+  }
 }`;
 
+  if (context?.knownProfiles && context.knownProfiles.length > 0) {
+    prompt += `\n\nPERHEEN REKISTERÖIDYT PELAAJAT:\n` +
+      context.knownProfiles.map((p) => `- ${p.playerName} (Laji: ${p.sport}, Joukkue: ${p.teamName})`).join('\n');
+  }
+
+  if (context?.upcomingEvents && context.upcomingEvents.length > 0) {
+    prompt += `\n\nLÄHIAJAN OLEMASSA OLEVAT KALENTERITAPAHTUMAT:\n` +
+      context.upcomingEvents.map((e) => `- ID: "${e.id}" | Pelaaja: ${e.playerName} | Pvm: ${e.dateStr} | Klo: ${e.startTime} (Kokoontuminen: ${e.warmupTime || '-'}) | ${e.title} @ ${e.venueName || 'Kenttä'}`).join('\n');
+  }
+
+  return prompt;
+}
+
 /**
- * Parses freeform text using Google Chrome's built-in Gemini Nano model.
+ * Deep semantic reasoning with Google Chrome's Gemini Nano.
  */
-export async function parseWithGeminiNano(
+export async function reasonWithGeminiNano(
   text: string,
+  context?: LlmContextGuide,
   defaultPlayerName = 'Pelaaja'
-): Promise<ExtractedSportsEvent | null> {
+): Promise<LlmReasoningDecision | null> {
   if (typeof window === 'undefined') return null;
   const ai = (window as any).ai;
   if (!ai?.languageModel) return null;
 
   try {
+    const systemPrompt = buildContextAwareSystemPrompt(context);
     const session = await ai.languageModel.create({
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt,
       temperature: 0.1
     });
 
     const rawResponse = await session.prompt(
-      `Pura seuraava viesti JSON-muodossa. Oletuspelaaja on "${defaultPlayerName}":\n\n${text}`
+      `Analysoi seuraava viesti ja palauta JSON-vastaus. Oletuspelaaja on "${defaultPlayerName}":\n\n${text}`
     );
 
     session.destroy?.();
 
     if (!rawResponse || typeof rawResponse !== 'string') return null;
 
-    // Clean any surrounding markdown code fences
     const cleanJson = rawResponse
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
@@ -93,28 +163,50 @@ export async function parseWithGeminiNano(
       .trim();
 
     const parsed = JSON.parse(cleanJson);
+    const ev = parsed.extractedEvent || {};
+
+    const extractedEvent: ExtractedSportsEvent = {
+      title: ev.title || 'Urheilutapahtuma',
+      eventType: (ev.eventType as EventType) || 'match',
+      sport: (ev.sport as SportType) || 'football',
+      homeTeam: ev.homeTeam || 'Oma joukkue',
+      awayTeam: ev.awayTeam || '',
+      isHomeMatch: Boolean(ev.isHomeMatch),
+      dateStr: ev.dateStr || '',
+      kickoffTime: ev.kickoffTime || '',
+      warmupTime: ev.warmupTime || '',
+      endTime: ev.endTime || '',
+      venueHint: ev.venueHint || '',
+      kitColor: ev.kitColor || undefined,
+      volunteerDuties: Array.isArray(ev.volunteerDuties) ? ev.volunteerDuties : [],
+      rawNotes: text.trim(),
+      confidenceScore: typeof ev.confidenceScore === 'number' ? ev.confidenceScore : 0.95
+    };
 
     return {
-      title: parsed.title || 'Urheilutapahtuma',
-      eventType: (parsed.eventType as EventType) || 'match',
-      sport: (parsed.sport as SportType) || 'football',
-      homeTeam: parsed.homeTeam || 'Oma joukkue',
-      awayTeam: parsed.awayTeam || '',
-      isHomeMatch: Boolean(parsed.isHomeMatch),
-      dateStr: parsed.dateStr || '',
-      kickoffTime: parsed.kickoffTime || '',
-      warmupTime: parsed.warmupTime || '',
-      endTime: parsed.endTime || '',
-      venueHint: parsed.venueHint || '',
-      kitColor: parsed.kitColor || undefined,
-      volunteerDuties: Array.isArray(parsed.volunteerDuties) ? parsed.volunteerDuties : [],
-      rawNotes: text.trim(),
-      confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.95
+      action: parsed.action === 'update_existing' ? 'update_existing' : 'create_new',
+      targetEventId: parsed.targetEventId || undefined,
+      detectedPlayerName: parsed.detectedPlayerName || defaultPlayerName,
+      changesSummary: parsed.changesSummary || 'Päivitetään tapahtuman tiedot',
+      extractedEvent,
+      confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.95,
+      engineUsed: 'chrome_gemini_nano'
     };
   } catch (err) {
-    console.warn('[CHROME_BUILTIN_AI] Gemini Nano parse error:', err);
+    console.warn('[CHROME_BUILTIN_AI] Gemini Nano reasoning error:', err);
     return null;
   }
+}
+
+/**
+ * Parses freeform text using Google Chrome's built-in Gemini Nano model (simple extraction).
+ */
+export async function parseWithGeminiNano(
+  text: string,
+  defaultPlayerName = 'Pelaaja'
+): Promise<ExtractedSportsEvent | null> {
+  const res = await reasonWithGeminiNano(text, undefined, defaultPlayerName);
+  return res ? res.extractedEvent : null;
 }
 
 /**
@@ -125,7 +217,8 @@ export async function parseWithGeminiNano(
  */
 export async function parseSportsMessageHybrid(
   text: string,
-  defaultPlayerName = 'Pelaaja'
+  defaultPlayerName = 'Pelaaja',
+  context?: LlmContextGuide
 ): Promise<HybridParseResult> {
   const fastResult = parseFreeformSportsMessage(text, defaultPlayerName);
 
@@ -141,10 +234,10 @@ export async function parseSportsMessageHybrid(
   // Check if Chrome built-in AI is available
   const caps = await checkChromeAiCapabilities();
   if (caps.isSupported && caps.status === 'readily') {
-    const nanoResult = await parseWithGeminiNano(text, defaultPlayerName);
+    const nanoResult = await reasonWithGeminiNano(text, context, defaultPlayerName);
     if (nanoResult && nanoResult.confidenceScore > fastResult.confidenceScore) {
       return {
-        result: nanoResult,
+        result: nanoResult.extractedEvent,
         engineUsed: 'chrome_gemini_nano',
         confidence: nanoResult.confidenceScore,
         enrichedByLlm: true

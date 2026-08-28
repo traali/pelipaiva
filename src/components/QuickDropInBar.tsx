@@ -158,8 +158,32 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
           setSelectedSport(ranking.detectedSport);
         }
 
-        // 2. Parse new event preview as fallback (using progressive Chrome Gemini Nano if available)
-        const hybridResult = await parseSportsMessageHybrid(trimmed, resolvedPlayer);
+        // 2. Parse new event preview as fallback (using progressive Chrome Gemini Nano with family context)
+        const contextGuide = {
+          knownProfiles: profiles.map((p) => ({
+            id: p.id,
+            playerName: p.playerName,
+            sport: p.sport,
+            teamName: p.teamName || ''
+          })),
+          upcomingEvents: events.slice(0, 15).map((e) => {
+            const prof = profiles.find((p) => p.id === e.profileId);
+            return {
+              id: e.id,
+              profileId: e.profileId,
+              playerName: prof?.playerName || 'Pelaaja',
+              title: e.title,
+              dateStr: e.startTime.split('T')[0] || '',
+              startTime: new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }),
+              warmupTime: e.warmupTime ? new Date(e.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }) : undefined,
+              venueName: e.venue?.name,
+              homeTeam: e.homeTeam,
+              awayTeam: e.awayTeam
+            };
+          })
+        };
+
+        const hybridResult = await parseSportsMessageHybrid(trimmed, resolvedPlayer, contextGuide);
         setPreviewEvent(hybridResult.result);
         if (!ranking.detectedSport) {
           setSelectedSport(hybridResult.result.sport);
