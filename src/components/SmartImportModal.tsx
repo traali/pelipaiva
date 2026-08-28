@@ -106,8 +106,13 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     (async () => {
       if (!selectedPlayer) return;
       try {
-        const profiles = await db.profiles.where('playerName').equals(selectedPlayer).toArray();
-        const events = await db.events.where('playerName').equals(selectedPlayer).toArray();
+        const allProfiles = await db.profiles.toArray();
+        const profiles = allProfiles.filter(
+          (p) => (p.playerName || '').trim().toLowerCase() === selectedPlayer.trim().toLowerCase()
+        );
+        const profileIds = new Set(profiles.map((p) => p.id));
+        const allEvents = await db.events.toArray();
+        const events = allEvents.filter((e) => profileIds.has(e.profileId));
         const sportsSet = new Set<SportType>();
         for (const p of profiles) {
           if (p.sport) sportsSet.add(p.sport as SportType);

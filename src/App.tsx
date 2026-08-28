@@ -247,9 +247,9 @@ export const App: React.FC = () => {
     }
   };
 
-  // Filter events by selected profile or player group
+  // Filter events by selected profile or player group and deduplicate reconciled events
   const filteredEvents = useMemo(() => {
-    return [...rawEvents]
+    const rawFiltered = [...rawEvents]
       .filter((e) => {
         if (e.isHidden) return false;
         if (activeProfileId === 'all') return true;
@@ -259,8 +259,25 @@ export const App: React.FC = () => {
           return (profile?.playerName || '').toLowerCase() === pName;
         }
         return e.profileId === activeProfileId;
-      })
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      });
+
+    // Find all linked officialFixtureIds on enriched calendar events
+    const enrichedFixtureIds = new Set<string>();
+    for (const e of rawFiltered) {
+      if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
+        enrichedFixtureIds.add(e.officialFixtureId);
+      }
+    }
+
+    // Suppress bare fixture duplicates if an enriched calendar event already represents it
+    const deduplicated = rawFiltered.filter((e) => {
+      if (e.id.startsWith('fixture-') && e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
+        return false;
+      }
+      return true;
+    });
+
+    return deduplicated.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [rawEvents, activeProfileId, profiles]);
 
   const [clockTick, setClockTick] = useState(0);
@@ -338,7 +355,7 @@ export const App: React.FC = () => {
             ? { hex: club.colorHex, label: club.primaryColor }
             : pickNextTeamColor(existing.map((p) => p.colorHex)));
 
-    const reused = findExistingTeamProfile(existing, playerName, url);
+    const reused = findExistingTeamProfile(existing, playerName, url, sport);
     const profileId = reused?.id || generateStableProfileId(playerName, url);
 
     if (reused) {

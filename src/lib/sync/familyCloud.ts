@@ -443,7 +443,11 @@ async function executeSyncFamilyRosterCycle(
       roster: rosterToPush
     };
   } catch (err: any) {
-    console.error('[FAMILY_CLOUD] Sync cycle error:', err);
+    if (err?.message === 'unknown_family') {
+      console.warn(`[FAMILY_CLOUD] Family code ${cleanCode} is operating in local mode (not registered on edge).`);
+    } else {
+      console.warn('[FAMILY_CLOUD] Sync cycle warning:', err);
+    }
     return { success: false, error: err?.message || 'Sync failed' };
   }
 }

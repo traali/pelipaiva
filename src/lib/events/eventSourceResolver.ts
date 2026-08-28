@@ -79,6 +79,14 @@ export function resolveEventSourceInfo(
     sources.push('iCal-kalenteri');
   }
 
+  // If an official fixture is linked, ensure official federation source is present
+  if (fixtureId && !sources.some((s) => ['Palloliitto', 'Salibandyliitto', 'Basket.fi', 'Torneopal'].includes(s))) {
+    if (event.sport === 'football') sources.unshift('Palloliitto');
+    else if (event.sport === 'floorball') sources.unshift('Salibandyliitto');
+    else if (event.sport === 'basketball') sources.unshift('Basket.fi');
+    else sources.unshift('Tulospalvelu');
+  }
+
   // 3. User direct chat updates (WhatsApp / NLP chat input)
   if (event.hasWhatsAppUpdates || (event.chatMessages && event.chatMessages.length > 0)) {
     sources.push('WhatsApp');
@@ -96,14 +104,7 @@ export function resolveEventSourceInfo(
     }
   }
 
-  const isCombined =
-    uniqueSources.length >= 2 ||
-    event.reconciliationStatus === 'auto_matched' ||
-    event.reconciliationStatus === 'manual_matched';
-
-  if (isCombined && uniqueSources.length === 1) {
-    if (!uniqueSources.includes('MyClub')) uniqueSources.push('MyClub');
-  }
+  const isCombined = uniqueSources.length >= 2;
 
   const badgeText = isCombined
     ? `🔗 Yhdistetty: ${uniqueSources.join(' + ')}`

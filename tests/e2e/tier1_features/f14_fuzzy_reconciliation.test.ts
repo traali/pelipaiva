@@ -195,4 +195,67 @@ describe('Feature 14: Conservative Fuzzy Match & Reconciliation', () => {
     expect(res).toBeDefined();
     expect(['auto_matched', 'candidate_match']).toContain(res?.status);
   });
+
+  it('should auto-match internal club match entry without opponent name if club and squad match (e.g. MyClub style)', () => {
+    const calendarEvents: MatchdayEvent[] = [
+      {
+        id: 'cal-myclub-sin',
+        profileId: 'p1',
+        sport: 'football',
+        eventType: 'match',
+        isTraining: false,
+        title: 'HJK T13: Piirisarja - Sininen',
+        homeTeam: 'HJK T13: Piirisarja',
+        awayTeam: 'Sininen',
+        isHomeMatch: true,
+        startTime: '2026-05-16T11:15:00.000Z', // 45 min warmup before 12:00 kickoff
+        endTime: '2026-05-16T13:30:00.000Z',
+        venue: {
+          name: 'Bubu',
+          normalizedName: 'bubu',
+          coordinates: { lat: 60.2132, lng: 25.1098 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      }
+    ];
+
+    const results = reconcileCalendarWithOfficial(calendarEvents, officialFixtures);
+    const res = results.get('cal-myclub-sin');
+    expect(res).toBeDefined();
+    expect(res?.status).toBe('auto_matched');
+    expect(res?.confidenceScore).toBeGreaterThanOrEqual(0.85);
+    expect(res?.officialFixture?.id).toBe('spl_60341_101');
+  });
+
+  it('should NOT match squad entry if squad colors conflict (e.g. MUSTA calendar event vs SININEN fixture)', () => {
+    const calendarEvents: MatchdayEvent[] = [
+      {
+        id: 'cal-myclub-musta',
+        profileId: 'p1',
+        sport: 'football',
+        eventType: 'match',
+        isTraining: false,
+        title: 'HJK T13: Piirisarja - Musta',
+        homeTeam: 'HJK T13: Piirisarja',
+        awayTeam: 'Musta',
+        isHomeMatch: true,
+        startTime: '2026-05-16T11:15:00.000Z',
+        endTime: '2026-05-16T13:30:00.000Z',
+        venue: {
+          name: 'Bubu',
+          normalizedName: 'bubu',
+          coordinates: { lat: 60.2132, lng: 25.1098 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      }
+    ];
+
+    const results = reconcileCalendarWithOfficial(calendarEvents, officialFixtures);
+    const res = results.get('cal-myclub-musta');
+    expect(res?.status).toBe('unlinked');
+  });
 });

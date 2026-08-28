@@ -205,18 +205,48 @@ export async function ingestIcsForProfile(opts: {
   // fixtures and attach mismatch diagnostics so the 1-tap banner is reachable.
   if (withMeta.length > 0) {
     const profile = await database.profiles.get(opts.profileId);
-    if (profile?.teamId) {
-      const officialFixtures = await getOfficialFixtures(profile.teamId, database);
+    let targetTeamId = profile?.teamId;
+    if (!targetTeamId && profile?.playerName) {
+      const allProfiles = await database.profiles.toArray();
+      const peerProfile = allProfiles.find(
+        (p) =>
+          p.id !== opts.profileId &&
+          (p.playerName || '').trim().toLowerCase() === profile.playerName.trim().toLowerCase() &&
+          p.sport === opts.sport &&
+          p.teamId
+      );
+      if (peerProfile) targetTeamId = peerProfile.teamId;
+    }
+
+    if (targetTeamId) {
+      const officialFixtures = await getOfficialFixtures(targetTeamId, database);
       if (officialFixtures.length > 0) {
         const aliasRows = await database.customAliases.toArray();
         const aliasMap = new Map(aliasRows.map((a) => [a.pattern.toLowerCase().trim(), a.canonicalClub]));
         const results = reconcileCalendarWithOfficial(withMeta, officialFixtures, aliasMap);
+        const duplicateFixtureIdsToDelete: string[] = [];
+
         for (const ev of withMeta) {
           const result = results.get(ev.id);
           if (!result || result.status === 'unlinked' || !result.officialFixture) continue;
           ev.reconciliationStatus = result.status;
           ev.confidenceScore = result.confidenceScore;
           ev.officialFixtureId = result.officialFixture.id;
+
+          // Enrich event with official match details
+          if (result.officialFixture.homeTeam && result.officialFixture.awayTeam) {
+            ev.homeTeam = result.officialFixture.homeTeam;
+            ev.awayTeam = result.officialFixture.awayTeam;
+            ev.title = `${result.officialFixture.homeTeam} vs ${result.officialFixture.awayTeam}`;
+            ev.isHomeMatch = result.officialFixture.isHome;
+            if (result.officialFixture.leagueName) {
+              ev.tournamentName = result.officialFixture.leagueName;
+            }
+            if (result.officialFixture.score) {
+              ev.score = result.officialFixture.score;
+            }
+          }
+
           const diag = computeMismatchDiagnostics(ev, result.officialFixture);
           if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
             ev.mismatchFlags = {
@@ -233,6 +263,13 @@ export async function ingestIcsForProfile(opts: {
               officialOpponent: diag.officialOpponent
             };
           }
+
+          // Mark corresponding bare fixture event for deletion to avoid duplicates
+          duplicateFixtureIdsToDelete.push(`fixture-${opts.profileId}-${result.officialFixture.id}`);
+        }
+
+        if (duplicateFixtureIdsToDelete.length > 0) {
+          await database.events.bulkDelete(duplicateFixtureIdsToDelete).catch(() => {});
         }
       }
     }

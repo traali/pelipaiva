@@ -4,7 +4,32 @@ import {
   OfficialLeagueFixture,
   ReconciliationResult
 } from '../../types/matchday';
-import { calculateTeamSimilarity } from './teamNameMatcher';
+import { calculateTeamSimilarity, normalizeTeamName, MULTILINGUAL_COLORS } from './teamNameMatcher';
+
+function isGenericOrSquadTag(tag: string): boolean {
+  const t = (tag || '').trim().toLowerCase();
+  if (!t || t.length <= 1) return true;
+  if (MULTILINGUAL_COLORS[t]) return true;
+  const GENERIC_MATCH_TERMS = [
+    'piirisarja',
+    'sarjapeli',
+    'sarjaottelu',
+    'harkkapeli',
+    'harjoitusottelu',
+    'peli',
+    'ottelu',
+    'turnaus',
+    'haaste',
+    'kilpa',
+    'edustus',
+    'akatemia',
+    'pelipäivä',
+    'omatoimi',
+    'liiga',
+    'cup'
+  ];
+  return GENERIC_MATCH_TERMS.some((term) => t === term || t.startsWith(term) || t.endsWith(term));
+}
 
 /** Helsinki-local calendar-day key — UTC keys mis-bucketed 00:00–02:59 FI events
  *  against the ±180 min tolerance window (M-19/V6, SPEC §5.1 "same day" is local). */
@@ -105,6 +130,7 @@ export function reconcileCalendarWithOfficial(
 
       // Opponent comparison
       const offOpponent = fixture.isHome ? fixture.awayTeam : fixture.homeTeam;
+      const offOwnTeam = fixture.isHome ? fixture.homeTeam : fixture.awayTeam;
       let simAway = calculateTeamSimilarity(event.awayTeam, offOpponent);
       let simHome = calculateTeamSimilarity(event.homeTeam, offOpponent);
 
@@ -120,17 +146,43 @@ export function reconcileCalendarWithOfficial(
         }
       }
 
-      const bestOppSim = Math.max(simAway, simHome);
+      let bestMatchSim = Math.max(simAway, simHome);
 
-      // Must have at least basic opponent similarity (>= 0.40) to be a valid candidate
-      if (bestOppSim < 0.40) continue;
+      // If opponent is not named in calendar event (e.g. MyClub title is "PPJ Laru 2013: PIIRISARJA - SININEN"),
+      // check if this is the team's internal match entry for this exact fixture.
+      if (bestMatchSim < 0.40) {
+        const isInternalTag = isGenericOrSquadTag(event.awayTeam) || !event.awayTeam;
+        if (isInternalTag) {
+          const simOwnHome = calculateTeamSimilarity(event.homeTeam, offOwnTeam);
+          const simOwnTitle = calculateTeamSimilarity(event.title, offOwnTeam);
+          const simOwn = Math.max(simOwnHome, simOwnTitle);
+
+          if (simOwn >= 0.60) {
+            const normAway = normalizeTeamName(event.awayTeam);
+            const normHome = normalizeTeamName(event.homeTeam);
+            const normTitle = normalizeTeamName(event.title);
+            const normOff = normalizeTeamName(offOwnTeam);
+
+            const eventColor = normAway.color || normTitle.color || normHome.color;
+            const fixtureColor = normOff.color;
+            const hasColorConflict = eventColor && fixtureColor && eventColor !== fixtureColor;
+
+            if (!hasColorConflict) {
+              bestMatchSim = eventColor && fixtureColor && eventColor === fixtureColor ? 0.95 : 0.85;
+            }
+          }
+        }
+      }
+
+      // Must have at least basic similarity (>= 0.40) to be a valid candidate
+      if (bestMatchSim < 0.40) continue;
 
       // Time score: 1.0 if calendar event is 15-75 min early (intentional coach warmup), or dropping from 1.0 to 0.0 across 180 min
       const isIntentionalWarmup = fixDate.getTime() > eventDate.getTime() && timeDiffMins >= 15 && timeDiffMins <= 75;
       const timeScore = isIntentionalWarmup ? 1.0 : Math.max(0, 1 - timeDiffMins / 180);
 
       // Overall confidence score
-      const confidenceScore = Math.round((0.7 * bestOppSim + 0.3 * timeScore) * 100) / 100;
+      const confidenceScore = Math.round((0.7 * bestMatchSim + 0.3 * timeScore) * 100) / 100;
 
       if (confidenceScore >= 0.50) {
         candidates.push({ fixture, score: confidenceScore });
