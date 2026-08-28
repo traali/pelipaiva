@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Plus, CheckCircle2, MapPin, Clock, Shirt, User, X, Camera, Loader2, Link2 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { SportType, MatchdayEvent } from '../types/matchday';
-import { parseFreeformSportsMessage, ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
+import { ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
+import { parseSportsMessageHybrid } from '../lib/ai/chromeBuiltinAi';
 import { convertExtractedToMatchdayEvent } from '../lib/ai/localAiEngine';
 import { applyEventChatUpdate } from '../lib/ai/eventChatEngine';
 import { db } from '../lib/storage/db';
@@ -157,11 +158,11 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
           setSelectedSport(ranking.detectedSport);
         }
 
-        // 2. Parse new event preview as fallback
-        const parsed = parseFreeformSportsMessage(trimmed, resolvedPlayer);
-        setPreviewEvent(parsed);
+        // 2. Parse new event preview as fallback (using progressive Chrome Gemini Nano if available)
+        const hybridResult = await parseSportsMessageHybrid(trimmed, resolvedPlayer);
+        setPreviewEvent(hybridResult.result);
         if (!ranking.detectedSport) {
-          setSelectedSport(parsed.sport);
+          setSelectedSport(hybridResult.result.sport);
         }
       } catch (e) {
         console.warn('Failed to rank candidate events', e);
