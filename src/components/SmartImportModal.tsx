@@ -71,6 +71,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [activeTab, setActiveTab] = useState<ImportTab>(initialTab);
   const [selectedPlayer, setSelectedPlayer] = useState(initialPlayerName || existingPlayers[0] || 'Maija');
   const [selectedSport, setSelectedSport] = useState<SportType>(initialSport || 'football');
+  const [playerActiveSports, setPlayerActiveSports] = useState<SportType[]>([]);
+  const [customPlayerDraft, setCustomPlayerDraft] = useState('');
 
   // Tab 1: Freeform / WhatsApp messages (multi-match support)
   const [pastedMessage, setPastedMessage] = useState('');
@@ -97,6 +99,35 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Query active sports for the selected player from profiles and events
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      if (!selectedPlayer) return;
+      try {
+        const profiles = await db.profiles.where('playerName').equals(selectedPlayer).toArray();
+        const events = await db.events.where('playerName').equals(selectedPlayer).toArray();
+        const sportsSet = new Set<SportType>();
+        for (const p of profiles) {
+          if (p.sport) sportsSet.add(p.sport as SportType);
+        }
+        for (const e of events) {
+          if (e.sport) sportsSet.add(e.sport as SportType);
+        }
+        const sportsList = Array.from(sportsSet);
+        if (isMounted) {
+          setPlayerActiveSports(sportsList);
+          if (sportsList.length > 0 && !initialSport && !sportsList.includes(selectedSport)) {
+            setSelectedSport(sportsList[0]!);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to query player sports in SmartImportModal', e);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [selectedPlayer, initialSport]);
 
   // Handle escape key — never abandon an in-flight save/import (M-45/V61)
   useEffect(() => {
@@ -381,9 +412,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                     <button
                       key={p}
                       type="button"
-                      onClick={() => setSelectedPlayer(p)}
+                      onClick={() => {
+                        setSelectedPlayer(p);
+                        setCustomPlayerDraft('');
+                      }}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer transition-all ${
-                        selectedPlayer === p
+                        selectedPlayer === p && !customPlayerDraft
                           ? 'bg-pitch text-text-inverse border-pitch shadow-sm'
                           : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
                       }`}
@@ -393,9 +427,16 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                   ))}
                   <input
                     type="text"
-                    value={selectedPlayer}
-                    onChange={(e) => setSelectedPlayer(e.target.value)}
-                    placeholder="Muu nimi"
+                    value={customPlayerDraft}
+                    onChange={(e) => {
+                      setCustomPlayerDraft(e.target.value);
+                      if (e.target.value.trim()) {
+                        setSelectedPlayer(e.target.value.trim());
+                      } else if (existingPlayers[0]) {
+                        setSelectedPlayer(existingPlayers[0]);
+                      }
+                    }}
+                    placeholder="+ Uusi nimi"
                     className="px-2.5 py-1 rounded-lg bg-surface border border-border-strong text-text-primary text-xs font-bold w-28 focus:outline-none focus:border-pitch"
                   />
                 </div>
@@ -408,13 +449,57 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                   onChange={(e) => setSelectedSport(e.target.value as SportType)}
                   className="px-2.5 py-1 rounded-lg bg-surface border border-border-strong text-text-primary text-xs font-medium focus:outline-none focus:border-pitch"
                 >
-                  <option value="football">⚽ Jalkapallo</option>
-                  <option value="floorball">🏑 Salibandy</option>
-                  <option value="basketball">🏀 Koripallo</option>
-                  <option value="volleyball">🏐 Lentopallo</option>
-                  <option value="icehockey">🏒 Jääkiekko</option>
-                  <option value="futsal">👟 Futsal</option>
-                  <option value="other">Muu / treenit</option>
+                  {playerActiveSports.length > 0 ? (
+                    <>
+                      <optgroup label={`⭐ ${selectedPlayer}n lajit`}>
+                        {[
+                          { type: 'football', label: '⚽ Jalkapallo' },
+                          { type: 'floorball', label: '🏑 Salibandy' },
+                          { type: 'basketball', label: '🏀 Koripallo' },
+                          { type: 'volleyball', label: '🏐 Lentopallo' },
+                          { type: 'icehockey', label: '🏒 Jääkiekko' },
+                          { type: 'futsal', label: '👟 Futsal' },
+                          { type: 'school', label: '🏫 Koulu / Wilma' },
+                          { type: 'other', label: '📌 Muu / treenit' }
+                        ]
+                          .filter((s) => playerActiveSports.includes(s.type as SportType))
+                          .map((s) => (
+                            <option key={s.type} value={s.type}>
+                              {s.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Muut lajit">
+                        {[
+                          { type: 'football', label: '⚽ Jalkapallo' },
+                          { type: 'floorball', label: '🏑 Salibandy' },
+                          { type: 'basketball', label: '🏀 Koripallo' },
+                          { type: 'volleyball', label: '🏐 Lentopallo' },
+                          { type: 'icehockey', label: '🏒 Jääkiekko' },
+                          { type: 'futsal', label: '👟 Futsal' },
+                          { type: 'school', label: '🏫 Koulu / Wilma' },
+                          { type: 'other', label: '📌 Muu / treenit' }
+                        ]
+                          .filter((s) => !playerActiveSports.includes(s.type as SportType))
+                          .map((s) => (
+                            <option key={s.type} value={s.type}>
+                              {s.label}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </>
+                  ) : (
+                    <>
+                      <option value="football">⚽ Jalkapallo</option>
+                      <option value="floorball">🏑 Salibandy</option>
+                      <option value="basketball">🏀 Koripallo</option>
+                      <option value="volleyball">🏐 Lentopallo</option>
+                      <option value="icehockey">🏒 Jääkiekko</option>
+                      <option value="futsal">👟 Futsal</option>
+                      <option value="school">🏫 Koulu / Wilma</option>
+                      <option value="other">📌 Muu / treenit</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>

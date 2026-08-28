@@ -36,6 +36,8 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
       : existingPlayers[0] || 'Maija'
   );
   const [selectedSport, setSelectedSport] = useState<SportType>('football');
+  const [playerActiveSports, setPlayerActiveSports] = useState<SportType[]>([]);
+  const [customPlayerDraft, setCustomPlayerDraft] = useState('');
   const [previewEvent, setPreviewEvent] = useState<ExtractedSportsEvent | null>(null);
   const [rankingResult, setRankingResult] = useState<CandidateRankingResult | null>(null);
   const [familyJoinCode, setFamilyJoinCode] = useState<string | null>(null);
@@ -81,6 +83,35 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
       setSelectedPlayer(activeProfilePlayerName);
     }
   }, [activeProfilePlayerName]);
+
+  // Load sports configured for the selected player from profiles and events
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      if (!selectedPlayer) return;
+      try {
+        const profiles = await db.profiles.where('playerName').equals(selectedPlayer).toArray();
+        const events = await db.events.where('playerName').equals(selectedPlayer).toArray();
+        const sportsSet = new Set<SportType>();
+        for (const p of profiles) {
+          if (p.sport) sportsSet.add(p.sport as SportType);
+        }
+        for (const e of events) {
+          if (e.sport) sportsSet.add(e.sport as SportType);
+        }
+        const sportsList = Array.from(sportsSet);
+        if (isMounted) {
+          setPlayerActiveSports(sportsList);
+          if (sportsList.length > 0 && !sportsList.includes(selectedSport)) {
+            setSelectedSport(sportsList[0]!);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to query player sports', e);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [selectedPlayer]);
 
   // Live parse text with 250ms debounce as user types or pastes
   useEffect(() => {
@@ -335,10 +366,13 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                       <button
                         key={p}
                         type="button"
-                        onClick={() => setSelectedPlayer(p)}
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border cursor-pointer ${
-                          selectedPlayer === p
-                            ? 'bg-pitch text-text-inverse border-pitch'
+                        onClick={() => {
+                          setSelectedPlayer(p);
+                          setCustomPlayerDraft('');
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border cursor-pointer transition-all ${
+                          selectedPlayer === p && !customPlayerDraft
+                            ? 'bg-pitch text-text-inverse border-pitch shadow-xs'
                             : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
                         }`}
                       >
@@ -347,29 +381,80 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                     ))}
                     <input
                       type="text"
-                      value={selectedPlayer}
-                      onChange={(e) => setSelectedPlayer(e.target.value)}
-                      placeholder="Muu nimi"
-                      className="px-2 py-0.5 rounded-md bg-surface border border-border-strong text-text-primary text-[11px] font-bold w-20 focus:outline-none"
+                      value={customPlayerDraft}
+                      onChange={(e) => {
+                        setCustomPlayerDraft(e.target.value);
+                        if (e.target.value.trim()) {
+                          setSelectedPlayer(e.target.value.trim());
+                        } else if (existingPlayers[0]) {
+                          setSelectedPlayer(existingPlayers[0]);
+                        }
+                      }}
+                      placeholder="+ Uusi"
+                      className="px-2 py-0.5 rounded-md bg-surface border border-border-strong text-text-primary text-[11px] font-bold w-16 focus:outline-none focus:border-pitch"
                     />
                   </div>
 
-                    <div className="flex items-center gap-1">
-                      <span className="text-[11px] font-bold text-text-muted">Laji:</span>
-                      <select
-                        value={selectedSport}
-                        onChange={(e) => setSelectedSport(e.target.value as SportType)}
-                        className="px-2 py-0.5 rounded-md bg-surface border border-border-strong text-text-primary text-[11px] font-semibold focus:outline-none"
-                      >
-                        <option value="football">⚽ Futis</option>
-                        <option value="floorball">🏑 Säbä</option>
-                        <option value="basketball">🏀 Koris</option>
-                        <option value="volleyball">🏐 Lentis</option>
-                        <option value="icehockey">🏒 Lätkä</option>
-                        <option value="school">🏫 Koulu / Wilma</option>
-                        <option value="other">📌 Muu meno</option>
-                      </select>
-                    </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-bold text-text-muted">Laji:</span>
+                    <select
+                      value={selectedSport}
+                      onChange={(e) => setSelectedSport(e.target.value as SportType)}
+                      className="px-2 py-0.5 rounded-md bg-surface border border-border-strong text-text-primary text-[11px] font-semibold focus:outline-none"
+                    >
+                      {playerActiveSports.length > 0 ? (
+                        <>
+                          <optgroup label={`⭐ ${selectedPlayer}n lajit`}>
+                            {[
+                              { type: 'football', label: 'Futis', icon: '⚽' },
+                              { type: 'floorball', label: 'Säbä', icon: '🏑' },
+                              { type: 'basketball', label: 'Koris', icon: '🏀' },
+                              { type: 'volleyball', label: 'Lentis', icon: '🏐' },
+                              { type: 'icehockey', label: 'Lätkä', icon: '🏒' },
+                              { type: 'futsal', label: 'Futsal', icon: '👟' },
+                              { type: 'school', label: 'Koulu / Wilma', icon: '🏫' },
+                              { type: 'other', label: 'Muu meno', icon: '📌' }
+                            ]
+                              .filter((s) => playerActiveSports.includes(s.type as SportType))
+                              .map((s) => (
+                                <option key={s.type} value={s.type}>
+                                  {s.icon} {s.label}
+                                </option>
+                              ))}
+                          </optgroup>
+                          <optgroup label="Muut lajit">
+                            {[
+                              { type: 'football', label: 'Futis', icon: '⚽' },
+                              { type: 'floorball', label: 'Säbä', icon: '🏑' },
+                              { type: 'basketball', label: 'Koris', icon: '🏀' },
+                              { type: 'volleyball', label: 'Lentis', icon: '🏐' },
+                              { type: 'icehockey', label: 'Lätkä', icon: '🏒' },
+                              { type: 'futsal', label: 'Futsal', icon: '👟' },
+                              { type: 'school', label: 'Koulu / Wilma', icon: '🏫' },
+                              { type: 'other', label: 'Muu meno', icon: '📌' }
+                            ]
+                              .filter((s) => !playerActiveSports.includes(s.type as SportType))
+                              .map((s) => (
+                                <option key={s.type} value={s.type}>
+                                  {s.icon} {s.label}
+                                </option>
+                              ))}
+                          </optgroup>
+                        </>
+                      ) : (
+                        <>
+                          <option value="football">⚽ Futis</option>
+                          <option value="floorball">🏑 Säbä</option>
+                          <option value="basketball">🏀 Koris</option>
+                          <option value="volleyball">🏐 Lentis</option>
+                          <option value="icehockey">🏒 Lätkä</option>
+                          <option value="futsal">👟 Futsal</option>
+                          <option value="school">🏫 Koulu / Wilma</option>
+                          <option value="other">📌 Muu meno</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Multiline textarea if user wants to paste large text */}
