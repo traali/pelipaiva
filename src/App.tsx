@@ -22,7 +22,6 @@ import { runMissionControlGraph } from './lib/agents';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
 import { generateOrResolveMatchStats } from './lib/stats/statsEngine';
 import { helsinkiDateISO } from './lib/agents/time';
-import { EXTRA_PROFILES } from './lib/matchday/seedWeekendExtras';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
@@ -66,7 +65,6 @@ export const App: React.FC = () => {
     }
     return true;
   });
-  const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
   const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
@@ -230,95 +228,6 @@ export const App: React.FC = () => {
         p.id.startsWith('profile-kw-') ||
         p.id === 'profile-hjk-demo'
     );
-  // Seed family demo from live tulospalvelu — no invented KäPa/Honka cards.
-  const handleStartDemo = async () => {
-    if (!window.confirm('Tämä tyhjentää nykyiset tiedot ja lataa esimerkkikauden. Jatketaanko?')) return;
-    setIsSeeding(true);
-    try {
-    await db.profiles.clear();
-    await db.events.clear();
-
-    const defaultProfiles = [
-      {
-        id: 'profile-ppj-185085',
-        playerName: 'Simo',
-        teamName: 'PPJ/Laru sin',
-        sport: 'football' as SportType,
-        primaryColor: 'sininen',
-        secondaryColor: 'valkoinen',
-        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
-        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
-        associationType: 'palloliitto' as const,
-        teamId: '185085',
-        colorHex: '#3b82f6'
-      },
-      {
-        id: 'profile-ppj-185083',
-        playerName: 'Eemil',
-        teamName: 'PPJ/Laru mus',
-        sport: 'football' as SportType,
-        primaryColor: 'valkoinen',
-        secondaryColor: 'sininen',
-        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-        associationType: 'palloliitto' as const,
-        teamId: '185083',
-        colorHex: '#64748b'
-      },
-      {
-        id: 'profile-ppj-185086',
-        playerName: 'Ville',
-        teamName: 'PPJ/Laru oran',
-        sport: 'football' as SportType,
-        primaryColor: 'oranssi',
-        secondaryColor: 'musta',
-        calendarUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
-        associationUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
-        associationType: 'palloliitto' as const,
-        teamId: '185086',
-        colorHex: '#f97316'
-      }
-    ];
-
-    for (const p of defaultProfiles) {
-      await db.profiles.add(p);
-    }
-    for (const p of EXTRA_PROFILES) {
-      await db.profiles.add(p);
-    }
-
-    const seeded = [...defaultProfiles, ...EXTRA_PROFILES];
-    const ingested: number[] = [];
-    for (let i = 0; i < seeded.length; i += 2) {
-      const chunk = seeded.slice(i, i + 2);
-      const part = await Promise.all(
-        chunk.map((p) =>
-          ingestSourceForProfile({
-            profileId: p.id,
-            playerName: p.playerName,
-            teamName: p.teamName,
-            sport: p.sport,
-            url: p.associationUrl || p.calendarUrl,
-            includeWeather: false
-          }).catch((e) => {
-            console.warn('[DEMO_INGEST]', p.teamName, e);
-            return 0;
-          })
-        )
-      );
-      ingested.push(...part);
-    }
-    const total = ingested.reduce((a, b) => a + b, 0);
-    if (total === 0) {
-      await db.profiles.clear();
-      await db.events.clear();
-      return false;
-    }
-    return true;
-    } finally {
-      setIsSeeding(false);
-    }
-  };
 
   const handleClearData = async () => {
     if (!window.confirm('Haluatko varmasti tyhjentää kaikki tiedot?')) return;
@@ -607,26 +516,11 @@ export const App: React.FC = () => {
     );
   }
 
-  if (isSeeding) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-canvas px-6 text-center text-text-primary">
-        <p className="text-sm font-semibold text-pitch">Haetaan otteluita tulospalvelusta…</p>
-      </div>
-    );
-  }
-
   // If no profiles exist yet or onboarding is explicitly in progress, show the Interactive Onboarding Wizard
   if (profiles.length === 0 || isOnboardingActive) {
     return (
       <>
         <OnboardingWizard
-          onStartDemo={async () => {
-            const ok = await handleStartDemo();
-            if (ok) {
-              localStorage.setItem('pelipaiva_onboarding_done', 'true');
-              setIsOnboardingActive(false);
-            }
-          }}
           onFinishOnboarding={() => {
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);

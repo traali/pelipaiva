@@ -25,7 +25,6 @@ interface AddedSource {
 }
 
 interface OnboardingWizardProps {
-  onStartDemo: () => void;
   onOpenImportModal?: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
   onOpenFamilyShare?: () => void;
   onOpenSmartImport?: () => void;
@@ -107,7 +106,6 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
 ];
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
-  onStartDemo,
   onOpenFamilyShare,
   onOpenSmartImport,
   onQuickAddTeam,
@@ -254,14 +252,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onStartDemo}
-            className="text-[11px] font-bold text-pitch hover:underline cursor-pointer"
-          >
-            Lataa esimerkkidata
-          </button>
         </div>
 
         {/* FAMILY ROSTER SUMMARY (if players already added) */}
@@ -377,15 +367,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       </button>
                     )}
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={onStartDemo}
-                    className="mt-1 p-2.5 rounded-xl bg-pitch/10 text-pitch border border-pitch/25 text-xs font-bold flex items-center justify-center gap-2 hover:bg-pitch hover:text-text-inverse transition-all cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Kokeile esimerkkidatalla (PPJ, TOPOLA, Indians)</span>
-                  </button>
                 </div>
               </div>
             </form>
