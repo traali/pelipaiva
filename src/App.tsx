@@ -5,7 +5,7 @@ import { MatchdayCard } from './components/MatchdayCard';
 import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
-import { MatchdayEvent, SportType, PlayerProfile } from './types/matchday';
+import { MatchdayEvent, SportType, PlayerProfile, HomeLocation } from './types/matchday';
 import { LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
@@ -28,6 +28,7 @@ import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
+import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 
 const SmartImportModal = lazy(() =>
   import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
@@ -44,11 +45,15 @@ const FamilyShareModal = lazy(() =>
 const FamilyManageModal = lazy(() =>
   import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
 );
+const HomeLocationModal = lazy(() =>
+  import('./components/HomeLocationModal').then((m) => ({ default: m.HomeLocationModal }))
+);
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
   const [isSmartImportOpen, setIsSmartImportOpen] = useState<boolean>(false);
   const [isLogisticsOpen, setIsLogisticsOpen] = useState<boolean>(false);
+  const [isHomeLocationOpen, setIsHomeLocationOpen] = useState<boolean>(false);
   const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
@@ -187,6 +192,34 @@ export const App: React.FC = () => {
   const eventsQuery = useLiveQuery(() => db.events.toArray(), []);
   const rawEvents = eventsQuery || [];
   const arrivalRules = useLiveQuery(() => db.arrivalRules.toArray(), []) || [];
+  const homeSync = useLiveQuery(() => db.syncState.get('home_location'), []);
+
+  const homeLocation: HomeLocation = useMemo(() => {
+    if (homeSync && homeSync.syncKey) {
+      try {
+        const parsed = JSON.parse(homeSync.syncKey);
+        if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
+          return parsed;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    if (typeof localStorage !== 'undefined') {
+      const local = localStorage.getItem('pelipaiva_home_location');
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
+            return parsed;
+          }
+        } catch {
+          // fallback
+        }
+      }
+    }
+    return DEFAULT_HOME_LOCATION;
+  }, [homeSync]);
 
   const isDemoActive =
     profiles.length > 0 &&
@@ -327,9 +360,9 @@ export const App: React.FC = () => {
   }, []);
 
   const snapshot = useMemo(
-    () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules),
+    () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules, homeLocation),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick intentionally restarts the graph each minute
-    [rawEvents, profiles, arrivalRules, clockTick]
+    [rawEvents, profiles, arrivalRules, clockTick, homeLocation]
   );
 
   const nowMs = Date.now();
@@ -647,6 +680,7 @@ export const App: React.FC = () => {
         onAmbient={() => setIsAmbientMode(true)}
         onLogistics={() => setIsLogisticsOpen(true)}
         onImport={() => setIsSmartImportOpen(true)}
+        onOpenHomeLocation={() => setIsHomeLocationOpen(true)}
         onAsk={() => setIsAskCopilotOpen(true)}
         onClear={handleClearData}
       />
@@ -981,6 +1015,21 @@ export const App: React.FC = () => {
         onClose={() => setIsLogisticsOpen(false)}
         events={rawEvents}
         profiles={profiles}
+        homeLocation={homeLocation}
+        onOpenHomeModal={() => {
+          setIsLogisticsOpen(false);
+          setIsHomeLocationOpen(true);
+        }}
+      />
+
+      {/* Home Location & Active Transit Modal */}
+      <HomeLocationModal
+        isOpen={isHomeLocationOpen}
+        onClose={() => setIsHomeLocationOpen(false)}
+        currentHome={homeLocation}
+        onSaveHome={async (h) => {
+          await saveHomeLocation(h);
+        }}
       />
 
       {/* Natural Language Q&A Modal */}
@@ -996,6 +1045,11 @@ export const App: React.FC = () => {
         isOpen={isFamilyManageOpen}
         onClose={() => setIsFamilyManageOpen(false)}
         profiles={profiles}
+        homeLocation={homeLocation}
+        onOpenHomeLocation={() => {
+          setIsFamilyManageOpen(false);
+          setIsHomeLocationOpen(true);
+        }}
         onOpenImportForPlayer={(playerName) => {
           setIsFamilyManageOpen(false);
           openAddTeam(playerName);

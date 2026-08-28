@@ -1,4 +1,4 @@
-import type { MatchdayEvent, PlayerProfile, SportType } from '../../types/matchday';
+import type { MatchdayEvent, PlayerProfile, SportType, HomeLocation, TransitPlan } from '../../types/matchday';
 
 export type AgentId =
   | 'planner'
@@ -28,6 +28,7 @@ export interface FamilyConflict {
   travelMinutesEstimate: number;
   message: string;
   suggestedFix: string;
+  isResolvedByActiveTransit?: boolean;
 }
 
 export interface CarpoolLeg {
@@ -40,6 +41,7 @@ export interface CarpoolLeg {
   action: string;
   driverSlot: 'kuski-1' | 'kuski-2' | 'yhteiskyyti' | 'oma-kyyti';
   canShareRideWith?: string;
+  transit?: TransitPlan;
 }
 
 export interface KitItem {
@@ -136,6 +138,7 @@ export interface MissionControlSnapshot {
   nextPlayer?: PlayerProfile;
   leaveBy?: string;
   leaveCountdownMinutes?: number;
+  homeLocation?: HomeLocation;
   conflicts: FamilyConflict[];
   carpool: CarpoolLeg[];
   talkoo: TalkooBalance;
@@ -152,4 +155,5 @@ export interface AgentContext {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
   now: Date;
+  homeLocation?: HomeLocation;
 }

@@ -70,7 +70,10 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const sourceInfo = resolveEventSourceInfo(event, profile);
 
   // Respect the child's configured arrival rules — the bare call ignored them (M-41/V49).
-  const { departureTime, countdownMinutes } = calculateDepartureCountdown(event, profile?.arrivalRules);
+  const { departureTime, countdownMinutes, transitPlan } = calculateDepartureCountdown(
+    event,
+    profile?.arrivalRules
+  );
   
   const kickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
@@ -110,6 +113,15 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const jerseyColor = kit?.kitColors?.primary || profile?.colorHex || '#3b82f6';
   const jerseyText = event.isHomeMatch === false ? 'Vieraspaita (+ varapaita)' : 'Kotipeliasu (ykkönen)';
 
+  const transitEmoji =
+    transitPlan?.mode === 'walk'
+      ? '🚶 Kävely'
+      : transitPlan?.mode === 'bicycle'
+      ? '🚴 Pyörä'
+      : transitPlan?.mode === 'transit'
+      ? '🚌 Bussi'
+      : '🚗 Lähde';
+
   return (
     <article className="liquid-glass relative mb-4 overflow-hidden rounded-2xl border border-border-subtle shadow-card">
       <div
@@ -139,6 +151,20 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <span className="text-text-muted">
               {dateLabel}
             </span>
+
+            {/* Transit Mode Badge */}
+            {transitPlan && (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                  transitPlan.isSelfTransit
+                    ? 'bg-pitch/15 text-pitch border-pitch/30'
+                    : 'bg-surface-elevated text-text-secondary border-border-subtle'
+                }`}
+                title={transitPlan.transitLabel}
+              >
+                <span>{transitPlan.transitLabel}</span>
+              </span>
+            )}
 
             {/* Data Source Provenance Badge */}
             <span
@@ -201,7 +227,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         <div className="mt-4 grid grid-cols-3 gap-1.5 p-3 rounded-xl bg-surface-elevated/80 border border-border-subtle text-center">
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-floodlight flex items-center gap-1">
-              🚗 Lähde
+              {transitEmoji}
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-floodlight mt-0.5">
               {departureTime}

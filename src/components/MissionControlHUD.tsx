@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CalendarPlus,
   Car,
+  Home,
   MessageSquarePlus,
   MoreHorizontal,
   RefreshCw,
@@ -26,6 +27,7 @@ interface MissionControlHUDProps {
   onAmbient: () => void;
   onLogistics: () => void;
   onImport: () => void;
+  onOpenHomeLocation?: () => void;
   onAsk?: () => void;
   onClear: () => void;
 }
@@ -40,6 +42,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
   onAmbient,
   onLogistics,
   onImport,
+  onOpenHomeLocation,
   onAsk,
   onClear
 }) => {
@@ -122,6 +125,16 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                     setMenuOpen(false);
                   }}
                 />
+                {onOpenHomeLocation && (
+                  <MenuItem
+                    icon={<Home className="h-4 w-4" />}
+                    label="Kotiosoite & Kulkuvälineet"
+                    onClick={() => {
+                      onOpenHomeLocation();
+                      setMenuOpen(false);
+                    }}
+                  />
+                )}
                 <MenuItem
                   icon={<Share2 className="h-4 w-4" />}
                   label="Perhe-koodi"

@@ -86,12 +86,13 @@ export async function convertExtractedToMatchdayEvent(
 export function planFamilyLogistics(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  targetDate?: string
+  targetDate?: string,
+  homeLocation?: import('../../types/matchday').HomeLocation
 ): FamilyLogisticsPlan {
   const now = targetDate
     ? new Date(`${targetDate}T12:00:00${getFinnishTimezoneOffset(new Date(`${targetDate}T12:00:00Z`))}`)
     : new Date();
-  const snap = runMissionControlGraph(events, profiles, now);
+  const snap = runMissionControlGraph(events, profiles, now, [], homeLocation);
   const date = targetDate || snap.weekendLabel;
 
   if (!snap.nextEvent && snap.days.every((d) => d.events.length === 0)) {
@@ -107,7 +108,7 @@ export function planFamilyLogistics(
 
   return {
     date,
-    hasConflicts: snap.conflicts.length > 0,
+    hasConflicts: snap.conflicts.some((c) => !c.isResolvedByActiveTransit),
     conflictDetails: snap.conflicts.map((c) => c.message),
     departureSchedule: snap.carpool.map((step) => ({
       time: step.leaveBy,

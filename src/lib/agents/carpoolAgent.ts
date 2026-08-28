@@ -1,4 +1,4 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import type { CarpoolLeg, FamilyConflict } from './types';
 import { formatFiTime, helsinkiDateISO } from './time';
@@ -24,29 +24,52 @@ function canShareWithNext(ev: MatchdayEvent, next: MatchdayEvent | undefined): b
 export function carpoolAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  conflicts: FamilyConflict[]
+  conflicts: FamilyConflict[],
+  homeLocation?: HomeLocation
 ): CarpoolLeg[] {
   const sorted = [...events].sort(
     (a, b) => new Date(a.warmupTime).getTime() - new Date(b.warmupTime).getTime()
   );
-  const conflictedIds = new Set(conflicts.filter((c) => c.severity !== 'info').flatMap((c) => [c.eventAId, c.eventBId]));
+  const conflictedIds = new Set(
+    conflicts.filter((c) => c.severity !== 'info').flatMap((c) => [c.eventAId, c.eventBId])
+  );
   const legs: CarpoolLeg[] = [];
 
   for (let i = 0; i < sorted.length; i++) {
     const ev = sorted[i]!;
     const profile = childOf(ev, profiles);
     const childName = profile?.playerName || 'Lapsi';
-    const { departureTime } = calculateDepartureCountdown(ev, profile?.arrivalRules);
+    const { departureTime, transitPlan } = calculateDepartureCountdown(
+      ev,
+      profile?.arrivalRules,
+      homeLocation
+    );
     const next = sorted[i + 1];
     const sameVenueNext = canShareWithNext(ev, next);
     const shareWith = sameVenueNext ? childOf(next!, profiles)?.playerName : undefined;
     const isConflicted = conflictedIds.has(ev.id);
 
     let driverSlot: CarpoolLeg['driverSlot'] = 'kuski-1';
-    if (sameVenueNext) driverSlot = 'yhteiskyyti';
-    else if (isConflicted && i > 0) driverSlot = 'kuski-2';
+
+    if (transitPlan.isSelfTransit) {
+      driverSlot = 'oma-kyyti';
+    } else if (sameVenueNext) {
+      driverSlot = 'yhteiskyyti';
+    } else if (isConflicted && i > 0) {
+      driverSlot = 'kuski-2';
+    }
 
     const kickoff = formatFiTime(ev.startTime);
+    let actionDesc = ev.isTraining ? `Treenit alkavat ${kickoff}` : `Alkulämpö, peli ${kickoff}`;
+
+    if (transitPlan.mode === 'walk') {
+      actionDesc = `🚶 Kävellen (${transitPlan.distanceKm < 1 ? Math.round(transitPlan.distanceKm * 1000) + ' m' : transitPlan.distanceKm + ' km'}, ${transitPlan.travelMinutes} min) · ${actionDesc}`;
+    } else if (transitPlan.mode === 'bicycle') {
+      actionDesc = `🚴 Pyörällä (${transitPlan.distanceKm} km, ${transitPlan.travelMinutes} min) · ${actionDesc}`;
+    } else if (transitPlan.mode === 'transit') {
+      actionDesc = `🚌 Julkisilla (${transitPlan.travelMinutes} min) · ${actionDesc}`;
+    }
+
     legs.push({
       time: formatFiTime(ev.warmupTime),
       leaveBy: departureTime,
@@ -54,11 +77,10 @@ export function carpoolAgent(
       profileId: ev.profileId,
       eventId: ev.id,
       venueName: ev.venue.name,
-      action: ev.isTraining
-        ? `Treenit alkavat ${kickoff}`
-        : `Alkulämpö, peli ${kickoff}`,
+      action: actionDesc,
       driverSlot,
-      canShareRideWith: shareWith
+      canShareRideWith: shareWith,
+      transit: transitPlan
     });
   }
 

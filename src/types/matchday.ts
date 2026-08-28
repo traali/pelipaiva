@@ -28,6 +28,27 @@ export type FootwearRecommendation =
   | 'TF_TURF_SHOES'
   | 'INDOOR_NON_MARKING';
 
+export type TransitMode = 'auto' | 'walk' | 'bicycle' | 'car' | 'transit';
+
+export interface HomeLocation {
+  name: string; // e.g. "Kotiosoite" or "Lauttasaari"
+  address: string; // e.g. "Otavantie 5, 00200 Helsinki"
+  coordinates: Coordinates;
+  maxWalkingDistanceKm: number; // default: 1.5 km
+  maxCyclingDistanceKm: number; // default: 5.0 km
+  defaultTransitMode?: TransitMode;
+  updatedAt?: string; // ISO 8601 string
+}
+
+export interface TransitPlan {
+  mode: 'walk' | 'bicycle' | 'car' | 'transit';
+  distanceKm: number;
+  travelMinutes: number;
+  transitLabel: string;
+  isSelfTransit: boolean; // true for walk/bicycle (independent transit, no parent driver needed)
+  weatherWarning?: string;
+}
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -470,6 +491,7 @@ export interface PlayerProfile {
   arrivalRules?: ArrivalRules;
   squadFilters?: string[];
   lastOfficialSyncAt?: string;
+  preferredTransitMode?: TransitMode;
 }
 
 export interface PlayerMatchLog {
@@ -513,6 +535,7 @@ export interface MatchdayEvent {
   weather?: WeatherCondition;
   lightning?: LightningSafetyAlert;
   parking?: ParkingInfo;
+  transit?: TransitPlan;
   stats?: FullMatchStats;
   playerLog?: PlayerMatchLog;
   briefing?: MatchdayBriefing;

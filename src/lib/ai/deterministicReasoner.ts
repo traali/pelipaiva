@@ -2,10 +2,13 @@ import {
   ArrivalRules,
   Coordinates,
   FootwearRecommendation,
+  HomeLocation,
   MatchdayBriefing,
   MatchdayEvent,
-  PitchSurface
+  PitchSurface,
+  TransitPlan
 } from '../../types/matchday';
+import { resolveTransitPlan } from '../geo/transitEngine';
 
 export function determineFootwear(
   surface: PitchSurface,
@@ -60,13 +63,19 @@ export function determineFootwear(
 }
 
 /**
- * Calculates dynamic departure time and countdown based on user-configured arrival rules.
+ * Calculates dynamic departure time and countdown based on user-configured arrival rules,
+ * home location, and resolved transit mode (walk, cycle, car).
  */
 export function calculateDepartureCountdown(
   event: MatchdayEvent,
   arrivalRules?: ArrivalRules,
-  _userCoordinates?: Coordinates
-): { departureTime: string; countdownMinutes: number; leaveHomeDate: Date } {
+  homeLocation?: HomeLocation | Coordinates
+): {
+  departureTime: string;
+  countdownMinutes: number;
+  leaveHomeDate: Date;
+  transitPlan: TransitPlan;
+} {
   const isTraining = event.isTraining || event.eventType === 'training';
   const isTournament = event.eventType === 'tournament';
   const isHome = event.isHomeMatch;
@@ -85,14 +94,38 @@ export function calculateDepartureCountdown(
     }
   }
 
-  const drivingEstimateMins = arrivalRules?.defaultDrivingEstimateMinutes ?? 20;
+  const normalizedHome: HomeLocation | undefined =
+    homeLocation && 'coordinates' in homeLocation
+      ? (homeLocation as HomeLocation)
+      : homeLocation && 'lat' in homeLocation
+      ? {
+          name: 'Koti',
+          address: '',
+          coordinates: homeLocation as Coordinates,
+          maxWalkingDistanceKm: 1.5,
+          maxCyclingDistanceKm: 5.0
+        }
+      : undefined;
+
+  const transitPlan =
+    event.transit ||
+    resolveTransitPlan(
+      normalizedHome,
+      event.venue?.coordinates,
+      event.weather,
+      undefined,
+      arrivalRules?.defaultDrivingEstimateMinutes ?? 20
+    );
+
+  const transitTravelMins = transitPlan.travelMinutes;
   const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? 10;
-  const walkingMins = event.parking?.walkingTimeMinutes ?? 3;
+  // Walking from parking only applies if traveling by car
+  const parkingWalkMins = transitPlan.mode === 'car' ? (event.parking?.walkingTimeMinutes ?? 3) : 0;
   const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
 
   // Kickoff time
   const kickoffDate = new Date(event.startTime);
-  const totalOffsetMins = warmupOffset + drivingEstimateMins + departureBufferMins + walkingMins + dutyBufferMins;
+  const totalOffsetMins = warmupOffset + transitTravelMins + departureBufferMins + parkingWalkMins + dutyBufferMins;
   const leaveHomeDate = new Date(kickoffDate.getTime() - totalOffsetMins * 60 * 1000);
 
   const departureTime = leaveHomeDate.toLocaleTimeString('fi-FI', {
@@ -106,7 +139,8 @@ export function calculateDepartureCountdown(
   return {
     departureTime,
     countdownMinutes,
-    leaveHomeDate
+    leaveHomeDate,
+    transitPlan
   };
 }
 

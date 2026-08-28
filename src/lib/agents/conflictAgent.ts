@@ -1,4 +1,5 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import { resolveTransitPlan } from '../geo/transitEngine';
 import type { FamilyConflict } from './types';
 import { estimateDriveMinutes, overlapMinutes } from './time';
 
@@ -10,7 +11,11 @@ function plusMinutes(iso: string, minutes: number): string {
   return new Date(new Date(iso).getTime() + minutes * 60000).toISOString();
 }
 
-export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]): FamilyConflict[] {
+export function conflictAgent(
+  events: MatchdayEvent[],
+  profiles: PlayerProfile[],
+  homeLocation?: HomeLocation
+): FamilyConflict[] {
   const upcoming = [...events].sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
@@ -33,11 +38,42 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
       const nameB = childName(b, profiles);
       const isSameChild = nameA.toLowerCase() === nameB.toLowerCase();
 
+      // Check active transit mode for both events from home
+      const transitA = a.transit || resolveTransitPlan(homeLocation, a.venue.coordinates, a.weather);
+      const transitB = b.transit || resolveTransitPlan(homeLocation, b.venue.coordinates, b.weather);
+      const aIsActive = transitA.isSelfTransit;
+      const bIsActive = transitB.isSelfTransit;
+
       // Presence window is warmup → final whistle, not just kickoff → end.
       const overlap = overlapMinutes(a.warmupTime, a.endTime, b.warmupTime, b.endTime);
 
       if (overlap > 0) {
         if (sameVenue && !isSameChild) continue;
+
+        if (!isSameChild && (aIsActive || bIsActive)) {
+          const activeChild = aIsActive ? nameA : nameB;
+          const activeVenue = aIsActive ? a.venue.name : b.venue.name;
+          const activePlan = aIsActive ? transitA : transitB;
+          const carChild = aIsActive ? nameB : nameA;
+          const transitWord = activePlan.mode === 'walk' ? 'kävellen' : 'pyörällä';
+
+          conflicts.push({
+            id: `c-${a.id}-${b.id}`,
+            severity: 'info',
+            childA: nameA,
+            childB: nameB,
+            eventAId: a.id,
+            eventBId: b.id,
+            venueA: a.venue.name,
+            venueB: b.venue.name,
+            overlapMinutes: overlap,
+            travelMinutesEstimate: sameVenue ? 0 : drive,
+            isResolvedByActiveTransit: true,
+            message: `🟢 Päällekkäisyys ratkaistu: ${activeChild} kulkee kentälle ${activeVenue} ${transitWord} (${activePlan.distanceKm < 1 ? Math.round(activePlan.distanceKm * 1000) + ' m' : activePlan.distanceKm + ' km'}), auto vapaana pelaajalle ${carChild}.`,
+            suggestedFix: `${activeChild} menee ${transitWord} lähikentälle (${activePlan.travelMinutes} min). Ei tarvita toista kuskia.`
+          });
+          continue;
+        }
 
         const severity = isSameChild || drive > 25 || overlap > 40 ? 'critical' : 'warn';
         conflicts.push({
@@ -77,6 +113,30 @@ export function conflictAgent(events: MatchdayEvent[], profiles: PlayerProfile[]
         const gapWarmup = (new Date(b.warmupTime).getTime() - new Date(a.endTime).getTime()) / 60000;
         const gapKickoff = (new Date(b.startTime).getTime() - new Date(a.endTime).getTime()) / 60000;
         const isDriveImpossible = gapKickoff < drive;
+
+        if (!isSameChild && (aIsActive || bIsActive)) {
+          const activeChild = aIsActive ? nameA : nameB;
+          const activePlan = aIsActive ? transitA : transitB;
+          const carChild = aIsActive ? nameB : nameA;
+          const transitWord = activePlan.mode === 'walk' ? 'kävellen' : 'pyörällä';
+
+          conflicts.push({
+            id: `c-${a.id}-${b.id}-tight`,
+            severity: 'info',
+            childA: nameA,
+            childB: nameB,
+            eventAId: a.id,
+            eventBId: b.id,
+            venueA: a.venue.name,
+            venueB: b.venue.name,
+            overlapMinutes: 0,
+            travelMinutesEstimate: drive,
+            isResolvedByActiveTransit: true,
+            message: `🟢 Siirtymä ratkaistu: ${activeChild} kulkee ${transitWord} omatoimisesti, auto vapaana pelaajalle ${carChild}.`,
+            suggestedFix: `${activeChild} siirtyy ${transitWord} omatoimisesti.`
+          });
+          continue;
+        }
 
         conflicts.push({
           id: `c-${a.id}-${b.id}-tight`,

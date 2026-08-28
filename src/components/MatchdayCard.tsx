@@ -265,6 +265,20 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </span>
             )}
 
+            {/* Transit Mode Badge */}
+            {event.transit && (
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                  event.transit.isSelfTransit
+                    ? 'bg-pitch/15 text-pitch border-pitch/30'
+                    : 'bg-surface-elevated text-text-secondary border-border-subtle'
+                }`}
+                title={event.transit.transitLabel}
+              >
+                <span>{event.transit.transitLabel}</span>
+              </span>
+            )}
+
             {/* Data Source Provenance Badge */}
             {(() => {
               const sourceInfo = resolveEventSourceInfo(event);

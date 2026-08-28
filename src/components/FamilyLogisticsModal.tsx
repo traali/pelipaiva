@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Car, AlertTriangle, CheckCircle2, Share2, Copy, MapPin, User } from 'lucide-react';
+import { X, Car, AlertTriangle, CheckCircle2, Share2, Copy, MapPin, User, Home, Pencil } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { MatchdayEvent, PlayerProfile } from '../types/matchday';
+import { HomeLocation, MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { planFamilyLogistics } from '../lib/ai/localAiEngine';
 
 interface FamilyLogisticsModalProps {
@@ -10,13 +10,17 @@ interface FamilyLogisticsModalProps {
   onClose: () => void;
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
+  homeLocation?: HomeLocation;
+  onOpenHomeModal?: () => void;
 }
 
 export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
   isOpen,
   onClose,
   events,
-  profiles
+  profiles,
+  homeLocation,
+  onOpenHomeModal
 }) => {
   const [copied, setCopied] = useState(false);
   // Memoized: the mission graph is heavy and this modal re-renders on every
@@ -32,8 +36,8 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
         whatsAppShareText: ''
       };
     }
-    return planFamilyLogistics(events, profiles);
-  }, [events, profiles, isOpen]);
+    return planFamilyLogistics(events, profiles, undefined, homeLocation);
+  }, [events, profiles, isOpen, homeLocation]);
 
   const handleCopy = async () => {
     try {
@@ -82,15 +86,15 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
             className="liquid-glass relative w-full max-w-lg rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
           >
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-pitch/15 text-pitch">
                   <Car className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-text-primary">Perheen Kyytiapuri</h3>
+                  <h3 id="family-logistics-title" className="text-lg font-black text-text-primary">Perheen Kyytiapuri</h3>
                   <p className="text-xs text-text-muted">
-                    Pelipäivän logistiikka ja kuskijako
+                    Pelipäivän logistiikka, siirtymiset ja kuskijako
                   </p>
                 </div>
               </div>
@@ -100,6 +104,31 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Home Location Bar */}
+            <div className="mb-3.5 p-2.5 rounded-2xl bg-surface-elevated border border-border-strong flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 rounded-lg bg-pitch/15 text-pitch shrink-0">
+                  <Home className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">Lähtöpaikka:</span>
+                  <span className="font-bold text-text-primary truncate block">
+                    {homeLocation?.name || 'Lauttasaari'} <span className="font-normal text-text-secondary">({homeLocation?.address || 'Koti'})</span>
+                  </span>
+                </div>
+              </div>
+              {onOpenHomeModal && (
+                <button
+                  type="button"
+                  onClick={onOpenHomeModal}
+                  className="px-2.5 py-1 rounded-xl bg-surface border border-border-subtle hover:border-pitch text-pitch text-[11px] font-bold flex items-center gap-1 cursor-pointer shrink-0 transition-all"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span>Muokkaa</span>
+                </button>
+              )}
             </div>
 
             {/* Conflict Warning Banner if needed */}
@@ -142,14 +171,18 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
                         <User className="w-3 h-3 text-pitch" />
                         <span>{step.childName}</span>
                         {step.driverRole && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-elevated text-text-muted font-normal">
-                            Kuski: {step.driverRole}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                            step.driverRole === 'oma-kyyti'
+                              ? 'bg-pitch/20 text-pitch border border-pitch/30'
+                              : 'bg-surface-elevated text-text-muted font-normal'
+                          }`}>
+                            {step.driverRole === 'oma-kyyti' ? 'Omatoiminen kulku' : `Kuski: ${step.driverRole}`}
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-text-secondary mt-0.5">{step.action}</div>
+                      <div className="text-xs text-text-secondary mt-0.5 font-medium">{step.action}</div>
                       <div className="text-[11px] text-text-muted flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" />
+                        <MapPin className="w-3 h-3 text-radar" />
                         <span>{step.venueName}</span>
                       </div>
                     </div>

@@ -175,7 +175,8 @@ export function runMissionControlGraph(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
   now: Date = new Date(),
-  _arrivalRules: ArrivalRules[] = []
+  _arrivalRules: ArrivalRules[] = [],
+  homeLocation?: import('../../types/matchday').HomeLocation
 ): MissionControlSnapshot {
   const week = sportsWeekRange(now);
   const lookbackMs = now.getTime() - 2 * 3600 * 1000;
@@ -184,7 +185,7 @@ export function runMissionControlGraph(
 
   const nextEvent = upcoming.find((e) => new Date(e.endTime).getTime() >= now.getTime()) || upcoming[0];
   const nextPlayer = nextEvent ? profiles.find((p) => p.id === nextEvent.profileId) : undefined;
-  const depart = nextEvent ? calculateDepartureCountdown(nextEvent, nextPlayer?.arrivalRules) : undefined;
+  const depart = nextEvent ? calculateDepartureCountdown(nextEvent, nextPlayer?.arrivalRules, homeLocation) : undefined;
 
   const windowEvents = eventsInRange(events, week.start, week.end).sort(byStart);
 
@@ -192,8 +193,8 @@ export function runMissionControlGraph(
   const specialistEvents =
     nextEvent && !graphEvents.some((e) => e.id === nextEvent.id) ? [...graphEvents, nextEvent] : graphEvents;
 
-  const conflicts = conflictAgent(specialistEvents, profiles);
-  const carpool = carpoolAgent(specialistEvents, profiles, conflicts);
+  const conflicts = conflictAgent(specialistEvents, profiles, homeLocation);
+  const carpool = carpoolAgent(specialistEvents, profiles, conflicts, homeLocation);
   const talkoo = volunteerAgent(specialistEvents, profiles);
   const tournaments = tournamentAgent(events, profiles, now);
   const kitByEventId = kitAgent(specialistEvents, profiles);
@@ -202,10 +203,11 @@ export function runMissionControlGraph(
   const mondayISO = helsinkiDateISO(week.start);
   const days = buildDayStrips(windowEvents, profiles, mondayISO, now);
 
+  const activeConflicts = conflicts.filter((c) => !c.isResolvedByActiveTransit);
   const conflictLine =
-    conflicts.length === 0
+    activeConflicts.length === 0
       ? 'Ei päällekkäisyyksiä.'
-      : `${conflicts.length} ristiriita${conflicts.length === 1 ? '' : 'a'}: ${conflicts[0]!.message}`;
+      : `${activeConflicts.length} ristiriita${activeConflicts.length === 1 ? '' : 'a'}: ${activeConflicts[0]!.message}`;
 
   const summary =
     windowEvents.length === 0 && !nextEvent
@@ -214,20 +216,25 @@ export function runMissionControlGraph(
         ? `Seuraava: ${childName(nextEvent, profiles)} ${formatFiTime(nextEvent.startTime)} · ${nextEvent.venue.name}. ${conflictLine}`
         : `${windowEvents.length} tapahtumaa ${week.label}. ${conflictLine} ${talkoo.recommendation}`;
 
+  const transitBadge = depart?.transitPlan?.mode === 'walk' ? '🚶' : depart?.transitPlan?.mode === 'bicycle' ? '🚴' : '🚗';
   const ambientLine = nextEvent
-    ? `${childName(nextEvent, profiles)} · lähde klo ${depart?.departureTime} · ${nextEvent.venue.name}`
+    ? `${childName(nextEvent, profiles)} · ${transitBadge} lähde klo ${depart?.departureTime} · ${nextEvent.venue.name}`
     : 'Ei seuraavaa peliä.';
 
   const whatsAppShareText = [
     `PELIPÄIVÄ ${week.label}`,
+    homeLocation ? `🏠 Lähtö: ${homeLocation.name} (${homeLocation.address || 'Koti'})` : '',
     'Kyytisuunnitelma',
-    ...carpool.map(
-      (l) =>
-        `• Lähde ${l.leaveBy} · ${l.childName} → ${l.venueName} (${l.driverSlot}${
-          l.canShareRideWith ? ` + ${l.canShareRideWith}` : ''
-        })`
-    ),
-    conflicts.length ? `\nHuom: ${conflicts.map((c) => c.message).join('\n')}` : '',
+    ...carpool.map((l) => {
+      const modeEmoji = l.transit?.mode === 'walk' ? '🚶' : l.transit?.mode === 'bicycle' ? '🚴' : '🚗';
+      const slotDesc = l.transit?.isSelfTransit
+        ? `${modeEmoji} ${l.transit.mode === 'walk' ? 'Kävellen' : 'Pyörällä'} (${l.transit.travelMinutes} min, omatoiminen)`
+        : `${modeEmoji} ${l.driverSlot}${l.canShareRideWith ? ` + ${l.canShareRideWith}` : ''}`;
+      return `• Lähde ${l.leaveBy} · ${l.childName} → ${l.venueName} (${slotDesc})`;
+    }),
+    conflicts.length
+      ? `\nHuom:\n${conflicts.map((c) => (c.isResolvedByActiveTransit ? `• ${c.message}` : `⚠️ ${c.message}`)).join('\n')}`
+      : '',
     talkooWhatsAppLine(talkoo)
   ]
     .filter(Boolean)
@@ -240,6 +247,7 @@ export function runMissionControlGraph(
     nextPlayer,
     leaveBy: depart?.departureTime,
     leaveCountdownMinutes: depart?.countdownMinutes,
+    homeLocation,
     conflicts,
     carpool,
     talkoo,

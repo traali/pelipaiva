@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  X,
-  Users,
-  Plus,
-  Trash2,
-  Share2,
-  PlusCircle,
-  Pencil
-} from 'lucide-react';
+import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { PlayerProfile } from '../types/matchday';
+import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
 import { TeamColorPicker } from './TeamColorPicker';
 
@@ -18,6 +10,8 @@ interface FamilyManageModalProps {
   isOpen: boolean;
   onClose: () => void;
   profiles: PlayerProfile[];
+  homeLocation?: HomeLocation;
+  onOpenHomeLocation?: () => void;
   onOpenImportForPlayer: (playerName: string) => void;
   onEditProfile: (profile: PlayerProfile) => void;
   onOpenFamilyShare: () => void;
@@ -28,6 +22,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   isOpen,
   onClose,
   profiles,
+  homeLocation,
+  onOpenHomeLocation,
   onOpenImportForPlayer,
   onEditProfile,
   onOpenFamilyShare,
@@ -205,6 +201,35 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
 
           {/* Body: List of Children & Teams */}
           <div className="py-4 overflow-y-auto flex-1 flex flex-col gap-4">
+            {/* Home Location Settings Card */}
+            <div className="p-3.5 rounded-2xl bg-surface border border-pitch/30 flex items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-pitch/15 text-pitch shrink-0">
+                  <Home className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-text-primary truncate">
+                    Kotiosoite: {homeLocation?.name || 'Lauttasaari'}
+                  </div>
+                  <div className="text-[11px] text-text-muted truncate">
+                    {homeLocation?.address || 'Lähikentille kävellen / pyörällä'}
+                  </div>
+                </div>
+              </div>
+              {onOpenHomeLocation && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenHomeLocation();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer shrink-0 transition-all shadow-xs"
+                >
+                  Muokkaa
+                </button>
+              )}
+            </div>
+
             {playerGroups.map(([playerName, playerProfiles]) => (
               <div
                 key={playerName}
