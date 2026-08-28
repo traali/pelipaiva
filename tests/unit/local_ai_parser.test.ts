@@ -6,7 +6,8 @@ import {
   extractTimesFromFinnishText,
   extractVenueFromFinnishText,
   extractVolunteerDutiesFromText,
-  extractKitColorFromText
+  extractKitColorFromText,
+  extractCarpoolAssignmentsFromText
 } from '../../src/lib/ai/messageParserNLP';
 import {
   parsePastedSpreadsheetText,
@@ -187,6 +188,46 @@ Ti 17.11.2026 yHI1.7 yHI1 : Historia Opettaja Sam (Maria Salovaara)`;
       expect(pianoRes.kickoffTime).toBe('17:00');
       expect(pianoRes.endTime).toBe('17:45');
       expect(pianoRes.title).toContain('Pianotunti');
+    });
+
+    it('parses real-world PPJ team camp carpool WhatsApp roster message per child', () => {
+      const ppjMsg = `Iina A
+Tässä päivitettynä vielä kyydit:
+
+Anna-Lotta Waselius: Philip, Eddi, Max, Iina
+Tom Keskinen: Victor, Chrisu, Beni, Mikael
+Per Ehrström: Vilho, Henkka, Simo, Valo
+Ville Wallinmaa: Eki, Denkku, Anton, Luge
+Tom Lindfors: Samuel, Oliver
+Leena Turtiainen: Elmeri, Elias
+Kari Kakkonen: Nooa, Rene, Wayne, Oiva
+Harviaiset (illalla): Eemil, Alvar
+Savijoet lauantaina: Aleksi
+Savijoet kotiin: Eemil, Aleksi, Alvar
+
+Otso ja Armin omilla kyydeillä`;
+
+      // 1. Overall carpool roster (10 car legs + 1 own transit group)
+      const roster = extractCarpoolAssignmentsFromText(ppjMsg);
+      expect(roster.entries.length).toBe(11);
+
+      // 2. Simo's ride
+      const simoRoster = extractCarpoolAssignmentsFromText(ppjMsg, 'Simo');
+      expect(simoRoster.playerSummary).toContain('Per Ehrström');
+      expect(simoRoster.playerSummary).toContain('Vilho, Henkka, Valo');
+
+      // 3. Eemil's separate outbound & return rides
+      const eemilRoster = extractCarpoolAssignmentsFromText(ppjMsg, 'Eemil');
+      expect(eemilRoster.playerSummary).toContain('Harviaiset (illalla)');
+      expect(eemilRoster.playerSummary).toContain('Savijoet kotiin');
+
+      // 4. Otso on own transit
+      const otsoRoster = extractCarpoolAssignmentsFromText(ppjMsg, 'Otso');
+      expect(otsoRoster.playerSummary).toContain('Omalla kyydillä');
+
+      // 5. In full message parser
+      const parsed = parseFreeformSportsMessage(ppjMsg, 'Simo');
+      expect(parsed.volunteerDuties.some((d) => d.includes('Per Ehrström'))).toBe(true);
     });
 
     it('does not invent Vastustaja @ 15:00 / Bollis from garbage paste', () => {

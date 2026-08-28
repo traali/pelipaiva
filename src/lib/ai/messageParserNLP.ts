@@ -222,10 +222,93 @@ export function extractVenueFromFinnishText(text: string): string {
   return '';
 }
 
+export interface CarpoolRosterEntry {
+  driver: string;
+  passengers: string[];
+  notes?: string;
+}
+
 /**
- * Extracts volunteer duties from message text.
+ * Extracts structured carpool / kyytirinki assignments from team WhatsApp messages.
+ * Handles formats like:
+ * "Anna-Lotta Waselius: Philip, Eddi, Max, Iina"
+ * "Harviaiset (illalla): Eemil, Alvar"
+ * "Savijoet kotiin: Eemil, Aleksi, Alvar"
+ * "Otso ja Armin omilla kyydeillä"
  */
-export function extractVolunteerDutiesFromText(text: string): string[] {
+export function extractCarpoolAssignmentsFromText(
+  text: string,
+  targetPlayer?: string
+): { entries: CarpoolRosterEntry[]; playerSummary?: string } {
+  const entries: CarpoolRosterEntry[] = [];
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    // Check line format "Driver Name: Child1, Child2, Child3"
+    const colonMatch = line.match(/^([^:\d]{3,40}):\s*([a-zA-ZäöåÄÖÅ\s,.-]+)$/);
+    if (colonMatch && colonMatch[1] && colonMatch[2]) {
+      const driver = colonMatch[1].trim();
+      const passengerStr = colonMatch[2].trim();
+      // Exclude bogus labels and header lines like "Tässä päivitettynä vielä kyydit", "Päivämäärä"
+      const isMetadataLabel =
+        /^(?:päivämäärä|pvm|aika|klo|kello|paikka|kenttä|lisätiedot|tapahtuma|varusteet|peliasu|opettaja|kyydit|tässä|päivitetty|kyytijako|autojako)\b/i.test(
+          driver
+        ) || /kyydit\s*$/i.test(driver);
+
+      if (!isMetadataLabel && passengerStr.length > 0) {
+        const passengers = passengerStr
+          .split(/[,&/]| ja /i)
+          .map((p) => p.trim())
+          .filter((p) => p.length >= 2);
+        if (passengers.length > 0) {
+          entries.push({ driver, passengers });
+        }
+      }
+    } else {
+      // Check line format "X ja Y omilla kyydeillä" / "X omalla kyydillä"
+      const ownTransitMatch = line.match(/^([a-zA-ZäöåÄÖÅ\s,]+?)\s+(?:omalla\s+kyydillä|omilla\s+kyydeillä|omatoimisesti)/i);
+      if (ownTransitMatch && ownTransitMatch[1]) {
+        const passengers = ownTransitMatch[1]
+          .split(/[,&/]| ja /i)
+          .map((p) => p.trim())
+          .filter((p) => p.length >= 2);
+        if (passengers.length > 0) {
+          entries.push({ driver: 'Omalla kyydillä', passengers });
+        }
+      }
+    }
+  }
+
+  let playerSummary: string | undefined;
+  if (targetPlayer) {
+    const targetNorm = targetPlayer.toLowerCase();
+    const matchingEntries = entries.filter((e) =>
+      e.passengers.some((p) => p.toLowerCase().includes(targetNorm) || targetNorm.includes(p.toLowerCase()))
+    );
+
+    if (matchingEntries.length > 0) {
+      const legSummaries = matchingEntries.map((e) => {
+        const others = e.passengers.filter(
+          (p) => !p.toLowerCase().includes(targetNorm) && !targetNorm.includes(p.toLowerCase())
+        );
+        if (e.driver === 'Omalla kyydillä') {
+          return 'Omalla kyydillä';
+        }
+        return others.length > 0
+          ? `Kuski ${e.driver} (kyydissä myös ${others.join(', ')})`
+          : `Kuski ${e.driver}`;
+      });
+      playerSummary = `🚗 Kyyti (${targetPlayer}): ${legSummaries.join(' • ')}`;
+    }
+  }
+
+  return { entries, playerSummary };
+}
+
+/**
+ * Extracts volunteer duties and carpool ring from message text.
+ */
+export function extractVolunteerDutiesFromText(text: string, defaultPlayer?: string): string[] {
   const duties: string[] = [];
   const lines = text.split(/\r?\n/);
 
@@ -260,6 +343,12 @@ export function extractVolunteerDutiesFromText(text: string): string[] {
         break;
       }
     }
+  }
+
+  // Check structured carpool roster
+  const carpool = extractCarpoolAssignmentsFromText(text, defaultPlayer);
+  if (carpool.playerSummary) {
+    duties.push(carpool.playerSummary);
   }
 
   return Array.from(new Set(duties));
@@ -626,7 +715,7 @@ function parseSingleFreeformBlock(
   const venueHint = extractVenueFromFinnishText(rawText);
 
   // 6. Duties & Kit
-  const volunteerDuties = extractVolunteerDutiesFromText(rawText);
+  const volunteerDuties = extractVolunteerDutiesFromText(rawText, _defaultPlayer);
   const kitColor = extractKitColorFromText(rawText);
 
   let title = '';
