@@ -9,7 +9,8 @@ import {
   Clock,
   MapPin,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Unlink
 } from 'lucide-react';
 import type { MatchdayEvent } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
@@ -62,13 +63,26 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
 
     setIsProcessing(true);
     try {
+      const isSourceOfficial = sourceEvent.id.startsWith('fixture-') || Boolean(sourceEvent.officialFixtureId);
+      const isTargetOfficial = target.id.startsWith('fixture-') || Boolean(target.officialFixtureId);
+
       // Merge properties from sourceEvent into target
       const mergedTarget: MatchdayEvent = {
         ...target,
+        homeTeam: (isTargetOfficial ? target.homeTeam : sourceEvent.homeTeam) || target.homeTeam,
+        awayTeam: (isTargetOfficial ? target.awayTeam : sourceEvent.awayTeam) || target.awayTeam,
+        title: isTargetOfficial
+          ? target.title
+          : isSourceOfficial
+          ? sourceEvent.title
+          : target.title,
+        officialFixtureId: target.officialFixtureId || sourceEvent.officialFixtureId,
+        tournamentName: target.tournamentName || sourceEvent.tournamentName,
         score: target.score || sourceEvent.score,
+        warmupTime: target.warmupTime || sourceEvent.warmupTime,
         volunteerDuty: target.volunteerDuty || sourceEvent.volunteerDuty,
         hasWhatsAppUpdates: true,
-        reconciliationStatus: 'auto_matched'
+        reconciliationStatus: 'manual_matched'
       };
 
       // Merge chat messages and notes
@@ -101,9 +115,31 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
       setTimeout(() => {
         onEventMerged?.(mergedTarget, sourceEvent.id);
         onClose();
-      }, 1200);
+      }, 1000);
     } catch (err) {
       console.error('Failed to merge events', err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUnmerge = async () => {
+    setIsProcessing(true);
+    try {
+      const unmerged: MatchdayEvent = {
+        ...sourceEvent,
+        officialFixtureId: undefined,
+        reconciliationStatus: 'unlinked',
+        mismatchFlags: undefined
+      };
+      await db.events.put(unmerged);
+      setSuccessMessage('Tapahtuman lähteet erotettu toisistaan!');
+      setTimeout(() => {
+        onEventMerged?.(unmerged, '');
+        onClose();
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to unmerge event', err);
     } finally {
       setIsProcessing(false);
     }
@@ -294,16 +330,32 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                 )}
               </div>
 
-              {/* Action 2 & 3: Hide or Delete */}
+              {/* Action 2 & 3: Unmerge, Hide, or Delete */}
               <div className="pt-3 border-t border-border-subtle/60 flex items-center justify-between gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleHide}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface border border-border-subtle hover:border-border-strong text-text-secondary hover:text-text-primary text-xs font-semibold cursor-pointer transition-all"
-                >
-                  <EyeOff className="w-3.5 h-3.5 text-text-muted" />
-                  <span>Piilota tapahtuma</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {(sourceEvent.reconciliationStatus === 'auto_matched' ||
+                    sourceEvent.reconciliationStatus === 'manual_matched' ||
+                    sourceEvent.officialFixtureId) && (
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={handleUnmerge}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-elevated border border-pitch/40 hover:border-pitch text-pitch text-xs font-bold cursor-pointer transition-all shadow-xs"
+                    >
+                      <Unlink className="w-3.5 h-3.5" />
+                      <span>Erota lähteet</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleHide}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface border border-border-subtle hover:border-border-strong text-text-secondary hover:text-text-primary text-xs font-semibold cursor-pointer transition-all"
+                  >
+                    <EyeOff className="w-3.5 h-3.5 text-text-muted" />
+                    <span>Piilota</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"

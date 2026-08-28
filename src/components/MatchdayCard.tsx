@@ -286,20 +286,23 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </span>
             )}
 
-            {/* Data Source Provenance Badge */}
+            {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
             {(() => {
               const sourceInfo = resolveEventSourceInfo(event);
               return (
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                <button
+                  type="button"
+                  onClick={() => setIsMergeOpen(true)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
                     sourceInfo.isCombined
-                      ? 'bg-pitch/15 text-pitch border-pitch/30'
-                      : 'bg-surface-elevated text-text-secondary border-border-subtle'
+                      ? 'bg-pitch/15 text-pitch border-pitch/30 hover:bg-pitch/25'
+                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
                   }`}
-                  title={sourceInfo.tooltipDetails}
+                  title={`${sourceInfo.tooltipDetails || ''} • Klikkaa hallitaksesi lähteitä tai yhdistääksesi`}
+                  aria-label={`Tietolähde: ${sourceInfo.badgeText}. Klikkaa hallitaksesi yhdistämistä.`}
                 >
                   <span>{sourceInfo.badgeText}</span>
-                </span>
+                </button>
               );
             })()}
           </div>
