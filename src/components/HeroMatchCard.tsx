@@ -25,7 +25,8 @@ import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { EventChatModal } from './EventChatModal';
 import { EventMergeModal } from './EventMergeModal';
-import { MoreHorizontal } from 'lucide-react';
+import { EventInlineDropIn } from './EventInlineDropIn';
+import { MoreHorizontal, FileText } from 'lucide-react';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -480,6 +481,28 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <ParkingEaseBadge parking={event.parking} venueName={event.venue.name} />
           </div>
         )}
+
+        {/* Applied Notes / Carpool / Volunteer / School Details */}
+        {event.notes && (
+          <div className="mt-3 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-primary flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 font-bold text-pitch text-[11px] uppercase tracking-wider">
+              <FileText className="w-3.5 h-3.5" />
+              <span>Tapahtuman lisätiedot & huomiot</span>
+            </div>
+            <div className="whitespace-pre-line text-xs font-medium text-text-secondary leading-relaxed">
+              {event.notes}
+            </div>
+          </div>
+        )}
+
+        {/* Inline Fast Drop-In & Update Zone */}
+        <div className="mt-2">
+          <EventInlineDropIn
+            event={event}
+            profile={profile}
+            onEventUpdated={onEventUpdated}
+          />
+        </div>
 
         {/* Action Buttons: 1-Tap Navigation to Parking & Kassi toggle */}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">

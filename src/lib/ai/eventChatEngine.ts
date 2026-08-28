@@ -2,7 +2,11 @@ import type { MatchdayEvent, PlayerProfile, EventChatMessage } from '../../types
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
-import { extractTimesFromFinnishText } from './messageParserNLP';
+import {
+  extractTimesFromFinnishText,
+  extractCarpoolAssignmentsFromText,
+  extractKitColorFromText
+} from './messageParserNLP';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 
 export interface EventChatResult {
@@ -13,7 +17,7 @@ export interface EventChatResult {
 
 /**
  * Parses freeform natural language user messages entered directly into an event (chat-like)
- * and applies changes (kickoff time, warmup time, score, kit, venue, volunteer duties, player stats).
+ * and applies changes (kickoff time, warmup time, score, kit, venue, volunteer duties, carpools, player stats).
  */
 export async function applyEventChatUpdate(
   event: MatchdayEvent,
@@ -25,6 +29,7 @@ export async function applyEventChatUpdate(
   const updated: MatchdayEvent = { ...event };
   const eventDateStr = event.startTime.split('T')[0] || new Date().toISOString().split('T')[0];
   const offset = getFinnishTimezoneOffset(new Date(`${eventDateStr}T12:00:00Z`));
+  const targetPlayerName = _profile?.playerName;
 
   // 1. Score detection (e.g. "tulos 3-2", "voitettiin 4-1", "hävittiin 0-3", "päättyi 2–2")
   const scoreMatch = norm.match(/(?:tulos|päättyi|voitettiin|hävittiin|lopputulos)?\s*(\d{1,2})\s*[-–:]\s*(\d{1,2})/i);
@@ -69,11 +74,38 @@ export async function applyEventChatUpdate(
     appliedChanges.push(`Talkootehtävä asetettu: ${dutyText}`);
   }
 
-  // 3.5 Carpool / Kyyti notes (e.g. "simolla kyyti Ekiltä. lähtö ekin luota 15:30")
-  if (norm.includes('kyyti') || norm.includes('lähtö') || norm.includes('kyydit')) {
+  // 3.5 Structured Carpool & Ride Roster detection
+  const carpool = extractCarpoolAssignmentsFromText(message, targetPlayerName);
+  if (carpool.playerSummary) {
+    appliedChanges.push(carpool.playerSummary);
+  } else if (norm.includes('kyyti') || norm.includes('lähtö') || norm.includes('kyydit')) {
     const kyytiNote = `🚗 Kyyti: ${message.trim()}`;
-    updated.notes = updated.notes ? `${updated.notes}\n${kyytiNote}` : kyytiNote;
-    appliedChanges.push(`Kyytitieto lisätty: ${message.trim()}`);
+    appliedChanges.push(kyytiNote);
+  }
+
+  // 3.6 Kit / Peliasu color detection
+  const kit = extractKitColorFromText(message);
+  if (kit) {
+    appliedChanges.push(`👕 Peliasu: ${kit}`);
+    if (updated.briefing) {
+      updated.briefing = {
+        ...updated.briefing,
+        gearAndPackingAdvice: {
+          ...updated.briefing.gearAndPackingAdvice,
+          kitRecommendation: kit
+        }
+      };
+    }
+  }
+
+  // 3.7 School notes / Exam pages (e.g. "sivut 22-27", "luokka T 36", "tiivistelmävihko mukaan")
+  const schoolPagesMatch = message.match(/(?:sivut|sivuilta|s\.)\s*(\d+[\s–-]+\d+)/i);
+  const classroomMatch = message.match(/\b(?:luokka|luokassa|tila)\s+([A-Za-z0-9\s-]+)\b/i);
+  if (schoolPagesMatch && schoolPagesMatch[1]) {
+    appliedChanges.push(`📚 Kokeen sivut: ${schoolPagesMatch[1]}`);
+  }
+  if (classroomMatch && classroomMatch[1]) {
+    appliedChanges.push(`🏫 Tila: Luokka ${classroomMatch[1].trim()}`);
   }
 
   // 4. Venue change (e.g. "kenttä vaihdettu: Bollis 2", "pelipaikka Talin halli", "kenttänä Pirkkola TN2")
@@ -115,6 +147,14 @@ export async function applyEventChatUpdate(
   updated.hasWhatsAppUpdates = true;
   updated.reconciliationStatus = 'auto_matched';
 
+  // Append applied changes to notes
+  if (appliedChanges.length > 0) {
+    const newNotes = appliedChanges.join('\n• ');
+    updated.notes = updated.notes ? `${updated.notes}\n• ${newNotes}` : `• ${newNotes}`;
+  } else {
+    updated.notes = updated.notes ? `${updated.notes}\n• ${message}` : `• ${message}`;
+  }
+
   // Append to chat messages thread
   const newMsg: EventChatMessage = {
     id: `msg-${Date.now()}`,
@@ -126,10 +166,6 @@ export async function applyEventChatUpdate(
 
   const existingMsgs = updated.chatMessages || [];
   updated.chatMessages = [...existingMsgs, newMsg];
-
-  // Also append to notes
-  const noteSnippet = appliedChanges.length > 0 ? appliedChanges.join('; ') : message;
-  updated.notes = updated.notes ? `${updated.notes}\n• ${noteSnippet}` : `• ${noteSnippet}`;
 
   const aiResponse = appliedChanges.length > 0
     ? `Selvä! Päivitin tiedot: ${appliedChanges.join(', ')}.`

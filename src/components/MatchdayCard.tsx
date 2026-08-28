@@ -23,7 +23,8 @@ import { RainRadarCurve } from './RainRadarCurve';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventChatModal } from './EventChatModal';
-import { Edit3 } from 'lucide-react';
+import { EventInlineDropIn } from './EventInlineDropIn';
+import { Edit3, FileText } from 'lucide-react';
 import type { PitchSurface } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
@@ -569,6 +570,26 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </div>
           </div>
         )}
+
+        {/* Applied Notes / Carpool / Volunteer / School Details */}
+        {event.notes && (
+          <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-primary flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 font-bold text-pitch text-[11px] uppercase tracking-wider">
+              <FileText className="w-3.5 h-3.5" />
+              <span>Tapahtuman lisätiedot & huomiot</span>
+            </div>
+            <div className="whitespace-pre-line text-xs font-medium text-text-secondary leading-relaxed">
+              {event.notes}
+            </div>
+          </div>
+        )}
+
+        {/* Inline Fast Drop-In & Update Zone */}
+        <EventInlineDropIn
+          event={event}
+          onEventUpdated={onEventUpdated}
+          compact={compact}
+        />
 
         {/* Footer Action Bar */}
         <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-3 flex-wrap">

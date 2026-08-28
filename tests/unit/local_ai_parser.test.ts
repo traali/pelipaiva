@@ -17,6 +17,7 @@ import {
   planFamilyLogistics,
   queryFamilySchedule
 } from '../../src/lib/ai/localAiEngine';
+import { applyEventChatUpdate } from '../../src/lib/ai/eventChatEngine';
 import { MatchdayEvent, PlayerProfile } from '../../src/types/matchday';
 
 describe('🤖 Finnish Sports NLP & Local AI Engine', () => {
@@ -368,6 +369,81 @@ Otso ja Armin omilla kyydeillä`;
 
       expect(qResult.answer).toContain('Seuraava ottelu on');
       expect(qResult.confidence).toBeGreaterThanOrEqual(0.9);
+    });
+  });
+
+  describe('3. In-Event Drop-In & Fast WhatsApp/Wilma Reconciler', () => {
+    const sampleEvent: MatchdayEvent = {
+      id: 'ev-test-drop-in',
+      profileId: 'prof-1',
+      childName: 'Simo',
+      sport: 'football',
+      eventType: 'match',
+      isTraining: false,
+      title: 'HJK vs Honka',
+      homeTeam: 'HJK',
+      awayTeam: 'Honka',
+      isHomeMatch: true,
+      startTime: '2026-08-28T18:00:00+03:00',
+      endTime: '2026-08-28T19:30:00+03:00',
+      warmupTime: '2026-08-28T17:15:00+03:00',
+      venue: {
+        name: 'Töölön PK 1',
+        normalizedName: 'töölön pk 1',
+        coordinates: { lat: 60.186, lng: 24.925 },
+        isIndoor: false,
+        surface: 'artificial_turf_3g',
+        hasFloodlights: true
+      }
+    };
+
+    it('updates existing event with child-specific carpool ride from team roster paste', async () => {
+      const rosterPaste = `Anna-Lotta Waselius: Philip, Eddi, Max, Iina
+Per Ehrström: Vilho, Henkka, Simo, Valo
+Ville Wallinmaa: Eki, Denkku, Anton, Luge`;
+
+      const result = await applyEventChatUpdate(
+        sampleEvent,
+        rosterPaste,
+        { id: 'prof-1', playerName: 'Simo', teamName: 'HJK', sport: 'football', primaryColor: 'sininen', colorHex: '#0044bb', calendarUrl: '' }
+      );
+
+      expect(result.appliedChanges.some((c) => c.includes('Per Ehrström'))).toBe(true);
+      expect(result.updatedEvent.notes).toContain('Per Ehrström');
+      expect(result.updatedEvent.hasWhatsAppUpdates).toBe(true);
+    });
+
+    it('updates kit color and volunteer duty when dropped on event', async () => {
+      const dropText = 'Peliin mustat pelipaidat ja Simon isälle kahviovuoro klo 17.30 - 19.30';
+      const result = await applyEventChatUpdate(sampleEvent, dropText);
+
+      expect(result.appliedChanges.some((c) => c.includes('Musta peliasu'))).toBe(true);
+      expect(result.appliedChanges.some((c) => c.includes('Kahviovuoro'))).toBe(true);
+      expect(result.updatedEvent.volunteerDuty).toContain('Kahviovuoro');
+    });
+
+    it('updates match score when dropped directly on event', async () => {
+      const scoreText = 'Hieno peli, voitettiin 4-2!';
+      const result = await applyEventChatUpdate(sampleEvent, scoreText);
+
+      expect(result.updatedEvent.score).toBe('4–2');
+      expect(result.appliedChanges).toContain('Tulos päivitetty: 4–2');
+    });
+
+    it('updates school exam notes and classroom when dropped on school event', async () => {
+      const schoolEvent: MatchdayEvent = {
+        ...sampleEvent,
+        sport: 'school',
+        eventType: 'school',
+        title: 'Matematiikka (Koe)'
+      };
+
+      const examNote = 'Koe luvut 1-6 eli s. 8-29 luokassa T 36, laskin mukaan';
+      const result = await applyEventChatUpdate(schoolEvent, examNote);
+
+      expect(result.appliedChanges.some((c) => c.includes('8-29'))).toBe(true);
+      expect(result.appliedChanges.some((c) => c.includes('Luokka T 36'))).toBe(true);
+      expect(result.updatedEvent.notes).toContain('8-29');
     });
   });
 });
