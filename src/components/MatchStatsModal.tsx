@@ -572,7 +572,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 </div>
 
                 {/* Coach and Squad Header */}
-                {currentRoster && (
+                {currentRoster && currentRoster.players.length > 0 && (
                   <div className="p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-secondary flex items-center justify-between">
                     <div>
                       <span className="font-bold text-text-primary text-sm">{currentRoster.teamName}</span>
@@ -585,6 +585,24 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     <span className="px-2.5 py-1 rounded-xl bg-surface-base font-semibold text-text-primary text-xs border border-border-subtle">
                       {currentRoster.players.length} pelaajaa listalla
                     </span>
+                  </div>
+                )}
+
+                {/* Empty / GDPR-protected Roster Notice */}
+                {(!currentRoster || currentRoster.players.length === 0) && (
+                  <div className="p-5 rounded-2xl bg-surface-elevated/60 border border-border-subtle text-center flex flex-col items-center gap-2 text-xs">
+                    <div className="w-10 h-10 rounded-full bg-surface border border-border-strong flex items-center justify-center text-text-muted text-base">
+                      🛡️
+                    </div>
+                    <div className="font-bold text-text-primary text-sm">
+                      {selectedTeamName}: Pelaajaluettelo ei julkinen
+                    </div>
+                    <p className="text-text-secondary max-w-sm leading-relaxed">
+                      Palloliiton ja urheiluliittojen tietosuojakäytännön (GDPR) vuoksi juniorisarjojen pelaajalistoja ei julkaista avoimessa Tulospalvelussa.
+                    </p>
+                    <div className="mt-1 text-[11px] text-pitch font-semibold">
+                      💡 Voit kirjata oman lapsen suoritukset ja fiilikset <strong>🌟 Omat tilastot</strong> -välilehdellä!
+                    </div>
                   </div>
                 )}
 
