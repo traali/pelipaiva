@@ -60,6 +60,16 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
     };
   }, [isPlaying, isOpen, frames.length]);
 
+  // Escape Key Dismissal Handler (WCAG 2.1 AA Compliance)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const currentFrame = frames[currentFrameIndex] || frames[frames.length - 1] || { label: 'Nyt', date: new Date() };
