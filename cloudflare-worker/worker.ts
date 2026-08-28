@@ -341,6 +341,116 @@ export default {
       });
     }
 
+    // -------------------------------------------------------------
+    // LIVE RFC 5545 iCALENDAR FEED: /api/calendar/feed/:code or /api/calendar?perhe=:code
+    // -------------------------------------------------------------
+    if (url.pathname.startsWith('/api/calendar/feed/') || (url.pathname === '/api/calendar' && url.searchParams.has('perhe'))) {
+      if (request.method !== 'GET') {
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+          status: 405,
+          headers: corsHeaders
+        });
+      }
+
+      let rawCode = url.pathname.startsWith('/api/calendar/feed/')
+        ? url.pathname.replace('/api/calendar/feed/', '')
+        : url.searchParams.get('perhe') || '';
+
+      const cleanCode = rawCode.trim().toUpperCase();
+      const familyCode = cleanCode.includes('-')
+        ? cleanCode
+        : cleanCode.length === 6
+        ? `${cleanCode.slice(0, 5)}-${cleanCode.slice(5)}`
+        : cleanCode;
+
+      const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
+      if (!codeRegex.test(familyCode)) {
+        return new Response(JSON.stringify({ error: 'invalid_family_code' }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      // Read family roster from KV
+      const kvKey = `fam_roster_${familyCode}`;
+      const existingStr = await env.MATCHDAY_KV.get(kvKey);
+      let roster: FamilyRosterV1 | null = null;
+      if (existingStr) {
+        try {
+          roster = JSON.parse(existingStr) as FamilyRosterV1;
+        } catch {
+          roster = null;
+        }
+      }
+
+      // Read customized family events / notes from KV
+      const eventsKey = `fam_events_${familyCode}`;
+      const existingEventsStr = await env.MATCHDAY_KV.get(eventsKey);
+      let customEvents: any[] = [];
+      if (existingEventsStr) {
+        try {
+          customEvents = JSON.parse(existingEventsStr) || [];
+        } catch {
+          customEvents = [];
+        }
+      }
+
+      const nowUtc = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const lines: string[] = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//FamDay//FamDay Family Calendar 1.0//FI',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        `X-WR-CALNAME:FamDay (${familyCode})`,
+        'X-WR-TIMEZONE:Europe/Helsinki',
+        'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+        'X-PUBLISHED-TTL:PT1H'
+      ];
+
+      // Format custom events into iCalendar VEVENT blocks
+      for (const ev of customEvents) {
+        if (!ev.startTime || !ev.title) continue;
+        const uid = `famday-${ev.id || Math.random().toString(36).slice(2)}@famday.app`;
+        const startUtc = new Date(ev.startTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        let endUtc = ev.endTime
+          ? new Date(ev.endTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+          : new Date(new Date(ev.startTime).getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+        const descLines: string[] = [];
+        if (ev.isTraining) descLines.push('🏃 HARJOITUKSET');
+        if (ev.eventType === 'school') descLines.push('📚 KOULU / WILMA');
+        if (ev.notes) descLines.push(`📝 Huomiot & Kyydit: ${ev.notes}`);
+        if (ev.volunteerDuty) descLines.push(`☕ Talkoovuoro: ${ev.volunteerDuty}`);
+        if (ev.kitAdvice) descLines.push(`👕 Peliasu: ${ev.kitAdvice.primaryJerseyColor || ''}`);
+        descLines.push(`FamDay: https://pelipaiva.pages.dev/?perhe=${familyCode}`);
+
+        lines.push('BEGIN:VEVENT');
+        lines.push(`UID:${uid}`);
+        lines.push(`DTSTAMP:${nowUtc}`);
+        lines.push(`DTSTART:${startUtc}`);
+        lines.push(`DTEND:${endUtc}`);
+        lines.push(`SUMMARY:${(ev.title || 'Tapahtuma').replace(/,/g, '\\,')}`);
+        if (ev.venue?.name) lines.push(`LOCATION:${(ev.venue.name).replace(/,/g, '\\,')}`);
+        lines.push(`DESCRIPTION:${descLines.join('\\n')}`);
+        lines.push('STATUS:CONFIRMED');
+        lines.push('END:VEVENT');
+      }
+
+      lines.push('END:VCALENDAR');
+      const icsContent = lines.join('\r\n');
+
+      return new Response(icsContent, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'Content-Disposition': `inline; filename="famday-${familyCode}.ics"`,
+          'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360'
+        }
+      });
+    }
+
     // CORS proxy for ICS, FMI, LIPAS, hel.fi, association HTML — not an open proxy.
     if (url.pathname === '/api/proxy/ics') {
       const targetUrl = url.searchParams.get('url');

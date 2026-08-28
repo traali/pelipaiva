@@ -44,6 +44,9 @@ const FamilyShareModal = lazy(() =>
 const FamilyManageModal = lazy(() =>
   import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
 );
+const FamilyCalendarModal = lazy(() =>
+  import('./components/FamilyCalendarModal').then((m) => ({ default: m.FamilyCalendarModal }))
+);
 const HomeLocationModal = lazy(() =>
   import('./components/HomeLocationModal').then((m) => ({ default: m.HomeLocationModal }))
 );
@@ -56,6 +59,7 @@ export const App: React.FC = () => {
   const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
   const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
   const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState<boolean>(false);
   const [selectedStatsEvent, setSelectedStatsEvent] = useState<MatchdayEvent | null>(null);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
@@ -595,6 +599,7 @@ export const App: React.FC = () => {
               onSelectProfile={(id) => setActiveProfileId(id)}
               onAddProfile={() => openAddTeam(activePlayerName)}
               onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
+              onOpenCalendarSubscribe={() => setIsCalendarModalOpen(true)}
             />
           </div>
 
@@ -966,6 +971,14 @@ export const App: React.FC = () => {
         onClose={() => setIsFamilyShareOpen(false)}
         profiles={profiles}
         onDataImported={() => {}}
+      />
+
+      {/* Live Family Calendar Subscription Modal (webcal://) */}
+      <FamilyCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        events={rawEvents}
+        profiles={profiles}
       />
 
       {/* Global Interactive Match Stats Modal (for Timeline & Calendar selections) */}

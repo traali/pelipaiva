@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { PlayerProfile } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
-import { User, Plus, Users } from 'lucide-react';
+import { User, Plus, Users, Calendar } from 'lucide-react';
 
 interface MultiProfileHeaderProps {
   profiles: PlayerProfile[];
@@ -10,6 +10,7 @@ interface MultiProfileHeaderProps {
   onSelectProfile: (id: string) => void;
   onAddProfile: () => void;
   onOpenFamilyManage?: () => void;
+  onOpenCalendarSubscribe?: () => void;
 }
 
 export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
@@ -17,7 +18,8 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   activeProfileId,
   onSelectProfile,
   onAddProfile,
-  onOpenFamilyManage
+  onOpenFamilyManage,
+  onOpenCalendarSubscribe
 }) => {
   // Group profiles by playerName (normalized casing)
   const playerGroups = React.useMemo(() => {
@@ -48,6 +50,20 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         >
           <Users className="h-4 w-4" />
           <span>Perhe</span>
+        </motion.button>
+      )}
+
+      {onOpenCalendarSubscribe && (
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          transition={springTactile.snappy}
+          onClick={onOpenCalendarSubscribe}
+          aria-label="Tilaa elävä perhekalenteri puhelimeen"
+          title="Tilaa elävä perhekalenteri puhelimeen"
+          className="touch-target inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border-strong bg-surface-elevated px-3 text-xs font-bold text-text-primary hover:text-pitch hover:border-pitch transition-all focus-visible:ring-2 focus-visible:ring-pitch"
+        >
+          <Calendar className="h-3.5 w-3.5 text-pitch" />
+          <span>Kalenteri</span>
         </motion.button>
       )}
 
