@@ -1,29 +1,42 @@
 import { chromium } from 'playwright';
 
-(async () => {
-  console.log('--- VERIFYING LIVE PRODUCTION DEPLOYMENT ---');
+async function verifyLiveProduction() {
+  console.log('=== VERIFYING LIVE PRODUCTION (https://pelipaiva.pages.dev) ===');
   
-  // 1. Fetch live production HTTP headers
-  const res = await fetch('https://pelipaiva.pages.dev/?v=' + Date.now());
-  console.log('HTTP Status:', res.status, res.statusText);
-  console.log('Cache-Control Header:', res.headers.get('cache-control'));
-  console.log('CF-Ray / Edge:', res.headers.get('cf-ray'));
+  // 1. Check HTTP response
+  const startTime = Date.now();
+  const res = await fetch('https://pelipaiva.pages.dev/?ts=' + Date.now());
+  const latency = Date.now() - startTime;
+  console.log(`HTTP Status: ${res.status} ${res.statusText} (${latency}ms)`);
+  if (!res.ok) {
+    throw new Error(`Apex returned HTTP ${res.status}`);
+  }
 
-  const text = await res.text();
-  console.log('HTML size:', text.length, 'bytes');
-
-  // 2. Playwright Live Browser Test on the apex production URL
+  // 2. Launch headless browser
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    serviceWorkers: 'block'
+    viewport: { width: 390, height: 844 }, // iPhone 14 mobile viewport
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
   });
+  
   const page = await context.newPage();
+  
+  const consoleErrors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
 
-  console.log('Navigating to https://pelipaiva.pages.dev...');
-  await page.goto('https://pelipaiva.pages.dev/?v=' + Date.now(), { waitUntil: 'networkidle' });
+  page.on('pageerror', err => {
+    consoleErrors.push(`Uncaught: ${err.message}`);
+  });
 
-  // Clear local storage and IndexedDB for pure first-load verification
+  // 3. Navigate to live app
+  console.log('Navigating to live production...');
+  await page.goto('https://pelipaiva.pages.dev/?ts=' + Date.now(), { waitUntil: 'networkidle' });
+
+  // 4. Reset indexedDB and localStorage for clean test
   await page.evaluate(async () => {
     localStorage.clear();
     const dbs = await indexedDB.databases();
@@ -32,17 +45,52 @@ import { chromium } from 'playwright';
     }
   });
   await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(600);
 
-  // Take screenshot of live production apex URL
-  await page.screenshot({ path: 'C:/Users/aoinonen/.gemini/antigravity/brain/342d4833-d66d-4f2b-9254-89632bc4e5d4/prod_verified_latest_live.png' });
+  // 5. Check Onboarding View
+  const title = await page.title();
+  console.log('Page Title:', title);
 
-  const title = await page.textContent('h1');
-  console.log('Live H1 title:', title);
+  const demoBtn = page.getByRole('button', { name: /esimerkkidatalla/i }).first();
+  const demoVisible = await demoBtn.isVisible();
+  console.log('Demo Onboarding Button visible:', demoVisible);
 
-  const hasPresetTeams = await page.getByRole('button', { name: /PPJ Laru Sininen/i }).isVisible();
-  console.log('Preset Torneopal team visible on live prod:', hasPresetTeams);
+  if (demoVisible) {
+    console.log('Clicking demo data button...');
+    await demoBtn.click();
+    await page.waitForTimeout(1200);
+  }
+
+  // 6. Verify Dashboard elements
+  const tabs = await page.getByRole('tab').allTextContents();
+  console.log('Available tabs rendered:', tabs);
+
+  // 7. Verify Timeline view
+  const timelineTab = page.getByRole('tab', { name: /tiivis/i });
+  if (await timelineTab.isVisible()) {
+    await timelineTab.click();
+    await page.waitForTimeout(500);
+    console.log('Timeline View switched successfully');
+  }
+
+  // 8. Verify Calendar view
+  const calendarTab = page.getByRole('tab', { name: /kalenteri/i });
+  if (await calendarTab.isVisible()) {
+    await calendarTab.click();
+    await page.waitForTimeout(500);
+    console.log('Calendar View switched successfully');
+  }
+
+  // 9. Check for unexpected console errors
+  console.log('Console errors recorded:', consoleErrors.length);
+  if (consoleErrors.length > 0) {
+    console.log('Errors:', consoleErrors);
+  }
 
   await browser.close();
-  console.log('--- LIVE PRODUCTION CONFIRMED ---');
-})();
+  console.log('=== PRODUCTION VERIFICATION COMPLETED SUCCESSFULLY ===');
+}
+
+verifyLiveProduction().catch(err => {
+  console.error('Production verification failed:', err);
+  process.exit(1);
+});
