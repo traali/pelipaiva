@@ -143,6 +143,32 @@ Mustat paidat päälle. Kahviovuoro klo 12-14.`;
       expect(result.title).toContain('Ruotsi');
     });
 
+    it('parses multi-date Wilma exam list into multiple distinct calendar events', () => {
+      const wilmaMultiList = `Ke 2.9.2026 luvut 1-6 eli s.8-29 : yMA1.7 yMA1 : Matematiikka Opettaja Tuu (Paula Tuunanen)
+Ma 14.9.2026 Shell's Angles -kirjakoe : yÄI1.7 yÄI1 : Äidinkieli Opettaja Kaikin (Kaisla Kinnunen) Kokeen lisätiedot Kirja ja tiivistelmävihko mukaan.
+To 24.9.2026 Listening and Reading Comprehension : yENA1.7 yENA1 : Englanti Opettaja Vir (Päivi Virtanen)
+To 8.10.2026 Kotitalouden koe Tiedonhallintataidot T10-T13 : yKO1.9 yKO1 : Kotitalous Opettaja Kare (Reetta Kaarnakorpi)
+Ti 17.11.2026 yHI1.7 yHI1 : Historia Opettaja Sam (Maria Salovaara)`;
+
+      const results = parseMultipleSportsMessages(wilmaMultiList, 'Simo');
+
+      expect(results.length).toBe(5);
+      expect(results[0]?.dateStr).toBe('2026-09-02');
+      expect(results[0]?.title).toContain('Matematiikka');
+
+      expect(results[1]?.dateStr).toBe('2026-09-14');
+      expect(results[1]?.title).toContain('Äidinkieli');
+
+      expect(results[2]?.dateStr).toBe('2026-09-24');
+      expect(results[2]?.title).toContain('Englanti');
+
+      expect(results[3]?.dateStr).toBe('2026-10-08');
+      expect(results[3]?.title).toContain('Kotitalous');
+
+      expect(results[4]?.dateStr).toBe('2026-11-17');
+      expect(results[4]?.title).toContain('Historia');
+    });
+
     it('parses dentist appointment and music hobby as other event', () => {
       const dentistMsg = `Hammaslääkäri Simolle tiistaina 15.9. klo 14.30`;
       const dentistRes = parseFreeformSportsMessage(dentistMsg, 'Simo');

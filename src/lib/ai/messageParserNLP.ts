@@ -419,6 +419,28 @@ export function parseMultipleSportsMessages(
     return results;
   }
 
+  // Check for multi-date Wilma / school / calendar schedule blocks (e.g. "Ke 2.9.2026 ... \n Ma 14.9.2026 ...")
+  const dateLineMatches = Array.from(
+    rawText.matchAll(/(?:^|\r?\n)\s*((?:(?:Ma|Ti|Ke|To|Pe|La|Su)\s+)?\d{1,2}\.\d{1,2}\.(?:\d{4})?)\b/gi)
+  );
+
+  if (dateLineMatches.length > 1) {
+    const chunks: string[] = [];
+    for (let i = 0; i < dateLineMatches.length; i++) {
+      const startIdx = dateLineMatches[i]?.index ?? 0;
+      const endIdx = i < dateLineMatches.length - 1 ? (dateLineMatches[i + 1]?.index ?? rawText.length) : rawText.length;
+      const chunk = rawText.substring(startIdx, endIdx).trim();
+      if (chunk) chunks.push(chunk);
+    }
+
+    if (chunks.length > 1) {
+      const multiResults = chunks.map((c) => parseSingleFreeformBlock(c, defaultPlayer)).filter((r) => r.confidenceScore >= 0.3);
+      if (multiResults.length > 1) {
+        return multiResults;
+      }
+    }
+  }
+
   return [parseSingleFreeformBlock(rawText, defaultPlayer)];
 }
 
