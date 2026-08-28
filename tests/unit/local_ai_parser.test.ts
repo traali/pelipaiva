@@ -445,5 +445,14 @@ Ville Wallinmaa: Eki, Denkku, Anton, Luge`;
       expect(result.appliedChanges.some((c) => c.includes('Luokka T 36'))).toBe(true);
       expect(result.updatedEvent.notes).toContain('8-29');
     });
+
+    it('does not falsely extract score from departure times like "Lähtö 15:30"', async () => {
+      const departureMsg = 'Simo menee ekin kyydillä. Lähtö 15:30 kokoontuminen 14:45';
+      const result = await applyEventChatUpdate(sampleEvent, departureMsg);
+
+      expect(result.updatedEvent.score).toBeUndefined();
+      expect(result.appliedChanges.some((c) => c.includes('Tulos päivitetty'))).toBe(false);
+      expect(result.appliedChanges.some((c) => c.includes('Kyyti'))).toBe(true);
+    });
   });
 });

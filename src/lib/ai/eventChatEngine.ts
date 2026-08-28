@@ -31,12 +31,30 @@ export async function applyEventChatUpdate(
   const offset = getFinnishTimezoneOffset(new Date(`${eventDateStr}T12:00:00Z`));
   const targetPlayerName = _profile?.playerName;
 
-  // 1. Score detection (e.g. "tulos 3-2", "voitettiin 4-1", "hävittiin 0-3", "päättyi 2–2")
-  const scoreMatch = norm.match(/(?:tulos|päättyi|voitettiin|hävittiin|lopputulos)?\s*(\d{1,2})\s*[-–:]\s*(\d{1,2})/i);
-  if (scoreMatch) {
-    const scoreStr = `${scoreMatch[1]}–${scoreMatch[2]}`;
-    updated.score = scoreStr;
-    appliedChanges.push(`Tulos päivitetty: ${scoreStr}`);
+  // 1. Score detection (e.g. "tulos 3-2", "voitettiin 4-1", "hävittiin 0-3", "päättyi 2–2", "lopputulos 1-1", "FT 3-2")
+  // MUST require explicit score keyword or hyphen format (never colon times like 15:30)
+  const explicitScoreMatch = norm.match(/\b(?:tulos|päättyi|voitettiin|hävittiin|lopputulos|ft)\s*[:=]?\s*(\d{1,2})\s*[-–:]\s*(\d{1,2})\b/i);
+  let resolvedScore: string | null = null;
+
+  if (explicitScoreMatch && explicitScoreMatch[1] && explicitScoreMatch[2]) {
+    resolvedScore = `${explicitScoreMatch[1]}–${explicitScoreMatch[2]}`;
+  } else {
+    // Implicit score like "4-2" or "3–1" (only hyphens, never colons, realistic scores <= 20, not time ranges like 15-17)
+    const implicitScoreMatch = norm.match(/(?:^|\s)(\d{1,2})\s*[-–]\s*(\d{1,2})(?:\s|$|[!.,])/);
+    if (implicitScoreMatch && implicitScoreMatch[1] && implicitScoreMatch[2]) {
+      const s1 = parseInt(implicitScoreMatch[1], 10);
+      const s2 = parseInt(implicitScoreMatch[2], 10);
+      // Ensure it's not a time range like "14-16" or "15-17" when preceded by klo or duty hours
+      const isTimeRange = norm.includes('klo') || norm.includes('vuoro') || (s1 >= 8 && s2 >= 9 && s2 <= 23 && s2 > s1 && (s2 - s1) <= 4);
+      if (!isTimeRange && s1 <= 20 && s2 <= 20) {
+        resolvedScore = `${s1}–${s2}`;
+      }
+    }
+  }
+
+  if (resolvedScore) {
+    updated.score = resolvedScore;
+    appliedChanges.push(`Tulos päivitetty: ${resolvedScore}`);
   }
 
   // 2. Times (Kickoff / Warmup)
