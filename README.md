@@ -93,6 +93,25 @@ npm run dev
 
 ---
 
+## 🔍 Latest Audit — 2026-08-28 · Competitive UI/UX (RED vs BLUE)
+
+**Winner: TEAM RED 89 vs 85 · 13 defects (Sev-1:1 · Sev-2:5 · Sev-3:5 · Sev-4:2) · Tree `7d36def`**
+
+Autonomous Competitive Agent Graph audit executed by **Muse Spark 1.2** (`opencode/muse-spark-1.2-contributor-free`) via **OpenCode** as **Chief of Staff** — TEAM RED (Chaos/Tokens/A11y) vs TEAM BLUE (Cognitive/Funnel/Copy).
+
+- **Sev-1 Blocker:** Offline onboarding with 0 profiles traps user (`src/App.tsx:374` + `src/components/OnboardingWizard.tsx:156`) — no offline guard.
+- **Sev-2 A11y:** HUD menu has no focus trap/inert (`src/components/MissionControlHUD.tsx:89`) · SmartImport tabs not keyboard-operable (`src/components/SmartImportModal.tsx:423`) · Double-submit not disabled (`src/App.tsx:201`).
+- **Tokens:** `liquid-glass` blur only in dark, `gap-3.5` grid drift, `whistle/15` contrast fail — see `src/styles/tokens.css:7`.
+- Full report with line refs, remediation steps, and prioritized backlog: **[docs/AUDIT_2026-08-28_muse-spark_competitive-uiux-audit.md](./docs/AUDIT_2026-08-28_muse-spark_competitive-uiux-audit.md)** · Docs index: [docs/README.md](./docs/README.md)
+
+**COMPETITIVE AI CROSS-CHECK UPDATE (2026-08-24):** Based on full corpus proof-or-deny verification:
+
+- **P0 Critical Gaps:** 11/24 currently OPEN (M-01 hooks crash, M-02 no ErrorBoundary, M-04 spec violation, M-05 fabricated stats, M-07 consent gaps, M-08 demo profile leak, M-10 KV guards, M-11 reconciliation unwired)
+- **Priority Escalations:** M-04 ↑ to DAY 1 (active spec violation), M-11 ↑ to DAY 1 (REQ-10/11 non-compliance)
+- **Ready for Imminent Fix:** M-03 "HH:24" RangeError, M-06 weather honesty partial, M-14 timeout chain complete, M-15 geocoder improvement
+
+---
+
 ## 🧪 Testing & Verification
 
 ```bash
@@ -101,6 +120,31 @@ npm test
 ```
 
 ---
+
+## 🔍 UI/UX Audits
+
+| Date | Auditor | Protocol | Scope | Key Findings |
+| :--- | :--- | :--- | :--- | :--- |
+| 2026-08-24 | ox-alpha | NEXUS 5-team adversarial | Full codebase | 2 Critical, 7 High, 15 Medium, 7 Low ([details](./docs/AUDIT_2026-08-24T1606_ox-alpha_nexus-uiux-user-flow-review.md)) |
+| 2026-08-28 | opencode/mimo-v2.5-free | Autonomous Competitive Agent Graph (Team Red vs Team Blue) | All 32 `.tsx` components, styles, tokens, A11y, data integrity | 5 Sev-1, 13 Sev-2, 14 Sev-3, 8 Sev-4. **Team Red 145 pts, Team Blue 85 pts** ([details](./docs/AUDIT_2026-08-28_opencode-competitive-agent-graph_full-spectrum-uiux-audit.md)) |
+
+**Top-priority items from 2026-08-28 audit:**
+1. **Data-loss race condition** in `ingestOfficial.ts` — `bulkDelete` + `bulkPut` without Dexie transaction
+2. **3 modals without Radix Dialog** — `EventChatModal`, `FamilyLogisticsModal`, `MatchStatsModal` (no focus trap, no Escape, no `aria-modal`)
+3. **No skip-to-content link** — keyboard/SR baseline gap
+4. **Non-transactional `clearAllDatabaseData`** — partial DB wipe risk
+
+See [MASTER_FINDINGS_REGISTER.md](./docs/MASTER_FINDINGS_REGISTER.md) for consolidated tracking.
+
+---
+
+## 🔍 UI/UX Competitive Audit (2026-08-28)
+
+A full adversarial + ergonomic UI/UX audit was run by the opencode Competitive Agent Graph (Chief of Staff + Team Red "BREAK" vs Team Blue "OPTIMIZE"). **Team Red won 110–70** across 16 findings (2 Sev-2, 10 Sev-3, 4 Sev-4).
+
+- Full report: [`docs/AUDIT_2026-08-28_ox-competitive-uiux-graph.md`](./docs/AUDIT_2026-08-28_ox-competitive-uiux-graph.md)
+- Tracked in: [`docs/MASTER_FINDINGS_REGISTER.md`](./docs/MASTER_FINDINGS_REGISTER.md) as **U-01…U-13** (all OPEN).
+- Top fixes: shared focus-trapped `Modal` primitive (resolves U-01 / M-33), sticky-header offset (U-02 / M-40), and `rel="noopener noreferrer"` on all 14 `window.open` calls (U-03).
 
 ## 📄 License
 MIT © [traali](https://github.com/traali)
