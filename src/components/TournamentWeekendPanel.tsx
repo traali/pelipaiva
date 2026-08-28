@@ -212,7 +212,8 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                                         : encodeURIComponent(m.venue?.name || 'Kenttä');
                                     window.open(
                                       `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                                      '_blank'
+                                      '_blank',
+                                      'noopener,noreferrer'
                                     );
                                   }
                                 }}

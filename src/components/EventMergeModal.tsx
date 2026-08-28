@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -132,6 +132,14 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const sourceDateLabel = new Date(sourceEvent.startTime).toLocaleDateString('fi-FI', {
     weekday: 'short',
     day: 'numeric',
@@ -142,6 +150,9 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md">
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="event-merge-title"
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -155,7 +166,7 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                 <Link2 className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-text-primary">Hallitse tapahtumaa</h3>
+                <h3 id="event-merge-title" className="text-sm font-bold text-text-primary">Hallitse tapahtumaa</h3>
                 <p className="text-[11px] text-text-secondary">
                   Yhdistä toiseen otteluun, piilota tai poista
                 </p>

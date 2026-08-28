@@ -156,7 +156,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const handleShareWhatsApp = () => {
     if (event.briefing?.postMatchWhatsAppTemplate) {
       const text = encodeURIComponent(event.briefing.postMatchWhatsAppTemplate);
-      window.open(`https://wa.me/?text=${text}`, '_blank');
+      window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -610,7 +610,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                         ? `${targetCoords.lat},${targetCoords.lng}`
                         : encodeURIComponent(event.venue?.name || 'Kenttä');
                     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
-                    window.open(mapsUrl, '_blank');
+                    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
                   })
                 }
                 aria-label={`Navigoi kohteeseen ${event.venue.name}`}

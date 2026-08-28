@@ -12,8 +12,12 @@ export function normalizeFamilyCode(code: string): string {
 }
 
 export function generateFamilyCode(): string {
-  const pick = () => CROCKFORD_ALPHABET[Math.floor(Math.random() * CROCKFORD_ALPHABET.length)];
-  return `${Array.from({ length: 5 }, pick).join('')}-${pick()}`;
+  const getRandomChar = (): string => {
+    const randomBuffer = new Uint8Array(1);
+    crypto.getRandomValues(randomBuffer);
+    return CROCKFORD_ALPHABET[(randomBuffer[0] ?? 0) % CROCKFORD_ALPHABET.length] ?? '0';
+  };
+  return `${Array.from({ length: 5 }, getRandomChar).join('')}-${getRandomChar()}`;
 }
 
 export function isValidFamilyCode(code?: string): boolean {

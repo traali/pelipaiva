@@ -299,7 +299,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                               const coords = ev.parking?.coordinates || ev.venue.coordinates;
                               window.open(
                                 `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                                '_blank'
+                                '_blank',
+                                'noopener,noreferrer'
                               );
                             }
                           }}
@@ -472,7 +473,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                           const coords = ev.parking?.coordinates || ev.venue.coordinates;
                           window.open(
                             `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                            '_blank'
+                            '_blank',
+                            'noopener,noreferrer'
                           );
                         }}
                         className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"

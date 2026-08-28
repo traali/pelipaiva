@@ -174,7 +174,12 @@ export async function ingestIcsForProfile(opts: {
   const database = opts.database || db;
   const raw = opts.url.trim().replace(/^webcal:/i, 'https:');
   const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
-  const res = await fetch(target);
+  let res: Response;
+  try {
+    res = await fetch(target, { signal: AbortSignal.timeout(10000) });
+  } catch {
+    return 0;
+  }
   if (!res.ok) return 0;
   const text = await res.text();
   if (!text || text.length < 20) return 0;

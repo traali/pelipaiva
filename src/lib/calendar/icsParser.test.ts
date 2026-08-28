@@ -62,4 +62,29 @@ describe('ICS Calendar Parser', () => {
     expect(volleyEvent.homeTeam).toBe('PuMa Volley');
     expect(volleyEvent.awayTeam).toBe('LP Viesti');
   });
+
+  it('expands recurring events via RRULE with deterministic IDs', async () => {
+    const RECURRING_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//EN
+BEGIN:VEVENT
+UID:recurring-weekly-practice@club.fi
+DTSTAMP:20260819T100000Z
+DTSTART:20260901T150000Z
+DTEND:20260901T163000Z
+RRULE:FREQ=WEEKLY;COUNT=4
+SUMMARY:Viikoittaiset futistreenit
+LOCATION:Käpylän tekonurmi
+DESCRIPTION:Harjoitukset
+END:VEVENT
+END:VCALENDAR`;
+
+    const events = await parseICSFeed(RECURRING_ICS, 'profile-1', 'football');
+    expect(events.length).toBe(4);
+    expect(events[0]!.id).toContain('recurring-weekly-practice');
+    expect(events[0]!.isTraining).toBe(true);
+    expect(events[1]!.startTime).toContain('2026-09-08');
+    expect(events[2]!.startTime).toContain('2026-09-15');
+    expect(events[3]!.startTime).toContain('2026-09-22');
+  });
 });

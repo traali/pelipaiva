@@ -149,11 +149,11 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     if (familyCode) {
       const msg = generateJoinWhatsApp(familyCode);
       const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     } else if (shareUrl) {
       const msg = `Tässä on meidän perheen Pelipäivä-kalenteri:\n${shareUrl}\n\nAvaa linkki puhelimellasi niin joukkueet ja ottelut synkronoituvat heti!`;
       const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-      window.open(url, '_blank');
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -213,6 +213,15 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -226,11 +235,14 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
           />
 
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="family-share-title"
             initial={{ scale: 0.92, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}
             transition={springTactile.gentle}
-            className="liquid-glass relative w-full max-w-md rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
+            className="liquid-glass relative w-full max-w-lg rounded-3xl p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto"
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
@@ -327,7 +339,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                       <button
                         type="button"
                         onClick={handleShareWhatsApp}
-                        className="flex-1 py-2 rounded-xl bg-[#25D366] text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-105 cursor-pointer"
+                        className="flex-1 py-2 rounded-xl bg-[#25D366] text-neutral-950 text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-105 cursor-pointer"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
                         <span>WhatsAppiin</span>
@@ -410,7 +422,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                       <button
                         type="button"
                         onClick={handleShareWhatsApp}
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-[#25D366] text-white font-bold text-xs flex items-center justify-center gap-2 hover:brightness-105 cursor-pointer"
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-[#25D366] text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 hover:brightness-105 cursor-pointer"
                       >
                         <MessageCircle className="w-4 h-4" />
                         <span>Jaa WhatsAppiin</span>

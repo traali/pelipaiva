@@ -86,11 +86,14 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
         />
 
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Säätutka ja satelliitti"
           initial={{ scale: 0.92, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.92, opacity: 0, y: 10 }}
           transition={springTactile.gentle}
-          className="liquid-glass relative w-full max-w-2xl rounded-3xl p-5 md:p-6 shadow-2xl z-10 max-h-[92vh] overflow-y-auto"
+          className="liquid-glass relative w-full max-w-4xl rounded-3xl p-4 md:p-6 shadow-2xl z-10 max-h-[92vh] overflow-y-auto flex flex-col gap-4"
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-4">

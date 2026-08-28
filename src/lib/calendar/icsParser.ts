@@ -470,6 +470,17 @@ export function splitICSBySquad(icsContent: string, squadName: string): string {
   }
 }
 
+function generateDeterministicEventId(title: string, startTimeIso: string, location: string): string {
+  let hash = 0;
+  const str = `${title}|${startTimeIso}|${location}`;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return `event-${Math.abs(hash).toString(36)}`;
+}
+
 /**
  * Parses raw iCalendar (.ics) string feeds from Nimenhuuto, MyClub, Jopox, or Torneopal.
  * Timezone-safe (RFC 5545) with deterministic volunteer duty detection.
@@ -510,25 +521,11 @@ export async function parseICSFeed(
         }
       }
 
-      // Timezone-safe JS dates from ICAL
-      const startDate = event.startDate ? event.startDate.toJSDate() : new Date();
-      const endDate = event.endDate
-        ? event.endDate.toJSDate()
-        : new Date(startDate.getTime() + 90 * 60 * 1000);
-
       const isTraining =
         category.toLowerCase().includes('treenit') ||
         category.toLowerCase().includes('harjoitus') ||
         isTrainingEvent(title, description);
       const parsedTitle = parseMatchTitle(title, defaultTeamName);
-
-      const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
-        startDate,
-        endDate,
-        title,
-        description,
-        isTraining
-      );
 
       // Volunteer duty detection (Talkoovahti)
       const dutyResult = extractVolunteerDuty(title, description);
@@ -541,22 +538,88 @@ export async function parseICSFeed(
         venueCache.set(venueQuery, venue);
       }
 
-      events.push({
-        id: event.uid || `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        profileId,
-        sport,
-        eventType: parsedTitle.eventType,
-        isTraining,
-        title,
-        homeTeam: parsedTitle.homeTeam,
-        awayTeam: parsedTitle.awayTeam,
-        isHomeMatch: parsedTitle.isHomeMatch,
-        startTime: kickoffTime.toISOString(),
-        endTime: endTime.toISOString(),
-        warmupTime: warmupTime.toISOString(),
-        venue,
-        volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined
-      });
+      // Handle RFC 5545 recurring event series (RRULE / RDATE / EXDATE)
+      if (event.isRecurring && event.isRecurring()) {
+        try {
+          const iterator = event.iterator();
+          const maxOccurrences = 52;
+          let count = 0;
+          let nextTime = iterator.next();
+          const durationMs = event.duration ? event.duration.toSeconds() * 1000 : 90 * 60 * 1000;
+          const maxDate = new Date();
+          maxDate.setDate(maxDate.getDate() + 180);
+
+          while (nextTime && count < maxOccurrences) {
+            const instanceStartDate = nextTime.toJSDate();
+            if (instanceStartDate > maxDate) break;
+            const instanceEndDate = new Date(instanceStartDate.getTime() + durationMs);
+
+            const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
+              instanceStartDate,
+              instanceEndDate,
+              title,
+              description,
+              isTraining
+            );
+
+            const baseUid = event.uid || generateDeterministicEventId(title, kickoffTime.toISOString(), location);
+            const instanceId = `${baseUid}-${kickoffTime.toISOString().slice(0, 10)}`;
+
+            events.push({
+              id: instanceId,
+              profileId,
+              sport,
+              eventType: parsedTitle.eventType,
+              isTraining,
+              title,
+              homeTeam: parsedTitle.homeTeam,
+              awayTeam: parsedTitle.awayTeam,
+              isHomeMatch: parsedTitle.isHomeMatch,
+              startTime: kickoffTime.toISOString(),
+              endTime: endTime.toISOString(),
+              warmupTime: warmupTime.toISOString(),
+              venue,
+              volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined
+            });
+
+            count++;
+            nextTime = iterator.next();
+          }
+        } catch (recurErr) {
+          console.warn('Failed to expand recurring ICS event, falling back to primary instance:', recurErr);
+        }
+      } else {
+        // Non-recurring single event
+        const startDate = event.startDate ? event.startDate.toJSDate() : new Date();
+        const endDate = event.endDate
+          ? event.endDate.toJSDate()
+          : new Date(startDate.getTime() + 90 * 60 * 1000);
+
+        const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
+          startDate,
+          endDate,
+          title,
+          description,
+          isTraining
+        );
+
+        events.push({
+          id: event.uid || generateDeterministicEventId(title, kickoffTime.toISOString(), location),
+          profileId,
+          sport,
+          eventType: parsedTitle.eventType,
+          isTraining,
+          title,
+          homeTeam: parsedTitle.homeTeam,
+          awayTeam: parsedTitle.awayTeam,
+          isHomeMatch: parsedTitle.isHomeMatch,
+          startTime: kickoffTime.toISOString(),
+          endTime: endTime.toISOString(),
+          warmupTime: warmupTime.toISOString(),
+          venue,
+          volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined
+        });
+      }
     }
   } catch (error) {
     console.error('Failed to parse ICS feed:', error);

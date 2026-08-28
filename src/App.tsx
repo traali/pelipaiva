@@ -857,7 +857,8 @@ export const App: React.FC = () => {
                                     : encodeURIComponent(event.venue?.name || 'Kenttä');
                                 window.open(
                                   `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                                  '_blank'
+                                  '_blank',
+                                  'noopener,noreferrer'
                                 );
                               }}
                               onOpenStats={() => setSelectedStatsEvent(event)}
@@ -949,7 +950,8 @@ export const App: React.FC = () => {
                     : encodeURIComponent(ev.venue?.name || 'Kenttä');
                 window.open(
                   `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                  '_blank'
+                  '_blank',
+                  'noopener,noreferrer'
                 );
               }}
             />

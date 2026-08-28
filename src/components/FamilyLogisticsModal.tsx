@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Car, AlertTriangle, CheckCircle2, Share2, Copy, MapPin, User } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
@@ -45,9 +45,18 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handleShareWhatsApp = () => {
     const text = encodeURIComponent(plan.whatsAppShareText);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -63,6 +72,9 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
           />
 
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="family-logistics-title"
             initial={{ scale: 0.92, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}

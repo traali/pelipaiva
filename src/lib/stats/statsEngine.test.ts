@@ -70,7 +70,7 @@ describe('Stats Engine', () => {
     expect(stats.divisionRosters['VJS Tytöt']?.players.length).toBeGreaterThanOrEqual(4);
 
     const honkaStar = stats.divisionRosters['FC Honka Musta']?.players.find((p) => p.jerseyNumber === 7);
-    expect(honkaStar?.playerName).toBe('Aada Korhonen');
+    expect(honkaStar?.playerName).toBe('Pelaaja 7');
     expect(honkaStar?.goals).toBe(9);
     expect(honkaStar?.isCaptain).toBe(true);
   });

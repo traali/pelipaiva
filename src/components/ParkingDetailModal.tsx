@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -63,16 +63,25 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
 
   const openGoogleMaps = () => {
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank', 'noopener,noreferrer');
   };
 
   const openAppleMaps = () => {
-    window.open(`https://maps.apple.com/?daddr=${lat},${lng}`, '_blank');
+    window.open(`https://maps.apple.com/?daddr=${lat},${lng}`, '_blank', 'noopener,noreferrer');
   };
 
   const openWaze = () => {
-    window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank');
+    window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank', 'noopener,noreferrer');
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   return (
     <AnimatePresence>
@@ -87,6 +96,9 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
           />
 
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="parking-detail-title"
             initial={{ scale: 0.92, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}

@@ -159,6 +159,15 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
     );
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -172,6 +181,9 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
           />
 
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="match-stats-title"
             initial={{ scale: 0.92, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.92, opacity: 0, y: 10 }}
