@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Pelipäivä - Matchday Hub',
-        short_name: 'Pelipäivä',
-        description: 'Suomalaisen junioriurheilun ottelupäivän tilannekeskus',
+        name: 'FamDay - Family Sports & Schedule Hub',
+        short_name: 'FamDay',
+        description: 'Perheen pelipäivät, kuskiringit, koulu ja arjen hermokeskus',
         theme_color: '#000000',
         background_color: '#000000',
         lang: 'fi',

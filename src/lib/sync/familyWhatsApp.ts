@@ -16,7 +16,7 @@ export interface ParsedWhatsAppResult {
  */
 export function generateJoinWhatsApp(code: string): string {
   const cleanCode = code.trim().toUpperCase();
-  return `Pelipäivä-perhe ${cleanCode}
+  return `FamDay-perhe ${cleanCode}
 Avaa: https://pelipaiva.pages.dev/?perhe=${cleanCode}
 
 Etunimi ja joukkue-URL Cloudflareen 7 pv.
@@ -32,7 +32,7 @@ export function generateRosterDeltaWhatsApp(
   cupOrLeagueName: string,
   rawCalendarUrl: string
 ): string {
-  return `Pelipäivä: ${playerName.trim()} → ${teamName.trim()}
+  return `FamDay: ${playerName.trim()} → ${teamName.trim()}
 ${cupOrLeagueName.trim()}
 ${rawCalendarUrl.trim()}`;
 }
@@ -71,9 +71,9 @@ export function parseFamilyWhatsAppMessage(rawText: string): ParsedWhatsAppResul
     return { type: 'join', familyCode: code };
   }
 
-  // 2. Check for "Pelipäivä-perhe PERHE-2" header
+  // 2. Check for "FamDay-perhe" / "Pelipäivä-perhe" header
   const headerMatch = text.match(
-    /Pelipäivä-perhe\s+([0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]|[0-9A-HJKMNP-TV-Z]{6})/i
+    /(?:FamDay|Pelipäivä)-perhe\s+([0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]|[0-9A-HJKMNP-TV-Z]{6})/i
   );
   if (headerMatch && headerMatch[1]) {
     let code = headerMatch[1].toUpperCase();
@@ -83,14 +83,14 @@ export function parseFamilyWhatsAppMessage(rawText: string): ParsedWhatsAppResul
     return { type: 'join', familyCode: code };
   }
 
-  // 3. Check for Delta format: "Pelipäivä: Aada → TOPOLA\nEspoo Liikkuu...\nhttps://..."
-  const deltaMatch = text.match(/Pelipäivä:\s*([^→\n]+?)\s*→\s*([^\n]+)/i);
+  // 3. Check for Delta format: "FamDay: Aada → TOPOLA" / "Pelipäivä: Aada → TOPOLA"
+  const deltaMatch = text.match(/(?:FamDay|Pelipäivä):\s*([^→\n]+?)\s*→\s*([^\n]+)/i);
   const urlMatch = text.match(/https?:\/\/[^\s]+/i);
 
   if (deltaMatch && deltaMatch[1] && deltaMatch[2] && urlMatch && urlMatch[0]) {
     const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
     const middleLines = lines.filter(
-      (l) => !l.startsWith('Pelipäivä:') && !l.startsWith('http')
+      (l) => !l.startsWith('FamDay:') && !l.startsWith('Pelipäivä:') && !l.startsWith('http')
     );
     return {
       type: 'delta',

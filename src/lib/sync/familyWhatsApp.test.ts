@@ -57,9 +57,20 @@ describe('familyWhatsApp Synthetics & Parse-back', () => {
 
   it('does not treat Crockford-illegal SAIMA-4 as a join code', () => {
     const parsed = parseFamilyWhatsAppMessage(
-      'Pelipäivä-perhe SAIMA-4\nAvaa: https://pelipaiva.pages.dev/?perhe=SAIMA-4'
+      'FamDay-perhe SAIMA-4\nAvaa: https://pelipaiva.pages.dev/?perhe=SAIMA-4'
     );
     expect(parsed.type).toBe('none');
+  });
+
+  it('maintains backwards compatibility for legacy Pelipäivä messages', () => {
+    const legacyJoin = parseFamilyWhatsAppMessage('Pelipäivä-perhe PERHE-2\nAvaa: https://pelipaiva.pages.dev/?perhe=PERHE-2');
+    expect(legacyJoin.type).toBe('join');
+    expect(legacyJoin.familyCode).toBe('PERHE-2');
+
+    const legacyDelta = parseFamilyWhatsAppMessage('Pelipäivä: Aada → TOPOLA\nEspoo Liikkuu\nhttps://espooliikkuutournament.fi/team/203621');
+    expect(legacyDelta.type).toBe('delta');
+    expect(legacyDelta.playerName).toBe('Aada');
+    expect(legacyDelta.teamName).toBe('TOPOLA');
   });
 
   it('generates exact deterministic join and delta templates', () => {
