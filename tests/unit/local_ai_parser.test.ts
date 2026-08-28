@@ -81,6 +81,17 @@ Lisätiedot: Peliasuna sininen pelipaita. Kahviovuoro: Maijan vanhemmat.`;
       expect(result.venueHint).toContain('Tapiola');
     });
 
+    it('parses school Wilma message for parents evening or school events', () => {
+      const wilmaMsg = `Hei kotiväki! 5B-luokan vanhempainilta pidetään torstaina 10.9. klo 18.00–19.30 Lauttasaaren peruskoululla ruokalassa. Käsitellään luokkaretkeä. Tervetuloa!`;
+      const result = parseFreeformSportsMessage(wilmaMsg, 'Otso');
+
+      expect(result.eventType).toBe('meeting');
+      expect(result.title).toContain('Vanhempainilta');
+      expect(result.kickoffTime).toBe('18:00');
+      expect(result.endTime).toBe('19:30');
+      expect(result.venueHint).toContain('Lauttasaaren peruskoulu');
+    });
+
     it('parses multi-match tournament schedule message into multiple distinct events', () => {
       const tournamentMsg = `Moi! Lauantaina 24.8. turnaus Väiskillä:
 klo 10:00 vs KäPa
