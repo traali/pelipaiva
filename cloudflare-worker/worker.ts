@@ -371,8 +371,16 @@ export default {
         });
       }
 
+      const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
+      if (issued.size > 0 && !issued.has(familyCode)) {
+        return new Response(JSON.stringify({ error: 'unknown_family' }), {
+          status: 403,
+          headers: corsHeaders
+        });
+      }
+
       // Read family roster from KV
-      const kvKey = `fam_roster_${familyCode}`;
+      const kvKey = `family:${familyCode}`;
       const existingStr = await env.MATCHDAY_KV.get(kvKey);
       let roster: FamilyRosterV1 | null = null;
       if (existingStr) {
