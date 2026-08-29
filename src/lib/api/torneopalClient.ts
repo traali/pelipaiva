@@ -32,9 +32,9 @@ const ENDPOINTS: Partial<
     referer: "https://tulospalvelu.salibandy.fi/",
   },
   basket: {
-    base: "https://tupa.api.torneopal.com/taso/rest",
+    base: "https://koripallo-api.torneopal.net/taso/rest",
     apiKey: TUPA_KEY,
-    referer: "https://www.basket.fi/",
+    referer: "https://tulospalvelu.basket.fi/",
   },
   torneopal: {
     base: "https://tupa.api.torneopal.com/taso/rest",

@@ -87,7 +87,7 @@ function hostnameAllowed(host: string): boolean {
   if (h === 'tulospalvelu.salibandy.fi' || h === 'www.tulospalvelu.salibandy.fi') return true;
   if (h === 'basket.fi' || h === 'www.basket.fi' || h === 'tulospalvelu.basket.fi') return true;
   if (h === 'espooliikkuutournament.fi' || h === 'www.espooliikkuutournament.fi') return true;
-  if (h === 'tupa.api.torneopal.com' || h === 'salibandy-api.torneopal.net') return true;
+  if (h === 'tupa.api.torneopal.com' || h === 'salibandy-api.torneopal.net' || h === 'koripallo-api.torneopal.net') return true;
   if (h === 'spl.torneopal.fi' || h.endsWith('.torneopal.fi') || h.endsWith('.torneopal.net') || h.endsWith('.torneopal.com')) {
     return true;
   }

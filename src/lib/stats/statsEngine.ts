@@ -1399,6 +1399,25 @@ export async function extractOfficialTeamData(
     return jsonData;
   }
 
+  // Cup subdomains and basket SPA shells have no fixture tables. Worker
+  // proxy 403s those hosts — skip HTML instead of failing the ingest.
+  const skipHtml =
+    parsedUrl.association === 'basket' ||
+    Boolean(parsedUrl.subdomain && /cup|memorial|turnaus|tournament|kwmemorial/i.test(parsedUrl.subdomain));
+  if (skipHtml) {
+    return (
+      jsonData || {
+        teamId: parsedUrl.teamId,
+        association: parsedUrl.association,
+        sport: parsedUrl.sport,
+        teamName: customTeamName,
+        fixtures: [],
+        sourceUrl: parsedUrl.canonicalUrl,
+        fetchedAt: new Date().toISOString()
+      }
+    );
+  }
+
   const targetUrl = parsedUrl.canonicalUrl;
   const fetchUrl = bypassProxy ? targetUrl : `${proxyUrl}?url=${encodeURIComponent(targetUrl)}`;
 

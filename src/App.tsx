@@ -20,7 +20,6 @@ import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { generateOrResolveMatchStats } from './lib/stats/statsEngine';
 import { helsinkiDateISO } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
@@ -1003,14 +1002,7 @@ export const App: React.FC = () => {
         <MatchStatsModal
           isOpen={true}
           onClose={() => setSelectedStatsEvent(null)}
-          stats={
-            selectedStatsEvent.stats ||
-            generateOrResolveMatchStats(
-              selectedStatsEvent.homeTeam,
-              selectedStatsEvent.awayTeam,
-              selectedStatsEvent.sport
-            )
-          }
+          stats={selectedStatsEvent.stats}
           homeTeam={selectedStatsEvent.homeTeam}
           awayTeam={selectedStatsEvent.awayTeam || 'Vastustaja'}
           playerName={profiles.find((p) => p.id === selectedStatsEvent.profileId)?.playerName}

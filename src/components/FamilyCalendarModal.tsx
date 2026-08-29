@@ -16,6 +16,7 @@ import { springTactile } from '../lib/motion/springs';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { generateIcsCalendarFeed } from '../lib/calendar/calendarFeedGenerator';
 import { db } from '../lib/storage/db';
+import { WORKER_BASE_URL } from '../lib/sync/familyCloud';
 
 interface FamilyCalendarModalProps {
   isOpen: boolean;
@@ -50,10 +51,8 @@ export const FamilyCalendarModal: React.FC<FamilyCalendarModalProps> = ({
 
   if (!isOpen) return null;
 
-  const host = typeof window !== 'undefined' ? window.location.host : 'pelipaiva.pages.dev';
-  
-  // Format webcal link
-  const webcalFeedUrl = `webcal://${host}/api/calendar?perhe=${encodeURIComponent(familyCode)}`;
+  const calendarHost = WORKER_BASE_URL.replace(/^https:\/\//, '');
+  const webcalFeedUrl = `webcal://${calendarHost}/api/calendar?perhe=${encodeURIComponent(familyCode)}`;
   const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalFeedUrl)}`;
 
   const handleCopyLink = async () => {

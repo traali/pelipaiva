@@ -39,6 +39,8 @@ jobs:
 
       - name: Deploy Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
+        env:
+          npm_config_legacy_peer_deps: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

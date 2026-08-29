@@ -28,7 +28,6 @@ import { Edit3, FileText } from 'lucide-react';
 import type { PitchSurface } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
-import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
 
@@ -118,7 +117,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const handleOpenStats = () => {
     let resolved = stats;
     if (!resolved && !isTraining && !isSchool && !isOther) {
-      resolved = generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport);
+      resolved = event.stats;
       // Synthetic previews stay ephemeral: never persisted as if they were
       // federation data (M-05 / anti-synthetic constitution).
       setStats(resolved);
@@ -675,7 +674,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         <MatchStatsModal
           isOpen={isStatsModalOpen}
           onClose={() => setIsStatsModalOpen(false)}
-          stats={stats || generateOrResolveMatchStats(event.homeTeam, event.awayTeam, event.sport)}
+          stats={stats}
           homeTeam={event.homeTeam}
           awayTeam={event.awayTeam || 'Vastustaja'}
           playerName={playerName}

@@ -21,7 +21,6 @@ import { KitChecklist } from './KitChecklist';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { SportGlyph } from './SportGlyph';
 import { getContrastTextColor } from '../lib/sport/teamColors';
-import { generateOrResolveMatchStats } from '../lib/stats/statsEngine';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { EventChatModal } from './EventChatModal';
 import { EventMergeModal } from './EventMergeModal';
@@ -61,12 +60,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
   const stats: FullMatchStats | null = useMemo(() => {
     if (event.isTraining) return null;
-    return generateOrResolveMatchStats(
-      event.homeTeam || 'Oma joukkue',
-      event.awayTeam || 'Vastustaja',
-      event.sport || 'football'
-    );
-  }, [event.homeTeam, event.awayTeam, event.sport, event.isTraining]);
+    return event.stats ?? null;
+  }, [event.stats, event.isTraining]);
 
   const sourceInfo = resolveEventSourceInfo(event, profile);
 

@@ -24,7 +24,7 @@ import { springTactile } from '../lib/motion/springs';
 interface MatchStatsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  stats: FullMatchStats;
+  stats?: FullMatchStats | null;
   homeTeam: string;
   awayTeam: string;
   playerName?: string;
@@ -36,10 +36,26 @@ interface MatchStatsModalProps {
 
 type StatsTab = 'stats' | 'player_log' | 'roster' | 'standings' | 'scorers' | 'common' | 'h2h' | 'scout';
 
+function blankStanding(teamName: string) {
+  return {
+    rank: 0,
+    teamName,
+    played: 0,
+    won: 0,
+    drawn: 0,
+    lost: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDifference: 0,
+    points: 0,
+    form: [] as Array<'W' | 'D' | 'L'>
+  };
+}
+
 export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   isOpen,
   onClose,
-  stats,
+  stats: statsProp,
   homeTeam,
   awayTeam,
   playerName,
@@ -48,6 +64,21 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   sport = 'football',
   onSavePlayerLog
 }) => {
+  const stats: FullMatchStats = statsProp ?? {
+    leagueName: 'Ei virallisia tilastoja',
+    homeStanding: blankStanding(homeTeam),
+    awayStanding: blankStanding(awayTeam),
+    standingsTable: [],
+    topScorers: [],
+    headToHeadHistory: [],
+    commonOpponents: [],
+    squadRosters: {
+      home: { teamName: homeTeam, players: [] },
+      away: { teamName: awayTeam, players: [] }
+    },
+    divisionRosters: {},
+    scoutAnalysis: 'Tulospalvelu ei palauttanut ottelukohtaisia tilastoja tälle ottelulle.'
+  };
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
 
@@ -59,7 +90,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   const [logMinutes, setLogMinutes] = useState<number>(playerLog?.minutesPlayed ?? (sport === 'floorball' ? 45 : 60));
   const [logStarAward, setLogStarAward] = useState<boolean>(playerLog?.starPlayerAward ?? false);
   const [logNotes, setLogNotes] = useState<string>(playerLog?.notes ?? '');
-  const [matchScoreInput, setMatchScoreInput] = useState<string>(score || `${stats.liveScore?.home ?? 0}–${stats.liveScore?.away ?? 0}`);
+  const [matchScoreInput, setMatchScoreInput] = useState<string>(score || `${stats?.liveScore?.home ?? 0}–${stats?.liveScore?.away ?? 0}`);
   const [isSavedFeedback, setIsSavedFeedback] = useState<boolean>(false);
 
   useEffect(() => {
@@ -70,7 +101,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
     setLogMinutes(playerLog?.minutesPlayed ?? (sport === 'floorball' ? 45 : 60));
     setLogStarAward(playerLog?.starPlayerAward ?? false);
     setLogNotes(playerLog?.notes ?? '');
-    setMatchScoreInput(score || `${stats.liveScore?.home ?? 0}–${stats.liveScore?.away ?? 0}`);
+    setMatchScoreInput(score || `${stats?.liveScore?.home ?? 0}–${stats?.liveScore?.away ?? 0}`);
   }, [playerLog, score, stats, sport]);
 
   const handleSaveLog = () => {
