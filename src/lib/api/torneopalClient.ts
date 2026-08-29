@@ -129,13 +129,11 @@ function federationEndpoint(
   return ENDPOINTS.torneopal;
 }
 
-async function torneopalGet<T>(
+export function listTorneopalAttempts(
   association: AssociationType,
-  method: string,
-  params: Record<string, string>,
   subdomain?: string,
   sport?: SportType
-): Promise<T | null> {
+): Array<{ base: string; apiKey: string; referer: string }> {
   type Attempt = { base: string; apiKey: string; referer: string };
   const attempts: Attempt[] = [];
   const seen = new Set<string>();
@@ -147,11 +145,12 @@ async function torneopalGet<T>(
     attempts.push(ep);
   };
 
-  if (subdomain) {
+  // Dedicated cup hosts 403 without a matching Referer. Browsers cannot set
+  // Referer, and OPTIONS preflight on Accept: json/{key} stalls ingest. Skip
+  // those hosts and go straight to the sport federation API.
+  if (subdomain && shouldTryAssociationEndpoint(subdomain)) {
     const base = `https://${subdomain}.torneopal.fi/taso/rest`;
     const referer = `https://${subdomain}.torneopal.fi/`;
-    // Cup hosts 403 without Referer (browser cannot set it). Federation
-    // hosts accept the same team id for the matching sport without Referer.
     if (sport === "floorball" || association === "salibandy") {
       push({ base, apiKey: SALIBANDY_KEY, referer });
       push({ base, apiKey: TUPA_KEY, referer });
@@ -167,6 +166,17 @@ async function torneopalGet<T>(
     }
   }
   push(federationEndpoint(association, sport));
+  return attempts;
+}
+
+async function torneopalGet<T>(
+  association: AssociationType,
+  method: string,
+  params: Record<string, string>,
+  subdomain?: string,
+  sport?: SportType
+): Promise<T | null> {
+  const attempts = listTorneopalAttempts(association, subdomain, sport);
 
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) {
@@ -188,6 +198,8 @@ async function torneopalGet<T>(
         headers: {
           Accept: `json/${ep.apiKey}`,
           Referer: ep.referer,
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         },
         referrerPolicy: "origin",
         signal: AbortSignal.timeout(Math.min(10000, remaining)),
@@ -499,7 +511,17 @@ export async function fetchTorneopalTeamData(
   ]);
 
   let rawMatches = Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [];
-  if (rawMatches.length === 0 && looksLikeCupRequest(parsed) && competitionId && categoryId) {
+  const claimedTotal = num(
+    (matchesJson as { call?: { total_result_count?: unknown } } | null)?.call?.total_result_count
+  );
+  // Cups often return total_result_count > 0 with matches: []. Always walk
+  // getGroups/getGroup when we have competition+category (KW Memorial).
+  if (
+    rawMatches.length === 0 &&
+    competitionId &&
+    categoryId &&
+    (looksLikeCupRequest(parsed) || claimedTotal > 0)
+  ) {
     rawMatches = await collectCupGroupMatches(parsed, competitionId, categoryId, teamName);
   } else if (Array.isArray(groupJson?.group?.matches) && rawMatches.length === 0) {
     rawMatches = groupJson!.group!.matches as Record<string, unknown>[];

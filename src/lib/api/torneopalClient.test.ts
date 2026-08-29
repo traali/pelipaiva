@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildGetMatchesParams,
   isTorneopalCompetitionId,
+  listTorneopalAttempts,
   looksLikeCupRequest,
   mapFixture,
   shouldTryAssociationEndpoint
@@ -38,6 +39,17 @@ describe('torneopal match params', () => {
     expect(shouldTryAssociationEndpoint('kwmemorialcup26')).toBe(false);
     expect(shouldTryAssociationEndpoint('spl')).toBe(true);
     expect(shouldTryAssociationEndpoint(undefined)).toBe(true);
+
+    const kwAttempts = listTorneopalAttempts('torneopal', 'kwmemorialcup26', 'floorball');
+    expect(kwAttempts.map((a) => a.base)).toEqual(['https://salibandy-api.torneopal.net/taso/rest']);
+    expect(kwAttempts.every((a) => !a.base.includes('kwmemorial'))).toBe(true);
+
+    const basketAttempts = listTorneopalAttempts('basket', undefined, 'basketball');
+    expect(basketAttempts.map((a) => a.base)).toEqual(['https://koripallo-api.torneopal.net/taso/rest']);
+
+    const splAttempts = listTorneopalAttempts('palloliitto', 'spl', 'football');
+    expect(splAttempts[0]?.base).toBe('https://spl.torneopal.fi/taso/rest');
+    expect(splAttempts.some((a) => a.base === 'https://spl.torneopal.net/taso/rest')).toBe(true);
   });
 
   it('accepts compact competition ids and rejects turnaus slugs', () => {

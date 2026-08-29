@@ -1,0 +1,4 @@
+# Fallback if Pages Functions are skipped: send calendar clients to the Worker.
+# Query string is preserved on 302. Prefer functions/api/calendar.js (200 proxy).
+/api/calendar https://pelipaiva-edge.sakkoja.workers.dev/api/calendar 302
+/api/calendar/* https://pelipaiva-edge.sakkoja.workers.dev/api/calendar/:splat 302

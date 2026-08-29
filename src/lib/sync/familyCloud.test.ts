@@ -42,6 +42,8 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).toContain('unknown_family');
     expect(workerSrc).toContain('isAllowedProxyTarget');
     expect(workerSrc).toContain('api.lipas.fi');
+    expect(workerSrc).toContain('collectRosterIcsEvents');
+    expect(workerSrc).toContain('isIcsCalendarUrl');
     expect(workerSrc).not.toContain('/api/sync/');
     expect(workerSrc).not.toContain('/api/nest/brief');
     expect(workerSrc).not.toMatch(/startsWith\('https:\/\/'\)/);

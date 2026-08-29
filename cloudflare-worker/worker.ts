@@ -120,6 +120,76 @@ function isAllowedProxyTarget(raw: string): boolean {
   return hostnameAllowed(parsed.hostname);
 }
 
+function isIcsCalendarUrl(raw: string): boolean {
+  const u = raw.trim().replace(/^webcal:/i, 'https:');
+  if (!isAllowedProxyTarget(u)) return false;
+  try {
+    const parsed = new URL(u);
+    return (
+      /\.ics(\?|$)/i.test(parsed.pathname + parsed.search) ||
+      parsed.hostname === 'myclub.fi' ||
+      parsed.hostname.endsWith('.myclub.fi') ||
+      parsed.hostname === 'nimenhuuto.com' ||
+      parsed.hostname.endsWith('.nimenhuuto.com') ||
+      parsed.hostname === 'jopox.fi' ||
+      parsed.hostname.endsWith('.jopox.fi')
+    );
+  } catch {
+    return false;
+  }
+}
+
+function extractVeventBlocks(ics: string): string[] {
+  const blocks: string[] = [];
+  const re = /BEGIN:VEVENT[\s\S]*?END:VEVENT/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(ics))) {
+    blocks.push(m[0].replace(/\r?\n/g, '\r\n'));
+  }
+  return blocks;
+}
+
+function prefixVeventSummary(block: string, playerName?: string): string {
+  const name = (playerName || '').trim();
+  if (!name) return block;
+  return block.replace(/^SUMMARY:(.*)$/m, (_all, rest: string) => {
+    if (rest.toLowerCase().startsWith(name.toLowerCase())) return `SUMMARY:${rest}`;
+    return `SUMMARY:${name}: ${rest}`;
+  });
+}
+
+async function collectRosterIcsEvents(roster: FamilyRosterV1 | null): Promise<string[]> {
+  if (!roster?.profiles?.length) return [];
+  const out: string[] = [];
+  for (const p of roster.profiles.slice(0, 10)) {
+    const raw = String(p.calendarUrl || '').trim();
+    if (!raw || !isIcsCalendarUrl(raw)) continue;
+    const target = raw.replace(/^webcal:/i, 'https:');
+    if (!isAllowedProxyTarget(target)) continue;
+    try {
+      const feedRes = await fetch(target, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(8000),
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          Accept: 'text/calendar,text/plain,*/*',
+          Referer: new URL(target).origin + '/'
+        }
+      });
+      if (!feedRes.ok) continue;
+      const text = await feedRes.text();
+      if (!/BEGIN:VCALENDAR/i.test(text)) continue;
+      for (const block of extractVeventBlocks(text)) {
+        out.push(prefixVeventSummary(block, p.playerName));
+      }
+    } catch {
+      // Skip unreachable club calendars; still emit the rest of the family feed.
+    }
+  }
+  return out;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -443,6 +513,11 @@ export default {
         lines.push(`DESCRIPTION:${descLines.join('\\n')}`);
         lines.push('STATUS:CONFIRMED');
         lines.push('END:VEVENT');
+      }
+
+      const rosterEvents = await collectRosterIcsEvents(roster);
+      for (const block of rosterEvents) {
+        lines.push(block);
       }
 
       lines.push('END:VCALENDAR');

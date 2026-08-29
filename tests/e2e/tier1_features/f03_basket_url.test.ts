@@ -56,6 +56,14 @@ describe('Feature 3: Basket.fi Team URL Parser', () => {
     expect(parsed?.canonicalUrl).toBe('https://tulospalvelu.basket.fi/team/5756346');
   });
 
+  it('should parse tulospalvelu.basket.fi fixture tab as the same team', () => {
+    const parsed = parseAssociationUrl('https://tulospalvelu.basket.fi/team/5756346/fixture');
+    expect(parsed?.teamId).toBe('5756346');
+    expect(parsed?.tab).toBe('fixture');
+    expect(parsed?.association).toBe('basket');
+    expect(parsed?.canonicalUrl).toBe('https://tulospalvelu.basket.fi/team/5756346');
+  });
+
   it('should detect association type and normalize URL correctly for Basket.fi', () => {
     const url = 'https://basket.fi/basket/sarjat/joukkue/?team_id=12894';
     expect(detectAssociationType(url)).toBe('basket');

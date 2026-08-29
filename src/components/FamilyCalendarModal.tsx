@@ -16,7 +16,7 @@ import { springTactile } from '../lib/motion/springs';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { generateIcsCalendarFeed } from '../lib/calendar/calendarFeedGenerator';
 import { db } from '../lib/storage/db';
-import { WORKER_BASE_URL } from '../lib/sync/familyCloud';
+import { isValidFamilyCode } from '../lib/sync/familyCode';
 
 interface FamilyCalendarModalProps {
   isOpen: boolean;
@@ -33,7 +33,7 @@ export const FamilyCalendarModal: React.FC<FamilyCalendarModalProps> = ({
   profiles,
   familyCode: propFamilyCode
 }) => {
-  const [familyCode, setFamilyCode] = useState<string>(propFamilyCode || 'PERHE-1');
+  const [familyCode, setFamilyCode] = useState<string>(propFamilyCode || '');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -51,11 +51,19 @@ export const FamilyCalendarModal: React.FC<FamilyCalendarModalProps> = ({
 
   if (!isOpen) return null;
 
-  const calendarHost = WORKER_BASE_URL.replace(/^https:\/\//, '');
-  const webcalFeedUrl = `webcal://${calendarHost}/api/calendar?perhe=${encodeURIComponent(familyCode)}`;
-  const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalFeedUrl)}`;
+  const hasFamily = isValidFamilyCode(familyCode);
+  // Pages Function proxies /api/calendar → Worker. Keep the public host so
+  // webcal://pelipaiva.pages.dev/api/calendar?perhe=… is the real feed.
+  const calendarHost = 'pelipaiva.pages.dev';
+  const webcalFeedUrl = hasFamily
+    ? `webcal://${calendarHost}/api/calendar?perhe=${encodeURIComponent(familyCode)}`
+    : '';
+  const googleCalendarUrl = webcalFeedUrl
+    ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalFeedUrl)}`
+    : '';
 
   const handleCopyLink = async () => {
+    if (!webcalFeedUrl) return;
     try {
       await navigator.clipboard.writeText(webcalFeedUrl);
       setCopied(true);
@@ -145,6 +153,8 @@ export const FamilyCalendarModal: React.FC<FamilyCalendarModalProps> = ({
           </div>
 
           {/* 1-Click Action Buttons */}
+          {hasFamily ? (
+          <>
           <div className="flex flex-col gap-2.5 mb-5">
             {/* Apple Calendar 1-Click */}
             <a
@@ -198,6 +208,12 @@ export const FamilyCalendarModal: React.FC<FamilyCalendarModalProps> = ({
               {webcalFeedUrl}
             </div>
           </div>
+          </>
+          ) : (
+          <div className="p-3.5 rounded-2xl bg-surface-base border border-border-subtle mb-4 text-xs text-text-secondary">
+            Liity perheeseen ensin (Perhejako), niin elävä tilauslinkki syntyy. Voit silti ladata tämän laitteen ottelut .ics-tiedostona.
+          </div>
+          )}
 
           {/* Offline Download Option */}
           <div className="flex items-center justify-between pt-2 border-t border-border-subtle">

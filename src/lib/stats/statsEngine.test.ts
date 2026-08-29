@@ -380,6 +380,11 @@ describe('Sports Association URL Parser', () => {
     it('returns null for non-association URLs (Nimenhuuto, MyClub, Google)', () => {
       expect(parseAssociationUrl('https://nimenhuuto.com/team/12345/calendar.ics')).toBeNull();
       expect(parseAssociationUrl('https://myclub.fi/teams/678/events.ics')).toBeNull();
+      expect(
+        parseAssociationUrl(
+          'webcal://id.myclub.fi/flow/calendar_subscriptions/9577.ics?token=77b47985c9cd2e780af46734e813317b7d7e79b9'
+        )
+      ).toBeNull();
       expect(parseAssociationUrl('https://www.google.com/search?q=palloliitto')).toBeNull();
       expect(parseAssociationUrl('not a url at all')).toBeNull();
     });
