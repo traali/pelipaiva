@@ -14,6 +14,7 @@ This expansion keeps the original local-first contract (Dexie, zero-auth, GDPR, 
 
 Start here:
 
+0. **[agency/README.md](./agency/README.md)** — ⭐⭐⭐ **2026-08-30 Grok agency pack** (other AIs: start here). Super prompt + Grok audit at `2e45f97` (361/400) + forward plan. Supersedes older OPEN registers for planning.
 1. **[AUDIT_2026-08-28_muse-spark_full-corpus_final.md](./AUDIT_2026-08-28_muse-spark_full-corpus_final.md)** — ⭐⭐⭐ **FINAL — 2026-08-28 · Muse Spark 1.2 (OpenCode Chief of Staff) — FULL-CORPUS PROOF-OR-DENY + COMPETITIVE PRIORITY RESET** — Every prior finding (54 MASTER + 13 U) re-verified at `7d36def` · **38 FIXED · 9 PARTIAL · 7 OPEN · 6 DENIED/BY-DESIGN** (P0 is now EMPTY) · Fresh line refs + U-defect audit + docs-vs-code drift + revised P1→P2 roadmap · _This supersedes all prior audit tiers for planning._
 2. **[AUDIT_2026-08-28_muse-spark_competitive-uiux-audit.md](./AUDIT_2026-08-28_muse-spark_competitive-uiux-audit.md)** — ⭐ **2026-08-28 · Competitive RED vs BLUE UI/UX audit (13 defects)** — Winner RED 89 vs 85 · Line-anchored findings, token & a11y matrix — _now subsumed by the final above_
 3. **[MASTER_FINDINGS_REGISTER.md](./MASTER_FINDINGS_REGISTER.md)** — ⭐⭐ **THE list that rules them all**: all 54 distinct findings deduplicated (49 OPEN · 3 PARTIAL · 4 FIXED · 5 BY-DESIGN at `f325e50`), P0–P3 tiers, source-ID traceability — _status counts now superseded by the final (38 FIXED). See final for current truth. Historical reference only._
