@@ -15,7 +15,8 @@ import {
 } from '../../src/lib/ai/tableAndExcelParser';
 import {
   planFamilyLogistics,
-  queryFamilySchedule
+  queryFamilySchedule,
+  convertExtractedToMatchdayEvent
 } from '../../src/lib/ai/localAiEngine';
 import { applyEventChatUpdate } from '../../src/lib/ai/eventChatEngine';
 import { MatchdayEvent, PlayerProfile } from '../../src/types/matchday';
@@ -237,6 +238,13 @@ Otso ja Armin omilla kyydeillä`;
       expect(result.kickoffTime).toBe('');
       expect(result.awayTeam === 'Vastustaja' || result.confidenceScore < 0.5).toBe(true);
       expect(result.venueHint).not.toContain('Bollis');
+    });
+
+    it('refuses to persist an event without a real kickoff time', async () => {
+      const extracted = parseFreeformSportsMessage('ok kiitos!', 'Maija');
+      await expect(convertExtractedToMatchdayEvent(extracted, 'p:maija:x')).rejects.toThrow(
+        /En arvaa kello 15:00/
+      );
     });
   });
 

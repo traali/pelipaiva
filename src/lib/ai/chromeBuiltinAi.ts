@@ -45,29 +45,92 @@ export interface LlmReasoningDecision {
   engineUsed: 'fast_nlp' | 'chrome_gemini_nano';
 }
 
-/**
- * Checks if the browser provides built-in AI (e.g. Chrome's Gemini Nano via the W3C Prompt API).
- */
-export async function checkChromeAiCapabilities(): Promise<ChromeAiCapabilities> {
-  if (typeof window === 'undefined') {
-    return { isSupported: false, status: 'no' };
+type PromptSession = {
+  prompt: (input: string) => Promise<string>;
+  destroy?: () => void;
+};
+
+type LanguageModelHandle =
+  | {
+      kind: 'prompt';
+      availability: (opts?: unknown) => Promise<string>;
+      create: (opts?: Record<string, unknown>) => Promise<PromptSession>;
+    }
+  | {
+      kind: 'legacy';
+      capabilities: () => Promise<{ available?: string }>;
+      create: (opts?: Record<string, unknown>) => Promise<PromptSession>;
+    };
+
+function getLanguageModelHandle(): LanguageModelHandle | null {
+  const g = globalThis as Record<string, any>;
+  const promptApi = g.LanguageModel || g.window?.LanguageModel;
+  if (promptApi && typeof promptApi.create === 'function' && typeof promptApi.availability === 'function') {
+    return { kind: 'prompt', availability: promptApi.availability.bind(promptApi), create: promptApi.create.bind(promptApi) };
   }
 
-  const ai = (window as any).ai || (window as any).model;
-  if (!ai?.languageModel) {
+  const legacy = g.window?.ai?.languageModel || g.ai?.languageModel;
+  if (legacy && typeof legacy.create === 'function') {
+    return {
+      kind: 'legacy',
+      capabilities: typeof legacy.capabilities === 'function'
+        ? legacy.capabilities.bind(legacy)
+        : async () => ({ available: 'readily' }),
+      create: legacy.create.bind(legacy)
+    };
+  }
+  return null;
+}
+
+function mapAvailability(raw?: string): ChromeAiCapabilities['status'] {
+  if (raw === 'available' || raw === 'readily') return 'readily';
+  if (raw === 'downloadable' || raw === 'downloading' || raw === 'after-download') return 'after-download';
+  return 'no';
+}
+
+/**
+ * Chrome 148+ Prompt API is `LanguageModel`. `window.ai.languageModel` is obsolete.
+ * iPhone Safari: unavailable — deterministic NLP stays the engine.
+ */
+export async function checkChromeAiCapabilities(): Promise<ChromeAiCapabilities> {
+  const handle = getLanguageModelHandle();
+  if (!handle) {
     return { isSupported: false, status: 'no' };
   }
 
   try {
-    const caps = await ai.languageModel.capabilities();
+    const raw =
+      handle.kind === 'prompt'
+        ? await handle.availability({
+            expectedInputs: [{ type: 'text' }],
+            expectedOutputs: [{ type: 'text' }]
+          })
+        : (await handle.capabilities()).available;
+    const status = mapAvailability(raw);
     return {
-      isSupported: caps.available !== 'no',
-      status: caps.available,
-      modelName: 'Gemini Nano'
+      isSupported: status !== 'no',
+      status,
+      modelName: status === 'no' ? undefined : 'Gemini Nano'
     };
   } catch {
     return { isSupported: false, status: 'no' };
   }
+}
+
+export async function createBuiltInLanguageSession(systemPrompt: string): Promise<PromptSession | null> {
+  const handle = getLanguageModelHandle();
+  if (!handle) return null;
+  const caps = await checkChromeAiCapabilities();
+  if (!caps.isSupported || caps.status !== 'readily') return null;
+
+  if (handle.kind === 'prompt') {
+    return handle.create({
+      initialPrompts: [{ role: 'system', content: systemPrompt }],
+      expectedInputs: [{ type: 'text' }],
+      expectedOutputs: [{ type: 'text' }]
+    });
+  }
+  return handle.create({ systemPrompt, temperature: 0.1 });
 }
 
 /**
@@ -91,8 +154,9 @@ OHJEET PÄÄTTELYYN:
    - Paikka (kenttä, halli, koulu), peliasun väri (esim. Sininen / Valkoinen)
    - Talkoovuorot (esim. Kahviovuoro, Toimitsijavuoro)
    - Tulos (esim. "4-2") tai peruutustieto.
+   - Älä keksity kellonaikaa. Jos viestissä ei ole kelloa, jätä kickoffTime tyhjäksi.
 
-JSON-SKEEEMA:
+JSON-SKEEMA:
 {
   "action": "update_existing" | "create_new",
   "targetEventId": string (vain jos action on "update_existing"),
@@ -130,23 +194,17 @@ JSON-SKEEEMA:
 }
 
 /**
- * Deep semantic reasoning with Google Chrome's Gemini Nano.
+ * Deep semantic reasoning with the browser's on-device Prompt API.
  */
 export async function reasonWithGeminiNano(
   text: string,
   context?: LlmContextGuide,
   defaultPlayerName = 'Pelaaja'
 ): Promise<LlmReasoningDecision | null> {
-  if (typeof window === 'undefined') return null;
-  const ai = (window as any).ai;
-  if (!ai?.languageModel) return null;
-
   try {
     const systemPrompt = buildContextAwareSystemPrompt(context);
-    const session = await ai.languageModel.create({
-      systemPrompt,
-      temperature: 0.1
-    });
+    const session = await createBuiltInLanguageSession(systemPrompt);
+    if (!session) return null;
 
     const rawResponse = await session.prompt(
       `Analysoi seuraava viesti ja palauta JSON-vastaus. Oletuspelaaja on "${defaultPlayerName}":\n\n${text}`
@@ -199,7 +257,7 @@ export async function reasonWithGeminiNano(
 }
 
 /**
- * Parses freeform text using Google Chrome's built-in Gemini Nano model (simple extraction).
+ * Parses freeform text using the browser's on-device language model (simple extraction).
  */
 export async function parseWithGeminiNano(
   text: string,
@@ -213,7 +271,7 @@ export async function parseWithGeminiNano(
  * Progressive Multi-Tier Hybrid Parser:
  * 1. Fast deterministic NLP runs in <1ms.
  * 2. If confidence >= 0.80, returns immediately.
- * 3. If confidence < 0.80 and Chrome Gemini Nano is available, escalates to Gemini Nano.
+ * 3. If confidence < 0.80 and the on-device Prompt API is ready, escalates.
  */
 export async function parseSportsMessageHybrid(
   text: string,
@@ -231,7 +289,6 @@ export async function parseSportsMessageHybrid(
     };
   }
 
-  // Check if Chrome built-in AI is available
   const caps = await checkChromeAiCapabilities();
   if (caps.isSupported && caps.status === 'readily') {
     const nanoResult = await reasonWithGeminiNano(text, context, defaultPlayerName);

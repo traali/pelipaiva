@@ -240,6 +240,11 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
 
   const handleSave = async () => {
     if (!previewEvent) return;
+    if (!previewEvent.dateStr || !previewEvent.kickoffTime || previewEvent.confidenceScore < 0.5) {
+      setSaveError('Viestistä puuttuu päivä tai kellonaika. En arvaa kello 15:00.');
+      setTimeout(() => setSaveError(''), 4000);
+      return;
+    }
     setIsSaving(true);
 
     try {

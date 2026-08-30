@@ -16,6 +16,7 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
 
   afterEach(() => {
     (global as any).window = originalWindow;
+    delete (globalThis as any).LanguageModel;
   });
 
   it('should report unsupported when window.ai is not available (e.g. Safari / Firefox)', async () => {
@@ -23,6 +24,57 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
     const caps = await checkChromeAiCapabilities();
     expect(caps.isSupported).toBe(false);
     expect(caps.status).toBe('no');
+  });
+
+  it('should report supported when Chrome LanguageModel Prompt API is present', async () => {
+    (globalThis as any).LanguageModel = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: vi.fn()
+    };
+    (global as any).window = {};
+
+    const caps = await checkChromeAiCapabilities();
+    expect(caps.isSupported).toBe(true);
+    expect(caps.status).toBe('readily');
+    expect(caps.modelName).toBe('Gemini Nano');
+
+    delete (globalThis as any).LanguageModel;
+  });
+
+  it('prefers LanguageModel over obsolete window.ai', async () => {
+    const promptCreate = vi.fn().mockResolvedValue({
+      prompt: vi.fn().mockResolvedValue(JSON.stringify({
+        action: 'create_new',
+        extractedEvent: {
+          title: 'Nano peli',
+          eventType: 'match',
+          sport: 'football',
+          homeTeam: 'PPJ',
+          awayTeam: 'HJK',
+          dateStr: '2026-09-12',
+          kickoffTime: '14:30',
+          confidenceScore: 0.9
+        }
+      })),
+      destroy: vi.fn()
+    });
+    (globalThis as any).LanguageModel = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: promptCreate
+    };
+    (global as any).window = {
+      ai: {
+        languageModel: {
+          capabilities: vi.fn().mockResolvedValue({ available: 'readily' }),
+          create: vi.fn()
+        }
+      }
+    };
+
+    await parseWithGeminiNano('lauantaina peli', 'Simo');
+    expect(promptCreate).toHaveBeenCalled();
+    expect((global as any).window.ai.languageModel.create).not.toHaveBeenCalled();
+    delete (globalThis as any).LanguageModel;
   });
 
   it('should report supported and ready when Chrome window.ai is present', async () => {

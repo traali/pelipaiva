@@ -4,6 +4,7 @@ import { X, Sparkles, Send, Search, Loader2 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { queryFamilyScheduleWithLLM, CopilotQueryResult } from '../lib/ai/localAiEngine';
+import { checkChromeAiCapabilities, ChromeAiCapabilities } from '../lib/ai/chromeBuiltinAi';
 
 interface AskCopilotModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
   const [query, setQuery] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [result, setResult] = useState<CopilotQueryResult | null>(null);
+  const [aiCaps, setAiCaps] = useState<ChromeAiCapabilities>({ isSupported: false, status: 'no' });
 
   const firstChild = profiles[0]?.playerName || 'lapsella';
 
@@ -33,6 +35,13 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    checkChromeAiCapabilities().then(setAiCaps).catch(() => {
+      setAiCaps({ isSupported: false, status: 'no' });
+    });
+  }, [isOpen]);
 
 
   const sampleQuestions = [
@@ -92,7 +101,9 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                   </h3>
                   <p className="text-xs text-text-muted flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-pitch animate-pulse" />
-                    Laitekohtainen tekoäly & aikataulujärki
+                    {aiCaps.status === 'readily'
+                      ? 'Paikallinen malli tällä laitteella (Gemini Nano)'
+                      : 'Aikataulujärki tällä laitteella — iPhonessa sääntöpohjainen, Chromessa Gemini Nano'}
                   </p>
                 </div>
               </div>
@@ -168,7 +179,11 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-pitch flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Pelipäivä Äly vastaa:</span>
+                    <span>
+                      {result.engineUsed === 'chrome_gemini_nano'
+                        ? 'Paikallinen malli vastaa:'
+                        : 'Aikataulujärki vastaa:'}
+                    </span>
                   </span>
                 </div>
 

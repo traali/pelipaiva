@@ -103,7 +103,7 @@ export function parseTableRows(
     }
 
     const dateStr = extractDateFromFinnishText(dateRaw);
-    const times = extractTimesFromFinnishText(timeRaw || '15:00');
+    const times = extractTimesFromFinnishText(timeRaw);
     const venueHint = extractVenueFromFinnishText(venueRaw);
 
     let homeTeam = defaultPlayer;

@@ -7,6 +7,7 @@ import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
+import { createBuiltInLanguageSession } from './chromeBuiltinAi';
 
 export interface FamilyLogisticsPlan {
   date: string;
@@ -27,6 +28,7 @@ export interface CopilotQueryResult {
   answer: string;
   relevantEvents: MatchdayEvent[];
   confidence: number;
+  engineUsed: 'deterministic' | 'chrome_gemini_nano';
 }
 
 /**
@@ -37,15 +39,41 @@ export async function convertExtractedToMatchdayEvent(
   profileId: string,
   _playerName = 'Pelaaja'
 ): Promise<MatchdayEvent> {
-  const effectiveDate = extracted.dateStr || new Date().toISOString().split('T')[0] || '2026-08-24';
-  const effectiveKickoff = extracted.kickoffTime || '15:00';
-  const effectiveEnd = extracted.endTime || '16:00';
+  if (!extracted.dateStr || !extracted.kickoffTime) {
+    throw new Error('Viestistä puuttuu päivä tai kellonaika. En arvaa kello 15:00.');
+  }
+
+  const effectiveDate = extracted.dateStr;
+  const effectiveKickoff = extracted.kickoffTime;
   const isSchool = extracted.sport === 'school' || extracted.eventType === 'school';
   const isOther = extracted.sport === 'other' || extracted.eventType === 'other' || extracted.eventType === 'meeting';
 
-  const effectiveWarmup = isSchool || isOther
-    ? effectiveKickoff
-    : extracted.warmupTime || '14:15';
+  const [hStr = '12', mStr = '00'] = effectiveKickoff.split(':');
+  const kickMins = Number(hStr) * 60 + Number(mStr);
+  const endMins = extracted.endTime
+    ? (() => {
+        const [eh = '13', em = '00'] = extracted.endTime.split(':');
+        return Number(eh) * 60 + Number(em);
+      })()
+    : kickMins + 60;
+  const warmupMins = isSchool || isOther
+    ? kickMins
+    : extracted.warmupTime
+      ? (() => {
+          const [wh = '11', wm = '15'] = extracted.warmupTime.split(':');
+          return Number(wh) * 60 + Number(wm);
+        })()
+      : kickMins - 45;
+
+  const hm = (total: number) => {
+    const t = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+    const h = Math.floor(t / 60).toString().padStart(2, '0');
+    const m = (t % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  const effectiveEnd = extracted.endTime || hm(endMins);
+  const effectiveWarmup = extracted.warmupTime || hm(warmupMins);
 
   const defaultVenueHint = isSchool ? 'Koulu' : isOther ? 'Paikka ilmoitetaan' : 'Kenttä ilmoitetaan';
   const venue = await resolveSportsVenue(extracted.venueHint || defaultVenueHint);
@@ -158,7 +186,8 @@ export function queryFamilySchedule(
     return {
       answer: plan.whatsAppShareText || plan.summaryNarrative,
       relevantEvents: scopedEvents.slice(0, 8),
-      confidence: 0.9
+      confidence: 0.9,
+      engineUsed: 'deterministic'
     };
   }
 
@@ -171,7 +200,8 @@ export function queryFamilySchedule(
           ? `Ei merkittyjä kahvio- tai toimitsijavuoroja pelaajan ${namedProfile.playerName} otteluissa.`
           : 'Sinulla ei ole merkittyjä kahvio- tai toimitsijavuoroja tulevissa otteluissa.',
         relevantEvents: [],
-        confidence: 0.95
+        confidence: 0.9,
+        engineUsed: 'deterministic'
       };
     }
     const list = dutyEvents
@@ -188,7 +218,8 @@ export function queryFamilySchedule(
     return {
       answer: `Löysin seuraavat vanhempien vuorot:\n${list}`,
       relevantEvents: dutyEvents,
-      confidence: 0.95
+      confidence: 0.9,
+      engineUsed: 'deterministic'
     };
   }
 
@@ -198,7 +229,8 @@ export function queryFamilySchedule(
     return {
       answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
       relevantEvents: turfEvents,
-      confidence: 0.9
+      confidence: 0.9,
+      engineUsed: 'deterministic'
     };
   }
 
@@ -221,7 +253,8 @@ export function queryFamilySchedule(
           ? `Ei tulevia otteluita kalenterissa pelaajalle ${namedProfile.playerName}.`
           : 'Ei tulevia otteluita kalenterissa.',
         relevantEvents: [],
-        confidence: 0.9
+        confidence: 0.9,
+        engineUsed: 'deterministic'
       };
     }
 
@@ -248,7 +281,8 @@ export function queryFamilySchedule(
     return {
       answer: `Seuraava ottelu on ${childName}:lla ${dateStr} klo ${timeStr} (alkulämpö klo ${warmupStr}) kentällä ${next.venue.name}. Vastassa on ${next.awayTeam}.`,
       relevantEvents: [next],
-      confidence: 0.95
+      confidence: 0.9,
+      engineUsed: 'deterministic'
     };
   }
 
@@ -257,13 +291,15 @@ export function queryFamilySchedule(
   return {
     answer: `Perheen kalenterissa on yhteensä ${events.length} merkittyä ottelua ja harjoitusta ${profiles.length} joukkueelle. Voit kysyä esimerkiksi seuraavasta pelistä, kahviovuoroista tai kyytisuunnitelmasta!`,
     relevantEvents: events.slice(0, 3),
-    confidence: 0.8
+    confidence: 0.8,
+    engineUsed: 'deterministic'
   };
 }
 
 /**
- * Enhanced query with On-Device LLM (Chrome Built-in Prompt API / window.ai)
- * with instant fallback to deterministic Finnish sports reasoner.
+ * On-device Prompt API (Chrome `LanguageModel` / Gemini Nano) with
+ * instant fallback to deterministic Finnish sports reasoner.
+ * iPhone Safari has no Prompt API — fallback is the real engine there.
  */
 export async function queryFamilyScheduleWithLLM(
   query: string,
@@ -272,36 +308,32 @@ export async function queryFamilyScheduleWithLLM(
 ): Promise<CopilotQueryResult> {
   const fallback = queryFamilySchedule(query, events, profiles);
 
-  // Check if browser has on-device Gemini Nano / window.ai available
-  if (typeof window !== 'undefined' && (window as any).ai?.languageModel) {
-    try {
-      const capabilities = await (window as any).ai.languageModel.capabilities();
-      if (capabilities.available === 'readily') {
-        const session = await (window as any).ai.languageModel.create({
-          systemPrompt:
-            'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta.'
-        });
-        const context = `Kalenterin tiedot: ${JSON.stringify(
-          events.slice(0, 15).map((e) => ({
-            peli: e.title,
-            aika: e.startTime,
-            paikka: e.venue.name,
-            talkoot: e.volunteerDuty
-          }))
-        )}`;
-        const response = await session.prompt(`${context}\nKysymys: ${query}`);
-        if (response && response.trim().length > 0) {
-          return {
-            answer: response.trim(),
-            relevantEvents: fallback.relevantEvents,
-            // Honest confidence: on-device model output, not a fabricated 0.98.
-            confidence: 0.75
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('[PELIPAIVA:COPILOT] Gemini path failed, using deterministic fallback:', err);
+  try {
+    const session = await createBuiltInLanguageSession(
+      'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta. Älä keksi otteluita, aikoja tai tuloksia joita listassa ei ole.'
+    );
+    if (!session) return fallback;
+
+    const context = `Kalenterin tiedot: ${JSON.stringify(
+      events.slice(0, 15).map((e) => ({
+        peli: e.title,
+        aika: e.startTime,
+        paikka: e.venue.name,
+        talkoot: e.volunteerDuty
+      }))
+    )}`;
+    const response = await session.prompt(`${context}\nKysymys: ${query}`);
+    session.destroy?.();
+    if (response && response.trim().length > 0) {
+      return {
+        answer: response.trim(),
+        relevantEvents: fallback.relevantEvents,
+        confidence: 0.75,
+        engineUsed: 'chrome_gemini_nano'
+      };
     }
+  } catch (err) {
+    console.warn('[PELIPAIVA:COPILOT] Gemini path failed, using deterministic fallback:', err);
   }
 
   return fallback;
