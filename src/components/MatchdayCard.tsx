@@ -174,13 +174,30 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     }
   };
 
+  const isOut = event.attendanceStatus === 'out';
+
+  const handleToggleAttendance = async (newStatus: 'in' | 'out') => {
+    try {
+      const updated: MatchdayEvent = {
+        ...event,
+        attendanceStatus: newStatus
+      };
+      await db.events.update(event.id, { attendanceStatus: newStatus });
+      onEventUpdated?.(updated);
+    } catch (err) {
+      console.error('Failed to toggle attendance', err);
+    }
+  };
+
   return (
     <>
       <motion.div
         layout
         whileTap={{ scale: 0.99 }}
         transition={springTactile.squishy}
-        className={`liquid-glass relative overflow-hidden rounded-3xl transition-colors ${
+        className={`liquid-glass relative overflow-hidden rounded-3xl transition-all ${
+          isOut ? 'opacity-65 grayscale-20 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100' : ''
+        } ${
           compact ? 'p-4 md:p-5' : 'p-5 md:p-6'
         }`}
       >
@@ -193,6 +210,23 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         )}
         {/* Background Ambience Glow */}
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-pitch/10 blur-3xl" />
+
+        {/* Attendance Status: OUT Banner */}
+        {isOut && (
+          <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/90 border border-border-strong flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs font-bold text-text-muted">
+              <span>⛔</span>
+              <span>{playerName || 'Pelaaja'} ei osallistu (Poisjäänti merkitty)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleToggleAttendance('in')}
+              className="px-3 py-1 rounded-xl bg-pitch text-text-inverse text-xs font-bold shadow-xs hover:brightness-110 cursor-pointer transition-all active:scale-95"
+            >
+              ↩️ Osallistuu silti
+            </button>
+          </div>
+        )}
 
         {/* Conflict Warning Banner */}
         {event.briefing?.conflictWarning && (
@@ -326,6 +360,23 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 </button>
               );
             })()}
+
+            {/* 1-Tap Attendance In/Out Button */}
+            {!isOut ? (
+              <button
+                type="button"
+                onClick={() => handleToggleAttendance('out')}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
+                title={`Merkitse poisjäänti: ${playerName || 'Pelaaja'} ei mene`}
+                aria-label={`Merkitse poisjäänti: ${playerName || 'Pelaaja'} ei mene`}
+              >
+                <span>⛔ {playerName || 'Pelaaja'} ei mene</span>
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-stoppage/15 text-stoppage border border-stoppage/30">
+                <span>⛔ Poisjäänti (OUT)</span>
+              </span>
+            )}
           </div>
 
           {/* Live or Kickoff Info & More Actions */}

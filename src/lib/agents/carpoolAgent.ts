@@ -27,9 +27,9 @@ export function carpoolAgent(
   conflicts: FamilyConflict[],
   homeLocation?: HomeLocation
 ): CarpoolLeg[] {
-  const sorted = [...events].sort(
-    (a, b) => new Date(a.warmupTime).getTime() - new Date(b.warmupTime).getTime()
-  );
+  const sorted = [...events]
+    .filter((e) => e && !e.isHidden && e.attendanceStatus !== 'out')
+    .sort((a, b) => new Date(a.warmupTime).getTime() - new Date(b.warmupTime).getTime());
   const conflictedIds = new Set(
     conflicts.filter((c) => c.severity !== 'info').flatMap((c) => [c.eventAId, c.eventBId])
   );

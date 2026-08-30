@@ -29,8 +29,9 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
   );
 
   const cycle = useMemo(() => {
-    const upcoming = events.filter((e) => new Date(e.endTime).getTime() >= Date.now() - 30 * 60000);
-    return upcoming.length > 0 ? upcoming : events.slice(0, 3);
+    const active = events.filter((e) => !e.isHidden && e.attendanceStatus !== 'out');
+    const upcoming = active.filter((e) => new Date(e.endTime).getTime() >= Date.now() - 30 * 60000);
+    return upcoming.length > 0 ? upcoming : active.slice(0, 3);
   }, [events]);
 
   useEffect(() => {

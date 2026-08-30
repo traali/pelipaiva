@@ -181,13 +181,14 @@ export function runMissionControlGraph(
   const week = sportsWeekRange(now);
   const lookbackMs = now.getTime() - 2 * 3600 * 1000;
 
-  const upcoming = [...events].filter((e) => new Date(e.endTime).getTime() >= lookbackMs).sort(byStart);
+  const activeEvents = events.filter((e) => !e.isHidden && e.attendanceStatus !== 'out');
+  const upcoming = [...activeEvents].filter((e) => new Date(e.endTime).getTime() >= lookbackMs).sort(byStart);
 
   const nextEvent = upcoming.find((e) => new Date(e.endTime).getTime() >= now.getTime()) || upcoming[0];
   const nextPlayer = nextEvent ? profiles.find((p) => p.id === nextEvent.profileId) : undefined;
   const depart = nextEvent ? calculateDepartureCountdown(nextEvent, nextPlayer?.arrivalRules, homeLocation) : undefined;
 
-  const windowEvents = eventsInRange(events, week.start, week.end).sort(byStart);
+  const windowEvents = eventsInRange(activeEvents, week.start, week.end).sort(byStart);
 
   const graphEvents = upcoming.filter((e) => new Date(e.startTime).getTime() <= week.end.getTime());
   const specialistEvents =
@@ -196,9 +197,9 @@ export function runMissionControlGraph(
   const conflicts = conflictAgent(specialistEvents, profiles, homeLocation);
   const carpool = carpoolAgent(specialistEvents, profiles, conflicts, homeLocation);
   const talkoo = volunteerAgent(specialistEvents, profiles);
-  const tournaments = tournamentAgent(events, profiles, now);
+  const tournaments = tournamentAgent(activeEvents, profiles, now);
   const kitByEventId = kitAgent(specialistEvents, profiles);
-  const difficultDays = detectDifficultDays(events, profiles, conflicts, now);
+  const difficultDays = detectDifficultDays(activeEvents, profiles, conflicts, now);
 
   const mondayISO = helsinkiDateISO(week.start);
   const days = buildDayStrips(windowEvents, profiles, mondayISO, now);

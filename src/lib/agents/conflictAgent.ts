@@ -16,9 +16,9 @@ export function conflictAgent(
   profiles: PlayerProfile[],
   homeLocation?: HomeLocation
 ): FamilyConflict[] {
-  const upcoming = [...events].sort(
-    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-  );
+  const upcoming = [...events]
+    .filter((e) => e && !e.isHidden && e.attendanceStatus !== 'out')
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   const conflicts: FamilyConflict[] = [];
 
   for (let i = 0; i < upcoming.length; i++) {

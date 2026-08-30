@@ -552,6 +552,10 @@ export interface MatchdayEvent {
   isHidden?: boolean;
   mergedIntoEventId?: string;
 
+  // Attendance status (IN / OUT / MAYBE)
+  attendanceStatus?: 'in' | 'out' | 'maybe';
+  attendanceNotes?: string;
+
   // Milestone 1 & 3 additions:
   officialFixtureId?: string;
   reconciliationStatus?: ReconciliationStatus;
@@ -559,5 +563,6 @@ export interface MatchdayEvent {
   mismatchFlags?: MismatchFlags;
   userOverride?: UserOverrideDecision;
 }
+
 
 

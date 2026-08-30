@@ -26,6 +26,7 @@ import { EventChatModal } from './EventChatModal';
 import { EventMergeModal } from './EventMergeModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
 import { MoreHorizontal, FileText } from 'lucide-react';
+import { db } from '../lib/storage/db';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -123,6 +124,21 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
       ? '🚌 Bussi'
       : '🚗 Lähde';
 
+  const isOut = event.attendanceStatus === 'out';
+
+  const handleToggleAttendance = async (newStatus: 'in' | 'out') => {
+    try {
+      const updated: MatchdayEvent = {
+        ...event,
+        attendanceStatus: newStatus
+      };
+      await db.events.update(event.id, { attendanceStatus: newStatus });
+      onEventUpdated?.(updated);
+    } catch (err) {
+      console.error('Failed to toggle attendance', err);
+    }
+  };
+
   return (
     <article className="liquid-glass relative mb-4 overflow-hidden rounded-2xl border border-border-subtle shadow-card">
       <div
@@ -181,6 +197,27 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             >
               <span>{sourceInfo.badgeText}</span>
             </span>
+
+            {/* 1-Tap Attendance In/Out Button */}
+            {!isOut ? (
+              <button
+                type="button"
+                onClick={() => handleToggleAttendance('out')}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
+                title={`Merkitse poisjäänti: ${profile?.playerName || 'Pelaaja'} ei mene`}
+                aria-label={`Merkitse poisjäänti: ${profile?.playerName || 'Pelaaja'} ei mene`}
+              >
+                <span>⛔ {profile?.playerName || 'Pelaaja'} ei mene</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleToggleAttendance('in')}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-stoppage/15 text-stoppage border border-stoppage/30 hover:bg-pitch hover:text-text-inverse cursor-pointer transition-all active:scale-95"
+              >
+                <span>⛔ Poisjäänti (OUT) • Palauta</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

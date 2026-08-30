@@ -248,6 +248,54 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                 </div>
               </div>
 
+              {/* Attendance Status (IN / OUT) */}
+              <div className="p-3.5 rounded-2xl bg-surface border border-border-subtle flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-bold text-text-primary">Osallistuminen (IN / OUT):</span>
+                  <span className="text-[11px] text-text-secondary">
+                    {sourceEvent.attendanceStatus === 'out'
+                      ? 'Merkitty poisjäänti (ei hälytä lähtöaikoja)'
+                      : 'Merkitty osallistuvaksi tapahtumaan'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await db.events.update(sourceEvent.id, { attendanceStatus: 'in' });
+                      onEventMerged?.({ ...sourceEvent, attendanceStatus: 'in' }, '');
+                      setSuccessMessage('Merkitty: Osallistuu (IN)');
+                      setTimeout(() => onClose(), 800);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      sourceEvent.attendanceStatus !== 'out'
+                        ? 'bg-pitch text-text-inverse shadow-xs'
+                        : 'bg-surface-elevated text-text-secondary border border-border-subtle hover:text-text-primary'
+                    }`}
+                  >
+                    🟢 Osallistuu
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await db.events.update(sourceEvent.id, { attendanceStatus: 'out' });
+                      onEventMerged?.({ ...sourceEvent, attendanceStatus: 'out' }, '');
+                      setSuccessMessage('Merkitty: Ei osallistu (OUT)');
+                      setTimeout(() => onClose(), 800);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      sourceEvent.attendanceStatus === 'out'
+                        ? 'bg-stoppage text-text-inverse shadow-xs'
+                        : 'bg-surface-elevated text-text-secondary border border-border-subtle hover:text-stoppage'
+                    }`}
+                  >
+                    ⛔ Ei mene
+                  </button>
+                </div>
+              </div>
+
               {/* Action 1: Merge into existing fixture */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
