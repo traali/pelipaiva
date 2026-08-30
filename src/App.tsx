@@ -79,6 +79,9 @@ export const App: React.FC = () => {
     url?: string;
     name?: string;
     playerName?: string;
+    colorHex?: string;
+    squadFilters?: string[];
+    profileId?: string;
   }>({});
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
@@ -696,10 +699,13 @@ export const App: React.FC = () => {
 
   const openEditProfile = (profile: PlayerProfile) => {
     setImportDefaults({
+      profileId: profile.id,
       playerName: profile.playerName,
       name: profile.teamName,
       sport: profile.sport,
-      url: profile.calendarUrl || profile.associationUrl || ''
+      url: profile.calendarUrl || profile.associationUrl || '',
+      colorHex: profile.colorHex,
+      squadFilters: profile.squadFilters
     });
     setIsFamilyManageOpen(false);
     setIsSmartImportOpen(true);
@@ -848,6 +854,9 @@ export const App: React.FC = () => {
           initialTeamUrl={importDefaults.url}
           initialTeamName={importDefaults.name}
           initialPlayerName={importDefaults.playerName}
+          initialColorHex={importDefaults.colorHex}
+          initialSquadFilters={importDefaults.squadFilters}
+          editingProfileId={importDefaults.profileId}
         />
         <FamilyShareModal
           isOpen={isFamilyShareOpen}
@@ -1293,6 +1302,9 @@ export const App: React.FC = () => {
         initialTeamUrl={importDefaults.url}
         initialTeamName={importDefaults.name}
         initialPlayerName={importDefaults.playerName}
+        initialColorHex={importDefaults.colorHex}
+        initialSquadFilters={importDefaults.squadFilters}
+        editingProfileId={importDefaults.profileId}
         onImportClassic={handleImportCalendar}
       />
 
