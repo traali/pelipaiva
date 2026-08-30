@@ -202,28 +202,53 @@ export const App: React.FC = () => {
           }
         }
 
+        for (const p of allProfiles) {
+          if (/indians|salibandy|säbä|sähly|oilers|ervii/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'floorball') {
+            await db.profiles.update(p.id, { sport: 'floorball' });
+          }
+          if (/basket|topola|koris|hnmky/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'basketball') {
+            await db.profiles.update(p.id, { sport: 'basketball' });
+          }
+        }
+
         for (const ev of allEvents) {
           const profile = allProfiles.find((p) => p.id === ev.profileId);
           const playerName = profile?.playerName?.trim().toLowerCase() || '';
           const targetSport = officialSportByPlayer.get(playerName);
           const isLyk = /yhteiskoulu|lyk/i.test(ev.venue?.name || '');
+          const isSchoolGym = /lukio|yhteiskoulu|lyk|myk|phyk|syk|tyk/i.test(ev.venue?.name || '');
+          const isFloorballContext =
+            profile?.sport === 'floorball' ||
+            /indians|salibandy|säbä|sähly|oilers|ervii/i.test(
+              `${ev.title} ${ev.notes || ''} ${ev.profileId || ''} ${profile?.calendarUrl || ''}`
+            );
           const isBasketballContext =
             targetSport === 'basketball' ||
+            profile?.sport === 'basketball' ||
             isLyk ||
-            /basket|topola|koris/i.test(`${ev.title} ${ev.notes || ''}`);
+            /basket|topola|koris|hnmky/i.test(
+              `${ev.title} ${ev.notes || ''} ${ev.profileId || ''} ${profile?.calendarUrl || ''}`
+            );
 
           let needsUpdate = false;
           const updates: Partial<MatchdayEvent> = {};
 
-          if (isBasketballContext && ev.sport === 'football') {
+          if (isFloorballContext && ev.sport !== 'floorball') {
+            updates.sport = 'floorball';
+            needsUpdate = true;
+          } else if (isBasketballContext && ev.sport !== 'basketball') {
             updates.sport = 'basketball';
             needsUpdate = true;
           }
 
-          if (isLyk && (!ev.venue.isIndoor || ev.venue.surface === 'artificial_turf_3g')) {
+          if (isSchoolGym && (!ev.venue.isIndoor || ev.venue.surface === 'artificial_turf_3g')) {
             updates.venue = {
               ...ev.venue,
-              name: ev.venue.name.includes('LYK') ? ev.venue.name : `${ev.venue.name} (LYK)`,
+              name: ev.venue.name.includes('LYK')
+                ? ev.venue.name
+                : isLyk
+                ? `${ev.venue.name} (LYK)`
+                : ev.venue.name,
               isIndoor: true,
               surface: 'indoor_parquet'
             };
@@ -887,6 +912,7 @@ export const App: React.FC = () => {
                             allEvents={rawEvents}
                             playerName={profile?.playerName}
                             colorHex={profile?.colorHex}
+                            profile={profile}
                             compact
                             conflicts={snapshot.conflicts}
                             homeLocation={homeLocation}

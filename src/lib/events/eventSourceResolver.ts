@@ -52,14 +52,15 @@ export function resolveEventSourceInfo(
   // 2. Detect Club system / Calendar / Drop-in source
   const calUrl = profile?.calendarUrl?.toLowerCase() || '';
   const eventId = event.id || '';
+  const contextHint = `${calUrl} ${profile?.associationUrl || ''} ${event.profileId || ''} ${event.id || ''} ${event.notes || ''}`.toLowerCase();
 
-  if (calUrl.includes('myclub')) {
+  if (contextHint.includes('myclub')) {
     sources.push('MyClub');
-  } else if (calUrl.includes('nimenhuuto')) {
+  } else if (contextHint.includes('nimenhuuto')) {
     sources.push('Nimenhuuto');
-  } else if (calUrl.includes('jopox')) {
+  } else if (contextHint.includes('jopox')) {
     sources.push('Jopox');
-  } else if (calUrl.includes('suomisport')) {
+  } else if (contextHint.includes('suomisport')) {
     sources.push('SuomiSport');
   } else if (
     eventId.startsWith('dropin_') ||
@@ -99,6 +100,8 @@ export function resolveEventSourceInfo(
   if (uniqueSources.length === 0) {
     if (event.tournamentName || event.stage) {
       uniqueSources.push('Torneopal');
+    } else if (event.isTraining) {
+      uniqueSources.push('Seurakalenteri');
     } else {
       uniqueSources.push('Tulospalvelu');
     }

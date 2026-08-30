@@ -15,7 +15,7 @@ import {
   Sparkles,
   MessageSquare
 } from 'lucide-react';
-import { MatchdayEvent, FullMatchStats, PlayerMatchLog } from '../types/matchday';
+import { MatchdayEvent, FullMatchStats, PlayerMatchLog, PlayerProfile } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { NappisvahtiPill } from './NappisvahtiPill';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
@@ -61,6 +61,7 @@ interface MatchdayCardProps {
   allEvents?: MatchdayEvent[];
   playerName?: string;
   colorHex?: string;
+  profile?: PlayerProfile;
   compact?: boolean;
   conflicts?: FamilyConflict[];
   homeLocation?: HomeLocation;
@@ -78,6 +79,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   allEvents = [],
   playerName,
   colorHex,
+  profile,
   compact = false,
   conflicts,
   homeLocation,
@@ -300,7 +302,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
             {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
             {(() => {
-              const sourceInfo = resolveEventSourceInfo(event);
+              const sourceInfo = resolveEventSourceInfo(event, profile);
               return (
                 <button
                   type="button"
