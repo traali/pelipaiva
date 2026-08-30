@@ -305,6 +305,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
           </div>
 
           <input
+            id="quick-dropin-input"
+            name="quickDropInText"
+            aria-label="Liitä tapahtumateksti tai kirjoita oma merkintä"
             type="text"
             value={text}
             onFocus={() => setIsExpanded(true)}

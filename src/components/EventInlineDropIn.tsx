@@ -149,9 +149,10 @@ export const EventInlineDropIn: React.FC<EventInlineDropInProps> = ({
               type="button"
               onClick={handlePasteFromClipboard}
               title="Liitä leikepöydältä"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-pitch hover:border-pitch/40 cursor-pointer transition-all shadow-xs"
+              aria-label="Liitä leikepöydältä"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[32px] rounded-lg bg-surface border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-pitch hover:border-pitch/40 cursor-pointer transition-all shadow-xs"
             >
-              <ClipboardPaste className="w-3 h-3" />
+              <ClipboardPaste className="w-3.5 h-3.5" />
               <span className="hidden xs:inline">Liitä</span>
             </button>
           )}
@@ -159,8 +160,8 @@ export const EventInlineDropIn: React.FC<EventInlineDropInProps> = ({
           <button
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
-            aria-label={isOpen ? 'Sulje' : 'Avaa'}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface cursor-pointer transition-colors"
+            aria-label={isOpen ? 'Sulje pikasyöttö' : 'Avaa pikasyöttö'}
+            className="p-2 min-h-[32px] min-w-[32px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-surface cursor-pointer transition-colors"
           >
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
