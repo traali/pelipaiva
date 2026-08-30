@@ -12,6 +12,11 @@ export const NATIONAL_FIELD_ALIASES: Record<
     hasFloodlights: boolean;
   }
 > = {
+  'pyrkkä': { name: 'Lauttasaaren urheilupuisto "Pyrkkä"', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'pyrkkä tn': { name: 'Lauttasaaren urheilupuisto "Pyrkkä"', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lauttasaaren urheilupuisto': { name: 'Lauttasaaren urheilupuisto "Pyrkkä"', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lahnalahdentie 4': { name: 'Lauttasaaren urheilupuisto "Pyrkkä"', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lahnalahdentie': { name: 'Lauttasaaren urheilupuisto "Pyrkkä"', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'lauttasaari tn b': { name: 'Lauttasaari TN B', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'lauttasaari tn a': { name: 'Lauttasaari TN A', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'lauttasaari tn': { name: 'Lauttasaaren tekonurmi', lat: 60.16357, lng: 24.86750, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },

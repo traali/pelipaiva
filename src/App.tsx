@@ -206,13 +206,13 @@ export const App: React.FC = () => {
 
         for (const p of allProfiles) {
           const pUpdates: Partial<PlayerProfile> = {};
-          if (/indians|salibandy|säbä|sähly|oilers|ervii/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'floorball') {
+          if (/ppj|pallo-pojat|hjk|futis|jalkapallo|palloliitto/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'football') {
+            pUpdates.sport = 'football';
+          } else if (/indians|salibandy|säbä|sähly|oilers|ervii/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'floorball') {
             pUpdates.sport = 'floorball';
-          }
-          if (/basket|topola|koris|hnmky/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'basketball') {
+          } else if (/basket|topola|koris|hnmky/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'basketball') {
             pUpdates.sport = 'basketball';
-          }
-          if (/lentopallo|puma|lp viesti/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'volleyball') {
+          } else if (/lentopallo|puma|lp viesti/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'volleyball') {
             pUpdates.sport = 'volleyball';
           }
 
@@ -244,23 +244,36 @@ export const App: React.FC = () => {
           const targetSport = officialSportByPlayer.get(playerName);
           const isLyk = /yhteiskoulu|lyk/i.test(ev.venue?.name || '');
           const isSchoolGym = /lukio|yhteiskoulu|lyk|myk|phyk|syk|tyk/i.test(ev.venue?.name || '');
+
+          const isFootballContext =
+            /ppj|pallo-pojat|hjk|futis|jalkapallo|palloliitto|pyrkkä|ruukinlahti|bollis/i.test(
+              `${ev.title} ${ev.notes || ''} ${profile?.teamName || ''}`
+            ) ||
+            (profile?.sport === 'football' && !/indians|salibandy|säbä|sähly|topola|basket/i.test(ev.title));
+
           const isFloorballContext =
-            profile?.sport === 'floorball' ||
+            !isFootballContext &&
+            (profile?.sport === 'floorball' ||
             /indians|salibandy|säbä|sähly|oilers|ervii/i.test(
               `${ev.title} ${ev.notes || ''} ${ev.profileId || ''} ${profile?.calendarUrl || ''}`
-            );
+            ));
+
           const isBasketballContext =
-            targetSport === 'basketball' ||
+            !isFootballContext &&
+            (targetSport === 'basketball' ||
             profile?.sport === 'basketball' ||
             isLyk ||
             /basket|topola|koris|hnmky/i.test(
               `${ev.title} ${ev.notes || ''} ${ev.profileId || ''} ${profile?.calendarUrl || ''}`
-            );
+            ));
 
           let needsUpdate = false;
           const updates: Partial<MatchdayEvent> = {};
 
-          if (isFloorballContext && ev.sport !== 'floorball') {
+          if (isFootballContext && ev.sport !== 'football') {
+            updates.sport = 'football';
+            needsUpdate = true;
+          } else if (isFloorballContext && ev.sport !== 'floorball') {
             updates.sport = 'floorball';
             needsUpdate = true;
           } else if (isBasketballContext && ev.sport !== 'basketball') {
@@ -268,14 +281,35 @@ export const App: React.FC = () => {
             needsUpdate = true;
           }
 
-          if (isSchoolGym && (!ev.venue.isIndoor || ev.venue.surface === 'artificial_turf_3g')) {
+          // Check if venue is Pyrkkä or Lauttasaaren urheilupuisto
+          const isPyrkka = /pyrkkä|lauttasaaren urheilupuisto|lahnalahdentie/i.test(
+            `${ev.venue?.name || ''} ${ev.venue?.normalizedName || ''}`
+          );
+          if (
+            isPyrkka &&
+            (Math.abs((ev.venue?.coordinates?.lat || 0) - 60.16357) > 0.001 ||
+              Math.abs((ev.venue?.coordinates?.lng || 0) - 24.86750) > 0.001)
+          ) {
             updates.venue = {
               ...ev.venue,
-              name: ev.venue.name.includes('LYK')
-                ? ev.venue.name
+              name: 'Lauttasaaren urheilupuisto "Pyrkkä"',
+              normalizedName: 'lauttasaaren urheilupuisto pyrkkä',
+              coordinates: { lat: 60.16357, lng: 24.86750 },
+              isIndoor: false,
+              surface: 'artificial_turf_3g',
+              hasFloodlights: true
+            };
+            needsUpdate = true;
+          }
+
+          if (isSchoolGym && (!ev.venue.isIndoor || ev.venue.surface === 'artificial_turf_3g')) {
+            updates.venue = {
+              ...(updates.venue || ev.venue),
+              name: (updates.venue?.name || ev.venue.name).includes('LYK')
+                ? (updates.venue?.name || ev.venue.name)
                 : isLyk
-                ? `${ev.venue.name} (LYK)`
-                : ev.venue.name,
+                ? `${(updates.venue?.name || ev.venue.name)} (LYK)`
+                : (updates.venue?.name || ev.venue.name),
               isIndoor: true,
               surface: 'indoor_parquet'
             };

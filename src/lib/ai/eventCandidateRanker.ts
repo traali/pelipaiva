@@ -46,7 +46,7 @@ export function detectSportFromText(text: string): SportType | undefined {
   if (/\b(?:futsal)\b/i.test(norm)) {
     return 'futsal';
   }
-  if (/\b(?:futis|jalkapallo|nappikset|säärisuojat|viheriö|nurmi|tekonurmi|bollis|spl)\b/i.test(norm)) {
+  if (/\b(?:futis|jalkapallo|ppj|pallo-pojat|hjk|honka|vjs|pk-35|gnistan|käpa|fcfj|eps|ebk|palloliitto|piirisarja|11vs11|8vs8|5vs5|nappikset|säärisuojat|viheriö|nurmi|tekonurmi|bollis|spl)\b/i.test(norm)) {
     return 'football';
   }
   return undefined;
