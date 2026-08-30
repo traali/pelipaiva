@@ -522,22 +522,99 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                   </div>
                 )}
 
-                {/* RANKED CANDIDATE MATCHES LIST (Best to Weakest) */}
-                {rankingResult && rankingResult.candidates.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-text-secondary">
-                      <span className="flex items-center gap-1">
-                        <Link2 className="w-3.5 h-3.5 text-pitch" />
-                        <span>AI:n löytämät ottelut (parhaasta heikompaan):</span>
+                {/* 1. PRIMARY DEFAULT OPTION: CREATE NEW EVENT */}
+                {previewEvent && (
+                  <div className="pt-1">
+                    <div className="text-[12px] font-extrabold text-pitch mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="w-4 h-4" />
+                        <span>Luo uusi tapahtuma kalenteriin (Oletus):</span>
                       </span>
-                      <span className="text-text-muted">
-                        {rankingResult.candidates.length} ehdotus{rankingResult.candidates.length > 1 ? 'ta' : ''}
+                      <span className="text-[10px] font-semibold text-text-muted">
+                        Pelaajalle {selectedPlayer}
+                      </span>
+                    </div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 rounded-2xl bg-surface border-2 border-pitch/40 shadow-sm shadow-pitch/10 flex flex-col gap-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-sm font-black text-text-primary">
+                          <span className="text-pitch text-base">
+                            {previewEvent.sport === 'school' ? '🏫' : previewEvent.sport === 'other' ? '📌' : '✨'}
+                          </span>
+                          <span>{previewEvent.title}</span>
+                        </div>
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-pitch/20 text-pitch font-black">
+                          {previewEvent.dateStr}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-xs text-text-secondary flex-wrap">
+                        <span className="flex items-center gap-1.5 font-semibold">
+                          <Clock className="w-3.5 h-3.5 text-pitch" />
+                          <span>
+                            {previewEvent.sport === 'school' || previewEvent.sport === 'other' || previewEvent.eventType === 'school' || previewEvent.eventType === 'meeting' || previewEvent.eventType === 'other'
+                              ? `Klo ${previewEvent.kickoffTime}${previewEvent.endTime ? ` – ${previewEvent.endTime}` : ''}`
+                              : `Aloitus klo ${previewEvent.kickoffTime} (Alkulämpö ${previewEvent.warmupTime})`}
+                          </span>
+                        </span>
+                        {previewEvent.venueHint && (
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-radar" />
+                            <span>{previewEvent.venueHint}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {previewEvent.kitColor && (
+                        <div className="text-xs text-pitch font-semibold flex items-center gap-1.5">
+                          <Shirt className="w-3.5 h-3.5" />
+                          <span>Peliasu: {previewEvent.kitColor}</span>
+                        </div>
+                      )}
+
+                      {previewEvent.volunteerDuties.length > 0 && (
+                        <div className="text-xs text-whistle font-semibold">
+                          <span>{previewEvent.volunteerDuties.join(' • ')}</span>
+                        </div>
+                      )}
+
+                      <div className="mt-1 flex items-center justify-between pt-2 border-t border-border-subtle">
+                        <span className="text-[11px] text-text-muted flex items-center gap-1">
+                          <User className="w-3.5 h-3.5 text-pitch" />
+                          <span>Lisätään pelaajalle <strong>{selectedPlayer}</strong> ({sportLabelFi(selectedSport)})</span>
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="py-2 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center gap-1.5 hover:brightness-110 shadow-sm shadow-pitch/20 transition-all cursor-pointer"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Tallenna uutena tapahtumana</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+
+                {/* 2. OPTIONAL MATCHING CANDIDATES (Listed below) */}
+                {rankingResult && rankingResult.candidates.length > 0 && (
+                  <div className="pt-3 border-t border-border-subtle/80 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-text-secondary">
+                      <span className="flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-text-muted" />
+                        <span>Tai yhdistä olemassa olevaan otteluun ({rankingResult.candidates.length} vaihtoehtoa):</span>
                       </span>
                     </div>
 
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                      {rankingResult.candidates.map((cand, idx) => {
-                        const isTop = idx === 0;
+                      {rankingResult.candidates.map((cand) => {
+                        const isGoodMatch = cand.matchPercentage >= 65;
                         const candDate = new Date(cand.event.startTime).toLocaleDateString('fi-FI', {
                           weekday: 'short',
                           day: 'numeric',
@@ -554,24 +631,24 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                             key={cand.event.id}
                             initial={{ opacity: 0, y: 3 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 ${
-                              isTop
-                                ? 'bg-surface border-pitch shadow-sm shadow-pitch/10'
-                                : 'bg-surface/70 border-border-subtle hover:border-border-strong'
+                            className={`p-3 rounded-xl border transition-all flex flex-col gap-2 ${
+                              isGoodMatch
+                                ? 'bg-surface border-border-strong hover:border-pitch'
+                                : 'opacity-65 hover:opacity-100 bg-surface-elevated/40 border-border-subtle'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span
                                   className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                                    cand.matchPercentage >= 80
+                                    isGoodMatch
                                       ? 'bg-pitch/20 text-pitch border border-pitch/40'
-                                      : 'bg-whistle/20 text-whistle border border-whistle/40'
+                                      : 'bg-surface-elevated text-text-muted border border-border-subtle'
                                   }`}
                                 >
-                                  {isTop ? '🥇 Paras osuma' : `${idx + 1}. Vaihtoehto`} ({cand.matchPercentage}%)
+                                  {isGoodMatch ? `🎯 Hyvä osuma (${cand.matchPercentage}%)` : `⚪ Heikko osuma (${cand.matchPercentage}%)`}
                                 </span>
-                                <span className="text-xs font-black text-text-primary truncate">
+                                <span className={`text-xs font-black truncate ${isGoodMatch ? 'text-text-primary' : 'text-text-secondary'}`}>
                                   {cand.event.isTraining
                                     ? cand.event.title
                                     : `${cand.event.homeTeam} vs ${cand.event.awayTeam}`}
@@ -580,17 +657,8 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
 
                               <div className="flex items-center gap-1 shrink-0">
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-elevated text-text-secondary">
-                                  {cand.event.sport === 'floorball'
-                                    ? '🏑 Säbä'
-                                    : cand.event.sport === 'basketball'
-                                    ? '🏀 Koris'
-                                    : cand.event.sport === 'volleyball'
-                                    ? '🏐 Lentis'
-                                    : cand.event.sport === 'icehockey'
-                                    ? '🏒 Lätkä'
-                                    : '⚽ Futis'}
+                                  {sportLabelFi(cand.event.sport)}
                                 </span>
-
                                 {cand.profile && (
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface-elevated text-text-secondary">
                                     👤 {cand.profile.playerName}
@@ -601,7 +669,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
 
                             <div className="flex items-center gap-2 text-[11px] text-text-secondary flex-wrap">
                               <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-pitch" />
+                                <Clock className="w-3 h-3 text-text-muted" />
                                 <span>{candDate} klo {candTime}</span>
                               </span>
                               <span>•</span>
@@ -611,9 +679,8 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                               </span>
                             </div>
 
-                            {/* AI Suggestion Narrative */}
-                            <div className="text-xs text-text-secondary bg-surface-elevated p-2 rounded-xl border border-border-subtle/80 flex flex-col gap-0.5">
-                              <div className="text-[10px] font-bold text-pitch uppercase tracking-wider">
+                            <div className="text-xs text-text-secondary bg-surface-elevated/70 p-2 rounded-lg border border-border-subtle flex flex-col gap-0.5">
+                              <div className={`text-[10px] font-bold uppercase tracking-wider ${isGoodMatch ? 'text-pitch' : 'text-text-muted'}`}>
                                 {cand.matchReason}
                               </div>
                               <div className="text-[11px] text-text-primary font-medium">
@@ -621,104 +688,25 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                               </div>
                             </div>
 
-                            <div className="pt-1 flex items-center justify-between border-t border-border-subtle/60">
+                            <div className="pt-1 flex items-center justify-end border-t border-border-subtle/60">
                               <button
                                 type="button"
                                 onClick={() => handleUpdateSpecificMatch(cand.event)}
                                 disabled={isSaving}
-                                className={`py-1.5 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all ${
-                                  isTop
-                                    ? 'bg-pitch text-text-inverse hover:brightness-110 shadow-pitch/20'
-                                    : 'bg-surface-elevated border border-border-strong text-text-primary hover:border-pitch hover:text-pitch'
+                                className={`py-1 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all ${
+                                  isGoodMatch
+                                    ? 'bg-surface-elevated border border-pitch/50 text-pitch hover:bg-pitch hover:text-text-inverse'
+                                    : 'bg-surface-elevated border border-border-subtle text-text-secondary hover:text-text-primary'
                                 }`}
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Yhdistä tähän otteluun</span>
+                                <span>{isGoodMatch ? 'Yhdistä tähän otteluun' : 'Yhdistä silti tähän'}</span>
                               </button>
                             </div>
                           </motion.div>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-
-                {/* Fallback Option: Create As A Brand New Event */}
-                {previewEvent && (
-                  <div className="pt-2 border-t border-border-subtle/80">
-                    <div className="text-[11px] font-bold text-text-secondary mb-1.5 flex items-center gap-1">
-                      <span>✨</span>
-                      <span>
-                        {rankingResult && rankingResult.candidates.length > 0
-                          ? 'Tai luo kokonaan uusi erillinen tapahtuma:'
-                          : 'Luo uusi tapahtuma kalenteriin:'}
-                      </span>
-                    </div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-3 rounded-xl bg-surface border border-border-subtle flex flex-col gap-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-black text-text-primary">
-                          <span className="text-pitch">
-                            {previewEvent.sport === 'school' ? '🏫' : previewEvent.sport === 'other' ? '📌' : '✨'}
-                          </span>
-                          <span>{previewEvent.title}</span>
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-pitch/15 text-pitch font-bold">
-                          {previewEvent.dateStr}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-[11px] text-text-secondary flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-pitch" />
-                          <span>
-                            {previewEvent.sport === 'school' || previewEvent.sport === 'other' || previewEvent.eventType === 'school' || previewEvent.eventType === 'meeting' || previewEvent.eventType === 'other'
-                              ? `Klo ${previewEvent.kickoffTime}${previewEvent.endTime ? ` – ${previewEvent.endTime}` : ''}`
-                              : `Aloitus klo ${previewEvent.kickoffTime} (Alkulämpö ${previewEvent.warmupTime})`}
-                          </span>
-                        </span>
-                        {previewEvent.venueHint && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-radar" />
-                            <span>{previewEvent.venueHint}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {previewEvent.kitColor && (
-                        <div className="text-[11px] text-pitch font-semibold flex items-center gap-1">
-                          <Shirt className="w-3 h-3" />
-                          <span>{previewEvent.kitColor}</span>
-                        </div>
-                      )}
-
-                      {previewEvent.volunteerDuties.length > 0 && (
-                        <div className="text-[11px] text-whistle font-semibold">
-                          <span>{previewEvent.volunteerDuties.join(' • ')}</span>
-                        </div>
-                      )}
-
-                      <div className="mt-1 flex items-center justify-between pt-1.5 border-t border-border-subtle">
-                        <span className="text-[10px] text-text-muted flex items-center gap-1">
-                          <User className="w-3 h-3 text-pitch" />
-                          <span>Lisätään pelaajalle <strong>{selectedPlayer}</strong></span>
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={handleSave}
-                          disabled={isSaving}
-                          className="py-1.5 px-3 rounded-lg bg-surface-elevated border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-pitch" />
-                          <span>Tallenna uutena tapahtumana</span>
-                        </button>
-                      </div>
-                    </motion.div>
                   </div>
                 )}
 
