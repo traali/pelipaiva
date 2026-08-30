@@ -143,7 +143,13 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('ambient') === 'true' || window.location.pathname === '/ambient') {
+      const isAmbientRequest =
+        params.get('ambient') === 'true' ||
+        params.get('nest') === 'true' ||
+        params.get('display') === 'true' ||
+        window.location.pathname === '/ambient';
+
+      if (isAmbientRequest) {
         setIsAmbientMode(true);
       }
 
@@ -155,7 +161,11 @@ export const App: React.FC = () => {
           if (res.success) {
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);
-            window.history.replaceState({}, document.title, window.location.pathname);
+            if (isAmbientRequest) {
+              setIsAmbientMode(true);
+            } else {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
           } else {
             // FAMILY_CODES_OPS §7 mandates these client messages; the code
             // stays in the URL so a fix/retry is possible (M-28).

@@ -11,7 +11,8 @@ import {
   Smartphone,
   RefreshCw,
   MessageCircle,
-  Key
+  Key,
+  Tv
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { PlayerProfile } from '../types/matchday';
@@ -38,11 +39,13 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   profiles = [],
   onDataImported
 }) => {
-  const [activeTab, setActiveTab] = useState<'code' | 'link' | 'backup'>('link');
+  const [activeTab, setActiveTab] = useState<'code' | 'link' | 'nest' | 'backup'>('link');
   const [familyCode, setFamilyCode] = useState<string>('');
   const [inputCode, setInputCode] = useState<string>('');
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedNest, setCopiedNest] = useState(false);
+  const [copiedRoutine, setCopiedRoutine] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -119,9 +122,10 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
           : ''
       : '';
 
+  const nestUrl = shareUrl ? `${shareUrl}${shareUrl.includes('?') ? '&' : '?'}ambient=true` : '';
+
   const handleCopyLink = async () => {
     if (!shareUrl) return;
-    // Await + catch: clipboard permission denial must not report success (M-08/V56).
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
@@ -129,6 +133,29 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       setStatusMessage('Kopiointi estetty — valitse linkki ja kopioi käsin.');
     }
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyNestLink = async () => {
+    if (!nestUrl) return;
+    try {
+      await navigator.clipboard.writeText(nestUrl);
+      setCopiedNest(true);
+    } catch {
+      setStatusMessage('Kopiointi estetty — valitse linkki ja kopioi käsin.');
+    }
+    setTimeout(() => setCopiedNest(false), 2000);
+  };
+
+  const handleCopyRoutineCommand = async () => {
+    if (!nestUrl) return;
+    const cmd = `open ${nestUrl}`;
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setCopiedRoutine(true);
+    } catch {
+      setStatusMessage('Kopiointi estetty — valitse komento ja kopioi käsin.');
+    }
+    setTimeout(() => setCopiedRoutine(false), 2000);
   };
 
   const handleCopyWhatsAppMessage = async () => {
@@ -291,6 +318,18 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('nest')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeTab === 'nest'
+                    ? 'bg-pitch text-text-inverse shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span>Google Nest</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('backup')}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   activeTab === 'backup'
@@ -432,6 +471,90 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                 ) : (
                   <div className="py-6 text-center text-xs text-text-muted">
                     Lisää ensin vähintään yksi lapsi ja joukkue, niin perheen jakolinkki syntyy automaattisesti.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Google Nest & Älynäytöt */}
+            {activeTab === 'nest' && (
+              <div className="flex flex-col gap-3.5 text-left">
+                <div className="p-3.5 rounded-2xl bg-surface-elevated border border-pitch/30 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-pitch/20 text-pitch">
+                      <Tv className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs font-black text-text-primary">
+                      Google Nest Hub & Keittiönäyttö
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-text-muted leading-relaxed">
+                    Avaa perheen ottelut ja lähtölaskennan suoraan älynäytölle (Google Nest Hub, iPad, TV). Näyttö on optimoitu luettavaksi kaukaakin ilman kirjautumisia.
+                  </p>
+                </div>
+
+                {nestUrl ? (
+                  <>
+                    <div>
+                      <label className="block text-[11px] font-bold text-text-secondary mb-1">
+                        Google Nest -suoralinkki:
+                      </label>
+                      <div className="p-2.5 rounded-xl bg-surface border border-border-strong font-mono text-[11px] text-text-primary break-all">
+                        {nestUrl}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyNestLink}
+                        className="mt-1.5 w-full py-2.5 px-3 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-sm"
+                      >
+                        {copiedNest ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedNest ? 'Kopioitu leikepöydälle!' : 'Kopioi Google Nest -linkki'}</span>
+                      </button>
+                    </div>
+
+                    {/* Google Home Routine Guide */}
+                    <div className="p-3.5 rounded-2xl bg-surface border border-border-strong flex flex-col gap-2.5">
+                      <div className="text-xs font-bold text-text-primary flex items-center justify-between">
+                        <span>🎙️ Google Home -automaatio (Rutiini):</span>
+                      </div>
+                      <div className="text-[11px] text-text-secondary flex flex-col gap-2">
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-pitch shrink-0">1.</span>
+                          <span>Avaa <strong>Google Home</strong> -sovellus puhelimellasi.</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-pitch shrink-0">2.</span>
+                          <span>Mene alhaalta kohtaan <strong>Automaatiot (+ Lisää)</strong> &rarr; <strong>Kotitalous</strong>.</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-pitch shrink-0">3.</span>
+                          <span><strong>Aloitus:</strong> Valitse <em>"Kun sanon Google Assistantille..."</em> &rarr; kirjoita: <code className="bg-surface-elevated px-1 py-0.5 rounded text-pitch font-mono font-bold">näytä pelit</code></span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-pitch shrink-0">4.</span>
+                          <span><strong>Toiminto:</strong> Valitse <em>"Kokeile omia komentoja"</em> &rarr; liitä:</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-surface-elevated border border-border-subtle font-mono text-[11px] text-text-primary break-all flex items-center justify-between gap-2">
+                          <span className="select-all">open {nestUrl}</span>
+                          <button
+                            type="button"
+                            onClick={handleCopyRoutineCommand}
+                            title="Kopioi komento"
+                            className="shrink-0 p-1.5 rounded-md hover:bg-surface text-pitch cursor-pointer"
+                          >
+                            {copiedRoutine ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <div className="flex items-start gap-1.5 mt-0.5">
+                          <span className="font-bold text-pitch shrink-0">5.</span>
+                          <span><strong>Tallenna rutiini!</strong> Sano keittiössä Nestille: <em>"Hey Google, näytä pelit"</em>.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-6 text-center text-xs text-text-muted">
+                    Lisää ensin vähintään yksi joukkue, niin linkki muodostuu automaattisesti.
                   </div>
                 )}
               </div>
