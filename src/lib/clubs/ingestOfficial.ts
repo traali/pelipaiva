@@ -160,15 +160,39 @@ export async function ingestOfficialForProfile(opts: {
   return { official: officialData, resolvedTeamName: resolvedName };
 }
 
+export function isLikelyIcsUrl(url?: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const raw = url.trim().toLowerCase();
+  if (!raw.startsWith('http://') && !raw.startsWith('https://') && !raw.startsWith('webcal://')) {
+    return false;
+  }
+  if (
+    raw.includes('tulospalvelu.palloliitto.fi') ||
+    raw.includes('tulospalvelu.salibandy.fi') ||
+    raw.includes('tulospalvelu.lentopallo.fi') ||
+    raw.includes('tulospalvelu.basket.fi') ||
+    raw.includes('basket.fi') ||
+    raw.includes('torneopal.fi')
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export async function fetchRawIcsFeed(url: string): Promise<string | null> {
-  if (!url) return null;
+  if (!url || !isLikelyIcsUrl(url)) return null;
   const raw = url.trim().replace(/^webcal:/i, 'https:');
   const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
   try {
     const res = await fetch(target, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) return null;
     const text = await res.text();
-    return text && text.length >= 20 ? text : null;
+    if (!text || text.length < 20) return null;
+    const trimmed = text.trim();
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('{"error"')) {
+      return null;
+    }
+    return text;
   } catch {
     return null;
   }

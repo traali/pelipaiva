@@ -440,6 +440,10 @@ export interface FeedCategory {
  */
 export function extractFeedCategories(icsContent: string): FeedCategory[] {
   if (!icsContent || typeof icsContent !== 'string') return [];
+  const trimmed = icsContent.trim();
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('{"error"') || !trimmed.includes('BEGIN:VCALENDAR')) {
+    return [];
+  }
 
   const categoryCounts = new Map<string, number>();
 
@@ -580,6 +584,11 @@ export async function parseICSFeed(
   squadFilters?: string[]
 ): Promise<MatchdayEvent[]> {
   const events: MatchdayEvent[] = [];
+  if (!icsContent || typeof icsContent !== 'string') return events;
+  const trimmed = icsContent.trim();
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('{"error"') || !trimmed.includes('BEGIN:VCALENDAR')) {
+    return events;
+  }
 
   try {
     const jcalData = ICAL.parse(icsContent);

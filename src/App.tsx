@@ -204,11 +204,36 @@ export const App: React.FC = () => {
         }
 
         for (const p of allProfiles) {
+          const pUpdates: Partial<PlayerProfile> = {};
           if (/indians|salibandy|säbä|sähly|oilers|ervii/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'floorball') {
-            await db.profiles.update(p.id, { sport: 'floorball' });
+            pUpdates.sport = 'floorball';
           }
           if (/basket|topola|koris|hnmky/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'basketball') {
-            await db.profiles.update(p.id, { sport: 'basketball' });
+            pUpdates.sport = 'basketball';
+          }
+          if (/lentopallo|puma|lp viesti/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'volleyball') {
+            pUpdates.sport = 'volleyball';
+          }
+
+          // Clean up corrupted calendarUrl (e.g. literal team string like "PPJ/Laru mus" or association page)
+          if (p.calendarUrl) {
+            const rawCal = p.calendarUrl.trim();
+            if (!rawCal.startsWith('http://') && !rawCal.startsWith('https://') && !rawCal.startsWith('webcal://')) {
+              pUpdates.calendarUrl = undefined;
+            } else if (
+              rawCal.includes('tulospalvelu.') ||
+              rawCal.includes('basket.fi') ||
+              rawCal.includes('torneopal.fi')
+            ) {
+              if (!p.associationUrl) {
+                pUpdates.associationUrl = rawCal;
+              }
+              pUpdates.calendarUrl = undefined;
+            }
+          }
+
+          if (Object.keys(pUpdates).length > 0) {
+            await db.profiles.update(p.id, pUpdates);
           }
         }
 

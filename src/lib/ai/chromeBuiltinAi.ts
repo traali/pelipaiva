@@ -130,7 +130,9 @@ export async function createBuiltInLanguageSession(systemPrompt: string): Promis
     return handle.create({
       initialPrompts: [{ role: 'system', content: systemPrompt }],
       expectedInputs: [{ type: 'text' }],
-      expectedOutputs: [{ type: 'text' }]
+      expectedOutputs: [{ type: 'text' }],
+      outputLanguage: 'en',
+      expectedInputLanguages: ['fi', 'en']
     });
   }
   return handle.create({ systemPrompt, temperature: 0.1 });

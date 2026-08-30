@@ -6,7 +6,7 @@ import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { formatHomeTransitSummary } from '../lib/storage/homeLocation';
 import { db } from '../lib/storage/db';
 import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsParser';
-import { fetchRawIcsFeed, ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
+import { fetchRawIcsFeed, isLikelyIcsUrl, ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
 import { TeamColorPicker } from './TeamColorPicker';
 import { OnDeviceLlmSettings } from './OnDeviceLlmSettings';
 
@@ -54,7 +54,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
       setLoadingCategoriesId(p.id);
       try {
         let cats: FeedCategory[] = [];
-        if (p.calendarUrl) {
+        if (p.calendarUrl && isLikelyIcsUrl(p.calendarUrl)) {
           const text = await fetchRawIcsFeed(p.calendarUrl);
           if (text) {
             cats = extractFeedCategories(text);
@@ -353,13 +353,13 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                           <div className="min-w-0">
                             <div className="font-bold text-text-primary truncate">{p.teamName}</div>
                             <div className="text-[10px] text-text-muted line-clamp-1">
-                              {p.calendarUrl || 'Manuaaliset merkinnät'}
+                              {p.calendarUrl || (p.associationUrl ? 'Virallinen sarja / tulospalvelu' : 'Manuaaliset merkinnät')}
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-1">
-                          {p.calendarUrl && (
+                          {p.calendarUrl && isLikelyIcsUrl(p.calendarUrl) && (
                             <button
                               type="button"
                               onClick={() => handleOpenCategories(p)}

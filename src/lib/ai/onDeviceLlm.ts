@@ -335,7 +335,9 @@ export async function requestLoadOnDeviceModel(
       if (api && typeof api.create === 'function') {
         const session = await api.create({
           expectedInputs: [{ type: 'text' }],
-          expectedOutputs: [{ type: 'text' }]
+          expectedOutputs: [{ type: 'text' }],
+          outputLanguage: 'en',
+          expectedInputLanguages: ['fi', 'en']
         });
         session?.destroy?.();
         markOnDeviceLlmLoaded('chrome');
