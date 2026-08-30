@@ -901,6 +901,13 @@ export const App: React.FC = () => {
                               }}
                               onOpenStats={() => setSelectedStatsEvent(event)}
                               onEventUpdated={handleEventUpdated}
+                              onEventMerged={handleEventUpdated}
+                              onEventDeleted={async (deletedId) => {
+                                await db.events.delete(deletedId);
+                              }}
+                              onEventHidden={async (hiddenId) => {
+                                await db.events.update(hiddenId, { isHidden: true });
+                              }}
                             />
                           );
                         }
@@ -919,6 +926,13 @@ export const App: React.FC = () => {
                             onOpenHomeModal={() => setIsHomeLocationOpen(true)}
                             onResolveMismatch={handleResolveMismatch}
                             onEventUpdated={handleEventUpdated}
+                            onEventMerged={handleEventUpdated}
+                            onEventDeleted={async (deletedId) => {
+                              await db.events.delete(deletedId);
+                            }}
+                            onEventHidden={async (hiddenId) => {
+                              await db.events.update(hiddenId, { isHidden: true });
+                            }}
                           />
                         );
                       })}

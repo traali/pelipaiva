@@ -38,7 +38,15 @@ export const EventChatModal: React.FC<EventChatModalProps> = ({
   const [localEvent, setLocalEvent] = useState<MatchdayEvent>(event);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !event) return null;
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
@@ -65,14 +73,6 @@ export const EventChatModal: React.FC<EventChatModalProps> = ({
     { label: '☕ Kahviovuoro 16-18', text: 'Kahviovuoro klo 16.00 - 18.00' },
     { label: '📍 Kenttävaihto TN2', text: 'Kenttä vaihdettu: TN2' }
   ];
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   const chatMessages = localEvent.chatMessages || [];
 

@@ -41,9 +41,10 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
 
   // Candidate events to merge into (exclude the source event itself and hidden ones)
   const candidateEvents = useMemo(() => {
+    if (!sourceEvent || !sourceEvent.startTime) return [];
     const sourceDateStr = sourceEvent.startTime.split('T')[0];
-    return allEvents
-      .filter((e) => e.id !== sourceEvent.id && !e.isHidden)
+    return (allEvents || [])
+      .filter((e) => e && e.id !== sourceEvent.id && !e.isHidden)
       .sort((a, b) => {
         // Prioritize events on the exact same date
         const aDate = a.startTime.split('T')[0];
@@ -54,7 +55,15 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
       });
   }, [allEvents, sourceEvent]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !sourceEvent) return null;
 
   const handleMerge = async () => {
     if (!selectedTargetId || isProcessing) return;
@@ -168,14 +177,6 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   const sourceDateLabel = new Date(sourceEvent.startTime).toLocaleDateString('fi-FI', {
     weekday: 'short',
     day: 'numeric',
@@ -242,7 +243,7 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                   </span>
                   <span className="flex items-center gap-1 truncate">
                     <MapPin className="w-3 h-3 text-pitch" />
-                    <span className="truncate">{sourceEvent.venue.name}</span>
+                    <span className="truncate">{sourceEvent.venue?.name || 'Kenttä'}</span>
                   </span>
                 </div>
               </div>
@@ -299,7 +300,7 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                             <div className="text-[11px] text-text-muted mt-0.5 flex items-center gap-2">
                               <span>{candDate} klo {new Date(cand.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}</span>
                               <span>•</span>
-                              <span className="truncate">{cand.venue.name}</span>
+                              <span className="truncate">{cand.venue?.name || 'Kenttä'}</span>
                             </div>
                           </div>
 
