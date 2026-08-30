@@ -18,6 +18,7 @@ export const MULTILINGUAL_COLORS: Record<string, string> = {
   musta: 'musta',
   svart: 'musta',
   black: 'musta',
+  mus: 'musta',
 
   // Red
   punainen: 'punainen',
@@ -39,7 +40,14 @@ export const MULTILINGUAL_COLORS: Record<string, string> = {
 
   // Orange
   oranssi: 'oranssi',
-  orange: 'oranssi'
+  orange: 'oranssi',
+  ora: 'oranssi',
+  or: 'oranssi',
+
+  // Striped
+  raita: 'raita',
+  randig: 'raita',
+  striped: 'raita'
 };
 
 /**

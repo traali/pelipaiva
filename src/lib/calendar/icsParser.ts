@@ -182,8 +182,18 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
         if (text.includes(delim)) {
           const parts = text.split(delim);
           if (parts.length >= 2) {
-            homeTeam = (parts[0] || '').trim();
-            awayTeam = (parts[1] || '').trim();
+            const candidateHome = (parts[0] || '').trim();
+            const candidateAway = (parts[1] || '').trim();
+            const isSquadTag = /^(?:musta|mus|oranssi|ora|or|valkoinen|valk|sininen|sin|keltainen|kelt|punainen|pun|vihreä|vihr|raita|kilpa|haastaja|haaste|harraste|edustus|akatemia|black|white|blue|red|yellow|green|orange)$/i.test(
+              candidateAway
+            );
+            if (isSquadTag && delim !== ' vs ') {
+              homeTeam = `${candidateHome} ${candidateAway}`.trim();
+              awayTeam = '';
+            } else {
+              homeTeam = candidateHome;
+              awayTeam = candidateAway;
+            }
             break;
           }
         }

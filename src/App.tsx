@@ -28,6 +28,7 @@ import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/at
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { detectSportFromText } from './lib/ai/eventCandidateRanker';
+import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 
 const SmartImportModal = lazy(() =>
   import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
@@ -259,6 +260,36 @@ export const App: React.FC = () => {
             await db.events.update(ev.id, updates);
           }
         }
+
+        // Reconcile and merge any unlinked calendar matches with bare official fixtures on the same day
+        const freshEvents = await db.events.toArray();
+        const calEvents = freshEvents.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining && !e.officialFixtureId);
+        const fixEvents = freshEvents.filter((e) => e.id.startsWith('fixture-'));
+
+        for (const cal of calEvents) {
+          const calDate = new Date(cal.startTime);
+          for (const fix of fixEvents) {
+            const fixDate = new Date(fix.startTime);
+            const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
+            if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
+              const sim = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+              if (sim >= 0.70) {
+                const enriched: MatchdayEvent = {
+                  ...cal,
+                  homeTeam: fix.homeTeam,
+                  awayTeam: fix.awayTeam,
+                  title: `${fix.homeTeam} vs ${fix.awayTeam}`,
+                  officialFixtureId: fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, ''),
+                  reconciliationStatus: 'auto_matched',
+                  score: fix.score || cal.score,
+                  tournamentName: fix.tournamentName || cal.tournamentName
+                };
+                await db.events.put(enriched);
+                await db.events.delete(fix.id);
+              }
+            }
+          }
+        }
       } catch (err) {
         console.warn('[SELF_HEAL] Sport harmonization error:', err);
       }
@@ -339,16 +370,52 @@ export const App: React.FC = () => {
 
     // Find all linked officialFixtureIds on enriched calendar events
     const enrichedFixtureIds = new Set<string>();
+    const bareFixtureIdsToDelete = new Set<string>();
+
     for (const e of rawFiltered) {
       if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
         enrichedFixtureIds.add(e.officialFixtureId);
       }
     }
 
+    const calendarMatches = rawFiltered.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
+    const bareFixtures = rawFiltered.filter((e) => e.id.startsWith('fixture-'));
+
+    // Dynamic stitch for same-day matches matching squad/club
+    for (const cal of calendarMatches) {
+      const calDate = new Date(cal.startTime);
+      for (const fix of bareFixtures) {
+        if (bareFixtureIdsToDelete.has(fix.id)) continue;
+        const fixDate = new Date(fix.startTime);
+        const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
+        if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
+          const sim = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+          if (sim >= 0.70) {
+            cal.homeTeam = fix.homeTeam;
+            cal.awayTeam = fix.awayTeam;
+            cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
+            cal.officialFixtureId = fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, '');
+            cal.reconciliationStatus = 'auto_matched';
+            cal.score = fix.score || cal.score;
+            cal.tournamentName = fix.tournamentName || cal.tournamentName;
+            if (cal.officialFixtureId) {
+              enrichedFixtureIds.add(cal.officialFixtureId);
+            }
+            bareFixtureIdsToDelete.add(fix.id);
+          }
+        }
+      }
+    }
+
     // Suppress bare fixture duplicates if an enriched calendar event already represents it
     const deduplicated = rawFiltered.filter((e) => {
-      if (e.id.startsWith('fixture-') && e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
-        return false;
+      if (e.id.startsWith('fixture-')) {
+        if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
+          return false;
+        }
+        if (bareFixtureIdsToDelete.has(e.id)) {
+          return false;
+        }
       }
       return true;
     });
