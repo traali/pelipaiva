@@ -138,6 +138,7 @@ export interface MissionControlSnapshot {
   nextPlayer?: PlayerProfile;
   leaveBy?: string;
   leaveCountdownMinutes?: number;
+  leaveTransitLabel?: string;
   homeLocation?: HomeLocation;
   conflicts: FamilyConflict[];
   carpool: CarpoolLeg[];

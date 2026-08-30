@@ -65,7 +65,10 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
           {leaveBy ? (
             <p className="truncate text-xs text-text-secondary">
               {child ? `${child} · ` : ''}
-              <span className="font-semibold text-floodlight">Lähde klo {leaveBy}</span>
+              <span className="font-semibold text-floodlight">
+                {snapshot.leaveTransitLabel ? `${snapshot.leaveTransitLabel} · ` : ''}
+                Lähde klo {leaveBy}
+              </span>
             </p>
           ) : (
             <p className="text-xs text-text-muted">{snapshot.summary || snapshot.weekendLabel}</p>

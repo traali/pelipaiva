@@ -67,9 +67,21 @@ export function resolveTransitPlan(
       weather.windGustMs >= 17);
 
   let selectedMode: 'walk' | 'bicycle' | 'car' | 'transit' = 'car';
+  const preferred = home.defaultTransitMode || 'auto';
 
   if (overrideMode && overrideMode !== 'auto') {
     selectedMode = overrideMode;
+  } else if (preferred === 'car') {
+    selectedMode = 'car';
+  } else if (preferred === 'transit') {
+    selectedMode = 'transit';
+  } else if (preferred === 'walk') {
+    if (distanceKm <= maxWalk && !isSevereWeather) selectedMode = 'walk';
+    else if (distanceKm <= maxBike && !isSevereWeather) selectedMode = 'bicycle';
+    else selectedMode = 'car';
+  } else if (preferred === 'bicycle') {
+    if (distanceKm <= maxBike && !isSevereWeather) selectedMode = 'bicycle';
+    else selectedMode = 'car';
   } else if (distanceKm <= maxWalk && !isSevereWeather) {
     selectedMode = 'walk';
   } else if (distanceKm <= maxBike && !isSevereWeather) {

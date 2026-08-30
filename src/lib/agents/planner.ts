@@ -247,6 +247,7 @@ export function runMissionControlGraph(
     nextPlayer,
     leaveBy: depart?.departureTime,
     leaveCountdownMinutes: depart?.countdownMinutes,
+    leaveTransitLabel: depart?.transitPlan?.transitLabel,
     homeLocation,
     conflicts,
     carpool,

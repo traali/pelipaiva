@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, PlayerProfile } from '../types/matchday';
+import { formatHomeTransitSummary } from '../lib/storage/homeLocation';
 import { db } from '../lib/storage/db';
 import { TeamColorPicker } from './TeamColorPicker';
 import { OnDeviceLlmSettings } from './OnDeviceLlmSettings';
@@ -213,7 +214,10 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     Kotiosoite: {homeLocation?.name || 'Lauttasaari'}
                   </div>
                   <div className="text-[11px] text-text-muted truncate">
-                    {homeLocation?.address || 'Lähikentille kävellen / pyörällä'}
+                    {homeLocation?.address || 'Aseta koti — lähikentille kävellen / pyörällä'}
+                  </div>
+                  <div className="text-[11px] text-pitch truncate">
+                    {formatHomeTransitSummary(homeLocation)}
                   </div>
                 </div>
               </div>

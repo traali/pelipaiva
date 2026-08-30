@@ -14,7 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { HomeLocation } from '../types/matchday';
+import { HomeLocation, TransitMode } from '../types/matchday';
 import {
   POPULAR_HOME_PRESETS,
   DEFAULT_HOME_LOCATION,
@@ -40,6 +40,7 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
   const [coords, setCoords] = useState(currentHome.coordinates || DEFAULT_HOME_LOCATION.coordinates);
   const [maxWalk, setMaxWalk] = useState(currentHome.maxWalkingDistanceKm ?? 1.5);
   const [maxBike, setMaxBike] = useState(currentHome.maxCyclingDistanceKm ?? 5.0);
+  const [preferredMode, setPreferredMode] = useState<TransitMode>(currentHome.defaultTransitMode || 'auto');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -55,6 +56,7 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
       setCoords(currentHome.coordinates || DEFAULT_HOME_LOCATION.coordinates);
       setMaxWalk(currentHome.maxWalkingDistanceKm ?? 1.5);
       setMaxBike(currentHome.maxCyclingDistanceKm ?? 5.0);
+      setPreferredMode(currentHome.defaultTransitMode || 'auto');
       setSearchQuery('');
       setSaveSuccess(false);
       setErrorMessage('');
@@ -126,7 +128,7 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
       coordinates: coords,
       maxWalkingDistanceKm: maxWalk,
       maxCyclingDistanceKm: maxBike,
-      defaultTransitMode: 'auto',
+      defaultTransitMode: preferredMode,
       updatedAt: new Date().toISOString()
     };
 
@@ -271,6 +273,41 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
             </div>
           </div>
 
+          {/* Preferred transit: not always a car */}
+          <div className="p-3.5 rounded-2xl bg-surface-elevated/80 border border-border-subtle flex flex-col gap-2">
+            <div className="text-xs font-black text-text-primary">Miten lähdette kentälle?</div>
+            <p className="text-[11px] text-text-muted -mt-1">
+              Ei ole aina auto. Lähikenttä kävellen, vähän pidempi pyörällä.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {(
+                [
+                  { id: 'auto', label: 'Automaattinen', hint: 'matkan mukaan' },
+                  { id: 'walk', label: 'Kävely', hint: 'ensin jalkaisin' },
+                  { id: 'bicycle', label: 'Pyörä', hint: 'ensin fillarilla' },
+                  { id: 'car', label: 'Auto', hint: 'aina kyyti' },
+                  { id: 'transit', label: 'Bussi', hint: 'julkinen' }
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setPreferredMode(opt.id)}
+                  className={`px-2.5 py-2 rounded-xl text-left border cursor-pointer ${
+                    preferredMode === opt.id
+                      ? 'bg-pitch text-text-inverse border-pitch'
+                      : 'bg-surface text-text-secondary border-border-subtle hover:text-text-primary'
+                  }`}
+                >
+                  <div className="text-[11px] font-black">{opt.label}</div>
+                  <div className={`text-[10px] ${preferredMode === opt.id ? 'text-text-inverse/80' : 'text-text-muted'}`}>
+                    {opt.hint}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Active Transport Limits (Walk & Bike ranges) */}
           <div className="p-3.5 rounded-2xl bg-surface-elevated/80 border border-border-subtle flex flex-col gap-3">
             <div className="text-xs font-black text-text-primary flex items-center gap-1.5">
@@ -335,7 +372,15 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
             <div className="text-[11px] text-text-muted flex items-start gap-1.5 pt-1 border-t border-border-subtle/60">
               <Car className="w-3.5 h-3.5 text-text-muted shrink-0 mt-0.5" />
               <span>
-                Yli {maxBike.toFixed(1)} km matkat ja rankkasateet ohjataan automaattisesti autokyyteihin.
+                {preferredMode === 'car'
+                  ? 'Kaikki matkat autolla. Kävely/pyörä rajat eivät vaikuta.'
+                  : preferredMode === 'transit'
+                    ? 'Bussi/ratikka. Kävely/pyörä rajat eivät vaikuta.'
+                    : preferredMode === 'walk'
+                      ? `Kävely ensisijainen. Yli ${maxWalk.toFixed(1)} km → pyörä / auto.`
+                      : preferredMode === 'bicycle'
+                        ? `Pyörä ensisijainen. Yli ${maxBike.toFixed(1)} km tai rankkasade (automaattisessa) → auto.`
+                        : `Yli ${maxBike.toFixed(1)} km ja rankkasade → auto. Lähikenttä kävellen, keskipitkä pyörällä.`}
               </span>
             </div>
           </div>

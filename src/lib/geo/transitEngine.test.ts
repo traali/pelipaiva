@@ -5,6 +5,7 @@ import {
   resolveTransitPlan
 } from './transitEngine';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
+import { formatHomeTransitSummary } from '../storage/homeLocation';
 import { conflictAgent } from '../agents/conflictAgent';
 import { carpoolAgent } from '../agents/carpoolAgent';
 import { HomeLocation, MatchdayEvent, PlayerProfile, WeatherCondition } from '../../types/matchday';
@@ -134,6 +135,22 @@ describe('transitEngine', () => {
     expect(walkPlan.mode).toBe('walk');
     expect(walkPlan.isSelfTransit).toBe(true);
   });
+
+  it('family bicycle preference skips walk for a nearby pitch', () => {
+    const nearby = { lat: 60.1590, lng: 24.8780 };
+    const bikeHome = { ...mockHome, defaultTransitMode: 'bicycle' as const };
+    const plan = resolveTransitPlan(bikeHome, nearby);
+    expect(plan.mode).toBe('bicycle');
+    expect(plan.transitLabel).toContain('Pyöräily');
+  });
+
+  it('family car preference never walks a local pitch', () => {
+    const nearby = { lat: 60.1590, lng: 24.8780 };
+    const carHome = { ...mockHome, defaultTransitMode: 'car' as const };
+    const plan = resolveTransitPlan(carHome, nearby);
+    expect(plan.mode).toBe('car');
+    expect(plan.isSelfTransit).toBe(false);
+  });
 });
 
 describe('departure countdown with HomeLocation', () => {
@@ -151,6 +168,12 @@ describe('departure countdown with HomeLocation', () => {
     expect(transitPlan.mode).toBe('walk');
     expect(transitPlan.isSelfTransit).toBe(true);
     expect(departureTime).toBeDefined();
+  });
+
+  it('formats Finnish home transit summary for auto vs bike vs car', () => {
+    expect(formatHomeTransitSummary(mockHome)).toMatch(/Kävely/i);
+    expect(formatHomeTransitSummary({ ...mockHome, defaultTransitMode: 'bicycle' })).toMatch(/pyörä/i);
+    expect(formatHomeTransitSummary({ ...mockHome, defaultTransitMode: 'car' })).toMatch(/auto/i);
   });
 });
 

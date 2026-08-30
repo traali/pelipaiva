@@ -38,6 +38,18 @@ export const DEFAULT_HOME_LOCATION: HomeLocation = {
   updatedAt: new Date().toISOString()
 };
 
+export function formatHomeTransitSummary(home?: HomeLocation | null): string {
+  if (!home) return 'Lähikentille kävellen / pyörällä — aseta koti';
+  const walk = (home.maxWalkingDistanceKm ?? 1.5).toString().replace('.', ',');
+  const bike = (home.maxCyclingDistanceKm ?? 5.0).toString().replace('.', ',');
+  const mode = home.defaultTransitMode || 'auto';
+  if (mode === 'walk') return `Ensisijaisesti kävely (≤ ${walk} km)`;
+  if (mode === 'bicycle') return `Ensisijaisesti pyörä (≤ ${bike} km)`;
+  if (mode === 'car') return 'Ensisijaisesti auto';
+  if (mode === 'transit') return 'Ensisijaisesti bussi / ratikka';
+  return `Kävely ≤ ${walk} km · pyörä ≤ ${bike} km · muuten auto`;
+}
+
 const STORAGE_KEY = 'pelipaiva_home_location';
 
 /**
@@ -82,6 +94,7 @@ export async function saveHomeLocation(home: HomeLocation): Promise<void> {
     ...home,
     maxWalkingDistanceKm: home.maxWalkingDistanceKm ?? 1.5,
     maxCyclingDistanceKm: home.maxCyclingDistanceKm ?? 5.0,
+    defaultTransitMode: home.defaultTransitMode ?? 'auto',
     updatedAt: new Date().toISOString()
   };
 
