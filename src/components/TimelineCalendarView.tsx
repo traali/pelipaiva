@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -14,6 +14,7 @@ import { helsinkiDateISO } from '../lib/agents/time';
 import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
+import { FamilyVisualCalendar } from './FamilyVisualCalendar';
 
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
@@ -96,22 +97,6 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     }
     return Array.from(map.values());
   }, [events]);
-
-  const todayISO = helsinkiDateISO(new Date());
-  const [selectedDayKey, setSelectedDayKey] = useState<string>(() => {
-    const hasToday = groupedByDay.some((g) => g.dateStr === todayISO);
-    if (hasToday) return todayISO;
-    const upcoming = groupedByDay.find((g) => g.dateStr >= todayISO);
-    return upcoming?.dateStr || groupedByDay[0]?.dateStr || todayISO;
-  });
-
-  const activeDayData = useMemo(() => {
-    const found = groupedByDay.find((g) => g.dateStr === selectedDayKey);
-    if (found) return found;
-    const hasToday = groupedByDay.find((g) => g.dateStr === todayISO);
-    if (hasToday) return hasToday;
-    return groupedByDay[0];
-  }, [groupedByDay, selectedDayKey, todayISO]);
 
   if (events.length === 0) {
     return (
@@ -321,175 +306,15 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     );
   }
 
-  // 2. CALENDAR DAY-MATRIX VIEW (Week grid + day breakdown)
+  // 2. VISUAL FAMILY CALENDAR VIEW (Month, Week & Day Visual Views)
   return (
-    <div className="flex flex-col gap-4 pb-8">
-      {/* Day Selector Pills Grid */}
-      <div className="flex rounded-2xl bg-surface-elevated p-1.5 border border-border-subtle gap-1 overflow-x-auto scrollbar-none">
-        {groupedByDay.map((dg) => {
-          const isSelected = dg.dateStr === (activeDayData?.dateStr || selectedDayKey);
-          const weekdayShort = dg.date.toLocaleDateString('fi-FI', { weekday: 'short' });
-          const dayNum = dg.date.getDate();
-
-          return (
-            <button
-              key={dg.dateStr}
-              type="button"
-              onClick={() => setSelectedDayKey(dg.dateStr)}
-              className={`flex-1 min-w-[64px] py-2 px-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-pitch text-text-inverse shadow-sm'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface'
-              }`}
-            >
-              <span className="text-[10px] uppercase font-bold tracking-wider">
-                {weekdayShort}
-              </span>
-              <span className="text-base font-black leading-none">{dayNum}</span>
-              <span
-                className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full ${
-                  isSelected ? 'bg-white/25 text-white' : 'bg-pitch/15 text-pitch'
-                }`}
-              >
-                {dg.events.length} {dg.events.length === 1 ? 'peli' : 'peliä'}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active Selected Day Schedule */}
-      {activeDayData && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-sm font-black text-text-primary flex items-center gap-2">
-              <CalendarIcon className="w-4 h-4 text-pitch" />
-              {activeDayData.label}
-            </span>
-            <span className="text-xs text-text-muted">
-              {activeDayData.events.length} tapahtumaa
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-2.5">
-            {activeDayData.events.map((ev) => {
-              const profile = profileMap.get(ev.profileId);
-              const start = new Date(ev.startTime);
-              const end = new Date(ev.endTime);
-              const timeStr = `${start.toLocaleTimeString('fi-FI', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Europe/Helsinki'
-              })} – ${end.toLocaleTimeString('fi-FI', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Europe/Helsinki'
-              })}`;
-
-              return (
-                <div
-                  key={ev.id}
-                  className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5 relative overflow-hidden"
-                >
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-2"
-                    style={{ backgroundColor: profile?.colorHex || '#3b82f6' }}
-                  />
-
-                  <div className="flex items-center justify-between pl-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black font-mono text-pitch">{timeStr}</span>
-                      <span
-                        className="text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xs"
-                        style={{
-                          backgroundColor: profile?.colorHex || '#3b82f6',
-                          color: getContrastTextColor(profile?.colorHex)
-                        }}
-                      >
-                        {profile?.playerName}
-                      </span>
-                    </div>
-
-                    <span className="text-xs font-bold text-text-secondary">
-                      {ev.sport === 'football' ? '⚽ Jalkapallo' : ev.sport === 'floorball' ? '🏑 Salibandy' : '🏀 Koripallo'}
-                    </span>
-                  </div>
-
-                  <div className="pl-2 text-sm font-bold text-text-primary line-clamp-2 break-words">
-                    {ev.title}
-                  </div>
-
-                  {(() => {
-                    const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
-                    if (related.length === 0) return null;
-                    return (
-                      <div className="pl-2 flex flex-col gap-1.5">
-                        {related.map((c) => (
-                          <div
-                            key={c.id}
-                            role="alert"
-                            className={`p-2 rounded-xl text-[11px] font-bold border flex items-start gap-1.5 ${
-                              c.severity === 'critical'
-                                ? 'bg-stoppage/15 border-stoppage/30 text-stoppage'
-                                : 'bg-whistle/15 border-whistle/30 text-whistle'
-                            }`}
-                          >
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <div>
-                                {c.overlapMinutes > 0
-                                  ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                  : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
-                              </div>
-                              <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
-                                {c.message}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  <div className="pl-2 flex items-center justify-between text-xs text-text-secondary pt-1 border-t border-border-subtle gap-2">
-                    <div className="flex items-center gap-1.5 truncate min-w-0">
-                      <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                      <span className="truncate">{ev.venue.name}</span>
-                    </div>
-
-                    {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="min-h-[36px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
-                          <Trophy className="w-3.5 h-3.5 text-pitch" />
-                          <span>{ev.score ? `Tulos: ${ev.score}` : 'Päättynyt'}</span>
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Navigoi kentälle ${ev.venue.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const coords = ev.parking?.coordinates || ev.venue.coordinates;
-                          window.open(
-                            `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                            '_blank',
-                            'noopener,noreferrer'
-                          );
-                        }}
-                        className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
-                      >
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>Reitti</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+    <FamilyVisualCalendar
+      events={events}
+      profiles={profiles}
+      conflicts={conflicts}
+      onSelectEvent={onSelectEvent}
+      onNavigate={onNavigate}
+      onClearFilter={onClearFilter}
+    />
   );
 };
