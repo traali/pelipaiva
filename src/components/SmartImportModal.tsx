@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   HelpCircle,
   ShieldCheck,
-  Search
+  Search,
+  Filter
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { SportType } from '../types/matchday';
@@ -33,6 +34,8 @@ import { generateStableProfileId } from '../lib/clubs/attachTeam';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import { searchPopularClubs, type ClubPreset } from '../lib/clubs/popularClubsCatalog';
 import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
+import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsParser';
+import { fetchRawIcsFeed } from '../lib/clubs/ingestOfficial';
 import { TeamColorPicker } from './TeamColorPicker';
 
 export type ImportTab = 'classic' | 'message' | 'table' | 'ocr';
@@ -52,7 +55,8 @@ interface SmartImportModalProps {
     teamName: string,
     sport: SportType,
     url: string,
-    colorHex?: string
+    colorHex?: string,
+    squadFilters?: string[]
   ) => Promise<{ success: boolean; count?: number; error?: string } | void>;
 }
 
@@ -95,10 +99,35 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [showGuide, setShowGuide] = useState(false);
   const [clubSearchQuery, setClubSearchQuery] = useState('');
   const [clubMatches, setClubMatches] = useState<ClubPreset[]>([]);
+  const [discoveredCategories, setDiscoveredCategories] = useState<FeedCategory[]>([]);
+  const [excludedCategories, setExcludedCategories] = useState<string[]>([]);
+  const [isScanningCategories, setIsScanningCategories] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const scanIcsCategories = async (urlToScan: string) => {
+    const trimmed = urlToScan.trim();
+    if (!trimmed || !/\.ics|webcal:|nimenhuuto\.com|myclub\.fi|jopox\.fi/i.test(trimmed)) {
+      setDiscoveredCategories([]);
+      return;
+    }
+    setIsScanningCategories(true);
+    try {
+      const text = await fetchRawIcsFeed(trimmed);
+      if (text) {
+        const cats = extractFeedCategories(text);
+        setDiscoveredCategories(cats);
+      } else {
+        setDiscoveredCategories([]);
+      }
+    } catch {
+      setDiscoveredCategories([]);
+    } finally {
+      setIsScanningCategories(false);
+    }
+  };
 
   // Query active sports for the selected player from profiles and events
   useEffect(() => {
@@ -168,7 +197,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
       setColorHex(pickNextTeamColor([]).hex);
       setSuccessMessage('');
       setErrorMessage('');
+      setDiscoveredCategories([]);
+      setExcludedCategories([]);
       setIsSaving(false);
+      if (initialTeamUrl) {
+        scanIcsCategories(initialTeamUrl);
+      }
     }
     prevIsOpen.current = isOpen;
   }, [isOpen, initialPlayerName, initialSport, initialTeamUrl, initialTeamName, initialTab]);
@@ -180,6 +214,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     if (parsed?.sport && parsed.sport !== 'other') {
       setSelectedSport(parsed.sport);
     }
+    scanIcsCategories(val);
   };
 
   const detectedAssoc = parseAssociationUrl(classicUrl);
@@ -328,7 +363,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
           classicTeamName || 'Oma joukkue',
           selectedSport,
           url,
-          colorHex
+          colorHex,
+          excludedCategories.length > 0 ? excludedCategories : undefined
         );
         if (res && res.success === false) {
           setErrorMessage(res.error || 'Otteluiden noutaminen epäonnistui. Tarkista osoite tai kokeile myöhemmin.');
@@ -729,6 +765,53 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                     </label>
                     <TeamColorPicker value={colorHex} onChange={(hex) => setColorHex(hex)} />
                   </div>
+
+                  {/* Discovered Categories / Squads (Nimenhuuto / MyClub) */}
+                  {isScanningCategories && (
+                    <div className="p-3 rounded-xl bg-surface border border-border-subtle flex items-center gap-2 text-xs text-text-muted">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-pitch" />
+                      <span>Etsitään kalenterin ryhmiä ja luokkia...</span>
+                    </div>
+                  )}
+
+                  {discoveredCategories.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-surface border border-pitch/30 flex flex-col gap-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                          <Filter className="w-3.5 h-3.5 text-pitch" />
+                          <span>Tunnistetut tapahtumaluokat ({discoveredCategories.length}):</span>
+                        </span>
+                        <span className="text-[10px] text-text-muted">Klikkaa pois mitä et halua</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {discoveredCategories.map((cat) => {
+                          const isExcluded = excludedCategories.includes(cat.name);
+                          return (
+                            <button
+                              key={cat.name}
+                              type="button"
+                              onClick={() => {
+                                setExcludedCategories((prev) =>
+                                  prev.includes(cat.name)
+                                    ? prev.filter((c) => c !== cat.name)
+                                    : [...prev, cat.name]
+                                );
+                              }}
+                              className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isExcluded
+                                  ? 'bg-surface-elevated text-text-muted line-through border border-dashed border-border-strong opacity-60'
+                                  : 'bg-pitch/15 text-pitch border border-pitch/30 hover:bg-pitch/25'
+                              }`}
+                            >
+                              <span>{isExcluded ? '✕' : '✓'}</span>
+                              <span>{cat.name}</span>
+                              <span className="text-[10px] opacity-75">({cat.count})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="submit"

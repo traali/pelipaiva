@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home } from 'lucide-react';
+import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { formatHomeTransitSummary } from '../lib/storage/homeLocation';
 import { db } from '../lib/storage/db';
+import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsParser';
+import { fetchRawIcsFeed, ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
 import { TeamColorPicker } from './TeamColorPicker';
 import { OnDeviceLlmSettings } from './OnDeviceLlmSettings';
 
@@ -34,10 +36,70 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   const [newPlayerName, setNewPlayerName] = useState('');
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
   const [colorForId, setColorForId] = useState<string | null>(null);
+  const [filterProfileId, setFilterProfileId] = useState<string | null>(null);
+  const [categoriesByProfile, setCategoriesByProfile] = useState<Record<string, FeedCategory[]>>({});
+  const [loadingCategoriesId, setLoadingCategoriesId] = useState<string | null>(null);
   const [undoState, setUndoState] = useState<{
     message: string;
     undoAction: () => Promise<void>;
   } | null>(null);
+
+  const handleOpenCategories = async (p: PlayerProfile) => {
+    if (filterProfileId === p.id) {
+      setFilterProfileId(null);
+      return;
+    }
+    setFilterProfileId(p.id);
+    if (!categoriesByProfile[p.id]) {
+      setLoadingCategoriesId(p.id);
+      try {
+        let cats: FeedCategory[] = [];
+        if (p.calendarUrl) {
+          const text = await fetchRawIcsFeed(p.calendarUrl);
+          if (text) {
+            cats = extractFeedCategories(text);
+          }
+        }
+        if (cats.length === 0) {
+          const events = await db.events.where('profileId').equals(p.id).toArray();
+          const counts = new Map<string, number>();
+          for (const ev of events) {
+            const title = ev.title || '';
+            const match = title.match(/\[([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\]|Peli\s+kilpa|Peli\s+haastaja|Treenit/i);
+            const cat = match ? match[0].replace(/[\[\]]/g, '') : ev.isTraining ? 'Treenit' : 'Pelit';
+            counts.set(cat, (counts.get(cat) || 0) + 1);
+          }
+          cats = Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
+        }
+        setCategoriesByProfile((prev) => ({ ...prev, [p.id]: cats }));
+      } catch (err) {
+        console.warn('Failed to load categories for profile', err);
+      } finally {
+        setLoadingCategoriesId(null);
+      }
+    }
+  };
+
+  const handleToggleCategoryFilter = async (profile: PlayerProfile, categoryName: string) => {
+    const currentExcluded = profile.squadFilters || [];
+    const updated = currentExcluded.includes(categoryName)
+      ? currentExcluded.filter((c) => c !== categoryName)
+      : [...currentExcluded, categoryName];
+
+    await db.profiles.update(profile.id, { squadFilters: updated });
+
+    if (profile.calendarUrl) {
+      await ingestSourceForProfile({
+        profileId: profile.id,
+        playerName: profile.playerName,
+        teamName: profile.teamName,
+        sport: profile.sport,
+        url: profile.calendarUrl,
+        squadFilters: updated,
+        includeWeather: true
+      });
+    }
+  };
 
   // Group profiles by player name
   const playerGroups = React.useMemo(() => {
@@ -297,6 +359,20 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                         </div>
 
                         <div className="flex items-center gap-1">
+                          {p.calendarUrl && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCategories(p)}
+                              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                filterProfileId === p.id || (p.squadFilters && p.squadFilters.length > 0)
+                                  ? 'text-pitch bg-pitch/15 border border-pitch/30'
+                                  : 'text-text-muted hover:text-pitch hover:bg-pitch/10'
+                              }`}
+                              title="Rajaa ryhmiä / tapahtumaluokkia (squad filters)"
+                            >
+                              <Filter className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => { onEditProfile(p); }}
@@ -315,6 +391,50 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                           </button>
                         </div>
                       </div>
+                      {filterProfileId === p.id && (
+                        <div className="p-3 border-t border-border-subtle bg-surface-elevated/50 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-text-primary flex items-center gap-1.5">
+                              <Filter className="w-3 h-3 text-pitch" />
+                              <span>Rajaa tapahtumaluokkia (Nimenhuuto / MyClub):</span>
+                            </span>
+                            <span className="text-[10px] text-text-muted">Klikkaa pois mitä et halua nähdä</span>
+                          </div>
+
+                          {loadingCategoriesId === p.id ? (
+                            <div className="flex items-center gap-2 py-2 text-xs text-text-muted">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-pitch" />
+                              <span>Haetaan kalenterin ryhmiä...</span>
+                            </div>
+                          ) : (categoriesByProfile[p.id] || []).length === 0 ? (
+                            <div className="text-[11px] text-text-muted py-1">
+                              Ei tunnistettuja erillisiä alaryhmiä tässä kalenterissa.
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {(categoriesByProfile[p.id] || []).map((cat) => {
+                                const isExcluded = (p.squadFilters || []).includes(cat.name);
+                                return (
+                                  <button
+                                    key={cat.name}
+                                    type="button"
+                                    onClick={() => handleToggleCategoryFilter(p, cat.name)}
+                                    className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                      isExcluded
+                                        ? 'bg-surface text-text-muted line-through border border-dashed border-border-strong opacity-60'
+                                        : 'bg-pitch/15 text-pitch border border-pitch/30 hover:bg-pitch/25'
+                                    }`}
+                                  >
+                                    <span>{isExcluded ? '✕' : '✓'}</span>
+                                    <span>{cat.name}</span>
+                                    <span className="text-[10px] opacity-75">({cat.count})</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {colorForId === p.id && (
                         <div className="px-2.5 pb-2.5">
                           <TeamColorPicker

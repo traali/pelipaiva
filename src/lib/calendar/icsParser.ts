@@ -419,29 +419,105 @@ export function detectSquadGroups(icsContent: string): { squadName: string; even
     .sort((a, b) => b.eventCount - a.eventCount);
 }
 
+export interface FeedCategory {
+  name: string;
+  count: number;
+}
+
 /**
- * Extracts all unique categories found in an ICS feed (e.g. Nimenhuuto, Google Calendar).
+ * Extracts and aggregates all distinct event categories and squad classes from an ICS feed string
+ * (e.g. Nimenhuuto/MyClub "Treenit", "Peli kilpa", "Peli haastaja", "Muu", [Kilpa], [Haastaja]).
  */
-export function extractFeedCategories(icsContent: string): string[] {
-  const categories = new Set<string>();
+export function extractFeedCategories(icsContent: string): FeedCategory[] {
+  if (!icsContent || typeof icsContent !== 'string') return [];
+
+  const categoryCounts = new Map<string, number>();
+
+  const recordCategory = (raw: string) => {
+    const cleaned = raw.trim();
+    if (!cleaned || cleaned.length < 2 || cleaned.length > 50) return;
+    const key = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
+  };
+
   try {
     const jcalData = ICAL.parse(icsContent);
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
     for (const vevent of vevents) {
-      const cat = vevent.getFirstPropertyValue('categories') as string | undefined;
-      if (cat) {
-        cat.split(',').forEach((c) => {
-          const trimmed = c.trim();
-          if (trimmed) categories.add(trimmed);
-        });
+      const foundInEvent = new Set<string>();
+
+      // 1. Explicit CATEGORIES properties (standard in Nimenhuuto / MyClub)
+      const catProps = vevent.getAllProperties('categories');
+      for (const cp of catProps) {
+        const val = cp.getFirstValue();
+        if (typeof val === 'string') {
+          val.split(/[,;]/).forEach((c) => {
+            const trimmed = c.trim();
+            if (trimmed) {
+              recordCategory(trimmed);
+              foundInEvent.add(trimmed.toLowerCase());
+            }
+          });
+        }
+      }
+
+      // 2. Scan SUMMARY and DESCRIPTION for squad brackets or explicit prefixes
+      const summary = (vevent.getFirstPropertyValue('summary') as string) || '';
+      const description = (vevent.getFirstPropertyValue('description') as string) || '';
+      const fullText = `${summary} ${description}`;
+
+      // Match [Kilpa], [Haastaja], (Kilpa), (Haastaja), [Sininen], [Valkoinen], etc.
+      const bracketMatches = fullText.match(/\[([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\]|\(([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\)/g);
+      if (bracketMatches) {
+        for (const bm of bracketMatches) {
+          const inner = bm.replace(/[\[\]\(\)]/g, '').trim();
+          if (
+            /kilpa|haastaja|harraste|edustus|musta|valkoinen|sininen|keltainen|punainen|oranssi|treenit|pelit|turnaus/i.test(
+              inner
+            ) &&
+            !foundInEvent.has(inner.toLowerCase())
+          ) {
+            recordCategory(inner);
+            foundInEvent.add(inner.toLowerCase());
+          }
+        }
+      }
+
+      // Explicit Finnish match/practice markers (Nimenhuuto class patterns)
+      if (/peli\s+kilpa/i.test(fullText) && !foundInEvent.has('peli kilpa')) {
+        recordCategory('Peli kilpa');
+        foundInEvent.add('peli kilpa');
+      } else if (/peli\s+haastaja/i.test(fullText) && !foundInEvent.has('peli haastaja')) {
+        recordCategory('Peli haastaja');
+        foundInEvent.add('peli haastaja');
+      } else if (/treenit|harjoitukset/i.test(fullText) && !foundInEvent.has('treenit') && foundInEvent.size === 0) {
+        recordCategory('Treenit');
+        foundInEvent.add('treenit');
       }
     }
-  } catch (e) {
-    console.error('Failed to extract feed categories', e);
+  } catch {
+    // Regex fallback if ical parser fails on malformed body
+    const catRegex = /CATEGORIES:([^\r\n]+)/gi;
+    let match;
+    while ((match = catRegex.exec(icsContent)) !== null) {
+      if (match[1]) {
+        match[1].split(/[,;]/).forEach((c) => recordCategory(c));
+      }
+    }
   }
-  return Array.from(categories);
+
+  return Array.from(categoryCounts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Legacy array of category name strings
+ */
+export function extractFeedCategoryNames(icsContent: string): string[] {
+  return extractFeedCategories(icsContent).map((c) => c.name);
 }
 
 /**

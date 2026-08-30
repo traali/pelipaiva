@@ -160,6 +160,20 @@ export async function ingestOfficialForProfile(opts: {
   return { official: officialData, resolvedTeamName: resolvedName };
 }
 
+export async function fetchRawIcsFeed(url: string): Promise<string | null> {
+  if (!url) return null;
+  const raw = url.trim().replace(/^webcal:/i, 'https:');
+  const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
+  try {
+    const res = await fetch(target, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text && text.length >= 20 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function ingestIcsForProfile(opts: {
   profileId: string;
   teamName: string;
@@ -169,17 +183,8 @@ export async function ingestIcsForProfile(opts: {
   squadFilters?: string[];
 }): Promise<number> {
   const database = opts.database || db;
-  const raw = opts.url.trim().replace(/^webcal:/i, 'https:');
-  const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
-  let res: Response;
-  try {
-    res = await fetch(target, { signal: AbortSignal.timeout(10000) });
-  } catch {
-    return 0;
-  }
-  if (!res.ok) return 0;
-  const text = await res.text();
-  if (!text || text.length < 20) return 0;
+  const text = await fetchRawIcsFeed(opts.url);
+  if (!text) return 0;
   const parsed = await parseICSFeed(
     text,
     opts.profileId,

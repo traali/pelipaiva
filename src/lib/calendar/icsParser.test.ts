@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseICSFeed, isTrainingEvent } from './icsParser';
+import { parseICSFeed, isTrainingEvent, extractFeedCategories } from './icsParser';
 
 const SAMPLE_ICS = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -86,5 +86,86 @@ END:VCALENDAR`;
     expect(events[1]!.startTime).toContain('2026-09-08');
     expect(events[2]!.startTime).toContain('2026-09-15');
     expect(events[3]!.startTime).toContain('2026-09-22');
+  });
+
+  it('extracts distinct categories and squad classes from Nimenhuuto/MyClub feeds', () => {
+    const NIMENHUUTO_SAMPLE = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Nimenhuuto.com//NONSGML Calendar//EN
+BEGIN:VEVENT
+UID:e1@nimenhuuto.com
+SUMMARY:Treenit 18:30-20:00
+CATEGORIES:Treenit
+END:VEVENT
+BEGIN:VEVENT
+UID:e2@nimenhuuto.com
+SUMMARY:Peli kilpa: Indians vs Oilers
+CATEGORIES:Peli kilpa
+END:VEVENT
+BEGIN:VEVENT
+UID:e3@nimenhuuto.com
+SUMMARY:Peli haastaja: Indians vs ErVi
+CATEGORIES:Peli haastaja
+END:VEVENT
+BEGIN:VEVENT
+UID:e4@nimenhuuto.com
+SUMMARY:Vanhempainilta ja kauden avaus
+CATEGORIES:Muu
+END:VEVENT
+BEGIN:VEVENT
+UID:e5@nimenhuuto.com
+SUMMARY:Treenit 17:00-18:30
+CATEGORIES:Treenit
+END:VEVENT
+END:VCALENDAR`;
+
+    const categories = extractFeedCategories(NIMENHUUTO_SAMPLE);
+    expect(categories).toEqual([
+      { name: 'Treenit', count: 2 },
+      { name: 'Peli kilpa', count: 1 },
+      { name: 'Peli haastaja', count: 1 },
+      { name: 'Muu', count: 1 }
+    ]);
+  });
+
+  it('filters out excluded squads/categories using squadFilters exclusion list', async () => {
+    const NIMENHUUTO_SAMPLE = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:e1@nimenhuuto.com
+SUMMARY:Treenit 18:30-20:00
+CATEGORIES:Treenit
+DTSTART:20260820T153000Z
+DTEND:20260820T170000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:e2@nimenhuuto.com
+SUMMARY:Peli kilpa: Indians vs Oilers
+CATEGORIES:Peli kilpa
+DTSTART:20260821T150000Z
+DTEND:20260821T163000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:e3@nimenhuuto.com
+SUMMARY:Peli haastaja: Indians vs ErVi
+CATEGORIES:Peli haastaja
+DTSTART:20260822T150000Z
+DTEND:20260822T163000Z
+END:VEVENT
+END:VCALENDAR`;
+
+    // Filter out "Peli haastaja"
+    const filteredEvents = await parseICSFeed(
+      NIMENHUUTO_SAMPLE,
+      'profile-1',
+      'floorball',
+      'Westend Indians',
+      ['Peli haastaja']
+    );
+
+    expect(filteredEvents.length).toBe(2);
+    expect(filteredEvents.some((e) => e.title.includes('Peli kilpa'))).toBe(true);
+    expect(filteredEvents.some((e) => e.title.includes('Treenit'))).toBe(true);
+    expect(filteredEvents.some((e) => e.title.includes('Peli haastaja'))).toBe(false);
   });
 });
