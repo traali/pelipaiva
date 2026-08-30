@@ -136,7 +136,7 @@ export const OnDeviceLlmSettings: React.FC = () => {
           className="w-full py-2 px-3 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-          {runtime.choice === 'qwen06' ? 'Lataa Qwen 0.6B tälle puhelimelle' : 'Lataa Chrome-malli tälle koneelle'}
+          {runtime.choice === 'qwen06' ? 'Lataa Qwen 0.6B tälle puhelimelle' : `Lataa Chrome-malli ${runtime.platform === 'chrome' ? 'tälle laitteelle' : 'tälle koneelle'}`}
         </button>
       )}
 

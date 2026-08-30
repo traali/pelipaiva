@@ -15,6 +15,12 @@ export default defineConfig({
   },
   projects: [
     {
+      name: 'Android Chrome Pixel 7',
+      use: {
+        ...devices['Pixel 7'],
+      },
+    },
+    {
       name: 'Mobile Chrome (iPhone 15 Viewport)',
       use: {
         ...devices['Pixel 7'],
@@ -32,7 +38,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 30000,
   },
 });

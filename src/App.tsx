@@ -536,8 +536,9 @@ export const App: React.FC = () => {
     );
   }
 
-  // If no profiles exist yet or onboarding is explicitly in progress, show the Interactive Onboarding Wizard
-  if (profiles.length === 0 || isOnboardingActive) {
+  // Only the wizard itself, not "zero profiles". Local-only parents can
+  // finish onboarding without a team and still reach Perhe / tekoäly.
+  if (isOnboardingActive) {
     return (
       <>
         <OnboardingWizard

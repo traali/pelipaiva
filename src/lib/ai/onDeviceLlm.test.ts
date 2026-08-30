@@ -110,6 +110,68 @@ describe('on-device LLM prefs (default off)', () => {
     expect(runtime.summaryFi).toMatch(/Safari/i);
   });
 
+  const ANDROID_CHROME =
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36';
+  const DESKTOP_CHROME =
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36';
+  const IOS_CHROME =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/148.0.0.0 Mobile/15E148 Safari/604.1';
+
+  it('Android Chrome is the chrome platform, not Apple/Qwen', async () => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent: ANDROID_CHROME, platform: 'Linux armv8l', maxTouchPoints: 5 },
+      configurable: true
+    });
+    expect(detectOnDevicePlatform()).toBe('chrome');
+    const runtime = await describeOnDeviceRuntime();
+    expect(runtime.options.some((o) => o.id === 'apple')).toBe(false);
+    expect(runtime.options.some((o) => o.id === 'qwen06')).toBe(false);
+    const chrome = runtime.options.find((o) => o.id === 'chrome');
+    expect(chrome).toBeTruthy();
+    expect(chrome?.available).toBe(false);
+    expect(runtime.summaryFi).toMatch(/Android Chrome/i);
+    expect(runtime.neuralReady).toBe(false);
+  });
+
+  it('Android Chrome with Prompt API can opt in like laptop Chrome', async () => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent: ANDROID_CHROME, platform: 'Linux armv8l', maxTouchPoints: 5 },
+      configurable: true
+    });
+    (globalThis as any).LanguageModel = {
+      availability: vi.fn().mockResolvedValue('available'),
+      create: vi.fn().mockResolvedValue({ prompt: vi.fn().mockResolvedValue('ok'), destroy: vi.fn() })
+    };
+    const load = await requestLoadOnDeviceModel('chrome');
+    expect(load.ok).toBe(true);
+    const runtime = await describeOnDeviceRuntime();
+    expect(runtime.activeEngine).toBe('chrome_gemini_nano');
+    expect(runtime.summaryFi).toMatch(/Gemini Nano/i);
+  });
+
+  it('desktop Chrome is chrome platform with Gemini Nano option', async () => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent: DESKTOP_CHROME, platform: 'Linux x86_64', maxTouchPoints: 0 },
+      configurable: true
+    });
+    expect(detectOnDevicePlatform()).toBe('chrome');
+    const runtime = await describeOnDeviceRuntime();
+    expect(runtime.options.find((o) => o.id === 'chrome')).toBeTruthy();
+    expect(runtime.options.find((o) => o.id === 'apple')).toBeFalsy();
+    expect(runtime.summaryFi).toMatch(/Chrome/i);
+  });
+
+  it('iOS Chrome (CriOS) stays ios-safari — WebKit has no Prompt API', async () => {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { userAgent: IOS_CHROME, platform: 'iPhone', maxTouchPoints: 5 },
+      configurable: true
+    });
+    expect(detectOnDevicePlatform()).toBe('ios-safari');
+    const runtime = await describeOnDeviceRuntime();
+    expect(runtime.options.find((o) => o.id === 'chrome')).toBeFalsy();
+    expect(runtime.options.find((o) => o.id === 'apple')?.available).toBe(false);
+  });
+
   it('iOS native bridge can expose Apple Intelligence after opt-in', async () => {
     (globalThis as any).FamdayNativeAi = {
       availability: vi.fn().mockResolvedValue('readily'),

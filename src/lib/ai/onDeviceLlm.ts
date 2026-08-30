@@ -86,6 +86,12 @@ export function detectOnDevicePlatform(): OnDevicePlatform {
   return 'other';
 }
 
+/** Android Chrome (not iOS CriOS). Same Prompt API contract as laptop Chrome. */
+export function isAndroidChromeUa(ua?: string): boolean {
+  const resolved = ua ?? (globalObj().navigator?.userAgent as string | undefined) ?? '';
+  return /Android/i.test(resolved) && /Chrome\//.test(resolved) && !/Edg\//.test(resolved);
+}
+
 function installNativeResultHook(): void {
   const g = globalObj();
   if (g.__famdayAiResolve) return;
@@ -202,6 +208,9 @@ export async function describeOnDeviceRuntime(): Promise<OnDeviceRuntime> {
     });
   }
 
+  const android = isAndroidChromeUa();
+  const deviceFi = android ? 'tälle puhelimelle' : 'tälle koneelle';
+
   if (platform === 'chrome' || chromeOk) {
     options.push({
       id: 'chrome',
@@ -210,8 +219,8 @@ export async function describeOnDeviceRuntime(): Promise<OnDeviceRuntime> {
         chrome.status === 'readily'
           ? 'Selaimen paikallinen malli on valmiina. Käytetään vain kun otat sen käyttöön.'
           : chrome.status === 'after-download'
-            ? 'Malli pitää ladata Chromessa (kerran, tälle koneelle). Ei lähde pilveen.'
-            : 'Chrome 148+ (Prompt API / LanguageModel) kannettavalla. Ei ole tässä selaimessa.',
+            ? `Malli pitää ladata Chromessa (kerran, ${deviceFi}). Ei lähde pilveen.`
+            : 'Chrome 148+ Prompt API (Gemini Nano). Ei ole tässä selaimessa — Aikataulujärki toimii Androidissa ja laptopissa.',
       available: chromeOk,
       needsUserLoad: chrome.status === 'after-download',
       reason: chromeOk ? undefined : 'no_prompt_api'
@@ -232,7 +241,13 @@ export async function describeOnDeviceRuntime(): Promise<OnDeviceRuntime> {
     if (platform === 'ios-safari') {
       summaryFi = 'iPhone Safari: Aikataulujärki. Apple / Qwen vaatii FamDay-sovelluksen.';
     } else if (platform === 'chrome' && chromeOk) {
-      summaryFi = 'Chrome: paikallinen malli on tarjolla. Ota käyttöön Perhe-asetuksista jos haluat.';
+      summaryFi = android
+        ? 'Android Chrome: paikallinen malli on tarjolla. Ota käyttöön jos haluat.'
+        : 'Chrome: paikallinen malli on tarjolla. Ota käyttöön Perhe-asetuksista jos haluat.';
+    } else if (platform === 'chrome') {
+      summaryFi = android
+        ? 'Android Chrome: Aikataulujärki. Gemini Nano ei ole tässä selaimessa — sovellus toimii silti.'
+        : 'Chrome: Aikataulujärki. Gemini Nano ei ole tässä selaimessa — sovellus toimii silti.';
     }
   } else if (neuralReady) {
     summaryFi =
