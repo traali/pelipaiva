@@ -106,13 +106,18 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
 
           <AnimatePresence>
             {menuOpen && (
-              <>
-                <div
+              <React.Fragment key="hud-menu-group">
+                <motion.div
+                  key="hud-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   className="fixed inset-0 z-40 bg-black/20"
                   onClick={() => setMenuOpen(false)}
                   aria-hidden="true"
                 />
                 <motion.div
+                  key="hud-dropdown"
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
@@ -199,7 +204,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                   />
                 )}
               </motion.div>
-              </>
+              </React.Fragment>
             )}
           </AnimatePresence>
         </div>
