@@ -27,6 +27,7 @@ import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
+import { detectSportFromText } from './lib/ai/eventCandidateRanker';
 
 const SmartImportModal = lazy(() =>
   import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
@@ -188,6 +189,57 @@ export const App: React.FC = () => {
     ensureStoragePersistence();
   }, []);
 
+  // Self-healing sport and indoor venue harmonization for multi-sport child profiles
+  useEffect(() => {
+    (async () => {
+      try {
+        const allProfiles = await db.profiles.toArray();
+        const allEvents = await db.events.toArray();
+        const officialSportByPlayer = new Map<string, SportType>();
+        for (const p of allProfiles) {
+          if ((p.associationUrl || p.teamId) && p.sport && p.sport !== 'football') {
+            officialSportByPlayer.set(p.playerName.trim().toLowerCase(), p.sport);
+          }
+        }
+
+        for (const ev of allEvents) {
+          const profile = allProfiles.find((p) => p.id === ev.profileId);
+          const playerName = profile?.playerName?.trim().toLowerCase() || '';
+          const targetSport = officialSportByPlayer.get(playerName);
+          const isLyk = /yhteiskoulu|lyk/i.test(ev.venue?.name || '');
+          const isBasketballContext =
+            targetSport === 'basketball' ||
+            isLyk ||
+            /basket|topola|koris/i.test(`${ev.title} ${ev.notes || ''}`);
+
+          let needsUpdate = false;
+          const updates: Partial<MatchdayEvent> = {};
+
+          if (isBasketballContext && ev.sport === 'football') {
+            updates.sport = 'basketball';
+            needsUpdate = true;
+          }
+
+          if (isLyk && (!ev.venue.isIndoor || ev.venue.surface === 'artificial_turf_3g')) {
+            updates.venue = {
+              ...ev.venue,
+              name: ev.venue.name.includes('LYK') ? ev.venue.name : `${ev.venue.name} (LYK)`,
+              isIndoor: true,
+              surface: 'indoor_parquet'
+            };
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            await db.events.update(ev.id, updates);
+          }
+        }
+      } catch (err) {
+        console.warn('[SELF_HEAL] Sport harmonization error:', err);
+      }
+    })();
+  }, []);
+
   // Dexie Reactive Live Queries
   const profiles = useLiveQuery(() => db.profiles.toArray(), []) || [];
   const eventsQuery = useLiveQuery(() => db.events.toArray(), []);
@@ -342,8 +394,17 @@ export const App: React.FC = () => {
     squadFilters?: string[]
   ): Promise<{ success: boolean; count: number; error?: string }> => {
     const existing = await db.profiles.toArray();
+    const detectedFromText = detectSportFromText(`${teamName} ${url}`);
+    const existingPlayerProfile = existing.find(
+      (p) => (p.playerName || '').trim().toLowerCase() === playerName.trim().toLowerCase() && p.sport && p.sport !== 'football'
+    );
+    const resolvedSport =
+      sport !== 'football'
+        ? sport
+        : detectedFromText || existingPlayerProfile?.sport || sport;
+
     const cup = exampleTournamentFromUrl(url);
-    const club = searchPopularClubs(teamName).find((c) => c.sport === sport);
+    const club = searchPopularClubs(teamName).find((c) => c.sport === resolvedSport);
     const named = colorFromNameHint(`${teamName} ${url}`);
     const swatch = colorHex
       ? swatchForHex(colorHex)
@@ -354,13 +415,13 @@ export const App: React.FC = () => {
             ? { hex: club.colorHex, label: club.primaryColor }
             : pickNextTeamColor(existing.map((p) => p.colorHex)));
 
-    const reused = findExistingTeamProfile(existing, playerName, url, sport);
+    const reused = findExistingTeamProfile(existing, playerName, url, resolvedSport);
     const profileId = reused?.id || generateStableProfileId(playerName, url);
 
     if (reused) {
       await db.profiles.update(profileId, {
         teamName: teamName || reused.teamName,
-        sport,
+        sport: resolvedSport,
         primaryColor: swatch.label,
         calendarUrl: url,
         colorHex: swatch.hex,
@@ -371,7 +432,7 @@ export const App: React.FC = () => {
         id: profileId,
         playerName,
         teamName,
-        sport,
+        sport: resolvedSport,
         primaryColor: swatch.label,
         calendarUrl: url,
         colorHex: swatch.hex,
@@ -384,7 +445,7 @@ export const App: React.FC = () => {
         profileId,
         playerName,
         teamName: cup?.teamName || teamName,
-        sport,
+        sport: resolvedSport,
         url,
         includeWeather: true,
         squadFilters

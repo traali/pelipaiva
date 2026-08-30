@@ -21,6 +21,13 @@ describe('National Sports Geocoder', () => {
     expect(esport.isIndoor).toBe(true);
     expect(esport.coordinates.lat).toBeCloseTo(60.1756, 2);
 
+    const lyk = await resolveSportsVenue('Lauttasaaren Yhteiskoulu Uusi, Isokaari 19, 00200 Helsinki, Suomi');
+    expect(lyk.name).toContain('Lauttasaaren yhteiskoulu');
+    expect(lyk.isIndoor).toBe(true);
+    expect(lyk.surface).toBe('indoor_parquet');
+    expect(lyk.coordinates.lat).toBeCloseTo(60.1601, 2);
+    expect(lyk.coordinates.lng).toBeCloseTo(24.8785, 2);
+
     const kauppi = await resolveSportsVenue('Kauppi TN 1');
     expect(kauppi.name).toContain('Kaupin');
     expect(kauppi.coordinates.lat).toBeCloseTo(61.5034, 2);

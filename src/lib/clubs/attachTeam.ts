@@ -52,7 +52,7 @@ export function findExistingTeamProfile(
   if (isIcsUrl) {
     const candidate = profiles.find((p) => {
       if ((p.playerName || '').trim().toLowerCase() !== name) return false;
-      if (sport && p.sport !== sport) return false;
+      if (sport && sport !== 'football' && p.sport !== sport) return false;
       return Boolean(p.associationUrl && !p.calendarUrl);
     });
     if (candidate) return candidate;

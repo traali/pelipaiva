@@ -31,13 +31,13 @@ export function detectSportFromText(text: string): SportType | undefined {
   if (/\b(?:hammaslääkäri|lääkäri|neuvola|terveydenhoitaja|optikko|partio|soittotunti|pianotunti|kitaratunti|viulutunti|bänditreenit|kuoro|synttärit|syntymäpäivä|kerho|sirkus|tanssitunti|baletti|ratsastus|uimakoulu)\b/i.test(norm)) {
     return 'other';
   }
-  if (/\b(?:salibandy|säbä|sähly|floorball|reikäpallo|suojalasit)\b/i.test(norm)) {
+  if (/\b(?:salibandy|säbä|sähly|floorball|reikäpallo|suojalasit|fliiga|indians|westend indians|ervii|eräviikingit|tiikerit|hawks|blackbirds|oilers)\b/i.test(norm)) {
     return 'floorball';
   }
-  if (/\b(?:koripallo|koris|basket|korisliiga|donkki)\b/i.test(norm)) {
+  if (/\b(?:koripallo|koris|basket|korisliiga|donkki|topola|hnmky|namika|honka basket|wartti|puhu|pantterit|lepy|tikka basket|toppari)\b/i.test(norm)) {
     return 'basketball';
   }
-  if (/\b(?:lentopallo|lentis|volley|hihalyönti|sormilyönti)\b/i.test(norm)) {
+  if (/\b(?:lentopallo|lentis|volley|hihalyönti|sormilyönti|mestaruusliiga|puijo|valepa|vaasan kiisto)\b/i.test(norm)) {
     return 'volleyball';
   }
   if (/\b(?:jääkiekko|lätkä|kiekko|hockey|luistimet|kypärä|leijonat)\b/i.test(norm)) {

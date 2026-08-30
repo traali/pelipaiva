@@ -211,6 +211,22 @@ export function mergeRosters(
     });
   }
 
+  // Harmonize child sport across profiles if the child has an official association sport (e.g. basketball, floorball, volleyball)
+  const officialSportByPlayer = new Map<string, SportType>();
+  for (const p of profileMap.values()) {
+    if (p.associationUrl || p.teamId) {
+      if (p.sport && p.sport !== 'football') {
+        officialSportByPlayer.set(p.playerName.trim().toLowerCase(), p.sport);
+      }
+    }
+  }
+  for (const p of profileMap.values()) {
+    const offSport = officialSportByPlayer.get(p.playerName.trim().toLowerCase());
+    if (offSport && p.sport === 'football' && !p.associationUrl) {
+      p.sport = offSport;
+    }
+  }
+
   const mergedProfiles = Array.from(profileMap.values());
   const tombstones = Array.from(tombstoneMap.entries()).map(([id, deletedAt]) => ({
     id,

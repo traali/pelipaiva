@@ -56,11 +56,29 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'kupla': { name: 'Käpylän Kuplahalli', lat: 60.2140, lng: 24.9460, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
   'töölön kisahalli': { name: 'Töölön Kisahalli (Kisis)', lat: 60.1835, lng: 24.9282, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'kisis': { name: 'Töölön Kisahalli (Kisis)', lat: 60.1835, lng: 24.9282, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lauttasaaren yhteiskoulu': { name: 'Lauttasaaren yhteiskoulu (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lauttasaaren yhteiskoulu uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lauttasaaren yhteiskoulun uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lyk': { name: 'Lauttasaaren yhteiskoulu (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lyk uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lyk vanha': { name: 'Lauttasaaren yhteiskoulu Vanha (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport center': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport center 2': { name: 'Esport Center 2', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport tapiola': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'munkkiniemen yhteiskoulu': { name: 'Munkkiniemen yhteiskoulu', lat: 60.1965, lng: 24.8758, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'munkkiniemen yhteiskoulu': { name: 'Munkkiniemen yhteiskoulu (MYK)', lat: 60.1965, lng: 24.8758, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'myk': { name: 'Munkkiniemen yhteiskoulu (MYK)', lat: 60.1965, lng: 24.8758, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'munkka': { name: 'Munkkiniemen yhteiskoulu', lat: 60.1965, lng: 24.8758, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'pohjois haagan yhteiskoulu': { name: 'Pohjois-Haagan yhteiskoulu (PHYK)', lat: 60.2235, lng: 24.8967, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'phyk': { name: 'Pohjois-Haagan yhteiskoulu (PHYK)', lat: 60.2235, lng: 24.8967, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'suomalainen yhteiskoulu': { name: 'Suomalainen yhteiskoulu (SYK)', lat: 60.1925, lng: 24.8968, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'syk': { name: 'Suomalainen yhteiskoulu (SYK)', lat: 60.1925, lng: 24.8968, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'namika areena': { name: 'Namika Areena Pakila', lat: 60.2450, lng: 24.9350, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'helsingin urheilutalo': { name: 'Helsingin Urheilutalo (Kallio)', lat: 60.1873, lng: 24.9525, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'urheilutalo': { name: 'Helsingin Urheilutalo (Kallio)', lat: 60.1873, lng: 24.9525, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'malmin palloiluhalli': { name: 'Malmin Palloiluhalli', lat: 60.2525, lng: 25.0125, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'herttoniemenrannan liikuntahalli': { name: 'Herttoniemenrannan Liikuntahalli', lat: 60.1912, lng: 25.0341, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'otahalli': { name: 'Otahalli Otaniemi', lat: 60.1850, lng: 24.8320, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'leppävaaran liikuntahalli': { name: 'Leppävaaran Liikuntahalli', lat: 60.2225, lng: 24.8085, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'mosahalli': { name: 'Tapanilan Mosahalli', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'mosahalli 1': { name: 'Tapanilan Mosahalli 1', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'mosahalli 2': { name: 'Tapanilan Mosahalli 2', lat: 60.2612, lng: 25.0234, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
@@ -278,7 +296,7 @@ export async function resolveSportsVenue(
     .replace(/\s+/g, ' ')
     .trim();
 
-  const indoorGuess = /halli|arena|center|sali/.test(normalized);
+  const indoorGuess = /halli|arena|center|sali|koulu|lukio|opisto|liikuntasali|monitoimitalo|gym|liikuntahalli/i.test(normalized);
 
   if (hint?.lat && hint?.lng) {
     const aliasHit = Object.entries(NATIONAL_FIELD_ALIASES)
@@ -290,7 +308,7 @@ export async function resolveSportsVenue(
       city: hint.city,
       coordinates: { lat: hint.lat, lng: hint.lng },
       isIndoor: aliasHit?.[1].isIndoor ?? indoorGuess,
-      surface: aliasHit?.[1].surface ?? (indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g'),
+      surface: aliasHit?.[1].surface ?? (indoorGuess ? 'indoor_parquet' : 'artificial_turf_3g'),
       hasFloodlights: aliasHit?.[1].hasFloodlights ?? true
     };
   }

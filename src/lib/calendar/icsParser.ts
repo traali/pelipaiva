@@ -7,6 +7,7 @@ import {
   VolunteerDutyResult
 } from '../../types/matchday';
 import { geocodeSportsVenue } from '../geo/sportsGeocoder';
+import { detectSportFromText } from '../ai/eventCandidateRanker';
 
 /**
  * Checks if an event is a training session, practice, or non-match exercise.
@@ -499,6 +500,10 @@ export async function parseICSFeed(
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
+    const calName = (vcalendar.getFirstPropertyValue('x-wr-calname') as string) || '';
+    const feedSportHint = detectSportFromText(`${calName} ${defaultTeamName || ''} ${icsContent.slice(0, 3000)}`);
+    const resolvedSport = sport === 'football' && feedSportHint ? feedSportHint : sport;
+
     const venueCache = new Map<string, any>();
 
     for (const vevent of vevents) {
@@ -527,6 +532,7 @@ export async function parseICSFeed(
         category.toLowerCase().includes('harjoitus') ||
         isTrainingEvent(title, description);
       const parsedTitle = parseMatchTitle(title, defaultTeamName);
+      const eventSport = detectSportFromText(`${title} ${category} ${description}`) || resolvedSport;
 
       // Volunteer duty detection (Talkoovahti)
       const dutyResult = extractVolunteerDuty(title, description);
@@ -569,7 +575,7 @@ export async function parseICSFeed(
             events.push({
               id: instanceId,
               profileId,
-              sport,
+              sport: eventSport,
               eventType: parsedTitle.eventType,
               isTraining,
               title,
@@ -607,7 +613,7 @@ export async function parseICSFeed(
         events.push({
           id: event.uid || generateDeterministicEventId(title, kickoffTime.toISOString(), location),
           profileId,
-          sport,
+          sport: eventSport,
           eventType: parsedTitle.eventType,
           isTraining,
           title,
