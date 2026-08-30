@@ -97,36 +97,49 @@ export const OnDeviceLlmSettings: React.FC = () => {
         </div>
       </div>
 
-      <div role="radiogroup" aria-label="Laitteen tekoäly" className="flex flex-col gap-1.5">
-        {runtime.options.map((opt) => {
-          const checked = runtime.choice === opt.id;
-          const disabled = opt.id !== 'off' && !opt.available;
-          return (
-            <label
-              key={opt.id}
-              className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left ${
-                checked
-                  ? 'border-pitch bg-pitch/10'
-                  : 'border-border-subtle bg-surface-elevated/60'
-              } ${disabled ? 'opacity-60' : 'cursor-pointer'}`}
-            >
-              <input
-                type="radio"
-                name="pelipaiva-ondevice-llm"
-                value={opt.id}
-                checked={checked}
-                disabled={disabled || busy}
-                onChange={() => handleSelect(opt.id)}
-                className="mt-0.5 accent-emerald-700"
-              />
-              <span className="min-w-0">
-                <span className="block text-xs font-bold text-text-primary">{opt.label}</span>
-                <span className="block text-[11px] text-text-muted leading-snug">{opt.detail}</span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
+      {runtime.platform === 'ios-safari' ? (
+        <div className="p-3 rounded-xl border border-border-subtle bg-surface-elevated/60 text-left flex flex-col gap-1">
+          <div className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-pitch" />
+            <span>Aikataulujärki aktiivinen</span>
+          </div>
+          <p className="text-[11px] text-text-muted leading-snug">
+            Nopea ja turvallinen sääntöpohjainen jäsennys toimii suoraan selaimessa ilman verkkolatauksia.
+            Applen omat laitemallit ovat käytettävissä FamDay-sovelluksessa.
+          </p>
+        </div>
+      ) : (
+        <div role="radiogroup" aria-label="Laitteen tekoäly" className="flex flex-col gap-1.5">
+          {runtime.options.map((opt) => {
+            const checked = runtime.choice === opt.id;
+            const disabled = opt.id !== 'off' && !opt.available;
+            return (
+              <label
+                key={opt.id}
+                className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-left ${
+                  checked
+                    ? 'border-pitch bg-pitch/10'
+                    : 'border-border-subtle bg-surface-elevated/60'
+                } ${disabled ? 'opacity-60' : 'cursor-pointer'}`}
+              >
+                <input
+                  type="radio"
+                  name="pelipaiva-ondevice-llm"
+                  value={opt.id}
+                  checked={checked}
+                  disabled={disabled || busy}
+                  onChange={() => handleSelect(opt.id)}
+                  className="mt-0.5 accent-emerald-700"
+                />
+                <span className="min-w-0">
+                  <span className="block text-xs font-bold text-text-primary">{opt.label}</span>
+                  <span className="block text-[11px] text-text-muted leading-snug">{opt.detail}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      )}
 
       {showLoad && (
         <button

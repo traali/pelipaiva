@@ -24,7 +24,6 @@ import {
   exampleTournamentFromUrl,
   isCupName,
   mergeOfficialWithCupFallback,
-  officialFromExampleCup,
   isUglyTeamName
 } from './exampleTournaments';
 
@@ -68,11 +67,9 @@ export async function ingestOfficialForProfile(opts: {
   officialData = mergeOfficialWithCupFallback(cup, officialData);
 
   if (!officialData || officialData.fixtures.length === 0) {
-    if (cup) {
-      officialData = officialFromExampleCup(cup);
-    }
-    // No synthetic fallback for league teams: return null and let the caller
-    // surface an explicit "source unreachable" error to the user.
+    // No synthetic or canned fallback: if federation returned 0 matches,
+    // return null and let caller show "ei julkaistu".
+    return { official: officialData, resolvedTeamName: cup?.teamName || opts.teamName };
   }
 
   if (!officialData || officialData.fixtures.length === 0) {

@@ -1,14 +1,14 @@
 import { ExtractedSportsEvent, parseFreeformSportsMessage } from './messageParserNLP';
 import { SportType, EventType } from '../../types/matchday';
 import { isOnDeviceLlmEnabled, getOnDeviceLlmChoice } from './onDeviceLlmPrefs';
+import type { NeuralEngineId } from './onDeviceLlm';
+export type { NeuralEngineId };
 
 export interface ChromeAiCapabilities {
   isSupported: boolean;
   status: 'readily' | 'after-download' | 'no';
   modelName?: string;
 }
-
-export type NeuralEngineId = 'chrome_gemini_nano' | 'apple_foundation' | 'apple_core_ai';
 
 export interface HybridParseResult {
   result: ExtractedSportsEvent;

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { generateOrResolveMatchStats } from '../../../tests/helpers/testStatsFixture';
 import {
-  generateOrResolveMatchStats,
   parseAssociationUrl,
   isAssociationUrl,
   getAssociationName,
