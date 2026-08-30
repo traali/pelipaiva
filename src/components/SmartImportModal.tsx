@@ -744,9 +744,10 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                     </div>
 
                     <input
-                      type="text"
-                      required
-                      placeholder="https://tulospalvelu.palloliitto.fi/team/... tai webcal://..."
+                      id="classic-cal-url"
+                      name="classicCalendarUrl"
+                      type="url"
+                      placeholder="Liitä linkki (esim. *.torneopal.fi/taso/joukkue.php?joukkue=... tai webcal://...)"
                       value={classicUrl}
                       onChange={(e) => handleUrlChange(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-mono text-xs focus:outline-none focus:border-pitch"
@@ -763,11 +764,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
                     {showGuide && (
                       <div className="mt-2 flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-elevated p-3 text-[11px] text-text-secondary">
+                        <div>🏆 Torneopal turnaukset & sarjat: *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
                         <div>⚽ Palloliitto: tulospalvelu.palloliitto.fi/team/{'{id}'}</div>
                         <div>🏑 Salibandy: tulospalvelu.salibandy.fi/team/{'{id}'}</div>
                         <div>🏀 Basket.fi: basket.fi/.../?team_id={'{id}'}</div>
                         <div>🏐 Lentopallo: tulospalvelu.lentopallo.fi/team/{'{id}'}</div>
-                        <div>🏐 Torneopal: *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
                         <div>📅 Kalenterit: Nimenhuuto, MyClub, Jopox (.ics / webcal://)</div>
                       </div>
                     )}

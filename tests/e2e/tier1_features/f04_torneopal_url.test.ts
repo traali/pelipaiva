@@ -46,6 +46,19 @@ describe('Feature 4: Torneopal Team URL Parser', () => {
     expect(parseAssociationUrl('https://torneopal.fi/etusivu')).toBeNull();
   });
 
+  it('should parse tournament Torneopal URLs with turnaus, sarja, and custom subdomain', () => {
+    const url = 'https://vierumaki-turnaus5-2026.torneopal.fi/taso/joukkue.php?joukkue=201313&turnaus=lime_0016&sarja=P13H#';
+    const parsed = parseAssociationUrl(url);
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.association).toBe('torneopal');
+    expect(parsed?.subdomain).toBe('vierumaki-turnaus5-2026');
+    expect(parsed?.teamId).toBe('201313');
+    expect(parsed?.seasonId).toBe('lime_0016');
+    expect(parsed?.leagueId).toBe('P13H');
+    expect(parsed?.canonicalUrl).toBe('https://vierumaki-turnaus5-2026.torneopal.fi/taso/joukkue.php?joukkue=201313&turnaus=lime_0016&sarja=P13H');
+  });
+
   it('should detect association type and normalize URL correctly for Torneopal', () => {
     const url = 'https://lentopallo.torneopal.fi/taso/joukkue.php?joukkue=88123';
     expect(detectAssociationType(url)).toBe('torneopal');

@@ -90,7 +90,7 @@ function isFinnishSummerTime(dateStr: string): boolean {
 
 export function isTorneopalCompetitionId(raw?: string): boolean {
   if (!raw) return false;
-  return /^[a-z0-9][a-z0-9-]{1,24}$/i.test(raw);
+  return /^[a-z0-9][a-z0-9_-]{1,32}$/i.test(raw);
 }
 
 export function looksLikeCupRequest(parsed: ParsedAssociationUrl): boolean {
