@@ -9,12 +9,13 @@ import { SportGlyph } from './SportGlyph';
 interface AmbientViewProps {
   events: MatchdayEvent[];
   profiles?: PlayerProfile[];
+  homeLocation?: import('../types/matchday').HomeLocation;
   onExit?: () => void;
 }
 
 const IDLE_MS = 90_000;
 
-export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [], onExit }) => {
+export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [], homeLocation, onExit }) => {
   const [timeStr, setTimeStr] = useState('');
   const [dateStr, setDateStr] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -23,8 +24,8 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
   const armIdleRef = useRef<() => void>(() => {});
 
   const snapshot = useMemo(
-    () => runMissionControlGraph(events, profiles, new Date()),
-    [events, profiles]
+    () => runMissionControlGraph(events, profiles, new Date(), undefined, homeLocation),
+    [events, profiles, homeLocation]
   );
 
   const cycle = useMemo(() => {
@@ -89,7 +90,7 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
 
   const shown = cycle[cursor] || snapshot.nextEvent;
   const profile = shown ? profiles.find((p) => p.id === shown.profileId) : undefined;
-  const depart = shown ? calculateDepartureCountdown(shown, profile?.arrivalRules) : undefined;
+  const depart = shown ? calculateDepartureCountdown(shown, profile?.arrivalRules, homeLocation) : undefined;
   const temp = shown?.weather?.isForecastLongRange ? undefined : shown?.weather?.temperatureC;
 
   return (
@@ -164,8 +165,13 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
 
           <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-lg border border-border-subtle bg-surface-elevated p-5">
-              <div className="text-sm font-medium uppercase tracking-wide text-text-muted">
-                Lähde kotoa
+              <div className="flex items-center justify-between text-sm font-medium uppercase tracking-wide text-text-muted">
+                <span>Lähde kotoa</span>
+                {depart?.transitPlan && (
+                  <span className="text-xs font-semibold text-pitch lowercase">
+                    {depart.transitPlan.transitLabel}
+                  </span>
+                )}
               </div>
               <div className="mt-1 font-tabular text-4xl font-semibold text-floodlight md:text-5xl">
                 {depart?.departureTime || '—'}

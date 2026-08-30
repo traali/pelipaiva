@@ -817,6 +817,7 @@ export const App: React.FC = () => {
       <AmbientView
         events={filteredEvents}
         profiles={profiles}
+        homeLocation={homeLocation}
         onExit={() => {
           setIsAmbientMode(false);
           // Strip a deep-linked ambient param so reload doesn't re-trap (M-29).

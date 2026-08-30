@@ -82,22 +82,6 @@ export function calculateDepartureCountdown(
   const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
   const isHome = event.isHomeMatch;
 
-  // Resolve warmup offset
-  let warmupOffset = isSchool || isOther ? 5 : isTraining ? 15 : (isHome ? 45 : 60);
-  if (arrivalRules) {
-    if (isSchool || isOther) {
-      warmupOffset = 5;
-    } else if (isTraining) {
-      warmupOffset = arrivalRules.warmupOffsetsMinutes?.training ?? arrivalRules.warmupOffsetTrainingMinutes ?? 15;
-    } else if (isTournament) {
-      warmupOffset = arrivalRules.warmupOffsetsMinutes?.tournament ?? arrivalRules.warmupOffsetTournamentMinutes ?? 30;
-    } else if (isHome) {
-      warmupOffset = arrivalRules.warmupOffsetsMinutes?.homeMatch ?? arrivalRules.warmupOffsetHomeMinutes ?? 45;
-    } else {
-      warmupOffset = arrivalRules.warmupOffsetsMinutes?.awayMatch ?? arrivalRules.warmupOffsetAwayMinutes ?? 60;
-    }
-  }
-
   const normalizedHome: HomeLocation | undefined =
     homeLocation && 'coordinates' in homeLocation
       ? (homeLocation as HomeLocation)
@@ -121,8 +105,27 @@ export function calculateDepartureCountdown(
       arrivalRules?.defaultDrivingEstimateMinutes ?? 20
     );
 
+  const isNearbyActiveTransit = transitPlan.mode === 'walk' || transitPlan.mode === 'bicycle';
+
+  // Resolve warmup offset
+  let warmupOffset = isSchool || isOther ? 5 : isTraining ? (isNearbyActiveTransit ? 8 : 15) : (isHome ? 45 : 60);
+  if (arrivalRules) {
+    if (isSchool || isOther) {
+      warmupOffset = 5;
+    } else if (isTraining) {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.training ?? arrivalRules.warmupOffsetTrainingMinutes ?? (isNearbyActiveTransit ? 8 : 15);
+    } else if (isTournament) {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.tournament ?? arrivalRules.warmupOffsetTournamentMinutes ?? 30;
+    } else if (isHome) {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.homeMatch ?? arrivalRules.warmupOffsetHomeMinutes ?? 45;
+    } else {
+      warmupOffset = arrivalRules.warmupOffsetsMinutes?.awayMatch ?? arrivalRules.warmupOffsetAwayMinutes ?? 60;
+    }
+  }
+
   const transitTravelMins = transitPlan.travelMinutes;
-  const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? 10;
+  const defaultBuffer = isNearbyActiveTransit ? 2 : 10;
+  const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? defaultBuffer;
   // Walking from parking only applies if traveling by car
   const parkingWalkMins = transitPlan.mode === 'car' ? (event.parking?.walkingTimeMinutes ?? 3) : 0;
   const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
