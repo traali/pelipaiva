@@ -527,8 +527,10 @@ export interface MatchdayEvent {
   startTime: string; // ISO 8601
   endTime: string;
   warmupTime: string; // ISO 8601
+  isTournament?: boolean;
   tournamentName?: string;
   stage?: string; // e.g. "P14 Haastaja Lohko B" or "Jatko-ottelut"
+  roundInfo?: string;
   matchNumber?: string; // e.g. "227"
   score?: string; // e.g. "2–12", "4–9", "7–3"
   venue: VenueInfo;

@@ -6,7 +6,7 @@ import { MultiProfileHeader } from './components/MultiProfileHeader';
 import { AmbientView } from './components/AmbientView';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { MatchdayEvent, SportType, PlayerProfile, HomeLocation } from './types/matchday';
-import { LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon } from 'lucide-react';
+import { LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon, Trophy } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
 import { MatchStatsModal } from './components/MatchStatsModal';
@@ -73,6 +73,7 @@ export const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
   const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'tournaments' | 'matches' | 'trainings' | 'other'>('all');
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
     url?: string;
@@ -463,24 +464,88 @@ export const App: React.FC = () => {
     [rawEvents, profiles, arrivalRules, clockTick, homeLocation]
   );
 
+  const isTournamentEvent = (e: MatchdayEvent): boolean => {
+    if (e.isTournament || e.tournamentName) return true;
+    const text = `${e.title} ${e.notes || ''} ${e.roundInfo || ''}`;
+    return /turnaus|tournament|cup\b|memorial/i.test(text);
+  };
+
+  const isMatchEvent = (e: MatchdayEvent): boolean => {
+    if (isTournamentEvent(e)) return false;
+    if (e.isTraining || e.eventType === 'training' || e.eventType === 'meeting') return false;
+    if (e.officialFixtureId || e.id.startsWith('fixture-')) return true;
+    if (e.homeTeam && e.awayTeam && e.homeTeam !== e.awayTeam) return true;
+    const text = `${e.title} ${e.notes || ''}`;
+    return /sarjapeli|piirisarja|ottelu|vs\b|peli\b/i.test(text);
+  };
+
+  const isTrainingEvent = (e: MatchdayEvent): boolean => {
+    if (isTournamentEvent(e)) return false;
+    if (e.isTraining || e.eventType === 'training') return true;
+    const text = `${e.title} ${e.notes || ''}`;
+    return /treeni|harjoitus|harjoitukset|fysiikka|lajitreeni|lajiharjoitus/i.test(text);
+  };
+
+  const isOtherEvent = (e: MatchdayEvent): boolean => {
+    return !isTournamentEvent(e) && !isMatchEvent(e) && !isTrainingEvent(e);
+  };
+
+  const categoryCounts = useMemo(() => {
+    let tournaments = 0;
+    let matches = 0;
+    let trainings = 0;
+    let other = 0;
+
+    for (const e of filteredEvents) {
+      if (isTournamentEvent(e)) tournaments++;
+      else if (isMatchEvent(e)) matches++;
+      else if (isTrainingEvent(e)) trainings++;
+      else other++;
+    }
+
+    return {
+      all: filteredEvents.length,
+      tournaments,
+      matches,
+      trainings,
+      other
+    };
+  }, [filteredEvents]);
+
+  const categoryFilteredEvents = useMemo(() => {
+    if (categoryFilter === 'tournaments') {
+      return filteredEvents.filter(isTournamentEvent);
+    }
+    if (categoryFilter === 'matches') {
+      return filteredEvents.filter(isMatchEvent);
+    }
+    if (categoryFilter === 'trainings') {
+      return filteredEvents.filter(isTrainingEvent);
+    }
+    if (categoryFilter === 'other') {
+      return filteredEvents.filter(isOtherEvent);
+    }
+    return filteredEvents;
+  }, [filteredEvents, categoryFilter]);
+
   const nowMs = Date.now();
   const pastEvents = useMemo(
-    () => filteredEvents.filter((e) => new Date(e.endTime).getTime() < nowMs - 60 * 60 * 1000),
+    () => categoryFilteredEvents.filter((e) => new Date(e.endTime).getTime() < nowMs - 60 * 60 * 1000),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredEvents, clockTick]
+    [categoryFilteredEvents, clockTick]
   );
   const upcomingEvents = useMemo(
-    () => filteredEvents.filter((e) => new Date(e.endTime).getTime() >= nowMs - 60 * 60 * 1000),
+    () => categoryFilteredEvents.filter((e) => new Date(e.endTime).getTime() >= nowMs - 60 * 60 * 1000),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredEvents, clockTick]
+    [categoryFilteredEvents, clockTick]
   );
 
   const displayCardsEvents = useMemo(() => {
     if (showPastEvents) {
-      return filteredEvents;
+      return categoryFilteredEvents;
     }
     return upcomingEvents;
-  }, [showPastEvents, upcomingEvents, filteredEvents]);
+  }, [showPastEvents, upcomingEvents, categoryFilteredEvents]);
 
   const eventsGroupedByDay = useMemo(() => {
     const map = new Map<string, { dateStr: string; label: string; events: MatchdayEvent[] }>();
@@ -786,69 +851,144 @@ export const App: React.FC = () => {
           />
         )}
         {/* Sticky Profile Filter & View Mode Switcher Header */}
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shadow-xs">
-          <div className="flex-1 min-w-0">
-            <MultiProfileHeader
-              profiles={profiles}
-              activeProfileId={activeProfileId}
-              onSelectProfile={(id) => setActiveProfileId(id)}
-              onAddProfile={() => openAddTeam(activePlayerName)}
-              onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
-              onOpenCalendarSubscribe={() => setIsCalendarModalOpen(true)}
-            />
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+            <div className="flex-1 min-w-0">
+              <MultiProfileHeader
+                profiles={profiles}
+                activeProfileId={activeProfileId}
+                onSelectProfile={(id) => setActiveProfileId(id)}
+                onAddProfile={() => openAddTeam(activePlayerName)}
+                onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
+                onOpenCalendarSubscribe={() => setIsCalendarModalOpen(true)}
+              />
+            </div>
+
+            {/* View Mode Switcher: Cards vs Timeline vs Calendar */}
+            <div
+              role="tablist"
+              aria-label="Näkymän valitsin"
+              className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'cards'}
+                onClick={() => setViewMode('cards')}
+                title="Korttinäkymä"
+                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                  viewMode === 'cards'
+                    ? 'bg-pitch text-text-inverse shadow-xs'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>Kortit</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'timeline'}
+                onClick={() => setViewMode('timeline')}
+                title="Tiivis aikajana"
+                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                  viewMode === 'timeline'
+                    ? 'bg-pitch text-text-inverse shadow-xs'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <TableProperties className="w-3.5 h-3.5" />
+                <span>Tiivis</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'calendar'}
+                onClick={() => setViewMode('calendar')}
+                title="Kalenteriruudukko"
+                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                  viewMode === 'calendar'
+                    ? 'bg-pitch text-text-inverse shadow-xs'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>Kalenteri</span>
+              </button>
+            </div>
           </div>
 
-          {/* View Mode Switcher: Cards vs Timeline vs Calendar */}
-          <div
-            role="tablist"
-            aria-label="Näkymän valitsin"
-            className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto"
-          >
+          {/* Quick Category & Source Filters (Kaikki, Turnaukset, Sarjapelit, Treenit, Muu) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             <button
               type="button"
-              role="tab"
-              aria-selected={viewMode === 'cards'}
-              onClick={() => setViewMode('cards')}
-              title="Korttinäkymä"
-              className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                viewMode === 'cards'
+              onClick={() => setCategoryFilter('all')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                categoryFilter === 'all'
                   ? 'bg-pitch text-text-inverse shadow-xs'
-                  : 'text-text-secondary hover:text-text-primary'
+                  : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
               }`}
             >
-              <LayoutList className="w-3.5 h-3.5" />
-              <span>Kortit</span>
+              <span>Kaikki tapahtumat</span>
+              <span className="text-[10px] opacity-80">({categoryCounts.all})</span>
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'timeline'}
-              onClick={() => setViewMode('timeline')}
-              title="Tiivis aikajana"
-              className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                viewMode === 'timeline'
-                  ? 'bg-pitch text-text-inverse shadow-xs'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              <TableProperties className="w-3.5 h-3.5" />
-              <span>Tiivis</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'calendar'}
-              onClick={() => setViewMode('calendar')}
-              title="Kalenteriruudukko"
-              className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                viewMode === 'calendar'
-                  ? 'bg-pitch text-text-inverse shadow-xs'
-                  : 'text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5" />
-              <span>Kalenteri</span>
-            </button>
+            {categoryCounts.tournaments > 0 && (
+              <button
+                type="button"
+                onClick={() => setCategoryFilter(categoryFilter === 'tournaments' ? 'all' : 'tournaments')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  categoryFilter === 'tournaments'
+                    ? 'bg-gold/30 text-gold border border-gold shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
+                }`}
+              >
+                <Trophy className="w-3 h-3 text-gold" />
+                <span>Turnaukset</span>
+                <span className="text-[10px] opacity-80">({categoryCounts.tournaments})</span>
+              </button>
+            )}
+            {categoryCounts.matches > 0 && (
+              <button
+                type="button"
+                onClick={() => setCategoryFilter(categoryFilter === 'matches' ? 'all' : 'matches')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  categoryFilter === 'matches'
+                    ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
+                }`}
+              >
+                <span>⚽ Sarjapelit</span>
+                <span className="text-[10px] opacity-80">({categoryCounts.matches})</span>
+              </button>
+            )}
+            {categoryCounts.trainings > 0 && (
+              <button
+                type="button"
+                onClick={() => setCategoryFilter(categoryFilter === 'trainings' ? 'all' : 'trainings')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  categoryFilter === 'trainings'
+                    ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
+                }`}
+              >
+                <span>🏃 Treenit</span>
+                <span className="text-[10px] opacity-80">({categoryCounts.trainings})</span>
+              </button>
+            )}
+            {categoryCounts.other > 0 && (
+              <button
+                type="button"
+                onClick={() => setCategoryFilter(categoryFilter === 'other' ? 'all' : 'other')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  categoryFilter === 'other'
+                    ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
+                }`}
+              >
+                <span>📋 Muu / Talkoot</span>
+                <span className="text-[10px] opacity-80">({categoryCounts.other})</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -939,7 +1079,7 @@ export const App: React.FC = () => {
               </div>
             )}
 
-            {filteredEvents.length > 0 ? (
+            {categoryFilteredEvents.length > 0 ? (
               /* Cards Feed with Structured Day Containers */
               <div className="flex flex-col gap-6 pb-4">
                 {eventsGroupedByDay.map((dayGroup) => (
@@ -1083,7 +1223,7 @@ export const App: React.FC = () => {
           /* Compact Timeline or Calendar Grid View */
           <div className="pb-4">
             <TimelineCalendarView
-              events={filteredEvents}
+              events={categoryFilteredEvents}
               profiles={profiles}
               viewMode={viewMode}
               conflicts={snapshot.conflicts}

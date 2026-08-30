@@ -279,6 +279,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </span>
             )}
 
+            {(event.isTournament || event.tournamentName || /turnaus|tournament|cup\b|memorial/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)) && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gold/20 text-gold border border-gold/35 shadow-xs">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Turnaus</span>
+              </span>
+            )}
+
             {/* Transit Mode Badge */}
             {(() => {
               const transitPlan = event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather);
