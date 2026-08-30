@@ -27,7 +27,6 @@ import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
-import { detectSportFromText } from './lib/ai/eventCandidateRanker';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 
 const SmartImportModal = lazy(() =>
@@ -620,17 +619,11 @@ export const App: React.FC = () => {
     sport: SportType,
     url: string,
     colorHex?: string,
-    squadFilters?: string[]
+    squadFilters?: string[],
+    editingProfileId?: string
   ): Promise<{ success: boolean; count: number; error?: string }> => {
     const existing = await db.profiles.toArray();
-    const detectedFromText = detectSportFromText(`${teamName} ${url}`);
-    const existingPlayerProfile = existing.find(
-      (p) => (p.playerName || '').trim().toLowerCase() === playerName.trim().toLowerCase() && p.sport && p.sport !== 'football'
-    );
-    const resolvedSport =
-      sport !== 'football'
-        ? sport
-        : detectedFromText || existingPlayerProfile?.sport || sport;
+    const resolvedSport: SportType = sport || 'football';
 
     const cup = exampleTournamentFromUrl(url);
     const club = searchPopularClubs(teamName).find((c) => c.sport === resolvedSport);
@@ -644,11 +637,17 @@ export const App: React.FC = () => {
             ? { hex: club.colorHex, label: club.primaryColor }
             : pickNextTeamColor(existing.map((p) => p.colorHex)));
 
-    const reused = findExistingTeamProfile(existing, playerName, url, resolvedSport);
+    const existingToEdit = editingProfileId
+      ? existing.find((p) => p.id === editingProfileId)
+      : undefined;
+
+    const reused = existingToEdit || findExistingTeamProfile(existing, playerName, url, resolvedSport);
     const profileId = reused?.id || generateStableProfileId(playerName, url);
 
     if (reused) {
+      await db.events.where('profileId').equals(profileId).delete();
       await db.profiles.update(profileId, {
+        playerName,
         teamName: teamName || reused.teamName,
         sport: resolvedSport,
         primaryColor: swatch.label,

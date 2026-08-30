@@ -238,19 +238,11 @@ export async function ingestIcsForProfile(opts: {
         (p) =>
           p.id !== opts.profileId &&
           (p.playerName || '').trim().toLowerCase() === profile.playerName.trim().toLowerCase() &&
-          (p.sport === opts.sport || (opts.sport === 'football' && p.sport)) &&
+          p.sport === opts.sport &&
           p.teamId
       );
       if (peerProfile) {
         targetTeamId = peerProfile.teamId;
-        if (opts.sport === 'football' && peerProfile.sport && peerProfile.sport !== 'football') {
-          for (const ev of withMeta) {
-            if (ev.sport === 'football') {
-              ev.sport = peerProfile.sport;
-            }
-          }
-          await database.profiles.update(opts.profileId, { sport: peerProfile.sport });
-        }
       }
     }
 

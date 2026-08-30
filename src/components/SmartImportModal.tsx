@@ -62,7 +62,8 @@ interface SmartImportModalProps {
     sport: SportType,
     url: string,
     colorHex?: string,
-    squadFilters?: string[]
+    squadFilters?: string[],
+    editingProfileId?: string
   ) => Promise<{ success: boolean; count?: number; error?: string } | void>;
 }
 
@@ -162,16 +163,13 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         const sportsList = Array.from(sportsSet);
         if (isMounted) {
           setPlayerActiveSports(sportsList);
-          if (sportsList.length > 0 && !initialSport && !sportsList.includes(selectedSport)) {
-            setSelectedSport(sportsList[0]!);
-          }
         }
       } catch (e) {
         console.warn('Failed to query player sports in SmartImportModal', e);
       }
     })();
     return () => { isMounted = false; };
-  }, [selectedPlayer, initialSport]);
+  }, [selectedPlayer]);
 
   // Handle escape key — never abandon an in-flight save/import (M-45/V61)
   useEffect(() => {
@@ -220,9 +218,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const handleUrlChange = (val: string) => {
     setClassicUrl(val);
     setErrorMessage('');
-    const parsed = parseAssociationUrl(val);
-    if (parsed?.sport && parsed.sport !== 'other') {
-      setSelectedSport(parsed.sport);
+    if (!isEditing) {
+      const parsed = parseAssociationUrl(val);
+      if (parsed?.sport && parsed.sport !== 'other') {
+        setSelectedSport(parsed.sport);
+      }
     }
     scanIcsCategories(val);
   };
@@ -374,7 +374,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
           selectedSport,
           url,
           colorHex,
-          excludedCategories.length > 0 ? excludedCategories : undefined
+          excludedCategories.length > 0 ? excludedCategories : undefined,
+          editingProfileId
         );
         if (res && res.success === false) {
           setErrorMessage(res.error || 'Otteluiden noutaminen epäonnistui. Tarkista osoite tai kokeile myöhemmin.');
