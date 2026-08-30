@@ -1,6 +1,5 @@
 import { PitchSurface, VenueInfo } from '../../types/matchday';
 import { db } from '../storage/db';
-import { proxiedUrl } from '../api/proxyUrl';
 
 export const NATIONAL_FIELD_ALIASES: Record<
   string,
@@ -357,9 +356,8 @@ export async function resolveSportsVenue(
 
   if (typeof fetch !== 'undefined' && rawVenueString) {
     try {
-      const rawLipasUrl =
+      const lipasUrl =
         'https://api.lipas.fi/v2/sports-sites?city-codes=91,49,92&type-codes=1110,1340,1350&page-size=200';
-      const lipasUrl = typeof window !== 'undefined' ? proxiedUrl(rawLipasUrl) : rawLipasUrl;
       const res = await fetch(lipasUrl, {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(5000)
@@ -403,9 +401,8 @@ export async function resolveSportsVenue(
     }
 
     try {
-      const rawHelUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(rawVenueString)}&type=unit`;
-      const pUrl = typeof window !== 'undefined' ? proxiedUrl(rawHelUrl) : rawHelUrl;
-      const pRes = await fetch(pUrl, { signal: AbortSignal.timeout(5000) });
+      const helUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(rawVenueString)}&type=unit`;
+      const pRes = await fetch(helUrl, { signal: AbortSignal.timeout(5000) });
       if (pRes.ok) {
         const pJson = await pRes.json();
         const results: Array<Record<string, unknown>> = pJson.results || [];
