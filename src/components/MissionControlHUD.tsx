@@ -53,7 +53,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
   const child = snapshot.nextPlayer?.playerName;
 
   return (
-    <header className="hud-stripe sticky top-0 z-30 border-b border-border-subtle bg-canvas/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="hud-stripe sticky top-0 z-40 border-b border-border-subtle bg-canvas/92 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
@@ -92,7 +92,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
 
         <ThemeToggle />
 
-        <div className="relative">
+        <div className="relative z-50">
           <motion.button
             type="button"
             whileTap={{ scale: 0.94 }}
@@ -106,12 +106,18 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
 
           <AnimatePresence>
             {menuOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                className="absolute right-0 top-12 z-40 w-56 overflow-hidden rounded-lg border border-border-strong bg-surface-base shadow-lg"
-              >
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-black/20"
+                  onClick={() => setMenuOpen(false)}
+                  aria-hidden="true"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-xl border border-border-strong bg-surface-base shadow-2xl"
+                >
                 <MenuItem
                   icon={<RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />}
                   label="Päivitä sää"
@@ -193,6 +199,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                   />
                 )}
               </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>

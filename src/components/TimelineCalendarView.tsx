@@ -122,7 +122,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
         {groupedByDay.map((dayGroup) => (
           <div key={dayGroup.dateStr} className="flex flex-col gap-2">
             {/* Sticky Day Section Header */}
-            <div className="sticky top-12 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
+            <div className="sticky top-12 z-10 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded-md bg-pitch/15 text-pitch">
                   <CalendarIcon className="w-3.5 h-3.5" />

@@ -851,7 +851,7 @@ export const App: React.FC = () => {
           />
         )}
         {/* Sticky Profile Filter & View Mode Switcher Header */}
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
+        <div className="sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="flex-1 min-w-0">
               <MultiProfileHeader
