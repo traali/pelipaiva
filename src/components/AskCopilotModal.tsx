@@ -4,7 +4,7 @@ import { X, Sparkles, Send, Search, Loader2 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { queryFamilyScheduleWithLLM, CopilotQueryResult } from '../lib/ai/localAiEngine';
-import { checkChromeAiCapabilities, ChromeAiCapabilities } from '../lib/ai/chromeBuiltinAi';
+import { describeOnDeviceRuntime, engineUsedToFi, OnDeviceRuntime } from '../lib/ai/onDeviceLlm';
 
 interface AskCopilotModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
   const [query, setQuery] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [result, setResult] = useState<CopilotQueryResult | null>(null);
-  const [aiCaps, setAiCaps] = useState<ChromeAiCapabilities>({ isSupported: false, status: 'no' });
+  const [aiRuntime, setAiRuntime] = useState<OnDeviceRuntime | null>(null);
 
   const firstChild = profiles[0]?.playerName || 'lapsella';
 
@@ -38,9 +38,7 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    checkChromeAiCapabilities().then(setAiCaps).catch(() => {
-      setAiCaps({ isSupported: false, status: 'no' });
-    });
+    describeOnDeviceRuntime().then(setAiRuntime).catch(() => setAiRuntime(null));
   }, [isOpen]);
 
 
@@ -101,9 +99,9 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                   </h3>
                   <p className="text-xs text-text-muted flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-pitch animate-pulse" />
-                    {aiCaps.status === 'readily'
-                      ? 'Paikallinen malli tällä laitteella (Gemini Nano)'
-                      : 'Aikataulujärki tällä laitteella — iPhonessa sääntöpohjainen, Chromessa Gemini Nano'}
+                    {aiRuntime?.neuralReady
+                      ? aiRuntime.summaryFi
+                      : aiRuntime?.summaryFi || 'Aikataulujärki tällä laitteella'}
                   </p>
                 </div>
               </div>
@@ -180,9 +178,7 @@ export const AskCopilotModal: React.FC<AskCopilotModalProps> = ({
                   <span className="text-xs font-bold text-pitch flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>
-                      {result.engineUsed === 'chrome_gemini_nano'
-                        ? 'Paikallinen malli vastaa:'
-                        : 'Aikataulujärki vastaa:'}
+                      {engineUsedToFi(result.engineUsed)} vastaa:
                     </span>
                   </span>
                 </div>

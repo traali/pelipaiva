@@ -7,7 +7,7 @@ import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
-import { createBuiltInLanguageSession } from './chromeBuiltinAi';
+import { createOnDeviceLanguageSession, CopilotEngineId } from './onDeviceLlm';
 
 export interface FamilyLogisticsPlan {
   date: string;
@@ -28,7 +28,7 @@ export interface CopilotQueryResult {
   answer: string;
   relevantEvents: MatchdayEvent[];
   confidence: number;
-  engineUsed: 'deterministic' | 'chrome_gemini_nano';
+  engineUsed: CopilotEngineId;
 }
 
 /**
@@ -297,9 +297,8 @@ export function queryFamilySchedule(
 }
 
 /**
- * On-device Prompt API (Chrome `LanguageModel` / Gemini Nano) with
- * instant fallback to deterministic Finnish sports reasoner.
- * iPhone Safari has no Prompt API — fallback is the real engine there.
+ * On-device model (Chrome Prompt API / Apple Intelligence / Qwen) only
+ * after the user opts in. Otherwise the deterministic Finnish reasoner.
  */
 export async function queryFamilyScheduleWithLLM(
   query: string,
@@ -309,10 +308,10 @@ export async function queryFamilyScheduleWithLLM(
   const fallback = queryFamilySchedule(query, events, profiles);
 
   try {
-    const session = await createBuiltInLanguageSession(
+    const boxed = await createOnDeviceLanguageSession(
       'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta. Älä keksi otteluita, aikoja tai tuloksia joita listassa ei ole.'
     );
-    if (!session) return fallback;
+    if (!boxed) return fallback;
 
     const context = `Kalenterin tiedot: ${JSON.stringify(
       events.slice(0, 15).map((e) => ({
@@ -322,18 +321,18 @@ export async function queryFamilyScheduleWithLLM(
         talkoot: e.volunteerDuty
       }))
     )}`;
-    const response = await session.prompt(`${context}\nKysymys: ${query}`);
-    session.destroy?.();
+    const response = await boxed.session.prompt(`${context}\nKysymys: ${query}`);
+    boxed.session.destroy?.();
     if (response && response.trim().length > 0) {
       return {
         answer: response.trim(),
         relevantEvents: fallback.relevantEvents,
         confidence: 0.75,
-        engineUsed: 'chrome_gemini_nano'
+        engineUsed: boxed.engine
       };
     }
   } catch (err) {
-    console.warn('[PELIPAIVA:COPILOT] Gemini path failed, using deterministic fallback:', err);
+    console.warn('[PELIPAIVA:COPILOT] On-device path failed, using deterministic fallback:', err);
   }
 
   return fallback;

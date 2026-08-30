@@ -6,17 +6,20 @@ import {
   parseSportsMessageHybrid,
   LlmContextGuide
 } from './chromeBuiltinAi';
+import { resetOnDeviceLlmPrefsForTests, setOnDeviceLlmChoice } from './onDeviceLlmPrefs';
 
 describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
   const originalWindow = global.window;
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    resetOnDeviceLlmPrefsForTests();
   });
 
   afterEach(() => {
     (global as any).window = originalWindow;
     delete (globalThis as any).LanguageModel;
+    resetOnDeviceLlmPrefsForTests();
   });
 
   it('should report unsupported when window.ai is not available (e.g. Safari / Firefox)', async () => {
@@ -275,6 +278,7 @@ describe('Chrome Built-in AI (Gemini Nano Prompt API) Integration', () => {
       }
     };
 
+    setOnDeviceLlmChoice('chrome');
     const messyText = 'Peli ensi viikolla Espoossa, ottakaa mustat paidat ja nappikset.';
     const res = await parseSportsMessageHybrid(messyText, 'Lilli');
 

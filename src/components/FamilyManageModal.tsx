@@ -5,6 +5,7 @@ import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
 import { TeamColorPicker } from './TeamColorPicker';
+import { OnDeviceLlmSettings } from './OnDeviceLlmSettings';
 
 interface FamilyManageModalProps {
   isOpen: boolean;
@@ -229,6 +230,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 </button>
               )}
             </div>
+
+            <OnDeviceLlmSettings />
 
             {playerGroups.map(([playerName, playerProfiles]) => (
               <div

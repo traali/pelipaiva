@@ -1,5 +1,6 @@
 import { ExtractedSportsEvent, parseFreeformSportsMessage } from './messageParserNLP';
 import { SportType, EventType } from '../../types/matchday';
+import { isOnDeviceLlmEnabled, getOnDeviceLlmChoice } from './onDeviceLlmPrefs';
 
 export interface ChromeAiCapabilities {
   isSupported: boolean;
@@ -7,9 +8,11 @@ export interface ChromeAiCapabilities {
   modelName?: string;
 }
 
+export type NeuralEngineId = 'chrome_gemini_nano' | 'apple_foundation' | 'apple_core_ai';
+
 export interface HybridParseResult {
   result: ExtractedSportsEvent;
-  engineUsed: 'fast_nlp' | 'chrome_gemini_nano';
+  engineUsed: 'fast_nlp' | NeuralEngineId;
   confidence: number;
   enrichedByLlm?: boolean;
 }
@@ -42,7 +45,7 @@ export interface LlmReasoningDecision {
   changesSummary: string;
   extractedEvent: ExtractedSportsEvent;
   confidenceScore: number;
-  engineUsed: 'fast_nlp' | 'chrome_gemini_nano';
+  engineUsed: 'fast_nlp' | NeuralEngineId;
 }
 
 type PromptSession = {
@@ -136,7 +139,7 @@ export async function createBuiltInLanguageSession(systemPrompt: string): Promis
 /**
  * Generates the system prompt tailored with family roster and calendar context.
  */
-function buildContextAwareSystemPrompt(context?: LlmContextGuide): string {
+export function buildContextAwareSystemPrompt(context?: LlmContextGuide): string {
   let prompt = `Olet Pelipäivän älykäs tekoälyassistentti suomalaisille urheiluperheille.
 Tehtäväsi on analysoida käyttäjän syöttämä viesti (WhatsApp, Wilma, MyClub, sähköposti), vertailla sitä perheen olemassa oleviin tapahtumiin ja palauttaa VAIN validi JSON-objekti ilman markdown-muotoilua.
 
@@ -193,6 +196,51 @@ JSON-SKEEMA:
   return prompt;
 }
 
+export function parseLlmSportsJson(
+  rawResponse: string,
+  text: string,
+  defaultPlayerName: string,
+  engineUsed: NeuralEngineId
+): LlmReasoningDecision | null {
+  if (!rawResponse || typeof rawResponse !== 'string') return null;
+  const cleanJson = rawResponse
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  const parsed = JSON.parse(cleanJson);
+  const ev = parsed.extractedEvent || {};
+
+  const extractedEvent: ExtractedSportsEvent = {
+    title: ev.title || 'Urheilutapahtuma',
+    eventType: (ev.eventType as EventType) || 'match',
+    sport: (ev.sport as SportType) || 'football',
+    homeTeam: ev.homeTeam || 'Oma joukkue',
+    awayTeam: ev.awayTeam || '',
+    isHomeMatch: Boolean(ev.isHomeMatch),
+    dateStr: ev.dateStr || '',
+    kickoffTime: ev.kickoffTime || '',
+    warmupTime: ev.warmupTime || '',
+    endTime: ev.endTime || '',
+    venueHint: ev.venueHint || '',
+    kitColor: ev.kitColor || undefined,
+    volunteerDuties: Array.isArray(ev.volunteerDuties) ? ev.volunteerDuties : [],
+    rawNotes: text.trim(),
+    confidenceScore: typeof ev.confidenceScore === 'number' ? ev.confidenceScore : 0.95
+  };
+
+  return {
+    action: parsed.action === 'update_existing' ? 'update_existing' : 'create_new',
+    targetEventId: parsed.targetEventId || undefined,
+    detectedPlayerName: parsed.detectedPlayerName || defaultPlayerName,
+    changesSummary: parsed.changesSummary || 'Päivitetään tapahtuman tiedot',
+    extractedEvent,
+    confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.95,
+    engineUsed
+  };
+}
+
 /**
  * Deep semantic reasoning with the browser's on-device Prompt API.
  */
@@ -211,45 +259,7 @@ export async function reasonWithGeminiNano(
     );
 
     session.destroy?.();
-
-    if (!rawResponse || typeof rawResponse !== 'string') return null;
-
-    const cleanJson = rawResponse
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-
-    const parsed = JSON.parse(cleanJson);
-    const ev = parsed.extractedEvent || {};
-
-    const extractedEvent: ExtractedSportsEvent = {
-      title: ev.title || 'Urheilutapahtuma',
-      eventType: (ev.eventType as EventType) || 'match',
-      sport: (ev.sport as SportType) || 'football',
-      homeTeam: ev.homeTeam || 'Oma joukkue',
-      awayTeam: ev.awayTeam || '',
-      isHomeMatch: Boolean(ev.isHomeMatch),
-      dateStr: ev.dateStr || '',
-      kickoffTime: ev.kickoffTime || '',
-      warmupTime: ev.warmupTime || '',
-      endTime: ev.endTime || '',
-      venueHint: ev.venueHint || '',
-      kitColor: ev.kitColor || undefined,
-      volunteerDuties: Array.isArray(ev.volunteerDuties) ? ev.volunteerDuties : [],
-      rawNotes: text.trim(),
-      confidenceScore: typeof ev.confidenceScore === 'number' ? ev.confidenceScore : 0.95
-    };
-
-    return {
-      action: parsed.action === 'update_existing' ? 'update_existing' : 'create_new',
-      targetEventId: parsed.targetEventId || undefined,
-      detectedPlayerName: parsed.detectedPlayerName || defaultPlayerName,
-      changesSummary: parsed.changesSummary || 'Päivitetään tapahtuman tiedot',
-      extractedEvent,
-      confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 0.95,
-      engineUsed: 'chrome_gemini_nano'
-    };
+    return parseLlmSportsJson(rawResponse, text, defaultPlayerName, 'chrome_gemini_nano');
   } catch (err) {
     console.warn('[CHROME_BUILTIN_AI] Gemini Nano reasoning error:', err);
     return null;
@@ -271,7 +281,7 @@ export async function parseWithGeminiNano(
  * Progressive Multi-Tier Hybrid Parser:
  * 1. Fast deterministic NLP runs in <1ms.
  * 2. If confidence >= 0.80, returns immediately.
- * 3. If confidence < 0.80 and the on-device Prompt API is ready, escalates.
+ * 3. Neural net only if the user opted in AND a local model is ready.
  */
 export async function parseSportsMessageHybrid(
   text: string,
@@ -280,7 +290,6 @@ export async function parseSportsMessageHybrid(
 ): Promise<HybridParseResult> {
   const fastResult = parseFreeformSportsMessage(text, defaultPlayerName);
 
-  // If fast NLP is already confident, return instantly
   if (fastResult.confidenceScore >= 0.80) {
     return {
       result: fastResult,
@@ -289,8 +298,17 @@ export async function parseSportsMessageHybrid(
     };
   }
 
+  if (!isOnDeviceLlmEnabled()) {
+    return {
+      result: fastResult,
+      engineUsed: 'fast_nlp',
+      confidence: fastResult.confidenceScore
+    };
+  }
+
+  const choice = getOnDeviceLlmChoice();
   const caps = await checkChromeAiCapabilities();
-  if (caps.isSupported && caps.status === 'readily') {
+  if (choice === 'chrome' && caps.isSupported && caps.status === 'readily') {
     const nanoResult = await reasonWithGeminiNano(text, context, defaultPlayerName);
     if (nanoResult && nanoResult.confidenceScore > fastResult.confidenceScore) {
       return {
@@ -300,6 +318,28 @@ export async function parseSportsMessageHybrid(
         enrichedByLlm: true
       };
     }
+  }
+
+  try {
+    const { createOnDeviceLanguageSession } = await import('./onDeviceLlm');
+    const boxed = await createOnDeviceLanguageSession(buildContextAwareSystemPrompt(context));
+    if (boxed && boxed.engine !== 'chrome_gemini_nano') {
+      const raw = await boxed.session.prompt(
+        `Analysoi seuraava viesti ja palauta JSON-vastaus. Oletuspelaaja on "${defaultPlayerName}":\n\n${text}`
+      );
+      boxed.session.destroy?.();
+      const parsed = parseLlmSportsJson(raw, text, defaultPlayerName, boxed.engine);
+      if (parsed && parsed.confidenceScore > fastResult.confidenceScore) {
+        return {
+          result: parsed.extractedEvent,
+          engineUsed: boxed.engine,
+          confidence: parsed.confidenceScore,
+          enrichedByLlm: true
+        };
+      }
+    }
+  } catch {
+    /* native path optional */
   }
 
   return {

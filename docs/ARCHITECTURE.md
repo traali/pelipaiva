@@ -43,7 +43,7 @@ Critic loop: `src/lib/agents/familyMission.test.ts` (overlap, indoor shoes, talk
 
 - Core logic must work **offline**.
 - A parent should be able to **audit** why the app said “kaksi kuskia”.
-- Product constraint: no cloud LLM and no server-side inference. Copilot is deterministic keyword/NLP reasoning over Dexie (`queryFamilySchedule`); when Chrome exposes the on-device Prompt API (`LanguageModel`, formerly `window.ai`), `localAiEngine` upgrades answers locally — still zero network, zero product API keys. iPhone Safari has no Prompt API.
+- Product constraint: no cloud LLM and no server-side inference. Copilot is deterministic keyword/NLP reasoning over Dexie (`queryFamilySchedule`). A **per-device opt-in** (`pelipaiva_ondevice_llm`, default `off`) can enable a local model: Chrome Prompt API (`LanguageModel` / Gemini Nano) on a laptop, or Apple Intelligence / Core AI Qwen 0.6B inside the native iOS wrapper (`native/ios`). iPhone Safari has no Core AI — Aikataulujärki stays the engine until the user installs the wrapper **and** taps Ota käyttöön. Neural net is light, on-demand, never auto-downloaded.
 
 ## Files
 
