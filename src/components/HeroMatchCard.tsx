@@ -33,8 +33,10 @@ interface HeroMatchCardProps {
   profile?: PlayerProfile;
   kit?: SportKitPlan;
   conflicts: FamilyConflict[];
+  homeLocation?: import('../types/matchday').HomeLocation;
   onNavigate?: () => void;
   onOpenStats?: () => void;
+  onOpenHomeModal?: () => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
   onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
   onEventDeleted?: (deletedId: string) => void;
@@ -47,8 +49,10 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   profile,
   kit,
   conflicts,
+  homeLocation,
   onNavigate,
   onOpenStats,
+  onOpenHomeModal,
   onEventUpdated,
   onEventMerged,
   onEventDeleted,
@@ -65,10 +69,11 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
   const sourceInfo = resolveEventSourceInfo(event, profile);
 
-  // Respect the child's configured arrival rules — the bare call ignored them (M-41/V49).
+  // Respect the child's configured arrival rules and family home location
   const { departureTime, countdownMinutes, transitPlan } = calculateDepartureCountdown(
     event,
-    profile?.arrivalRules
+    profile?.arrivalRules,
+    homeLocation
   );
   
   const kickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
@@ -150,16 +155,19 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
             {/* Transit Mode Badge */}
             {transitPlan && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+              <button
+                type="button"
+                onClick={onOpenHomeModal}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
                   transitPlan.isSelfTransit
                     ? 'bg-pitch/15 text-pitch border-pitch/30'
-                    : 'bg-surface-elevated text-text-secondary border-border-subtle'
+                    : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
                 }`}
-                title={transitPlan.transitLabel}
+                title={`${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`}
+                aria-label={`Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`}
               >
                 <span>{transitPlan.transitLabel}</span>
-              </span>
+              </button>
             )}
 
             {/* Data Source Provenance Badge */}

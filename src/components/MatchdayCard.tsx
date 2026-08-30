@@ -30,6 +30,8 @@ import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
+import { resolveTransitPlan } from '../lib/geo/transitEngine';
+import type { HomeLocation } from '../types/matchday';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return 'Sisähalli';
@@ -61,8 +63,10 @@ interface MatchdayCardProps {
   colorHex?: string;
   compact?: boolean;
   conflicts?: FamilyConflict[];
+  homeLocation?: HomeLocation;
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
+  onOpenHomeModal?: () => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
   onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
   onEventDeleted?: (deletedId: string) => void;
@@ -76,8 +80,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   colorHex,
   compact = false,
   conflicts,
+  homeLocation,
   onNavigateToVenue,
   onResolveMismatch,
+  onOpenHomeModal,
   onEventUpdated,
   onEventMerged,
   onEventDeleted,
@@ -272,18 +278,25 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             )}
 
             {/* Transit Mode Badge */}
-            {event.transit && (
-              <span
-                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
-                  event.transit.isSelfTransit
-                    ? 'bg-pitch/15 text-pitch border-pitch/30'
-                    : 'bg-surface-elevated text-text-secondary border-border-subtle'
-                }`}
-                title={event.transit.transitLabel}
-              >
-                <span>{event.transit.transitLabel}</span>
-              </span>
-            )}
+            {(() => {
+              const transitPlan = event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather);
+              if (!transitPlan) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={onOpenHomeModal}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
+                    transitPlan.isSelfTransit
+                      ? 'bg-pitch/15 text-pitch border-pitch/30'
+                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                  }`}
+                  title={`${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`}
+                  aria-label={`Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`}
+                >
+                  <span>{transitPlan.transitLabel}</span>
+                </button>
+              );
+            })()}
 
             {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
             {(() => {

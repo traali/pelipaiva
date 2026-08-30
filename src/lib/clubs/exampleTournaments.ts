@@ -210,7 +210,8 @@ export function isCupName(name?: string): boolean {
   return /turnaus|tournament|cup|memorial|cupis|helsinki cup|espoo liikkuu|kw memorial/i.test(name);
 }
 
-export function exampleTournamentFromUrl(url: string): ExampleTournament | undefined {
+export function exampleTournamentFromUrl(url?: string): ExampleTournament | undefined {
+  if (!url || typeof url !== 'string') return undefined;
   const raw = url.trim().toLowerCase();
   if (!raw) return undefined;
   if (

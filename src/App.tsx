@@ -799,6 +799,8 @@ export const App: React.FC = () => {
                               profile={snapshot.nextPlayer || profile}
                               kit={snapshot.kitByEventId[event.id]}
                               conflicts={snapshot.conflicts}
+                              homeLocation={homeLocation}
+                              onOpenHomeModal={() => setIsHomeLocationOpen(true)}
                               onNavigate={() => {
                                 const coords = event.parking?.coordinates || event.venue?.coordinates;
                                 const destination =
@@ -826,6 +828,8 @@ export const App: React.FC = () => {
                             colorHex={profile?.colorHex}
                             compact
                             conflicts={snapshot.conflicts}
+                            homeLocation={homeLocation}
+                            onOpenHomeModal={() => setIsHomeLocationOpen(true)}
                             onResolveMismatch={handleResolveMismatch}
                             onEventUpdated={handleEventUpdated}
                           />

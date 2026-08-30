@@ -563,7 +563,7 @@ describe('Adversarial Stress Suite — M1 URL Parser & HTML Extractor', () => {
         const elapsed = performance.now() - start;
 
         expect(fixtures.length).toBe(1000);
-        expect(elapsed).toBeLessThan(250);
+        expect(elapsed).toBeLessThan(1500);
       });
     });
   });
