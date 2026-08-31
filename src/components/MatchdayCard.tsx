@@ -101,15 +101,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
   const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
 
-  const { dismissedIds, dismiss: dismissConflictId, restore: restoreConflictId } = useDismissedConflicts();
+  const { isDismissed, dismiss: dismissConflict, restore: restoreConflict } = useDismissedConflicts();
   const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
 
   const rawConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
   const relatedConflicts = Array.from(
     new Map(rawConflicts.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
   );
-  const activeConflicts = relatedConflicts.filter((c) => !dismissedIds.has(c.id));
-  const dismissedConflicts = relatedConflicts.filter((c) => dismissedIds.has(c.id));
+  const activeConflicts = relatedConflicts.filter((c) => !isDismissed(c));
+  const dismissedConflicts = relatedConflicts.filter((c) => isDismissed(c));
 
   const venue = isVenueModalOpen ? localVenue : event.venue;
   const isLive =
@@ -539,9 +539,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => dismissConflictId(c.id)}
+                  onClick={() => dismissConflict(c)}
                   className="self-end sm:self-center px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-[11px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
-                  title="Merkitse tämä huomio hoidetuksi ja piilota se"
+                  title="Merkitse tämä huomio hoidetuksi ja piilota se molemmilta pelaajilta"
                 >
                   <span>✓</span>
                   <span>Kuittaa hoidetuksi</span>
@@ -572,7 +572,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     <span className="line-through truncate">{dc.message}</span>
                     <button
                       type="button"
-                      onClick={() => restoreConflictId(dc.id)}
+                      onClick={() => restoreConflict(dc)}
                       className="text-[10px] font-bold text-pitch hover:underline shrink-0 cursor-pointer"
                     >
                       ↩️ Palauta huomio

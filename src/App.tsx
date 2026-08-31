@@ -29,6 +29,7 @@ import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyC
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
+import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 
 const SmartImportModal = lazy(() =>
@@ -514,10 +515,10 @@ export const App: React.FC = () => {
     [rawEvents, profiles, arrivalRules, clockTick, homeLocation]
   );
 
-  const { dismissedIds, dismiss: dismissConflictId } = useDismissedConflicts();
+  const { isDismissed, dismiss: dismissConflict } = useDismissedConflicts();
   const unDismissedConflicts = useMemo(
-    () => snapshot.conflicts.filter((c) => !dismissedIds.has(c.id)),
-    [snapshot.conflicts, dismissedIds]
+    () => snapshot.conflicts.filter((c) => !isDismissed(c)),
+    [snapshot.conflicts, isDismissed]
   );
 
   const isTournamentEvent = (e: MatchdayEvent): boolean => {
@@ -753,21 +754,30 @@ export const App: React.FC = () => {
   const handleRefreshAll = async () => {
     setIsSyncing(true);
     try {
-      // 1. Fetch latest data for all profiles from external feeds
-      for (const p of profiles) {
+      // 1. Fetch latest data for all profiles from external feeds in parallel with 4s timeout
+      const fetchTasks = profiles.map(async (p) => {
         const url = p.associationUrl || p.calendarUrl;
-        if (!url) continue;
-        await ingestSourceForProfile({
-          profileId: p.id,
-          playerName: p.playerName,
-          teamName: p.teamName,
-          sport: p.sport,
-          url,
-          includeWeather: true
-        }).catch((e) => console.warn('[REFRESH]', p.teamName, e));
-      }
+        if (!url) return;
+        try {
+          await Promise.race([
+            ingestSourceForProfile({
+              profileId: p.id,
+              playerName: p.playerName,
+              teamName: p.teamName,
+              sport: p.sport,
+              url,
+              includeWeather: true
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Feed timeout')), 4000))
+          ]);
+        } catch (e) {
+          console.warn('[REFRESH TIMEOUT / ERROR]', p.teamName, e);
+        }
+      });
 
-      // 2. Re-evaluate sport & transit from current home location for ALL stored events
+      await Promise.allSettled(fetchTasks);
+
+      // 2. Re-evaluate sport, re-resolve venue coordinates & recalculate transit for ALL stored events
       const allEvents = await db.events.toArray();
       const allProfiles = await db.profiles.toArray();
       const profMap = new Map(allProfiles.map((p) => [p.id, p]));
@@ -783,9 +793,24 @@ export const App: React.FC = () => {
           updated = true;
         }
 
+        // Re-resolve venue with latest geocoding and aliases (e.g. Ruukinlahden tekonurmi)
+        let currentVenue = ev.venue;
+        if (ev.venue?.name) {
+          const freshVenue = await resolveSportsVenue(ev.venue.name);
+          if (
+            freshVenue.coordinates.lat !== ev.venue.coordinates?.lat ||
+            freshVenue.coordinates.lng !== ev.venue.coordinates?.lng ||
+            freshVenue.name !== ev.venue.name
+          ) {
+            currentVenue = freshVenue;
+            updates.venue = freshVenue;
+            updated = true;
+          }
+        }
+
         // Recalculate transit (distance & walk/bike/drive minutes from home)
-        if (homeLocation && ev.venue?.coordinates) {
-          const freshTransit = resolveTransitPlan(homeLocation, ev.venue.coordinates, ev.weather);
+        if (homeLocation && currentVenue?.coordinates) {
+          const freshTransit = resolveTransitPlan(homeLocation, currentVenue.coordinates, ev.weather);
           updates.transit = freshTransit;
           updated = true;
         }
@@ -814,8 +839,10 @@ export const App: React.FC = () => {
           await db.events.delete(match.id);
         }
       }
+    } catch (err) {
+      console.error('[REFRESH ERROR]', err);
     } finally {
-      setTimeout(() => setIsSyncing(false), 600);
+      setIsSyncing(false);
     }
   };
 
@@ -1177,7 +1204,7 @@ export const App: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => unDismissedConflicts[0] && dismissConflictId(unDismissedConflicts[0].id)}
+              onClick={() => unDismissedConflicts[0] && dismissConflict(unDismissedConflicts[0])}
               className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
               title="Merkitse tämä huomio hoidetuksi ja piilota se"
             >
@@ -1459,6 +1486,19 @@ export const App: React.FC = () => {
         currentHome={homeLocation}
         onSaveHome={async (h) => {
           await saveHomeLocation(h);
+          // Recalculate transit & venue coordinates immediately for all events
+          const all = await db.events.toArray();
+          for (const ev of all) {
+            let currentVenue = ev.venue;
+            if (ev.venue?.name) {
+              const freshVenue = await resolveSportsVenue(ev.venue.name);
+              currentVenue = freshVenue;
+            }
+            if (currentVenue?.coordinates) {
+              const freshTransit = resolveTransitPlan(h, currentVenue.coordinates, ev.weather);
+              await db.events.update(ev.id, { venue: currentVenue, transit: freshTransit });
+            }
+          }
         }}
       />
 

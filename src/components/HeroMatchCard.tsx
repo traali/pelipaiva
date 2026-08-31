@@ -103,11 +103,11 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const uniqueConflicts = Array.from(
     new Map(related.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
   );
-  const { dismissedIds, dismiss: dismissConflictId, restore: restoreConflictId } = useDismissedConflicts();
+  const { isDismissed, dismiss: dismissConflict, restore: restoreConflict } = useDismissedConflicts();
   const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
 
-  const activeConflicts = uniqueConflicts.filter((c) => !dismissedIds.has(c.id));
-  const dismissedConflicts = uniqueConflicts.filter((c) => dismissedIds.has(c.id));
+  const activeConflicts = uniqueConflicts.filter((c) => !isDismissed(c));
+  const dismissedConflicts = uniqueConflicts.filter((c) => isDismissed(c));
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
   const temp = event.weather?.isForecastLongRange ? undefined : event.weather?.temperatureC;
@@ -389,9 +389,9 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => dismissConflictId(c.id)}
+              onClick={() => dismissConflict(c)}
               className="self-end sm:self-center px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-[11px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
-              title="Merkitse tämä huomio hoidetuksi ja piilota se"
+              title="Merkitse tämä huomio hoidetuksi ja piilota se molemmilta pelaajilta"
             >
               <span>✓</span>
               <span>Kuittaa hoidetuksi</span>
@@ -420,7 +420,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
                     <span className="line-through truncate">{dc.message}</span>
                     <button
                       type="button"
-                      onClick={() => restoreConflictId(dc.id)}
+                      onClick={() => restoreConflict(dc)}
                       className="text-[10px] font-bold text-pitch hover:underline shrink-0 cursor-pointer"
                     >
                       ↩️ Palauta huomio

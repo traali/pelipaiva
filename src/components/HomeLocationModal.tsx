@@ -122,10 +122,18 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
   };
 
   const handleSave = async () => {
+    let finalCoords = coords;
+    if (address.trim()) {
+      const hit = await geocodeAddress(address.trim());
+      if (hit) {
+        finalCoords = hit;
+      }
+    }
+
     const updated: HomeLocation = {
       name: name.trim() || 'Kotiosoite',
-      address: address.trim() || `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`,
-      coordinates: coords,
+      address: address.trim() || `${finalCoords.lat.toFixed(4)}, ${finalCoords.lng.toFixed(4)}`,
+      coordinates: finalCoords,
       maxWalkingDistanceKm: maxWalk,
       maxCyclingDistanceKm: maxBike,
       defaultTransitMode: preferredMode,

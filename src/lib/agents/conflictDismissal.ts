@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { FamilyConflict } from './types';
 
 const STORAGE_KEY = 'pelipaiva_dismissed_conflicts';
 const EVENT_NAME = 'pelipaiva_conflict_dismissal_changed';
 
-export function getDismissedConflictIds(): Set<string> {
+export function getDismissedConflictKeys(): Set<string> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return new Set();
@@ -14,10 +15,32 @@ export function getDismissedConflictIds(): Set<string> {
   }
 }
 
-export function dismissConflict(id: string): void {
+export function computeConflictKeys(conflict: FamilyConflict | { id: string; eventAId?: string; eventBId?: string; message?: string }): string[] {
+  const keys: string[] = [];
+  if (conflict.id) keys.push(conflict.id);
+  if (conflict.eventAId && conflict.eventBId) {
+    keys.push(`${conflict.eventAId}-${conflict.eventBId}`);
+    keys.push(`${conflict.eventBId}-${conflict.eventAId}`);
+    keys.push(`c-${conflict.eventAId}-${conflict.eventBId}`);
+    keys.push(`c-${conflict.eventBId}-${conflict.eventAId}`);
+  }
+  if (conflict.message) {
+    keys.push(conflict.message.trim());
+  }
+  return keys;
+}
+
+export function dismissConflict(conflictOrId: FamilyConflict | string): void {
   try {
-    const set = getDismissedConflictIds();
-    set.add(id);
+    const set = getDismissedConflictKeys();
+    if (typeof conflictOrId === 'string') {
+      set.add(conflictOrId);
+    } else {
+      const keys = computeConflictKeys(conflictOrId);
+      for (const k of keys) {
+        set.add(k);
+      }
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
   } catch (err) {
@@ -25,10 +48,17 @@ export function dismissConflict(id: string): void {
   }
 }
 
-export function restoreConflict(id: string): void {
+export function restoreConflict(conflictOrId: FamilyConflict | string): void {
   try {
-    const set = getDismissedConflictIds();
-    set.delete(id);
+    const set = getDismissedConflictKeys();
+    if (typeof conflictOrId === 'string') {
+      set.delete(conflictOrId);
+    } else {
+      const keys = computeConflictKeys(conflictOrId);
+      for (const k of keys) {
+        set.delete(k);
+      }
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
   } catch (err) {
@@ -45,16 +75,21 @@ export function restoreAllConflicts(): void {
   }
 }
 
-export function isConflictDismissed(id: string): boolean {
-  return getDismissedConflictIds().has(id);
+export function isConflictDismissed(conflict: FamilyConflict | string, dismissedKeys?: Set<string>): boolean {
+  const set = dismissedKeys || getDismissedConflictKeys();
+  if (typeof conflict === 'string') {
+    return set.has(conflict);
+  }
+  const keys = computeConflictKeys(conflict);
+  return keys.some((k) => set.has(k));
 }
 
 export function useDismissedConflicts() {
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => getDismissedConflictIds());
+  const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(() => getDismissedConflictKeys());
 
   useEffect(() => {
     const handler = () => {
-      setDismissedIds(getDismissedConflictIds());
+      setDismissedKeys(getDismissedConflictKeys());
     };
     window.addEventListener(EVENT_NAME, handler);
     window.addEventListener('storage', handler);
@@ -64,17 +99,21 @@ export function useDismissedConflicts() {
     };
   }, []);
 
-  const dismiss = useCallback((id: string) => {
-    dismissConflict(id);
+  const dismiss = useCallback((conflictOrId: FamilyConflict | string) => {
+    dismissConflict(conflictOrId);
   }, []);
 
-  const restore = useCallback((id: string) => {
-    restoreConflict(id);
+  const restore = useCallback((conflictOrId: FamilyConflict | string) => {
+    restoreConflict(conflictOrId);
   }, []);
 
   const restoreAll = useCallback(() => {
     restoreAllConflicts();
   }, []);
 
-  return { dismissedIds, dismiss, restore, restoreAll };
+  const isDismissed = useCallback((c: FamilyConflict | string) => {
+    return isConflictDismissed(c, dismissedKeys);
+  }, [dismissedKeys]);
+
+  return { dismissedKeys, dismiss, restore, restoreAll, isDismissed };
 }
