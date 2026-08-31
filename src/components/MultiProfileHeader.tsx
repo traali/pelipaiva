@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { PlayerProfile } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
-import { User, Plus, Users, Calendar } from 'lucide-react';
+import { User, Plus, Users, Calendar, RefreshCw } from 'lucide-react';
 
 interface MultiProfileHeaderProps {
   profiles: PlayerProfile[];
@@ -11,6 +11,8 @@ interface MultiProfileHeaderProps {
   onAddProfile: () => void;
   onOpenFamilyManage?: () => void;
   onOpenCalendarSubscribe?: () => void;
+  onRefresh?: () => void;
+  isSyncing?: boolean;
 }
 
 export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
@@ -19,7 +21,9 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   onSelectProfile,
   onAddProfile,
   onOpenFamilyManage,
-  onOpenCalendarSubscribe
+  onOpenCalendarSubscribe,
+  onRefresh,
+  isSyncing
 }) => {
   // Group profiles by playerName (normalized casing)
   const playerGroups = React.useMemo(() => {
@@ -64,6 +68,21 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         >
           <Calendar className="h-3.5 w-3.5 text-pitch" />
           <span>Kalenteri</span>
+        </motion.button>
+      )}
+
+      {onRefresh && (
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          transition={springTactile.snappy}
+          onClick={onRefresh}
+          disabled={isSyncing}
+          aria-label="Päivitä löydökset, kulkumatkat ja perhetiedot"
+          title="Päivitä löydökset, kulkumatkat ja perhetiedot"
+          className="touch-target inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border-strong bg-surface-elevated px-3 text-xs font-bold text-text-primary hover:text-pitch hover:border-pitch transition-all focus-visible:ring-2 focus-visible:ring-pitch cursor-pointer disabled:opacity-50"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 text-pitch ${isSyncing ? 'animate-spin' : ''}`} />
+          <span>{isSyncing ? 'Päivitetään…' : 'Päivitä'}</span>
         </motion.button>
       )}
 

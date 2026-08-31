@@ -190,22 +190,48 @@ export function normalizeTeamName(rawName: string): NormalizedTeamName {
     text = text.replace(ageMatch[1], ' ').replace(/\s+/g, ' ').trim();
   }
 
-  // Extract Squad Level: Kilpa, Haaste, Harraste, Akatemia, Edustus, 1, 2, Green, etc.
+  // Extract 4-digit birth year: e.g. 2013, 2014, 2015, 2012
+  const yearMatch = text.match(/(?:^|\s)(200\d|201\d|202\d|199\d)(?:$|\s)/);
+  if (yearMatch && yearMatch[1]) {
+    if (!matchedAge) {
+      matchedAge = `P${yearMatch[1].slice(2)}`;
+    }
+    text = text.replace(yearMatch[1], ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // Extract Squad Level / District: Kilpa, Haaste, Harraste, Akatemia, Edustus, Laru, Töölö, Eira, Väke, Jätkäsaari, United, 1, 2, etc.
   let matchedSquad = '';
-  const squadMatch = text.match(/(?:^|\s)(kilpa|haaste|harraste|akatemia|edustus|green|white|black|blue|red|1|2|3)(?:$|\s)/i);
+  const squadMatch = text.match(/(?:^|\s)(kilpa|haaste|harraste|akatemia|edustus|green|white|black|blue|red|laru|lauttasaari|töölö|eira|väke|jätkäsaari|kantsu|malmi|united|city|1|2|3)(?:$|\s)/i);
   if (squadMatch && squadMatch[1]) {
     matchedSquad = squadMatch[1].toLowerCase();
     text = text.replace(squadMatch[1], ' ').replace(/\s+/g, ' ').trim();
   }
 
-  // Remaining text is candidate club
-  let clubCandidate = text.replace(/\s+/g, ' ').trim();
-  if (clubCandidate === 'åifk' || clubCandidate === 'abo ifk' || clubCandidate === 'åbo ifk') {
-    clubCandidate = 'aifk';
-  } else if (clubCandidate === 'pk 35' || clubCandidate === 'pk-35') {
-    clubCandidate = 'pk35';
+  // Check known club prefixes from remaining text
+  let canonicalClub = '';
+  const trimmed = text.replace(/\s+/g, ' ').trim();
+
+  // Direct alias check first
+  const directClub = getCanonicalClub(trimmed);
+  if (directClub && directClub !== trimmed) {
+    canonicalClub = directClub;
+  } else {
+    // Prefix scan against known club keys
+    for (const clubKey of Object.keys(CLUB_ALIASES)) {
+      const aliases = [clubKey, ...(CLUB_ALIASES[clubKey] || [])];
+      for (const alias of aliases) {
+        const lowerAlias = alias.toLowerCase();
+        if (trimmed === lowerAlias || trimmed.startsWith(lowerAlias + ' ') || trimmed.endsWith(' ' + lowerAlias)) {
+          canonicalClub = clubKey;
+          break;
+        }
+      }
+      if (canonicalClub) break;
+    }
+    if (!canonicalClub) {
+      canonicalClub = directClub || trimmed;
+    }
   }
-  const canonicalClub = getCanonicalClub(clubCandidate);
 
   // Build unified normalized string
   const parts = [canonicalClub, matchedAge, matchedSquad, matchedColor].filter(Boolean);
@@ -213,7 +239,7 @@ export function normalizeTeamName(rawName: string): NormalizedTeamName {
 
   return new NormalizedTeamName(
     normalized,
-    canonicalClub || clubCandidate,
+    canonicalClub,
     matchedSquad,
     matchedAge,
     matchedColor

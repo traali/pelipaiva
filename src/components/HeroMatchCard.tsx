@@ -27,6 +27,7 @@ import { EventMergeModal } from './EventMergeModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
 import { MoreHorizontal, FileText } from 'lucide-react';
 import { db } from '../lib/storage/db';
+import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -99,6 +100,14 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   });
   
   const related = conflicts.filter((c) => c.eventAId === event.id || c.eventBId === event.id);
+  const uniqueConflicts = Array.from(
+    new Map(related.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
+  );
+  const { dismissedIds, dismiss: dismissConflictId, restore: restoreConflictId } = useDismissedConflicts();
+  const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
+
+  const activeConflicts = uniqueConflicts.filter((c) => !dismissedIds.has(c.id));
+  const dismissedConflicts = uniqueConflicts.filter((c) => dismissedIds.has(c.id));
   const isLive =
     new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
   const temp = event.weather?.isForecastLongRange ? undefined : event.weather?.temperatureC;
@@ -140,12 +149,37 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   };
 
   return (
-    <article className="liquid-glass relative mb-4 overflow-hidden rounded-2xl border border-border-subtle shadow-card">
+    <article
+      className={`liquid-glass relative mb-4 overflow-hidden rounded-2xl border transition-all ${
+        isOut
+          ? 'opacity-65 grayscale-20 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100'
+          : 'border-border-subtle shadow-card'
+      }`}
+    >
       <div
         className="absolute inset-y-0 left-0 w-1.5"
         style={{ background: profile?.colorHex || 'var(--nv-pitch-primary)' }}
       />
       <div className="p-4 pl-5 md:p-5 md:pl-6">
+        {/* Top OUT Banner when event is marked as skipped */}
+        {isOut && (
+          <div className="mb-3.5 flex items-center justify-between gap-2 p-2.5 rounded-xl bg-stoppage/15 border border-stoppage/30 text-xs font-bold text-stoppage">
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span className="shrink-0">⛔</span>
+              <span className="truncate">{profile?.playerName || 'Pelaaja'} ei osallistu (Poisjäänti merkitty)</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => handleToggleAttendance('in')}
+              className="px-2.5 py-1 rounded-lg bg-pitch text-text-inverse hover:brightness-110 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1 shrink-0"
+              title="Merkitse pelaaja osallistuvaksi"
+            >
+              <span>↩️</span>
+              <span>Osallistuu silti</span>
+            </button>
+          </div>
+        )}
+
         {/* Top Meta: Profile, Sport, Date, and Data Source Provenance */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-text-secondary">
           <div className="flex flex-wrap items-center gap-2">
@@ -341,18 +375,62 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           </div>
         )}
 
-        {/* Conflicts Alert */}
-        {related.map((c) => (
+        {/* Conflicts Alert with Acknowledge / Dismiss Action */}
+        {activeConflicts.map((c) => (
           <div
             key={c.id}
-            className="mt-3 flex items-start gap-2 rounded-xl border border-whistle/30 bg-whistle/10 p-3 text-xs text-whistle"
+            className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-whistle/30 bg-whistle/10 p-3 text-xs text-whistle"
           >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span className="font-medium leading-snug">
-              {c.message} {c.suggestedFix}
-            </span>
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="font-medium leading-snug">
+                {c.message} {c.suggestedFix}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => dismissConflictId(c.id)}
+              className="self-end sm:self-center px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-[11px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
+              title="Merkitse tämä huomio hoidetuksi ja piilota se"
+            >
+              <span>✓</span>
+              <span>Kuittaa hoidetuksi</span>
+            </button>
           </div>
         ))}
+
+        {/* View Dismissed / Acknowledged Conflicts */}
+        {dismissedConflicts.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowDismissedConflicts(!showDismissedConflicts)}
+              className="text-[11px] font-semibold text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer transition-colors py-1 self-start"
+            >
+              <span>👁️</span>
+              <span>{showDismissedConflicts ? 'Piilota kuitatut huomiot' : `Näytä kuitatut huomiot (${dismissedConflicts.length})`}</span>
+            </button>
+            {showDismissedConflicts && (
+              <div className="flex flex-col gap-1.5 pl-2.5 border-l-2 border-border-subtle">
+                {dismissedConflicts.map((dc) => (
+                  <div
+                    key={dc.id}
+                    className="p-2 rounded-lg bg-surface/60 border border-border-subtle text-[11px] text-text-muted flex items-center justify-between gap-2"
+                  >
+                    <span className="line-through truncate">{dc.message}</span>
+                    <button
+                      type="button"
+                      onClick={() => restoreConflictId(dc.id)}
+                      className="text-[10px] font-bold text-pitch hover:underline shrink-0 cursor-pointer"
+                    >
+                      ↩️ Palauta huomio
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Interactive League Standings, Goals, Form & H2H Comparison */}
         {!event.isTraining && (

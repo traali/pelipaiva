@@ -573,15 +573,98 @@ function generateDeterministicEventId(title: string, startTimeIso: string, locat
 }
 
 /**
+ * Extracts attendance / participation status (IN / OUT / MAYBE / UNANSWERED)
+ * from RFC 5545 standard properties (STATUS, PARTSTAT, ATTENDEE, X-properties)
+ * and description/summary text tokens.
+ */
+export function extractAttendanceStatus(
+  vevent: any,
+  title: string,
+  description: string,
+  playerName?: string
+): 'in' | 'out' | 'maybe' | undefined {
+  try {
+    // 1. RFC 5545 STATUS property (e.g. STATUS:CANCELLED -> out)
+    const status = ((vevent?.getFirstPropertyValue?.('status') as string) || '').toUpperCase();
+    if (status === 'CANCELLED') return 'out';
+
+    // 2. Custom vendor X-properties (MyClub / Nimenhuuto / Jopox)
+    const xStatus = (
+      (vevent?.getFirstPropertyValue?.('x-myclub-status') ||
+       vevent?.getFirstPropertyValue?.('x-nimenhuuto-status') ||
+       vevent?.getFirstPropertyValue?.('x-partstat') ||
+       vevent?.getFirstPropertyValue?.('x-participation-status')) as string || ''
+    ).toUpperCase();
+    if (xStatus === 'IN' || xStatus === 'ACCEPTED' || xStatus === 'TULOSSA' || xStatus === 'OSALLISTUU') return 'in';
+    if (xStatus === 'OUT' || xStatus === 'DECLINED' || xStatus === 'POISSA' || xStatus === 'ESTYNYT') return 'out';
+    if (xStatus === 'MAYBE' || xStatus === 'TENTATIVE' || xStatus === 'EHKÄ') return 'maybe';
+
+    // 3. ATTENDEE properties with PARTSTAT
+    const attendees = vevent?.getAllProperties?.('attendee');
+    if (attendees && Array.isArray(attendees) && attendees.length > 0) {
+      for (const att of attendees) {
+        const partstat = ((att?.getParameter?.('partstat') as string) || '').toUpperCase();
+        const cn = ((att?.getParameter?.('cn') as string) || '').toLowerCase();
+        
+        if (playerName && cn) {
+          const targetName = playerName.toLowerCase().trim();
+          if (cn.includes(targetName) || targetName.includes(cn)) {
+            if (partstat === 'ACCEPTED') return 'in';
+            if (partstat === 'DECLINED') return 'out';
+            if (partstat === 'TENTATIVE') return 'maybe';
+          }
+        } else {
+          // Single-attendee personal feed
+          if (partstat === 'ACCEPTED') return 'in';
+          if (partstat === 'DECLINED') return 'out';
+          if (partstat === 'TENTATIVE') return 'maybe';
+        }
+      }
+    }
+
+    // 4. Check Description & Title for explicit personal attendance tokens
+    const fullText = `${title}\n${description}`.toLowerCase();
+
+    if (playerName) {
+      const pn = playerName.toLowerCase().trim();
+      const outRegex = new RegExp(`\\b${pn}\\s*[:=-]?\\s*(?:out|ei\\s+tule|ei\\s+mene|poissa|pois|estynyt|ei\\s+osallistu)\\b`, 'i');
+      if (outRegex.test(fullText)) return 'out';
+
+      const inRegex = new RegExp(`\\b${pn}\\s*[:=-]?\\s*(?:in|tulossa|mukana|osallistuu|paikalla)\\b`, 'i');
+      if (inRegex.test(fullText)) return 'in';
+
+      const maybeRegex = new RegExp(`\\b${pn}\\s*[:=-]?\\s*(?:maybe|ehkä|epävarma|\\?)\\b`, 'i');
+      if (maybeRegex.test(fullText)) return 'maybe';
+    }
+
+    // Generic personal status lines if present in personal calendar export
+    if (/\b(?:oma\s+tila|ilmoittautuminen|status|osallistuminen)\s*[:=-]?\s*(?:out|ei\s+tule|ei\s+mene|poissa|estynyt)\b/i.test(fullText)) {
+      return 'out';
+    }
+    if (/\b(?:oma\s+tila|ilmoittautuminen|status|osallistuminen)\s*[:=-]?\s*(?:in|tulossa|mukana|osallistuu|paikalla)\b/i.test(fullText)) {
+      return 'in';
+    }
+    if (/\b(?:oma\s+tila|ilmoittautuminen|status|osallistuminen)\s*[:=-]?\s*(?:ehkä|maybe|epävarma|\?)\b/i.test(fullText)) {
+      return 'maybe';
+    }
+  } catch (err) {
+    console.warn('[PELIPAIVA:ICS] Failed to extract attendance status:', err);
+  }
+
+  return undefined;
+}
+
+/**
  * Parses raw iCalendar (.ics) string feeds from Nimenhuuto, MyClub, Jopox, or Torneopal.
- * Timezone-safe (RFC 5545) with deterministic volunteer duty detection.
+ * Timezone-safe (RFC 5545) with deterministic volunteer duty detection and attendance extraction.
  */
 export async function parseICSFeed(
   icsContent: string,
   profileId: string,
   sport: SportType = 'football',
   defaultTeamName?: string,
-  squadFilters?: string[]
+  squadFilters?: string[],
+  playerName?: string
 ): Promise<MatchdayEvent[]> {
   const events: MatchdayEvent[] = [];
   if (!icsContent || typeof icsContent !== 'string') return events;
@@ -632,6 +715,9 @@ export async function parseICSFeed(
       // Volunteer duty detection (Talkoovahti)
       const dutyResult = extractVolunteerDuty(title, description);
 
+      // Attendance status extraction (IN / OUT / MAYBE)
+      const attendanceStatus = extractAttendanceStatus(vevent, title, description, playerName);
+
       // Geocode venue with LIPAS.fi and Slang aliases (use embedded hint if available)
       const venueQuery = parsedTitle.embeddedVenueHint || location;
       let venue = venueCache.get(venueQuery);
@@ -681,7 +767,8 @@ export async function parseICSFeed(
               endTime: endTime.toISOString(),
               warmupTime: warmupTime.toISOString(),
               venue,
-              volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined
+              volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined,
+              attendanceStatus
             });
 
             count++;
@@ -719,7 +806,8 @@ export async function parseICSFeed(
           endTime: endTime.toISOString(),
           warmupTime: warmupTime.toISOString(),
           venue,
-          volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined
+          volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined,
+          attendanceStatus
         });
       }
     }

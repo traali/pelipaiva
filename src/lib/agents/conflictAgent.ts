@@ -164,5 +164,16 @@ export function conflictAgent(
     }
   }
 
-  return conflicts;
+  // Deduplicate identical conflict messages between the same siblings/venues
+  const uniqueList: FamilyConflict[] = [];
+  const seenKeys = new Set<string>();
+  for (const c of conflicts) {
+    const key = `${c.eventAId}-${c.message}-${c.suggestedFix}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueList.push(c);
+    }
+  }
+
+  return uniqueList;
 }

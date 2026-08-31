@@ -32,6 +32,7 @@ import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
 import { resolveTransitPlan } from '../lib/geo/transitEngine';
 import type { HomeLocation } from '../types/matchday';
+import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return 'Sisähalli';
@@ -100,7 +101,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
   const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
 
-  const relatedConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
+  const { dismissedIds, dismiss: dismissConflictId, restore: restoreConflictId } = useDismissedConflicts();
+  const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
+
+  const rawConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
+  const relatedConflicts = Array.from(
+    new Map(rawConflicts.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
+  );
+  const activeConflicts = relatedConflicts.filter((c) => !dismissedIds.has(c.id));
+  const dismissedConflicts = relatedConflicts.filter((c) => dismissedIds.has(c.id));
 
   const venue = isVenueModalOpen ? localVenue : event.venue;
   const isLive =
@@ -495,39 +504,83 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         </div>
 
         {/* Overlap & Driving Buffer Conflict Warning Banner */}
-        {relatedConflicts.length > 0 && (
+        {activeConflicts.length > 0 && (
           <div className="mb-4 flex flex-col gap-2">
-            {relatedConflicts.map((c) => (
+            {activeConflicts.map((c) => (
               <div
                 key={c.id}
                 role="alert"
-                className={`p-3 rounded-2xl border flex items-start gap-2.5 text-xs ${
+                className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs ${
                   c.severity === 'critical'
                     ? 'bg-stoppage/15 border-stoppage/35 text-stoppage'
                     : 'bg-whistle/15 border-whistle/35 text-whistle'
                 }`}
               >
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-extrabold flex items-center justify-between gap-1">
-                    <span>
-                      {c.overlapMinutes > 0
-                        ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                        : '🚗 Tiukka siirtymä / Ajoaika'}
-                    </span>
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
-                      ~{c.travelMinutesEstimate} min ajo
-                    </span>
+                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-extrabold flex items-center justify-between gap-1">
+                      <span>
+                        {c.overlapMinutes > 0
+                          ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
+                          : '🚗 Tiukka siirtymä / Ajoaika'}
+                      </span>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
+                        ~{c.travelMinutesEstimate} min ajo
+                      </span>
+                    </div>
+                    <p className="mt-1 leading-snug font-medium text-text-primary dark:text-text-primary">
+                      {c.message}
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold opacity-90">
+                      💡 {c.suggestedFix}
+                    </p>
                   </div>
-                  <p className="mt-1 leading-snug font-medium text-text-primary dark:text-text-primary">
-                    {c.message}
-                  </p>
-                  <p className="mt-1 text-[11px] font-bold opacity-90">
-                    💡 {c.suggestedFix}
-                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => dismissConflictId(c.id)}
+                  className="self-end sm:self-center px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-[11px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
+                  title="Merkitse tämä huomio hoidetuksi ja piilota se"
+                >
+                  <span>✓</span>
+                  <span>Kuittaa hoidetuksi</span>
+                </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* View Dismissed / Acknowledged Conflicts */}
+        {dismissedConflicts.length > 0 && (
+          <div className="mb-4 flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowDismissedConflicts(!showDismissedConflicts)}
+              className="text-[11px] font-semibold text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer transition-colors py-1 self-start"
+            >
+              <span>👁️</span>
+              <span>{showDismissedConflicts ? 'Piilota kuitatut huomiot' : `Näytä kuitatut huomiot (${dismissedConflicts.length})`}</span>
+            </button>
+            {showDismissedConflicts && (
+              <div className="flex flex-col gap-1.5 pl-2.5 border-l-2 border-border-subtle">
+                {dismissedConflicts.map((dc) => (
+                  <div
+                    key={dc.id}
+                    className="p-2 rounded-lg bg-surface/60 border border-border-subtle text-[11px] text-text-muted flex items-center justify-between gap-2"
+                  >
+                    <span className="line-through truncate">{dc.message}</span>
+                    <button
+                      type="button"
+                      onClick={() => restoreConflictId(dc.id)}
+                      className="text-[10px] font-bold text-pitch hover:underline shrink-0 cursor-pointer"
+                    >
+                      ↩️ Palauta huomio
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

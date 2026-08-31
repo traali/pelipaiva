@@ -28,6 +28,8 @@ import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/at
 import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
+import { resolveTransitPlan } from './lib/geo/transitEngine';
+import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 
 const SmartImportModal = lazy(() =>
   import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
@@ -72,7 +74,9 @@ export const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
   const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'tournaments' | 'matches' | 'trainings' | 'other'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<
+    'all' | 'attending' | 'out' | 'tournaments' | 'matches' | 'trainings' | 'other'
+  >('all');
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
     url?: string;
@@ -510,6 +514,12 @@ export const App: React.FC = () => {
     [rawEvents, profiles, arrivalRules, clockTick, homeLocation]
   );
 
+  const { dismissedIds, dismiss: dismissConflictId } = useDismissedConflicts();
+  const unDismissedConflicts = useMemo(
+    () => snapshot.conflicts.filter((c) => !dismissedIds.has(c.id)),
+    [snapshot.conflicts, dismissedIds]
+  );
+
   const isTournamentEvent = (e: MatchdayEvent): boolean => {
     if (e.isTournament || e.tournamentName) return true;
     const text = `${e.title} ${e.notes || ''} ${e.roundInfo || ''}`;
@@ -541,8 +551,16 @@ export const App: React.FC = () => {
     let matches = 0;
     let trainings = 0;
     let other = 0;
+    let attending = 0;
+    let out = 0;
 
     for (const e of filteredEvents) {
+      if (e.attendanceStatus === 'out') {
+        out++;
+      } else {
+        attending++;
+      }
+
       if (isTournamentEvent(e)) tournaments++;
       else if (isMatchEvent(e)) matches++;
       else if (isTrainingEvent(e)) trainings++;
@@ -551,6 +569,8 @@ export const App: React.FC = () => {
 
     return {
       all: filteredEvents.length,
+      attending,
+      out,
       tournaments,
       matches,
       trainings,
@@ -559,6 +579,12 @@ export const App: React.FC = () => {
   }, [filteredEvents]);
 
   const categoryFilteredEvents = useMemo(() => {
+    if (categoryFilter === 'attending') {
+      return filteredEvents.filter((e) => e.attendanceStatus !== 'out');
+    }
+    if (categoryFilter === 'out') {
+      return filteredEvents.filter((e) => e.attendanceStatus === 'out');
+    }
     if (categoryFilter === 'tournaments') {
       return filteredEvents.filter(isTournamentEvent);
     }
@@ -727,6 +753,7 @@ export const App: React.FC = () => {
   const handleRefreshAll = async () => {
     setIsSyncing(true);
     try {
+      // 1. Fetch latest data for all profiles from external feeds
       for (const p of profiles) {
         const url = p.associationUrl || p.calendarUrl;
         if (!url) continue;
@@ -738,6 +765,54 @@ export const App: React.FC = () => {
           url,
           includeWeather: true
         }).catch((e) => console.warn('[REFRESH]', p.teamName, e));
+      }
+
+      // 2. Re-evaluate sport & transit from current home location for ALL stored events
+      const allEvents = await db.events.toArray();
+      const allProfiles = await db.profiles.toArray();
+      const profMap = new Map(allProfiles.map((p) => [p.id, p]));
+
+      for (const ev of allEvents) {
+        const prof = profMap.get(ev.profileId);
+        let updated = false;
+        const updates: Partial<MatchdayEvent> = {};
+
+        // Sync event sport to profile sport if profile sport changed
+        if (prof?.sport && ev.sport !== prof.sport) {
+          updates.sport = prof.sport;
+          updated = true;
+        }
+
+        // Recalculate transit (distance & walk/bike/drive minutes from home)
+        if (homeLocation && ev.venue?.coordinates) {
+          const freshTransit = resolveTransitPlan(homeLocation, ev.venue.coordinates, ev.weather);
+          updates.transit = freshTransit;
+          updated = true;
+        }
+
+        if (updated) {
+          await db.events.update(ev.id, updates);
+        }
+      }
+
+      // 3. Clean up ghost/bare fixtures if merged
+      const freshEvents = await db.events.toArray();
+      const calEvents = freshEvents.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining && !e.officialFixtureId);
+      const fixEvents = freshEvents.filter((e) => e.id.startsWith('fixture-'));
+
+      for (const cal of calEvents) {
+        const calDate = cal.startTime.split('T')[0];
+        const match = fixEvents.find((f) => {
+          const fDate = f.startTime.split('T')[0];
+          return f.profileId === cal.profileId && fDate === calDate;
+        });
+        if (match) {
+          await db.events.update(cal.id, {
+            officialFixtureId: match.id,
+            reconciliationStatus: 'auto_matched'
+          });
+          await db.events.delete(match.id);
+        }
       }
     } finally {
       setTimeout(() => setIsSyncing(false), 600);
@@ -914,6 +989,8 @@ export const App: React.FC = () => {
                 onAddProfile={() => openAddTeam(activePlayerName)}
                 onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
                 onOpenCalendarSubscribe={() => setIsCalendarModalOpen(true)}
+                onRefresh={handleRefreshAll}
+                isSyncing={isSyncing}
               />
             </div>
 
@@ -971,7 +1048,7 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Category & Source Filters (Kaikki, Turnaukset, Sarjapelit, Treenit, Muu) */}
+          {/* Quick Category & Attendance Filters (Kaikki, Osallistuu, Poisjäännit, Turnaukset, Sarjapelit, Treenit, Muu) */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             <button
               type="button"
@@ -985,6 +1062,39 @@ export const App: React.FC = () => {
               <span>Kaikki tapahtumat</span>
               <span className="text-[10px] opacity-80">({categoryCounts.all})</span>
             </button>
+
+            {/* Attendance: Osallistuu (IN) */}
+            <button
+              type="button"
+              onClick={() => setCategoryFilter(categoryFilter === 'attending' ? 'all' : 'attending')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                categoryFilter === 'attending'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
+              }`}
+              title="Näytä vain tapahtumat joihin osallistutaan"
+            >
+              <span>🟢 Osallistuu</span>
+              <span className="text-[10px] opacity-80">({categoryCounts.attending})</span>
+            </button>
+
+            {/* Attendance: Poisjäännit (OUT) */}
+            <button
+              type="button"
+              onClick={() => setCategoryFilter(categoryFilter === 'out' ? 'all' : 'out')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                categoryFilter === 'out'
+                  ? 'bg-stoppage text-text-inverse shadow-xs'
+                  : categoryCounts.out > 0
+                  ? 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
+                  : 'bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle'
+              }`}
+              title="Näytä tapahtumat mihin ei osallistuta (Poisjäännit)"
+            >
+              <span>⛔ Poisjäännit</span>
+              <span className="text-[10px] opacity-80">({categoryCounts.out})</span>
+            </button>
+
             {categoryCounts.tournaments > 0 && (
               <button
                 type="button"
@@ -1045,25 +1155,36 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {snapshot.conflicts.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setIsLogisticsOpen(true)}
-            aria-label={`Logistiikkaristiriita: ${snapshot.conflicts[0]?.message}. Avaa kuskijako.`}
-            className="mb-4 flex min-h-[48px] w-full items-start gap-2.5 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 text-left cursor-pointer hover:brightness-105 transition-all shadow-xs focus-visible:ring-2 focus-visible:ring-whistle"
-          >
-            <span className="mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse shrink-0">
-              Ristiriita
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-text-primary leading-snug">
-                {snapshot.conflicts[0]?.message}
+        {unDismissedConflicts.length > 0 && (
+          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setIsLogisticsOpen(true)}
+              aria-label={`Logistiikkaristiriita: ${unDismissedConflicts[0]?.message}. Avaa kuskijako.`}
+              className="flex min-h-[44px] flex-1 items-start gap-2.5 text-left cursor-pointer hover:brightness-105 transition-all focus-visible:ring-2 focus-visible:ring-whistle"
+            >
+              <span className="mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse shrink-0">
+                Ristiriita
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-text-primary leading-snug">
+                  {unDismissedConflicts[0]?.message}
+                </div>
+                <div className="text-xs font-bold text-whistle mt-1 flex items-center gap-1">
+                  <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
+                </div>
               </div>
-              <div className="text-xs font-bold text-whistle mt-1 flex items-center gap-1">
-                <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
-              </div>
-            </div>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={() => unDismissedConflicts[0] && dismissConflictId(unDismissedConflicts[0].id)}
+              className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
+              title="Merkitse tämä huomio hoidetuksi ja piilota se"
+            >
+              <span>✓</span>
+              <span>Kuittaa hoidetuksi</span>
+            </button>
+          </div>
         )}
 
         {viewMode === 'cards' ? (
