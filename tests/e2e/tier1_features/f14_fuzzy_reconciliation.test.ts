@@ -258,4 +258,39 @@ describe('Feature 14: Conservative Fuzzy Match & Reconciliation', () => {
     const res = results.get('cal-myclub-musta');
     expect(res?.status).toBe('unlinked');
   });
+
+  it('should flag venue mismatch when calendar venue differs from Torneopal/official venue', () => {
+    const calendarEvents: MatchdayEvent[] = [
+      {
+        id: 'cal-venue-diff',
+        profileId: 'p1',
+        sport: 'football',
+        eventType: 'match',
+        isTraining: false,
+        title: 'HJK T13 Sininen vs EPS',
+        homeTeam: 'HJK T13 Sininen',
+        awayTeam: 'EPS',
+        isHomeMatch: true,
+        startTime: '2026-05-16T12:00:00.000Z',
+        endTime: '2026-05-16T13:30:00.000Z',
+        venue: {
+          name: 'Lauttasaaren urheilupuisto "Pyrkkä"',
+          normalizedName: 'pyrkka',
+          coordinates: { lat: 60.16, lng: 24.87 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      }
+    ];
+
+    const results = reconcileCalendarWithOfficial(calendarEvents, officialFixtures);
+    const res = results.get('cal-venue-diff');
+    expect(res).toBeDefined();
+    expect(res?.status).toBe('auto_matched');
+    expect(res?.mismatches?.hasVenueMismatch).toBe(true);
+    expect(res?.mismatches?.calendarVenueName).toContain('Pyrkkä');
+    expect(res?.mismatches?.officialVenueName).toBe('Töölö PK 6 tn (Bubu)');
+  });
 });
+

@@ -450,9 +450,9 @@ export async function resolveSportsVenue(
   return {
     name: rawVenueString || 'Tuntematon kenttä',
     normalizedName: normalized,
-    coordinates: { lat: 60.1872, lng: 24.9248 },
-    // Flag the unverifiable fallback so UI can show "Sijainti arvioitu"
-    // instead of presenting Helsinki as fact (M-15/V21).
+    coordinates: { lat: 0, lng: 0 },
+    // Flag the unverifiable fallback so UI can show "Sijainti tuntematon"
+    // instead of presenting Helsinki as fact (M-15/G-06/F-11).
     isApproximateLocation: true,
     isIndoor: indoorGuess,
     surface: indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g',

@@ -202,12 +202,15 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                                 type="button"
                                 aria-label={`Navigoi kentälle ${m.venue.name}`}
                                 onClick={() => {
-                                  if (onNavigate) {
-                                    onNavigate(m.venue?.coordinates || { lat: 60.1872, lng: 24.9248 });
+                                    const isApprox = m.venue?.isApproximateLocation;
+                                  const coords = m.parking?.coordinates || (!isApprox ? m.venue?.coordinates : undefined);
+                                  const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+
+                                  if (onNavigate && hasValidCoords) {
+                                    onNavigate(coords);
                                   } else {
-                                    const coords = m.parking?.coordinates || m.venue?.coordinates;
                                     const destination =
-                                      coords?.lat != null && coords?.lng != null
+                                      hasValidCoords
                                         ? `${coords.lat},${coords.lng}`
                                         : encodeURIComponent(m.venue?.name || 'Kenttä');
                                     window.open(

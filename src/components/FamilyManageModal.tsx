@@ -65,8 +65,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
           const counts = new Map<string, number>();
           for (const ev of events) {
             const title = ev.title || '';
-            const match = title.match(/\[([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\]|Peli\s+kilpa|Peli\s+haastaja|Treenit/i);
-            const cat = match ? match[0].replace(/[\[\]]/g, '') : ev.isTraining ? 'Treenit' : 'Pelit';
+            const match = title.match(/\[([A-Za-z0-9äöåÄÖÅ\s-]{2,25})\]|Peli\s+kilpa|Peli\s+haastaja|Treenit/i);
+            const cat = match ? match[0].replace(/[[\]]/g, '') : ev.isTraining ? 'Treenit' : 'Pelit';
             counts.set(cat, (counts.get(cat) || 0) + 1);
           }
           cats = Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
@@ -88,13 +88,14 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
 
     await db.profiles.update(profile.id, { squadFilters: updated });
 
-    if (profile.calendarUrl) {
+    const sourceUrl = profile.calendarUrl || profile.associationUrl;
+    if (sourceUrl) {
       await ingestSourceForProfile({
         profileId: profile.id,
         playerName: profile.playerName,
         teamName: profile.teamName,
         sport: profile.sport,
-        url: profile.calendarUrl,
+        url: sourceUrl,
         squadFilters: updated,
         includeWeather: true
       });

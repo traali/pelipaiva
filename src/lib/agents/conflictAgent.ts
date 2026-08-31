@@ -27,6 +27,17 @@ export function conflictAgent(
       const b = upcoming[j]!;
       if (a.id === b.id) continue;
 
+      // Skip reconciled duplicates: if both events represent the same real-world
+      // match from different calendar sources (e.g. MyClub + Torneopal), they share
+      // an officialFixtureId or one is a bare fixture of the other. Never conflict.
+      if (
+        (a.officialFixtureId && b.officialFixtureId && a.officialFixtureId === b.officialFixtureId) ||
+        (a.officialFixtureId && b.id === `fixture-${a.profileId}-${a.officialFixtureId}`) ||
+        (b.officialFixtureId && a.id === `fixture-${b.profileId}-${b.officialFixtureId}`)
+      ) {
+        continue;
+      }
+
       const sameVenue = a.venue.normalizedName === b.venue.normalizedName || a.venue.name === b.venue.name;
       const drive = estimateDriveMinutes(
         a.venue.coordinates.lat,
@@ -51,6 +62,12 @@ export function conflictAgent(
         if (sameVenue && !isSameChild) continue;
 
         if (!isSameChild && (aIsActive || bIsActive)) {
+          // If BOTH kids travel independently (e.g. L walks to LYK, S bikes to Otaniemi),
+          // there is ZERO driving/logistics clash. No driver needed for either kid.
+          if (aIsActive && bIsActive) {
+            continue;
+          }
+
           const activeChild = aIsActive ? nameA : nameB;
           const activeVenue = aIsActive ? a.venue.name : b.venue.name;
           const activePlan = aIsActive ? transitA : transitB;
@@ -115,6 +132,10 @@ export function conflictAgent(
         const isDriveImpossible = gapKickoff < drive;
 
         if (!isSameChild && (aIsActive || bIsActive)) {
+          if (aIsActive && bIsActive) {
+            continue;
+          }
+
           const activeChild = aIsActive ? nameA : nameB;
           const activePlan = aIsActive ? transitA : transitB;
           const carChild = aIsActive ? nameB : nameA;

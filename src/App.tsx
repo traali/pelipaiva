@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteOfficialTeamData, ensureStoragePersistence, clearAllDatabaseData } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
@@ -74,9 +74,9 @@ export const App: React.FC = () => {
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
-  const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
-  const [categoryFilter, setCategoryFilter] = useState<
-    'all' | 'attending' | 'out' | 'tournaments' | 'matches' | 'trainings' | 'other'
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'in' | 'out'>('all');
+  const [eventTypeFilter, setEventTypeFilter] = useState<
+    'all' | 'tournaments' | 'matches' | 'trainings' | 'other'
   >('all');
   const [importDefaults, setImportDefaults] = useState<{
     sport?: SportType;
@@ -90,6 +90,7 @@ export const App: React.FC = () => {
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
+  const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
 
   // Listen to network status changes & background family sync
   useEffect(() => {
@@ -431,32 +432,22 @@ export const App: React.FC = () => {
     }
   };
 
-  // Filter events by selected profile or player group and deduplicate reconciled events
-  const filteredEvents = useMemo(() => {
-    const rawFiltered = [...rawEvents]
-      .filter((e) => {
-        if (e.isHidden) return false;
-        if (activeProfileId === 'all') return true;
-        if (activeProfileId.startsWith('player:')) {
-          const pName = activeProfileId.replace('player:', '').toLowerCase();
-          const profile = profiles.find((p) => p.id === e.profileId);
-          return (profile?.playerName || '').toLowerCase() === pName;
-        }
-        return e.profileId === activeProfileId;
-      });
+  // Reconcile and stitch calendar events with bare fixtures across all profiles
+  const allStitchedEvents = useMemo(() => {
+    const rawAll = rawEvents.filter((e) => !e.isHidden).map((e) => ({ ...e }));
 
     // Find all linked officialFixtureIds on enriched calendar events
     const enrichedFixtureIds = new Set<string>();
     const bareFixtureIdsToDelete = new Set<string>();
 
-    for (const e of rawFiltered) {
+    for (const e of rawAll) {
       if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
         enrichedFixtureIds.add(e.officialFixtureId);
       }
     }
 
-    const calendarMatches = rawFiltered.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
-    const bareFixtures = rawFiltered.filter((e) => e.id.startsWith('fixture-'));
+    const calendarMatches = rawAll.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
+    const bareFixtures = rawAll.filter((e) => e.id.startsWith('fixture-'));
 
     // Dynamic stitch for same-day matches matching squad/club
     for (const cal of calendarMatches) {
@@ -475,6 +466,24 @@ export const App: React.FC = () => {
             cal.reconciliationStatus = 'auto_matched';
             cal.score = fix.score || cal.score;
             cal.tournamentName = fix.tournamentName || cal.tournamentName;
+
+            // Venue mismatch: Torneopal wins, but flag for the UI banner
+            const calVenueName = cal.venue?.name || '';
+            const fixVenueName = fix.venue?.name || '';
+            const venuesDiffer = fixVenueName && calVenueName
+              && fixVenueName.toLowerCase() !== calVenueName.toLowerCase()
+              && (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !== (cal.venue?.normalizedName || calVenueName.toLowerCase());
+            if (venuesDiffer) {
+              cal.mismatchFlags = {
+                ...cal.mismatchFlags,
+                venueMismatch: true,
+                calendarVenueName: calVenueName,
+                officialVenueName: fixVenueName
+              };
+              // Adopt Torneopal venue as authoritative
+              cal.venue = fix.venue;
+            }
+
             if (cal.officialFixtureId) {
               enrichedFixtureIds.add(cal.officialFixtureId);
             }
@@ -485,7 +494,7 @@ export const App: React.FC = () => {
     }
 
     // Suppress bare fixture duplicates if an enriched calendar event already represents it
-    const deduplicated = rawFiltered.filter((e) => {
+    const deduplicated = rawAll.filter((e) => {
       if (e.id.startsWith('fixture-')) {
         if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
           return false;
@@ -498,7 +507,20 @@ export const App: React.FC = () => {
     });
 
     return deduplicated.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  }, [rawEvents, activeProfileId, profiles]);
+  }, [rawEvents]);
+
+  // Filter stitched events by selected profile or player group
+  const filteredEvents = useMemo(() => {
+    return allStitchedEvents.filter((e) => {
+      if (activeProfileId === 'all') return true;
+      if (activeProfileId.startsWith('player:')) {
+        const pName = activeProfileId.replace('player:', '').toLowerCase();
+        const profile = profiles.find((p) => p.id === e.profileId);
+        return (profile?.playerName || '').toLowerCase() === pName;
+      }
+      return e.profileId === activeProfileId;
+    });
+  }, [allStitchedEvents, activeProfileId, profiles]);
 
   const [clockTick, setClockTick] = useState(0);
 
@@ -509,10 +531,26 @@ export const App: React.FC = () => {
     return () => clearInterval(t);
   }, []);
 
+  const stickyFilterRef = useRef<HTMLDivElement>(null);
+
+  // Measure the sticky filter bar height dynamically so day headers stick right beneath it
+  useEffect(() => {
+    const el = stickyFilterRef.current;
+    if (!el) return;
+    const updateHeight = () => {
+      const h = el.offsetHeight;
+      document.documentElement.style.setProperty('--sticky-filter-height', `${h}px`);
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const snapshot = useMemo(
-    () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules, homeLocation),
+    () => runMissionControlGraph(allStitchedEvents, profiles, new Date(), arrivalRules, homeLocation),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick intentionally restarts the graph each minute
-    [rawEvents, profiles, arrivalRules, clockTick, homeLocation]
+    [allStitchedEvents, profiles, arrivalRules, clockTick, homeLocation]
   );
 
   const { isDismissed, dismiss: dismissConflict } = useDismissedConflicts();
@@ -547,7 +585,7 @@ export const App: React.FC = () => {
     return !isTournamentEvent(e) && !isMatchEvent(e) && !isTrainingEvent(e);
   };
 
-  const categoryCounts = useMemo(() => {
+  const filterCounts = useMemo(() => {
     let tournaments = 0;
     let matches = 0;
     let trainings = 0;
@@ -580,26 +618,20 @@ export const App: React.FC = () => {
   }, [filteredEvents]);
 
   const categoryFilteredEvents = useMemo(() => {
-    if (categoryFilter === 'attending') {
-      return filteredEvents.filter((e) => e.attendanceStatus !== 'out');
-    }
-    if (categoryFilter === 'out') {
-      return filteredEvents.filter((e) => e.attendanceStatus === 'out');
-    }
-    if (categoryFilter === 'tournaments') {
-      return filteredEvents.filter(isTournamentEvent);
-    }
-    if (categoryFilter === 'matches') {
-      return filteredEvents.filter(isMatchEvent);
-    }
-    if (categoryFilter === 'trainings') {
-      return filteredEvents.filter(isTrainingEvent);
-    }
-    if (categoryFilter === 'other') {
-      return filteredEvents.filter(isOtherEvent);
-    }
-    return filteredEvents;
-  }, [filteredEvents, categoryFilter]);
+    return filteredEvents.filter((e) => {
+      // 1. Attendance axis
+      if (attendanceFilter === 'in' && e.attendanceStatus === 'out') return false;
+      if (attendanceFilter === 'out' && e.attendanceStatus !== 'out') return false;
+
+      // 2. Event type axis
+      if (eventTypeFilter === 'tournaments' && !isTournamentEvent(e)) return false;
+      if (eventTypeFilter === 'matches' && !isMatchEvent(e)) return false;
+      if (eventTypeFilter === 'trainings' && !isTrainingEvent(e)) return false;
+      if (eventTypeFilter === 'other' && !isOtherEvent(e)) return false;
+
+      return true;
+    });
+  }, [filteredEvents, attendanceFilter, eventTypeFilter]);
 
   const nowMs = Date.now();
   const pastEvents = useMemo(
@@ -877,18 +909,17 @@ export const App: React.FC = () => {
     if (!ev) return;
 
     if (decision === 'use_official' && ev.mismatchFlags) {
-      // Adopt only from machine-readable official data — never from a display
-      // string, and never stamp the override when nothing was adopted (M-42/V59).
       const officialIso = ev.mismatchFlags.officialStartTimeIso;
-      if (!officialIso) {
+      const officialVenue = ev.mismatchFlags.officialVenueName;
+      if (!officialIso && !officialVenue) {
         return handleResolveMismatch(eventId, 'keep_calendar');
       }
       const updated: MatchdayEvent = {
         ...ev,
-        startTime: officialIso,
+        startTime: officialIso || ev.startTime,
         venue: {
           ...ev.venue,
-          name: ev.mismatchFlags.officialVenueName || ev.venue.name
+          name: officialVenue || ev.venue.name
         },
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
@@ -900,8 +931,10 @@ export const App: React.FC = () => {
       };
       await db.events.put(updated);
     } else if (decision === 'keep_calendar') {
+      const calendarVenue = ev.mismatchFlags?.calendarVenueName;
       const updated: MatchdayEvent = {
         ...ev,
+        venue: calendarVenue ? { ...ev.venue, name: calendarVenue } : ev.venue,
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
         userOverride: {
@@ -1006,7 +1039,10 @@ export const App: React.FC = () => {
           />
         )}
         {/* Sticky Profile Filter & View Mode Switcher Header */}
-        <div className="sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
+        <div
+          ref={stickyFilterRef}
+          className="sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs"
+        >
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="flex-1 min-w-0">
               <MultiProfileHeader
@@ -1025,7 +1061,7 @@ export const App: React.FC = () => {
             <div
               role="tablist"
               aria-label="Näkymän valitsin"
-              className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto"
+              className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-start"
             >
               <button
                 type="button"
@@ -1033,13 +1069,13 @@ export const App: React.FC = () => {
                 aria-selected={viewMode === 'cards'}
                 onClick={() => setViewMode('cards')}
                 title="Korttinäkymä"
-                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                className={`touch-target min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                   viewMode === 'cards'
                     ? 'bg-pitch text-text-inverse shadow-xs'
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <LayoutList className="w-3.5 h-3.5" />
+                <LayoutList className="w-4 h-4" />
                 <span>Kortit</span>
               </button>
               <button
@@ -1048,13 +1084,13 @@ export const App: React.FC = () => {
                 aria-selected={viewMode === 'timeline'}
                 onClick={() => setViewMode('timeline')}
                 title="Tiivis aikajana"
-                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                className={`touch-target min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                   viewMode === 'timeline'
                     ? 'bg-pitch text-text-inverse shadow-xs'
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <TableProperties className="w-3.5 h-3.5" />
+                <TableProperties className="w-4 h-4" />
                 <span>Tiivis</span>
               </button>
               <button
@@ -1063,122 +1099,144 @@ export const App: React.FC = () => {
                 aria-selected={viewMode === 'calendar'}
                 onClick={() => setViewMode('calendar')}
                 title="Kalenteriruudukko"
-                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                className={`touch-target min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                   viewMode === 'calendar'
                     ? 'bg-pitch text-text-inverse shadow-xs'
                     : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <CalendarIcon className="w-3.5 h-3.5" />
+                <CalendarIcon className="w-4 h-4" />
                 <span>Kalenteri</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Category & Attendance Filters (Kaikki, Osallistuu, Poisjäännit, Turnaukset, Sarjapelit, Treenit, Muu) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('all')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                categoryFilter === 'all'
-                  ? 'bg-pitch text-text-inverse shadow-xs'
-                  : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
-              }`}
-            >
-              <span>Kaikki tapahtumat</span>
-              <span className="text-[10px] opacity-80">({categoryCounts.all})</span>
-            </button>
+          {/* Composable Filters: 2-Axis Clean Facets */}
+          <div className="flex flex-col gap-2 pt-1.5 border-t border-border-subtle/40">
+            {/* Axis 1: Attendance Filter */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-text-muted mr-1 shrink-0">
+                Osallistuminen:
+              </span>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter('all')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                  attendanceFilter === 'all'
+                    ? 'bg-pitch text-text-inverse shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
+                }`}
+              >
+                Kaikki ({filterCounts.all})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter(attendanceFilter === 'in' ? 'all' : 'in')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  attendanceFilter === 'in'
+                    ? 'bg-pitch text-text-inverse shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
+                }`}
+                title="Näytä vain tapahtumat joihin osallistutaan (IN)"
+              >
+                <span>🟢 Osallistuu</span>
+                <span className="text-[10px] opacity-80">({filterCounts.attending})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttendanceFilter(attendanceFilter === 'out' ? 'all' : 'out')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  attendanceFilter === 'out'
+                    ? 'bg-stoppage text-text-inverse shadow-xs'
+                    : filterCounts.out > 0
+                    ? 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
+                    : 'bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle'
+                }`}
+                title="Näytä vain tapahtumat mihin ei osallistuta (Poisjäännit / OUT)"
+              >
+                <span>⛔ Poisjäännit</span>
+                <span className="text-[10px] opacity-80">({filterCounts.out})</span>
+              </button>
+            </div>
 
-            {/* Attendance: Osallistuu (IN) */}
-            <button
-              type="button"
-              onClick={() => setCategoryFilter(categoryFilter === 'attending' ? 'all' : 'attending')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                categoryFilter === 'attending'
-                  ? 'bg-pitch text-text-inverse shadow-xs'
-                  : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
-              }`}
-              title="Näytä vain tapahtumat joihin osallistutaan"
-            >
-              <span>🟢 Osallistuu</span>
-              <span className="text-[10px] opacity-80">({categoryCounts.attending})</span>
-            </button>
+            {/* Axis 2: Event Type Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-text-muted mr-1 shrink-0">
+                Tapahtumat:
+              </span>
+              <button
+                type="button"
+                onClick={() => setEventTypeFilter('all')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                  eventTypeFilter === 'all'
+                    ? 'bg-pitch text-text-inverse shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
+                }`}
+              >
+                Kaikki tyypit
+              </button>
 
-            {/* Attendance: Poisjäännit (OUT) */}
-            <button
-              type="button"
-              onClick={() => setCategoryFilter(categoryFilter === 'out' ? 'all' : 'out')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                categoryFilter === 'out'
-                  ? 'bg-stoppage text-text-inverse shadow-xs'
-                  : categoryCounts.out > 0
-                  ? 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
-                  : 'bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle'
-              }`}
-              title="Näytä tapahtumat mihin ei osallistuta (Poisjäännit)"
-            >
-              <span>⛔ Poisjäännit</span>
-              <span className="text-[10px] opacity-80">({categoryCounts.out})</span>
-            </button>
+              {filterCounts.tournaments > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEventTypeFilter(eventTypeFilter === 'tournaments' ? 'all' : 'tournaments')}
+                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    eventTypeFilter === 'tournaments'
+                      ? 'bg-gold/30 text-gold border border-gold shadow-xs'
+                      : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5 text-gold" />
+                  <span>Turnaukset</span>
+                  <span className="text-[10px] opacity-80">({filterCounts.tournaments})</span>
+                </button>
+              )}
 
-            {categoryCounts.tournaments > 0 && (
-              <button
-                type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'tournaments' ? 'all' : 'tournaments')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'tournaments'
-                    ? 'bg-gold/30 text-gold border border-gold shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
-                }`}
-              >
-                <Trophy className="w-3 h-3 text-gold" />
-                <span>Turnaukset</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.tournaments})</span>
-              </button>
-            )}
-            {categoryCounts.matches > 0 && (
-              <button
-                type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'matches' ? 'all' : 'matches')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'matches'
-                    ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
-                }`}
-              >
-                <span>⚽ Sarjapelit</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.matches})</span>
-              </button>
-            )}
-            {categoryCounts.trainings > 0 && (
-              <button
-                type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'trainings' ? 'all' : 'trainings')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'trainings'
-                    ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
-                }`}
-              >
-                <span>🏃 Treenit</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.trainings})</span>
-              </button>
-            )}
-            {categoryCounts.other > 0 && (
-              <button
-                type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'other' ? 'all' : 'other')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'other'
-                    ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
-                }`}
-              >
-                <span>📋 Muu / Talkoot</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.other})</span>
-              </button>
-            )}
+              {filterCounts.matches > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEventTypeFilter(eventTypeFilter === 'matches' ? 'all' : 'matches')}
+                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    eventTypeFilter === 'matches'
+                      ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
+                      : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
+                  }`}
+                >
+                  <span>⚽ Sarjapelit</span>
+                  <span className="text-[10px] opacity-80">({filterCounts.matches})</span>
+                </button>
+              )}
+
+              {filterCounts.trainings > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEventTypeFilter(eventTypeFilter === 'trainings' ? 'all' : 'trainings')}
+                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    eventTypeFilter === 'trainings'
+                      ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
+                      : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
+                  }`}
+                >
+                  <span>🏃 Treenit</span>
+                  <span className="text-[10px] opacity-80">({filterCounts.trainings})</span>
+                </button>
+              )}
+
+              {filterCounts.other > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEventTypeFilter(eventTypeFilter === 'other' ? 'all' : 'other')}
+                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    eventTypeFilter === 'other'
+                      ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
+                      : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
+                  }`}
+                >
+                  <span>📋 Muu / Talkoot</span>
+                  <span className="text-[10px] opacity-80">({filterCounts.other})</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1224,7 +1282,7 @@ export const App: React.FC = () => {
                   ? activeProfileId.replace('player:', '')
                   : profiles.find((p) => p.id === activeProfileId)?.playerName
               }
-              onEventCreated={() => {}}
+              onEventCreated={() => setActiveProfileId('all')}
             />
 
             {snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
@@ -1288,8 +1346,8 @@ export const App: React.FC = () => {
                     key={dayGroup.dateStr}
                     className="rounded-3xl border border-border-strong/70 bg-surface/60 backdrop-blur-sm p-3.5 sm:p-4.5 flex flex-col gap-3.5 shadow-sm"
                   >
-                    {/* Day Section Header (Inside the Day Container) */}
-                    <div className="pb-2.5 border-b border-border-subtle flex items-center justify-between">
+                    {/* Day Section Header (Sticky inside the Day Container) */}
+                    <div className="sticky top-[var(--sticky-filter-height,112px)] z-10 -mx-3.5 -mt-3.5 px-3.5 pt-3.5 pb-2.5 sm:-mx-4.5 sm:-mt-4.5 sm:px-4.5 sm:pt-4.5 bg-surface/95 backdrop-blur-md border-b border-border-subtle rounded-t-3xl flex items-center justify-between shadow-xs transition-all">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 rounded-xl bg-pitch/15 text-pitch">
                           <CalendarIcon className="w-4 h-4" />
@@ -1314,25 +1372,28 @@ export const App: React.FC = () => {
                             <HeroMatchCard
                               key={event.id}
                               event={event}
-                              allEvents={rawEvents}
+                              allEvents={allStitchedEvents}
                               profile={snapshot.nextPlayer || profile}
                               kit={snapshot.kitByEventId[event.id]}
                               conflicts={snapshot.conflicts}
                               homeLocation={homeLocation}
                               onOpenHomeModal={() => setIsHomeLocationOpen(true)}
                               onNavigate={() => {
-                                const coords = event.parking?.coordinates || event.venue?.coordinates;
-                                const destination =
-                                  coords?.lat != null && coords?.lng != null
-                                    ? `${coords.lat},${coords.lng}`
-                                    : encodeURIComponent(event.venue?.name || 'Kenttä');
-                                window.open(
-                                  `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                                  '_blank',
-                                  'noopener,noreferrer'
-                                );
-                              }}
+                                  const isApprox = event.venue?.isApproximateLocation;
+                                  const coords = event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined);
+                                  const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                                  const destination =
+                                    hasValidCoords
+                                      ? `${coords.lat},${coords.lng}`
+                                      : encodeURIComponent(event.venue?.name || 'Kenttä');
+                                  window.open(
+                                    `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+                                    '_blank',
+                                    'noopener,noreferrer'
+                                  );
+                                }}
                               onOpenStats={() => setSelectedStatsEvent(event)}
+                              onResolveMismatch={handleResolveMismatch}
                               onEventUpdated={handleEventUpdated}
                               onEventMerged={handleEventUpdated}
                               onEventDeleted={async (deletedId) => {
@@ -1349,7 +1410,7 @@ export const App: React.FC = () => {
                           <MatchdayCard
                             key={event.id}
                             event={event}
-                            allEvents={rawEvents}
+                            allEvents={allStitchedEvents}
                             playerName={profile?.playerName}
                             colorHex={profile?.colorHex}
                             profile={profile}
@@ -1431,9 +1492,11 @@ export const App: React.FC = () => {
               onSelectEvent={(ev) => setSelectedStatsEvent(ev)}
               onClearFilter={() => setActiveProfileId('all')}
               onNavigate={(ev) => {
-                const coords = ev.parking?.coordinates || ev.venue?.coordinates;
+                const isApprox = ev.venue?.isApproximateLocation;
+                const coords = ev.parking?.coordinates || (!isApprox ? ev.venue?.coordinates : undefined);
+                const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
                 const destination =
-                  coords?.lat != null && coords?.lng != null
+                  hasValidCoords
                     ? `${coords.lat},${coords.lng}`
                     : encodeURIComponent(ev.venue?.name || 'Kenttä');
                 window.open(
@@ -1470,7 +1533,7 @@ export const App: React.FC = () => {
       <FamilyLogisticsModal
         isOpen={isLogisticsOpen}
         onClose={() => setIsLogisticsOpen(false)}
-        events={rawEvents}
+        events={allStitchedEvents}
         profiles={profiles}
         homeLocation={homeLocation}
         onOpenHomeModal={() => {
@@ -1506,7 +1569,7 @@ export const App: React.FC = () => {
       <AskCopilotModal
         isOpen={isAskCopilotOpen}
         onClose={() => setIsAskCopilotOpen(false)}
-        events={rawEvents}
+        events={allStitchedEvents}
         profiles={profiles}
       />
 
@@ -1541,14 +1604,14 @@ export const App: React.FC = () => {
         isOpen={isFamilyShareOpen}
         onClose={() => setIsFamilyShareOpen(false)}
         profiles={profiles}
-        onDataImported={() => {}}
+        onDataImported={() => setActiveProfileId('all')}
       />
 
       {/* Live Family Calendar Subscription Modal (webcal://) */}
       <FamilyCalendarModal
         isOpen={isCalendarModalOpen}
         onClose={() => setIsCalendarModalOpen(false)}
-        events={rawEvents}
+        events={allStitchedEvents}
         profiles={profiles}
       />
 

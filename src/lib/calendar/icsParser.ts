@@ -483,10 +483,10 @@ export function extractFeedCategories(icsContent: string): FeedCategory[] {
       const fullText = `${summary} ${description}`;
 
       // Match [Kilpa], [Haastaja], (Kilpa), (Haastaja), [Sininen], [Valkoinen], etc.
-      const bracketMatches = fullText.match(/\[([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\]|\(([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\)/g);
+      const bracketMatches = fullText.match(/\[([A-Za-z0-9äöåÄÖÅ\s-]{2,25})\]|\(([A-Za-z0-9äöåÄÖÅ\s-]{2,25})\)/g);
       if (bracketMatches) {
         for (const bm of bracketMatches) {
-          const inner = bm.replace(/[\[\]\(\)]/g, '').trim();
+          const inner = bm.replace(/[[\]()]/g, '').trim();
           if (
             /kilpa|haastaja|harraste|edustus|musta|valkoinen|sininen|keltainen|punainen|oranssi|treenit|pelit|turnaus/i.test(
               inner

@@ -25,7 +25,7 @@ export interface ExtractedSportsEvent {
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[,\.;:!\?]/g, ' ')
+    .replace(/[,.;:!?]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -105,11 +105,14 @@ export function extractTimesFromFinnishText(text: string): {
     warmup = `${hh}:${mm}`;
   }
 
+  // Strip warmup text so warmup time is not erroneously matched as kickoff
+  const kickoffSearchText = warmupMatch ? norm.replace(warmupMatch[0], ' ') : norm;
+
   // Pattern: "klo 15:00", "klo 15.00 - 16.30", "15:00 alkaen", "ottelu klo 15:00"
   let kickoff = '';
   let end = '';
 
-  const rangeMatch = norm.match(
+  const rangeMatch = kickoffSearchText.match(
     /(?:klo|kello)?\s*(\d{1,2})[:.](\d{2})\s*(?:-|–|klo)?\s*(\d{1,2})[:.](\d{2})/i
   );
   if (rangeMatch && rangeMatch[1] && rangeMatch[2] && rangeMatch[3] && rangeMatch[4]) {
@@ -120,7 +123,7 @@ export function extractTimesFromFinnishText(text: string): {
     kickoff = `${h1}:${m1}`;
     end = `${h2}:${m2}`;
   } else {
-    const singleTimeMatch = norm.match(/(?:klo|kello|klo:)?\s*(\d{1,2})[:.](\d{2})/i);
+    const singleTimeMatch = kickoffSearchText.match(/(?:klo|kello|klo:)?\s*(\d{1,2})[:.](\d{2})/i);
     if (singleTimeMatch && singleTimeMatch[1] && singleTimeMatch[2]) {
       const hh = singleTimeMatch[1].padStart(2, '0');
       const mm = singleTimeMatch[2];
@@ -137,17 +140,6 @@ export function extractTimesFromFinnishText(text: string): {
     const m = Number(mStr);
     const endH = ((h + 1) % 24).toString().padStart(2, '0');
     end = `${endH}:${m.toString().padStart(2, '0')}`;
-  }
-
-  if (!warmup) {
-    const [hStr = '15', mStr = '00'] = kickoff.split(':');
-    const h = Number(hStr);
-    const m = Number(mStr);
-    let totalMins = h * 60 + m - 45;
-    if (totalMins < 0) totalMins += 24 * 60;
-    const wH = Math.floor(totalMins / 60).toString().padStart(2, '0');
-    const wM = (totalMins % 60).toString().padStart(2, '0');
-    warmup = `${wH}:${wM}`;
   }
 
   return { kickoff, warmup, end };
@@ -709,6 +701,15 @@ function parseSingleFreeformBlock(
   // For school and non-sport events, warmupTime defaults to kickoffTime (no 45min warmup)
   if (isSchool || isOtherEvent || eventType === 'meeting') {
     times.warmup = times.kickoff;
+  } else if (!times.warmup && times.kickoff) {
+    const [hStr = '15', mStr = '00'] = times.kickoff.split(':');
+    const h = Number(hStr);
+    const m = Number(mStr);
+    let totalMins = h * 60 + m - 45;
+    if (totalMins < 0) totalMins += 24 * 60;
+    const wH = Math.floor(totalMins / 60).toString().padStart(2, '0');
+    const wM = (totalMins % 60).toString().padStart(2, '0');
+    times.warmup = `${wH}:${wM}`;
   }
 
   // 5. Venue

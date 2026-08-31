@@ -7,8 +7,7 @@ import {
   Pause,
   RotateCcw,
   Sparkles,
-  Info,
-  MapPin
+  Info
 } from 'lucide-react';
 import { Coordinates } from '../types/matchday';
 import {
@@ -71,17 +70,18 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
-
+  const hasValidCoords = coordinates && (coordinates.lat !== 0 || coordinates.lng !== 0);
+  const targetCoords = hasValidCoords ? coordinates : { lat: 60.1872, lng: 24.9248 };
   const currentFrame = frames[currentFrameIndex] || frames[frames.length - 1] || { label: 'Nyt', date: new Date() };
   const layerInfo = WEATHER_IMAGERY_LAYERS[selectedLayer];
-  const imageUrl = buildImageryUrl(selectedLayer, coordinates, currentFrame.date);
+  const imageUrl = hasValidCoords ? buildImageryUrl(selectedLayer, targetCoords, currentFrame.date) : '';
 
   // OSM base map for backdrop
   const delta = 0.45;
-  const minLat = coordinates.lat - delta;
-  const maxLat = coordinates.lat + delta;
-  const minLng = coordinates.lng - (delta * 1.8);
-  const maxLng = coordinates.lng + (delta * 1.8);
+  const minLat = targetCoords.lat - delta;
+  const maxLat = targetCoords.lat + delta;
+  const minLng = targetCoords.lng - (delta * 1.8);
+  const maxLng = targetCoords.lng + (delta * 1.8);
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${minLng},${minLat},${maxLng},${maxLat}&layer=mapnik`;
 
   return (
@@ -118,25 +118,30 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
                     Tuore data ({layerInfo.refreshIntervalMinutes} min)
                   </span>
                 </h3>
-                <p className="text-xs text-text-muted flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-pitch" />
-                  <span className="truncate max-w-[260px]">{venueName}</span>
+                <p className="text-xs text-text-secondary">
+                  {venueName} {hasValidCoords ? `(${coordinates.lat.toFixed(3)}, ${coordinates.lng.toFixed(3)})` : '(Sijainti tuntematon)'}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-elevated cursor-pointer"
+              className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-elevated cursor-pointer transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
+          {!hasValidCoords && (
+            <div className="p-3.5 rounded-2xl bg-whistle/10 border border-whistle/25 text-whistle text-xs font-semibold flex items-center gap-2">
+              <span>⚠️ Kentän sijaintia ei ole vielä vahvistettu (LIPAS tai oma kiinnitys). Tutkakuva näyttää yleisnäkymän.</span>
+            </div>
+          )}
+
           {/* Layer Selector Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             {(
               [
-                { id: 'fmi_rain_radar', label: '🌧️ FMI Sadetutka' },
+                { id: 'fmi_rain_radar', label: '🌧️ FMI Sadetutka (5 min)' },
                 { id: 'eumetsat_fog', label: '🛰️ EUMETSAT Sumu & Pilvi' },
                 { id: 'eumetsat_natural', label: '☁️ EUMETSAT Luonnollinen' },
                 { id: 'fmi_lightning', label: '⚡ FMI Salamatutka' }
@@ -175,26 +180,29 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
             />
 
             {/* Live Weather Overlay Image */}
-            <img
-              src={imageUrl}
-              alt={layerInfo.title}
-              key={`${selectedLayer}-${currentFrameIndex}`}
-              className="absolute inset-0 w-full h-full object-cover mix-blend-multiply dark:mix-blend-screen transition-opacity duration-200"
-              onError={(e) => {
-                // Fallback styling for demo / test
-                e.currentTarget.style.opacity = '0.7';
-              }}
-            />
+            {hasValidCoords && imageUrl && (
+              <img
+                src={imageUrl}
+                alt={layerInfo.title}
+                key={`${selectedLayer}-${currentFrameIndex}`}
+                className="absolute inset-0 w-full h-full object-cover mix-blend-multiply dark:mix-blend-screen transition-opacity duration-200"
+                onError={(e) => {
+                  e.currentTarget.style.opacity = '0.7';
+                }}
+              />
+            )}
 
-            {/* Pitch Target Crosshair */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="relative">
-                <div className="h-6 w-6 rounded-full border-2 border-pitch bg-pitch/30 animate-ping absolute -inset-0" />
-                <div className="h-6 w-6 rounded-full border-2 border-pitch bg-pitch/60 flex items-center justify-center text-[10px] text-text-inverse font-bold shadow-lg">
-                  ⚽
+            {/* Pitch Target Crosshair - only for verified venues */}
+            {hasValidCoords && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="relative">
+                  <div className="h-6 w-6 rounded-full border-2 border-pitch bg-pitch/30 animate-ping absolute -inset-0" />
+                  <div className="h-6 w-6 rounded-full border-2 border-pitch bg-pitch/60 flex items-center justify-center text-[10px] text-text-inverse font-bold shadow-lg">
+                    ⚽
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Active Timestamp Badge */}
             <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-canvas/90 backdrop-blur-md border border-border-subtle text-xs font-semibold text-text-primary flex items-center gap-2">

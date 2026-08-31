@@ -174,18 +174,21 @@ export function generateMatchdayBriefing(
 
   // 1. Conflict Detection across family profiles
   let conflictWarning: string | undefined;
-  const eventStart = new Date(event.startTime).getTime();
-  const eventEnd = new Date(event.endTime).getTime();
+  if (event.attendanceStatus !== 'out' && !event.isHidden) {
+    const eventStart = new Date(event.startTime).getTime();
+    const eventEnd = new Date(event.endTime).getTime();
 
-  const overlapping = allDayEvents.filter((other) => {
-    if (other.id === event.id) return false;
-    const otherStart = new Date(other.startTime).getTime();
-    const otherEnd = new Date(other.endTime).getTime();
-    return eventStart < otherEnd && eventEnd > otherStart;
-  });
+    const overlapping = allDayEvents.filter((other) => {
+      if (other.id === event.id) return false;
+      if (other.attendanceStatus === 'out' || other.isHidden) return false;
+      const otherStart = new Date(other.startTime).getTime();
+      const otherEnd = new Date(other.endTime).getTime();
+      return eventStart < otherEnd && eventEnd > otherStart;
+    });
 
-  if (overlapping.length > 0 && overlapping[0]) {
-    conflictWarning = `⚠️ AIKATAULURUUHKI: Menee päällekkäin tapahtuman "${overlapping[0].title}" kanssa!`;
+    if (overlapping.length > 0 && overlapping[0]) {
+      conflictWarning = `⚠️ AIKATAULURUUHKI: Menee päällekkäin tapahtuman "${overlapping[0].title}" kanssa!`;
+    }
   }
 
   // 2. Footwear & Gear Advice

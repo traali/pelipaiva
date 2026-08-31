@@ -1,6 +1,7 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { ExtractedSportsEvent, parseFreeformSportsMessage, parseMultipleSportsMessages } from './messageParserNLP';
-import { parsePastedSpreadsheetText } from './tableAndExcelParser';
+import { parsePastedSpreadsheetText, parseExcelFileBuffer } from './tableAndExcelParser';
+import { parseScheduleImage, type OcrProgressCallback } from './ocrImageParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
@@ -172,9 +173,10 @@ export function queryFamilySchedule(
     return firstName && firstName.length >= 3 && norm.includes(firstName);
   }) || profiles.find((p) => p.playerName && norm.includes(p.playerName.toLowerCase()));
 
+  const activeEvents = events.filter((e) => !e.isHidden && e.attendanceStatus !== 'out');
   const scopedEvents = namedProfile
-    ? events.filter((e) => e.profileId === namedProfile.id)
-    : events;
+    ? activeEvents.filter((e) => e.profileId === namedProfile.id)
+    : activeEvents;
 
   if (
     norm.includes('kyyti') ||
@@ -341,24 +343,8 @@ export async function queryFamilyScheduleWithLLM(
 export {
   parseFreeformSportsMessage,
   parseMultipleSportsMessages,
-  parsePastedSpreadsheetText
+  parsePastedSpreadsheetText,
+  parseExcelFileBuffer,
+  parseScheduleImage,
+  type OcrProgressCallback
 };
-
-export async function parseExcelFileBuffer(
-  buffer: ArrayBuffer,
-  sport: Parameters<typeof import('./tableAndExcelParser').parseExcelFileBuffer>[1] = 'football',
-  defaultPlayer = 'Maija'
-) {
-  const mod = await import('./tableAndExcelParser');
-  return mod.parseExcelFileBuffer(buffer, sport, defaultPlayer);
-}
-
-export async function parseScheduleImage(
-  imageSource: File | Blob | string,
-  sport: Parameters<typeof import('./ocrImageParser').parseScheduleImage>[1] = 'football',
-  defaultPlayer = 'Maija',
-  onProgress?: import('./ocrImageParser').OcrProgressCallback
-) {
-  const mod = await import('./ocrImageParser');
-  return mod.parseScheduleImage(imageSource, sport, defaultPlayer, onProgress);
-}

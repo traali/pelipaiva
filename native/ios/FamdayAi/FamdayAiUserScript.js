@@ -25,7 +25,28 @@
       window.webkit.messageHandlers.famdayAi.postMessage(body);
     });
   }
+  function syncStorageToNative() {
+    try {
+      var choice = localStorage.getItem('pelipaiva_ondevice_llm') || 'off';
+      call('syncChoice', { choice: choice });
+    } catch (e) {}
+  }
+
+  // Initial sync & listen for storage changes
+  syncStorageToNative();
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'pelipaiva_ondevice_llm') {
+        syncStorageToNative();
+      }
+    });
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncStorageToNative);
+    }
+  }
+
   window.FamdayNativeAi = {
+    syncChoice: function (choice) { return call('syncChoice', { choice: choice }); },
     availability: function () { return call('availability'); },
     engine: function () { return call('engine'); },
     prompt: function (system, user) { return call('prompt', { system: system, user: user }); },

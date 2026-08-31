@@ -68,7 +68,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveError('Kuvasta ei löytynyt luettavaa tekstiä.');
         setTimeout(() => setSaveError(''), 4000);
       }
-    } catch (err: any) {
+    } catch {
       setSaveError('Kuvan lukeminen epäonnistui.');
       setTimeout(() => setSaveError(''), 4000);
     } finally {

@@ -1,0 +1,19 @@
+# Lefthook - Fast Git hooks manager for Pelipäivä
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: false
+  commands:
+    oxlint:
+      run: npx oxlint {staged_files}
+      glob: "*.{ts,tsx,js,jsx}"
+      stage_fixed: true
+    eslint:
+      run: npx eslint {staged_files}
+      glob: "*.{ts,tsx,js,jsx}"
+
+pre-push:
+  parallel: false
+  commands:
+    monastery-visit:
+      run: npm run visit

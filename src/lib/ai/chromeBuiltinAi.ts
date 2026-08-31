@@ -1,7 +1,7 @@
 import { ExtractedSportsEvent, parseFreeformSportsMessage } from './messageParserNLP';
 import { SportType, EventType } from '../../types/matchday';
 import { isOnDeviceLlmEnabled, getOnDeviceLlmChoice } from './onDeviceLlmPrefs';
-import type { NeuralEngineId } from './onDeviceLlm';
+import { createOnDeviceLanguageSession, type NeuralEngineId } from './onDeviceLlm';
 export type { NeuralEngineId };
 
 export interface ChromeAiCapabilities {
@@ -323,7 +323,6 @@ export async function parseSportsMessageHybrid(
   }
 
   try {
-    const { createOnDeviceLanguageSession } = await import('./onDeviceLlm');
     const boxed = await createOnDeviceLanguageSession(buildContextAwareSystemPrompt(context));
     if (boxed && boxed.engine !== 'chrome_gemini_nano') {
       const raw = await boxed.session.prompt(

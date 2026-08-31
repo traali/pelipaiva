@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
   Clock,
@@ -9,6 +9,8 @@ import {
   Share2,
   BarChart3,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Trophy,
   Dumbbell,
   Star,
@@ -32,7 +34,7 @@ import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
 import { resolveTransitPlan } from '../lib/geo/transitEngine';
 import type { HomeLocation } from '../types/matchday';
-import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
+import { useDismissedConflicts, groupActiveConflicts } from '../lib/agents/conflictDismissal';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return 'Sisähalli';
@@ -103,13 +105,29 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
   const { isDismissed, dismiss: dismissConflict, restore: restoreConflict } = useDismissedConflicts();
   const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
+  const [isOutExpanded, setIsOutExpanded] = useState(false);
 
-  const rawConflicts = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
-  const relatedConflicts = Array.from(
-    new Map(rawConflicts.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
+  const { activeConflicts, dismissedConflicts } = useMemo(() => {
+    const raw = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
+    const related = Array.from(
+      new Map(raw.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
+    );
+    const active = related.filter((c) => !isDismissed(c));
+    const dismissed = related.filter((c) => isDismissed(c));
+    return {
+      rawConflicts: raw,
+      relatedConflicts: related,
+      activeConflicts: active,
+      dismissedConflicts: dismissed
+    };
+  }, [conflicts, event.id, isDismissed]);
+
+  const consolidatedConflictGroups = useMemo(() => groupActiveConflicts(activeConflicts), [activeConflicts]);
+
+  const transitPlan = useMemo(
+    () => event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather),
+    [event.transit, homeLocation, event.venue?.coordinates, event.weather]
   );
-  const activeConflicts = relatedConflicts.filter((c) => !isDismissed(c));
-  const dismissedConflicts = relatedConflicts.filter((c) => isDismissed(c));
 
   const venue = isVenueModalOpen ? localVenue : event.venue;
   const isLive =
@@ -187,6 +205,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
   const handleToggleAttendance = async (newStatus: 'in' | 'out') => {
     try {
+      setIsOutExpanded(false);
       const updated: MatchdayEvent = {
         ...event,
         attendanceStatus: newStatus
@@ -197,6 +216,62 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
       console.error('Failed to toggle attendance', err);
     }
   };
+
+  if (isOut && !isOutExpanded) {
+    return (
+      <motion.div
+        layout
+        transition={springTactile.squishy}
+        className="liquid-glass relative overflow-hidden rounded-2xl border border-dashed border-border-strong/60 bg-surface/30 opacity-80 hover:opacity-100 transition-all p-3 pl-4 flex items-center justify-between gap-3 shadow-xs"
+      >
+        {colorHex && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-0 h-full w-1.5"
+            style={{ backgroundColor: colorHex }}
+          />
+        )}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
+          <span className="text-xs font-black text-stoppage bg-stoppage/15 px-2 py-0.5 rounded-md shrink-0 flex items-center gap-1">
+            <span>⛔</span>
+            <span className="hidden sm:inline">{playerName || 'Pelaaja'} ei osallistu</span>
+            <span className="sm:hidden">Poisjäänti</span>
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <span className="text-xs font-semibold text-text-muted line-through truncate block">
+              {isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
+            </span>
+            <span className="text-[11px] text-text-muted/80 truncate block">
+              klo {formattedKickoff} • {venue?.name || 'Kenttä'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => handleToggleAttendance('in')}
+            className="touch-target min-h-[44px] px-3.5 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold shadow-xs hover:brightness-110 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+            title="Merkitse pelaaja osallistuvaksi"
+          >
+            <span>↩️</span>
+            <span>Osallistuu silti</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsOutExpanded(true)}
+            className="touch-target min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-elevated cursor-pointer transition-all"
+            title="Näytä tapahtuman lisätiedot"
+            aria-label="Näytä tapahtuman lisätiedot"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <>
@@ -227,18 +302,30 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <span>⛔</span>
               <span>{playerName || 'Pelaaja'} ei osallistu (Poisjäänti merkitty)</span>
             </div>
-            <button
-              type="button"
-              onClick={() => handleToggleAttendance('in')}
-              className="px-3 py-1 rounded-xl bg-pitch text-text-inverse text-xs font-bold shadow-xs hover:brightness-110 cursor-pointer transition-all active:scale-95"
-            >
-              ↩️ Osallistuu silti
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleToggleAttendance('in')}
+                className="touch-target min-h-[44px] px-3.5 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold shadow-xs hover:brightness-110 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+              >
+                <span>↩️</span>
+                <span>Osallistuu silti</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOutExpanded(false)}
+                className="touch-target min-h-[44px] px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-text-primary text-xs font-semibold border border-border-subtle cursor-pointer transition-all flex items-center gap-1"
+                title="Pienennä kortti"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                <span>Pienennä</span>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Conflict Warning Banner */}
-        {event.briefing?.conflictWarning && (
+        {/* Conflict Warning Banner (only if no detailed conflict cards exist) */}
+        {!isOut && event.briefing?.conflictWarning && consolidatedConflictGroups.length === 0 && (
           <div className="mb-4 flex items-center gap-2 p-2.5 rounded-xl bg-whistle/15 border border-whistle/30 text-whistle text-xs font-semibold">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{event.briefing.conflictWarning}</span>
@@ -246,7 +333,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         )}
 
         {/* Schedule / Venue Mismatch Warning & 1-Tap Resolution Banner */}
-        {event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
+        {!isOut && event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
           <div className="mb-4 p-3.5 rounded-2xl bg-whistle/15 border border-whistle/30 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-whistle text-xs font-bold">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -260,14 +347,14 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <button
                 type="button"
                 onClick={() => onResolveMismatch?.(event.id, 'use_official')}
-                className="px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[11px] font-bold shadow-sm shadow-pitch/20 hover:brightness-110 cursor-pointer"
+                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[11px] font-bold shadow-sm shadow-pitch/20 hover:brightness-110 cursor-pointer"
               >
                 Päivitä liiton tietoon
               </button>
               <button
                 type="button"
                 onClick={() => onResolveMismatch?.(event.id, 'keep_calendar')}
-                className="px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer"
+                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer"
               >
                 Säilytä oma merkintä
               </button>
@@ -276,7 +363,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         )}
 
         {/* Lightning Danger Alert Banner */}
-        {event.lightning && event.lightning.status === 'danger' && (
+        {!isOut && event.lightning && event.lightning.status === 'danger' && (
           <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold animate-pulse">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{event.lightning.alertMessage}</span>
@@ -375,16 +462,26 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <button
                 type="button"
                 onClick={() => handleToggleAttendance('out')}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
-                title={`Merkitse poisjäänti: ${playerName || 'Pelaaja'} ei mene`}
-                aria-label={`Merkitse poisjäänti: ${playerName || 'Pelaaja'} ei mene`}
+                className="touch-target min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-pitch/15 text-pitch hover:bg-stoppage/15 hover:text-stoppage hover:border-stoppage/40 border border-pitch/30 transition-all cursor-pointer hover:brightness-110 active:scale-95 group"
+                title={`Pelaaja on tulossa. Klikkaa ilmoittaaksesi poisjäänti.`}
+                aria-label={`Pelaaja osallistuu. Klikkaa ilmoittaaksesi poisjäänti.`}
               >
-                <span>⛔ {playerName || 'Pelaaja'} ei mene</span>
+                <span className="h-2 w-2 rounded-full bg-pitch group-hover:bg-stoppage shrink-0" />
+                <span className="group-hover:hidden">🟢 {playerName || 'Pelaaja'} osallistuu</span>
+                <span className="hidden group-hover:inline">⛔ Ilmoita poisjäänti</span>
               </button>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-stoppage/15 text-stoppage border border-stoppage/30">
-                <span>⛔ Poisjäänti (OUT)</span>
-              </span>
+              <button
+                type="button"
+                onClick={() => handleToggleAttendance('in')}
+                className="touch-target min-h-[44px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-stoppage/15 text-stoppage hover:bg-pitch/15 hover:text-pitch hover:border-pitch/30 border border-stoppage/30 transition-all cursor-pointer hover:brightness-110 active:scale-95 group"
+                title={`Poisjäänti merkitty. Klikkaa merkitäksesi osallistuvaksi.`}
+                aria-label={`Poisjäänti merkitty. Klikkaa merkitäksesi osallistuvaksi.`}
+              >
+                <span className="h-2 w-2 rounded-full bg-stoppage group-hover:bg-pitch shrink-0" />
+                <span className="group-hover:hidden">⛔ Poisjäänti (OUT)</span>
+                <span className="hidden group-hover:inline">↩️ Osallistuu silti</span>
+              </button>
             )}
           </div>
 
@@ -486,7 +583,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             <span className="truncate">
               {venue.name}
               {event.venue.isApproximateLocation && (
-                <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti arvioitu)</span>
+                <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti tuntematon)</span>
               )}
             </span>
             <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
@@ -503,48 +600,67 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         </div>
 
-        {/* Overlap & Driving Buffer Conflict Warning Banner */}
-        {activeConflicts.length > 0 && (
-          <div className="mb-4 flex flex-col gap-2">
-            {activeConflicts.map((c) => (
+        {/* Overlap & Driving Buffer Conflict Warning Banner (Consolidated) */}
+        {!isOut && consolidatedConflictGroups.length > 0 && (
+          <div className="mb-4 flex flex-col gap-2.5">
+            {consolidatedConflictGroups.map((group) => (
               <div
-                key={c.id}
+                key={group.id}
                 role="alert"
-                className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs ${
-                  c.severity === 'critical'
+                className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs ${
+                  group.severity === 'critical'
                     ? 'bg-stoppage/15 border-stoppage/35 text-stoppage'
+                    : group.severity === 'info'
+                    ? 'bg-pitch/15 border-pitch/35 text-pitch'
                     : 'bg-whistle/15 border-whistle/35 text-whistle'
                 }`}
               >
                 <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${group.severity === 'info' ? 'text-pitch' : ''}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-extrabold flex items-center justify-between gap-1">
-                      <span>
-                        {c.overlapMinutes > 0
-                          ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                          : '🚗 Tiukka siirtymä / Ajoaika'}
-                      </span>
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
-                        ~{c.travelMinutesEstimate} min ajo
-                      </span>
+                      <span>{group.severity === 'info' ? group.title : `⚠️ ${group.title}`}</span>
+                      {group.severity !== 'info' && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
+                          ~{group.maxTravel} min ajo
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 leading-snug font-medium text-text-primary dark:text-text-primary">
-                      {c.message}
+                      {group.message}
                     </p>
-                    <p className="mt-1 text-[11px] font-bold opacity-90">
-                      💡 {c.suggestedFix}
+
+                    {/* Sub-items breakdown if multi-match */}
+                    {group.subItems.length > 0 && (
+                      <div className="mt-2 pl-2 border-l-2 border-current/30 flex flex-col gap-1 text-[11px] font-medium text-text-secondary dark:text-text-secondary">
+                        {group.subItems.map((sub, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                            <span>•</span>
+                            <span className="font-bold">{sub.venueA !== sub.venueB ? `${sub.venueA} & ${sub.venueB}` : sub.venueA}</span>
+                            <span>— päällekkäin {sub.overlap} min</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="mt-1.5 text-[11px] font-bold opacity-90">
+                      💡 {group.suggestedFix}
                     </p>
                   </div>
                 </div>
+
                 <button
                   type="button"
-                  onClick={() => dismissConflict(c)}
-                  className="self-end sm:self-center px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-[11px] font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
-                  title="Merkitse tämä huomio hoidetuksi ja piilota se molemmilta pelaajilta"
+                  onClick={() => {
+                    for (const c of group.conflicts) {
+                      dismissConflict(c);
+                    }
+                  }}
+                  className="touch-target min-h-[44px] self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1.5"
+                  title="Merkitse kaikki tämän ryhmän huomiot hoidetuiksi"
                 >
                   <span>✓</span>
-                  <span>Kuittaa hoidetuksi</span>
+                  <span>{group.conflicts.length > 1 ? 'Kuittaa kaikki hoidetuksi' : 'Kuittaa hoidetuksi'}</span>
                 </button>
               </div>
             ))}
@@ -557,25 +673,26 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             <button
               type="button"
               onClick={() => setShowDismissedConflicts(!showDismissedConflicts)}
-              className="text-[11px] font-semibold text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer transition-colors py-1 self-start"
+              className="touch-target min-h-[44px] text-xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer transition-colors py-1 self-start"
             >
               <span>👁️</span>
               <span>{showDismissedConflicts ? 'Piilota kuitatut huomiot' : `Näytä kuitatut huomiot (${dismissedConflicts.length})`}</span>
             </button>
             {showDismissedConflicts && (
-              <div className="flex flex-col gap-1.5 pl-2.5 border-l-2 border-border-subtle">
+              <div className="flex flex-col gap-2 pl-2.5 border-l-2 border-border-subtle">
                 {dismissedConflicts.map((dc) => (
                   <div
                     key={dc.id}
-                    className="p-2 rounded-lg bg-surface/60 border border-border-subtle text-[11px] text-text-muted flex items-center justify-between gap-2"
+                    className="p-2.5 rounded-xl bg-surface/60 border border-border-subtle text-xs text-text-muted flex items-center justify-between gap-3 flex-wrap"
                   >
-                    <span className="line-through truncate">{dc.message}</span>
+                    <span className="line-through truncate flex-1 min-w-[200px]">{dc.message}</span>
                     <button
                       type="button"
                       onClick={() => restoreConflict(dc)}
-                      className="text-[10px] font-bold text-pitch hover:underline shrink-0 cursor-pointer"
+                      className="touch-target min-h-[44px] px-3 py-1.5 rounded-xl bg-surface-elevated text-xs font-bold text-pitch hover:border-pitch/40 border border-border-subtle inline-flex items-center gap-1 shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
                     >
-                      ↩️ Palauta huomio
+                      <span>↩️</span>
+                      <span>Palauta huomio</span>
                     </button>
                   </div>
                 ))}
@@ -676,15 +793,21 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         )}
 
-        {/* Bento Sub-Cards: Nappisvahti & Parking */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+        {/* Bento Sub-Cards: Nappisvahti & Parking (compact parking when walking/cycling) */}
+        <div className={`grid gap-3 mb-5 ${transitPlan?.isSelfTransit ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
           {event.briefing && (
             <NappisvahtiPill
               footwear={event.briefing.gearAndPackingAdvice.footwear}
               reason={event.briefing.gearAndPackingAdvice.footwearReason}
             />
           )}
-          {event.parking && <ParkingEaseBadge parking={event.parking} venueName={event.venue.name} />}
+          {event.parking && (
+            <ParkingEaseBadge
+              parking={event.parking}
+              venueName={event.venue.name}
+              compact={transitPlan?.isSelfTransit}
+            />
+          )}
         </div>
 
         {!compact && event.briefing && (
@@ -775,12 +898,18 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 onClick={
                   onNavigateToVenue ||
                   (() => {
-                    const targetCoords = event.parking?.coordinates || event.venue?.coordinates;
+                    const isApprox = event.venue?.isApproximateLocation;
+                    const isSelfTransit = transitPlan?.isSelfTransit;
+                    const targetCoords = isSelfTransit
+                      ? (!isApprox ? event.venue?.coordinates : undefined)
+                      : (event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined));
+                    const hasValidCoords = targetCoords && (targetCoords.lat !== 0 || targetCoords.lng !== 0);
                     const destination =
-                      targetCoords?.lat != null && targetCoords?.lng != null
+                      hasValidCoords
                         ? `${targetCoords.lat},${targetCoords.lng}`
                         : encodeURIComponent(event.venue?.name || 'Kenttä');
-                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+                    const travelModeParam = transitPlan?.mode === 'walk' ? '&travelmode=walking' : transitPlan?.mode === 'bicycle' ? '&travelmode=bicycling' : '';
+                    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}${travelModeParam}`;
                     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
                   })
                 }
@@ -788,7 +917,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
               >
                 <Navigation className="w-3.5 h-3.5" />
-                <span>Navigoi paikalle</span>
+                <span>
+                  {transitPlan?.mode === 'walk'
+                    ? `Kävele paikalle (${transitPlan.travelMinutes} min)`
+                    : transitPlan?.mode === 'bicycle'
+                      ? `Pyöräile paikalle (${transitPlan.travelMinutes} min)`
+                      : 'Navigoi paikalle'}
+                </span>
               </motion.button>
             )}
           </div>

@@ -700,6 +700,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
           <div className="flex flex-col gap-3">
             {selectedDayEvents.map((ev) => {
               const profile = profileMap.get(ev.profileId);
+              const isOut = ev.attendanceStatus === 'out';
               const timeStr = `${formatFiTime(ev.startTime)} – ${formatFiTime(ev.endTime)}`;
 
               return (
@@ -708,7 +709,11 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                   onClick={() => {
                     if (onSelectEvent && !ev.isTraining) onSelectEvent(ev);
                   }}
-                  className={`p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5 relative overflow-hidden transition-all ${
+                  className={`p-4 rounded-2xl ${
+                    isOut
+                      ? 'bg-surface/40 border-dashed border-border-strong/60 opacity-65 grayscale-20'
+                      : 'bg-surface-elevated border border-border-strong'
+                  } flex flex-col gap-2.5 relative overflow-hidden transition-all ${
                     !ev.isTraining ? 'hover:border-pitch cursor-pointer' : ''
                   }`}
                 >
@@ -734,6 +739,11 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                       >
                         {profile?.playerName}
                       </span>
+                      {isOut && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-stoppage/15 text-stoppage flex items-center gap-0.5">
+                          ⛔ Poisjäänti
+                        </span>
+                      )}
                     </div>
 
                     <span className="text-xs font-bold text-text-secondary">
@@ -750,13 +760,13 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                   </div>
 
                   {/* Event Title */}
-                  <div className="pl-2 text-sm font-bold text-text-primary line-clamp-2 break-words">
+                  <h4 className={`text-base font-extrabold ${isOut ? 'line-through text-text-muted' : 'text-text-primary'} pl-2 leading-tight`}>
                     {ev.title}
-                  </div>
+                  </h4>
 
                   {/* Conflict warnings */}
                   {(() => {
-                    const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
+                    const related = !isOut ? conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [] : [];
                     if (related.length === 0) return null;
                     return (
                       <div className="pl-2 flex flex-col gap-1.5">
@@ -818,9 +828,15 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                           if (onNavigate) {
                             onNavigate(ev);
                           } else {
-                            const coords = ev.parking?.coordinates || ev.venue.coordinates;
+                            const isApprox = ev.venue?.isApproximateLocation;
+                            const coords = ev.parking?.coordinates || (!isApprox ? ev.venue.coordinates : undefined);
+                            const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                            const destination =
+                              hasValidCoords
+                                ? `${coords.lat},${coords.lng}`
+                                : encodeURIComponent(ev.venue?.name || 'Kenttä');
                             window.open(
-                              `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                              `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                               '_blank',
                               'noopener,noreferrer'
                             );

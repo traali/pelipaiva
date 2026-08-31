@@ -72,11 +72,12 @@ describe('Feature 12: 100+ National Pitch Slang Nicknames', () => {
     expect(kisapuisto.name).toContain('Kisapuiston');
   });
 
-  it('should provide fallback coordinates and safe defaults for unknown field names', async () => {
+  it('should provide fallback coordinates and safe defaults for unknown field names without fabricating Helsinki coordinates', async () => {
     const unknown = await resolveSportsVenue('Joku Satunnainen Kyläkenttä');
     expect(unknown.name).toBe('Joku Satunnainen Kyläkenttä');
-    expect(unknown.coordinates.lat).toBeDefined();
-    expect(unknown.coordinates.lng).toBeDefined();
+    expect(unknown.coordinates.lat).toBe(0);
+    expect(unknown.coordinates.lng).toBe(0);
+    expect(unknown.isApproximateLocation).toBe(true);
     expect(unknown.hasFloodlights).toBe(true);
   });
 });

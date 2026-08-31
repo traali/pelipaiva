@@ -207,7 +207,7 @@ export default {
     const requestOrigin = request.headers.get('Origin');
     const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, If-Match, X-Pelipaiva-Rev',
+      'Access-Control-Allow-Headers': 'Content-Type, If-Match',
       'Content-Type': 'application/json'
     };
     if (requestOrigin && allowedOrigins.has(requestOrigin)) {
@@ -273,7 +273,6 @@ export default {
           headers: {
             ...corsHeaders,
             ETag: `"${data.rev}"`,
-            'X-Pelipaiva-Rev': String(data.rev),
             'Cache-Control': 'no-cache, no-store, must-revalidate'
           }
         });
@@ -319,9 +318,7 @@ export default {
           }
           if (existing) {
             currentRev = existing.rev || 0;
-            const ifMatch =
-              request.headers.get('If-Match')?.replace(/"/g, '') ||
-              request.headers.get('X-Pelipaiva-Rev');
+            const ifMatch = request.headers.get('If-Match')?.replace(/"/g, '');
 
             // Existing key: missing or stale If-Match → 409 (never silent overwrite)
             if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
@@ -371,8 +368,7 @@ export default {
           {
             headers: {
               ...corsHeaders,
-              ETag: `"${nextRev}"`,
-              'X-Pelipaiva-Rev': String(nextRev)
+              ETag: `"${nextRev}"`
             }
           }
         );
@@ -389,9 +385,7 @@ export default {
           } catch {
             currentRev = 0;
           }
-          const ifMatch =
-            request.headers.get('If-Match')?.replace(/"/g, '') ||
-            request.headers.get('X-Pelipaiva-Rev');
+          const ifMatch = request.headers.get('If-Match')?.replace(/"/g, '');
           if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
             return new Response(JSON.stringify({ error: 'rev_conflict', currentRev }), {
               status: 409,

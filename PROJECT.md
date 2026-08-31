@@ -41,14 +41,14 @@
 | 20 | Dual Track E2E Test Suite (Tiers 1-4) | Comprehensive opaque-box test suite covering all 19 features | E2E Track / M4 | ORIGINAL_REQUEST Acceptance Criteria |
 | 21 | Adversarial Coverage Hardening (Tier 5) | White-box stress testing and edge-case hardening | M4 | Project Pattern Phase 2 |
 
-## Milestones
+## Milestones (Living Roadmap: [FORWARD_PLAN.md](docs/agency/FORWARD_PLAN.md))
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| E2E | E2E Testing Suite | Comprehensive 4-Tier test suite & TEST_READY.md | none | IN_PROGRESS |
-| 1 | Sports Association URL Parser, Extractor & Dexie Persistence | Features 1, 2, 3, 4, 5, 6 | none | IN_PROGRESS |
-| 2 | Calendar Permutations, 100+ Venue Geocoder & Arrival Rules | Features 7, 8, 9, 10, 11, 12, 13 | M1 (types) | PLANNED |
-| 3 | Conservative Fuzzy Join & Visual Mismatch UI | Features 14, 15, 16, 17, 18, 19 | M1, M2 | PLANNED |
-| 4 | Final Milestone: 100% E2E Pass & Tier 5 Hardening | Features 20, 21 | E2E, M1, M2, M3 | PLANNED |
+| E2E | E2E Testing Suite | Comprehensive 4-Tier test suite & TEST_READY.md | none | SHIPPED |
+| 1 | Sports Association URL Parser, Extractor & Dexie Persistence | Features 1, 2, 3, 4, 5, 6 | none | SHIPPED |
+| 2 | Calendar Permutations, 100+ Venue Geocoder & Arrival Rules | Features 7, 8, 9, 10, 11, 12, 13 | M1 (types) | SHIPPED |
+| 3 | Conservative Fuzzy Join & Visual Mismatch UI | Features 14, 15, 16, 17, 18, 19 | M1, M2 | SHIPPED |
+| 4 | Final Milestone: 100% E2E Pass & Tier 5 Hardening | Features 20, 21 | E2E, M1, M2, M3 | SHIPPED |
 
 ## Interface Contracts
 

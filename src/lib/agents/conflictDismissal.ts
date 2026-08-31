@@ -117,3 +117,94 @@ export function useDismissedConflicts() {
 
   return { dismissedKeys, dismiss, restore, restoreAll, isDismissed };
 }
+
+export interface ConsolidatedConflictGroup {
+  id: string;
+  conflicts: FamilyConflict[];
+  severity: 'critical' | 'warn' | 'info';
+  maxOverlap: number;
+  maxTravel: number;
+  childA: string;
+  childB: string;
+  isSameChild: boolean;
+  title: string;
+  message: string;
+  suggestedFix: string;
+  subItems: Array<{ overlap: number; venueA: string; venueB: string; travel: number }>;
+}
+
+export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedConflictGroup[] {
+  if (!conflicts || conflicts.length === 0) return [];
+
+  // Group by counterpart child and venue pair
+  const groupsMap = new Map<string, FamilyConflict[]>();
+  for (const c of conflicts) {
+    const isSameChild = c.childA.toLowerCase() === c.childB.toLowerCase();
+    const key = isSameChild
+      ? `same-${c.childA.toLowerCase()}`
+      : `pair-${c.childA.toLowerCase()}-${c.childB.toLowerCase()}`;
+    if (!groupsMap.has(key)) groupsMap.set(key, []);
+    groupsMap.get(key)!.push(c);
+  }
+
+  const result: ConsolidatedConflictGroup[] = [];
+  for (const [key, groupList] of groupsMap.entries()) {
+    if (groupList.length === 1) {
+      const c = groupList[0]!;
+      result.push({
+        id: c.id,
+        conflicts: [c],
+        severity: c.severity,
+        maxOverlap: c.overlapMinutes,
+        maxTravel: c.travelMinutesEstimate,
+        childA: c.childA,
+        childB: c.childB,
+        isSameChild: c.childA.toLowerCase() === c.childB.toLowerCase(),
+        title: c.severity === 'info'
+          ? 'Omatoiminen siirtymä'
+          : c.overlapMinutes > 0
+            ? `Päällekkäisyys (${c.overlapMinutes} min)`
+            : 'Tiukka siirtymä / Ajoaika',
+        message: c.message,
+        suggestedFix: c.suggestedFix,
+        subItems: []
+      });
+    } else {
+      const isSameChild = groupList[0]!.childA.toLowerCase() === groupList[0]!.childB.toLowerCase();
+      const maxOverlap = Math.max(...groupList.map((c) => c.overlapMinutes));
+      const maxTravel = Math.max(...groupList.map((c) => c.travelMinutesEstimate));
+      const hasCritical = groupList.some((c) => c.severity === 'critical');
+      const childName = groupList[0]!.childA;
+
+      const subItems = groupList.map((c) => ({
+        overlap: c.overlapMinutes,
+        venueA: c.venueA,
+        venueB: c.venueB,
+        travel: c.travelMinutesEstimate
+      }));
+
+      result.push({
+        id: `group-${key}`,
+        conflicts: groupList,
+        severity: hasCritical ? 'critical' : 'warn',
+        maxOverlap,
+        maxTravel,
+        childA: groupList[0]!.childA,
+        childB: groupList[0]!.childB,
+        isSameChild,
+        title: isSameChild
+          ? `Päällekkäisyys: ${groupList.length} päällekkäistä peliaikaa (max ${maxOverlap} min)`
+          : `Päällekkäisyys: ${groupList.length} aikatauluristeystä (${groupList[0]!.childA} & ${groupList[0]!.childB})`,
+        message: isSameChild
+          ? `${childName} on merkitty ${groupList.length} turnauspeliin päällekkäin toisen joukkueen kanssa samana iltapäivänä.`
+          : `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat samaan aikaan ${groupList.length} ottelussa.`,
+        suggestedFix: isSameChild
+          ? `Ilmoita valmentajille valinta mihin peleihin ${childName} osallistuu.`
+          : 'Sovi kuskijako ja kyydit etukäteen turnauspäivälle.',
+        subItems
+      });
+    }
+  }
+
+  return result;
+}

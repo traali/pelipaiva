@@ -8,9 +8,10 @@ import { ParkingDetailModal } from './ParkingDetailModal';
 interface ParkingProps {
   parking: ParkingInfo;
   venueName?: string;
+  compact?: boolean;
 }
 
-export const ParkingEaseBadge: React.FC<ParkingProps> = ({ parking, venueName = 'Kenttä' }) => {
+export const ParkingEaseBadge: React.FC<ParkingProps> = ({ parking, venueName = 'Kenttä', compact = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isTight = parking.easeScore === 'tight';
@@ -27,6 +28,40 @@ export const ParkingEaseBadge: React.FC<ParkingProps> = ({ parking, venueName = 
     : isModerate
     ? '🟡 Kohtalainen'
     : '🟢 Helppo parkki';
+
+  if (compact) {
+    return (
+      <>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: 1.01 }}
+          transition={springTactile.snappy}
+          onClick={() => setIsModalOpen(true)}
+          className="touch-target min-h-[44px] w-full text-left px-3 py-2 rounded-xl bg-surface-elevated/40 border border-border-subtle hover:border-pitch/40 text-xs text-text-secondary hover:text-text-primary flex items-center justify-between gap-2 cursor-pointer transition-colors group"
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Car className="w-3.5 h-3.5 text-text-muted shrink-0" />
+            <span className="truncate text-xs font-medium">Parkki: {parking.lotName}</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusColor}`}>
+              {scoreLabel}
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-text-muted group-hover:text-pitch transition-colors" />
+          </div>
+        </motion.button>
+
+        {/* Interactive Parking Map & Guide Modal */}
+        <ParkingDetailModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          parking={parking}
+          venueName={venueName}
+        />
+      </>
+    );
+  }
 
   return (
     <>

@@ -51,6 +51,10 @@ public final class FamdayAiBridge: NSObject, WKScriptMessageHandler {
 
     private func dispatch(method: String, body: [String: Any]) async throws -> String {
         switch method {
+        case "syncChoice":
+            let choice = body["choice"] as? String ?? "off"
+            UserDefaults.standard.set(choice, forKey: Self.userDefaultsChoiceKey)
+            return "ok"
         case "availability":
             return await availability()
         case "engine":

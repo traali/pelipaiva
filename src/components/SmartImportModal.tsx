@@ -265,7 +265,13 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     if (!file) return;
     setErrorMessage('');
 
-    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv')) {
+    if (
+      file.name.endsWith('.csv') ||
+      file.name.endsWith('.tsv') ||
+      file.name.endsWith('.txt') ||
+      file.name.endsWith('.xlsx') ||
+      file.name.endsWith('.xls')
+    ) {
       const buffer = await file.arrayBuffer();
       const res = await parseExcelFileBuffer(buffer, selectedSport, selectedPlayer);
       setExtractedTableEvents(res.events);
@@ -955,12 +961,12 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-text-secondary">
-                    Kopioi taulukko Sheetsistä tai pudota tiedosto (.xlsx, .csv):
+                    Kopioi taulukko Sheetsistä/Excelistä tai lataa tiedosto (.csv, .tsv, .txt):
                   </p>
                   <label className="px-2.5 py-1 rounded-lg bg-surface text-text-primary text-[11px] font-bold border border-border-strong hover:border-pitch cursor-pointer flex items-center gap-1">
                     <Upload className="w-3 h-3" />
                     <span>Lataa tiedosto</span>
-                    <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
+                    <input type="file" accept=".csv,.tsv,.txt" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
 

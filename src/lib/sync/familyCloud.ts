@@ -93,7 +93,6 @@ export async function pushFamilyRoster(
     };
     if (ifMatchRev !== undefined) {
       headers['If-Match'] = `"${ifMatchRev}"`;
-      headers['X-Pelipaiva-Rev'] = String(ifMatchRev);
     }
 
     const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}`, {

@@ -76,9 +76,26 @@ export function parseTableRows(
   const firstCellStartsWithDate = /^\s*\d{1,2}\.\d{1,2}/.test(firstRow[0] || '');
   const hasKnownHeaderWord = firstRow.some((cell) => {
     const norm = normalizeHeader(cell);
-    return ['pvm', 'paiva', 'klo', 'aika', 'ottelu', 'kentta', 'vuoro', 'vastuu', 'pelaaja', 'tapahtuma', 'vastustaja'].some((k) =>
-      norm.includes(k)
-    );
+    return [
+      'pvm',
+      'paiva',
+      'klo',
+      'aika',
+      'ottelu',
+      'kentta',
+      'vuoro',
+      'vastuu',
+      'pelaaja',
+      'tapahtuma',
+      'vastustaja',
+      'date',
+      'time',
+      'event',
+      'match',
+      'venue',
+      'location',
+      'duty'
+    ].some((k) => norm.includes(k));
   });
   const isHeaderRow = !firstCellStartsWithDate && hasKnownHeaderWord;
   const headers = isHeaderRow ? firstRow.map((c) => c.trim()) : [];
@@ -89,7 +106,7 @@ export function parseTableRows(
   let unrecognized = 0;
 
   for (const row of dataRows) {
-    if (!row || row.length === 0 || row.every((c) => !c.trim())) continue;
+    if (!row || row.every((c) => !c.trim())) continue;
 
     const dateRaw = row[mapping.dateCol] || '';
     const timeRaw = row[mapping.timeCol] || '';
@@ -104,7 +121,8 @@ export function parseTableRows(
 
     const dateStr = extractDateFromFinnishText(dateRaw);
     const times = extractTimesFromFinnishText(timeRaw);
-    const venueHint = extractVenueFromFinnishText(venueRaw);
+    const extractedVenue = extractVenueFromFinnishText(venueRaw);
+    const venueHint = extractedVenue || venueRaw.trim();
 
     let homeTeam = defaultPlayer;
     let awayTeam = eventRaw.trim() || 'Vastustaja';
@@ -153,7 +171,50 @@ export function parseTableRows(
 }
 
 /**
- * Parses copy-pasted TSV text from Google Sheets or Excel.
+ * Splits a CSV/TSV line into individual cell tokens, respecting double-quoted values.
+ */
+function splitDelimitedLine(line: string, delimiter: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === delimiter && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+/**
+ * Detects the most probable delimiter for a set of spreadsheet lines.
+ */
+function detectDelimiter(lines: string[]): string {
+  const sample = lines.slice(0, 5).join('\n');
+  const tabs = (sample.match(/\t/g) || []).length;
+  const semicolons = (sample.match(/;/g) || []).length;
+  const commas = (sample.match(/,/g) || []).length;
+
+  if (tabs >= semicolons && tabs >= commas && tabs > 0) return '\t';
+  if (semicolons >= commas && semicolons > 0) return ';';
+  if (commas > 0) return ',';
+  return '\t';
+}
+
+/**
+ * Parses copy-pasted TSV or CSV text from Google Sheets, Excel, or clipboard.
  */
 export function parsePastedSpreadsheetText(
   tsvText: string,
@@ -161,46 +222,41 @@ export function parsePastedSpreadsheetText(
   defaultPlayer = 'Maija'
 ): ParsedTableResult {
   const lines = tsvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  const rows = lines.map((line) => {
-    if (line.includes('\t')) return line.split('\t');
-    if (line.includes(';')) return line.split(';');
-    if (line.includes(',')) return line.split(',');
-    return [line];
-  });
+  if (lines.length === 0) {
+    return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
+  }
+
+  const delimiter = detectDelimiter(lines);
+  const rows = lines.map((line) => splitDelimitedLine(line, delimiter));
 
   return parseTableRows(rows, sport, defaultPlayer);
 }
 
 /**
- * Parses binary Excel (.xlsx / .xls) buffer into events.
+ * Parses tabular file buffer (.csv, .tsv, .txt) into events without unsafe external libraries.
  */
 export async function parseExcelFileBuffer(
   buffer: ArrayBuffer,
   sport: SportType = 'football',
   defaultPlayer = 'Maija'
 ): Promise<ParsedTableResult> {
-  // Size cap before parse: xlsx@0.18.5 (npm registry's last CE release) has
-  // public prototype-pollution/ReDoS advisories on untrusted input; the
-  // vendor's fixed versions are distributed off-registry. Cap + local-only
-  // blast radius is the interim mitigation until a vendored upgrade lands.
   const MAX_BYTES = 2 * 1024 * 1024;
   if (buffer.byteLength > MAX_BYTES) {
     return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
   }
-  const XLSX = await import('xlsx');
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) {
+
+  try {
+    let text = new TextDecoder('utf-8').decode(buffer);
+    // If replacement character dominates, try ISO-8859-1 / windows-1252
+    if (text.includes('\uFFFD')) {
+      try {
+        text = new TextDecoder('iso-8859-1').decode(buffer);
+      } catch {
+        // keep utf-8
+      }
+    }
+    return parsePastedSpreadsheetText(text, sport, defaultPlayer);
+  } catch {
     return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
   }
-
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) {
-    return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
-  }
-
-  const rawRows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: '' });
-  const stringRows: string[][] = rawRows.map((r) => r.map((cell) => String(cell || '')));
-
-  return parseTableRows(stringRows, sport, defaultPlayer);
 }

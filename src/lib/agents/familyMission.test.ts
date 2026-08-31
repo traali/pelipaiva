@@ -92,6 +92,37 @@ describe('conflictAgent', () => {
     expect(conflicts.length).toBe(0);
   });
 
+  it('does NOT generate any conflict when both kids travel independently (e.g. L walks, S bikes)', () => {
+    const events = [
+      ev({
+        id: 'a',
+        profileId: 'p-simo',
+        startTime: isoOn(0, 17, 15),
+        transit: {
+          mode: 'walk',
+          distanceKm: 0.46,
+          travelMinutes: 6,
+          transitLabel: '🚶 Kävely 6 min (460 m)',
+          isSelfTransit: true
+        }
+      }),
+      ev({
+        id: 'b',
+        profileId: 'p-aada',
+        startTime: isoOn(0, 18, 30),
+        transit: {
+          mode: 'bicycle',
+          distanceKm: 4.28,
+          travelMinutes: 19,
+          transitLabel: '🚴 Pyöräily 19 min (4,3 km)',
+          isSelfTransit: true
+        }
+      })
+    ];
+    const conflicts = conflictAgent(events, profiles);
+    expect(conflicts.length).toBe(0);
+  });
+
   it('flags warmup that starts before the other match ends at a different venue', () => {
     const events = [
       ev({
@@ -121,6 +152,43 @@ describe('conflictAgent', () => {
     const conflicts = conflictAgent(events, profiles);
     expect(conflicts.length).toBe(1);
     expect(conflicts[0]?.message).toContain('Päällekkäisyys');
+  });
+
+  it('skips reconciled event pairs from different calendar sources (same officialFixtureId)', () => {
+    // MyClub calendar event and Torneopal fixture represent the same real-world match.
+    // They share the same officialFixtureId and should never generate a conflict.
+    const events = [
+      ev({
+        id: 'myclub-123',
+        profileId: 'p-simo',
+        startTime: isoOn(0, 16, 45),
+        officialFixtureId: 'fix-abc-456',
+        venue: {
+          name: 'Lauttasaaren urheilupuisto "Pyrkkä"',
+          normalizedName: 'lauttasaaren urheilupuisto pyrkka',
+          coordinates: { lat: 60.16, lng: 24.87 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      }),
+      ev({
+        id: 'fixture-p-simo-fix-abc-456',
+        profileId: 'p-simo',
+        startTime: isoOn(0, 17, 0),
+        officialFixtureId: 'fix-abc-456',
+        venue: {
+          name: 'Lauttasaari TN B',
+          normalizedName: 'lauttasaari tn b',
+          coordinates: { lat: 60.161, lng: 24.871 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      })
+    ];
+    const conflicts = conflictAgent(events, profiles);
+    expect(conflicts.length).toBe(0);
   });
 });
 

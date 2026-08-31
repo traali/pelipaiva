@@ -59,7 +59,16 @@ export function resolveTransitPlan(
   const maxWalk = home.maxWalkingDistanceKm ?? 1.5;
   const maxBike = home.maxCyclingDistanceKm ?? 5.0;
 
-  // Severe weather checks (heavy rain, thunderstorm, freezing blizzard)
+  // Unfavorable cycling / walking weather:
+  // Rain >= 1.0 mm/h, freezing icy conditions <= 0°C, high wind gusts >= 14 m/s (sea bridges), or soaked/snowy ground.
+  const isBadCyclingWeather =
+    weather &&
+    (weather.precipitationMmh >= 1.0 ||
+      weather.temperatureC <= 0 ||
+      weather.windGustMs >= 14 ||
+      weather.turfCondition === 'snowy' ||
+      weather.turfCondition === 'slick');
+
   const isSevereWeather =
     weather &&
     (weather.precipitationMmh >= 2.5 ||
@@ -77,14 +86,14 @@ export function resolveTransitPlan(
     selectedMode = 'transit';
   } else if (preferred === 'walk') {
     if (distanceKm <= maxWalk && !isSevereWeather) selectedMode = 'walk';
-    else if (distanceKm <= maxBike && !isSevereWeather) selectedMode = 'bicycle';
+    else if (distanceKm <= maxBike && !isBadCyclingWeather) selectedMode = 'bicycle';
     else selectedMode = 'car';
   } else if (preferred === 'bicycle') {
-    if (distanceKm <= maxBike && !isSevereWeather) selectedMode = 'bicycle';
+    if (distanceKm <= maxBike && !isBadCyclingWeather) selectedMode = 'bicycle';
     else selectedMode = 'car';
   } else if (distanceKm <= maxWalk && !isSevereWeather) {
     selectedMode = 'walk';
-  } else if (distanceKm <= maxBike && !isSevereWeather) {
+  } else if (distanceKm <= maxBike && !isBadCyclingWeather) {
     selectedMode = 'bicycle';
   } else {
     selectedMode = 'car';
@@ -102,7 +111,7 @@ export function resolveTransitPlan(
       transitLabel = `🚶 Kävely ${travelMinutes} min (${distLabel})`;
       isSelfTransit = true;
       if (weather && weather.precipitationMmh > 0.5) {
-        weatherWarning = '🌧️ Kevyttä sadetta: sateenvarjo tai sadetakki mukaan';
+        weatherWarning = '🌧️ Sadetta: sateenvarjo tai sadetakki mukaan kävelyyn';
       }
       break;
     }
@@ -113,13 +122,15 @@ export function resolveTransitPlan(
       isSelfTransit = true;
       if (weather && weather.precipitationMmh > 0.5) {
         weatherWarning = '🌧️ Sadetta luvassa: sadevarusteet pyöräilyyn';
+      } else if (weather && weather.temperatureC >= 15 && weather.precipitationMmh === 0) {
+        weatherWarning = undefined;
       }
       break;
     }
     case 'transit': {
       // Public transit average = distance * 2.5 min + 7 min stop buffer
       travelMinutes = Math.max(8, Math.round(distanceKm * 2.5) + 7);
-      transitLabel = `🚌 Bussi/Ratikka ${travelMinutes} min (${distLabel})`;
+      transitLabel = `🚌 Bussi/Ratikka/Metro ${travelMinutes} min (${distLabel})`;
       isSelfTransit = true;
       break;
     }
@@ -129,8 +140,10 @@ export function resolveTransitPlan(
       travelMinutes = Math.max(5, Math.round(distanceKm * 1.6) + 4);
       transitLabel = `🚗 Auto ${travelMinutes} min (${distLabel})`;
       isSelfTransit = false;
-      if (isSevereWeather && (distanceKm <= maxBike || distanceKm <= maxWalk)) {
-        weatherWarning = '🌧️ Sadesää: auto suositeltava pyöräilyn sijaan';
+      if (isBadCyclingWeather && distanceKm <= maxBike && distanceKm > maxWalk) {
+        weatherWarning = '🌧️ Sadesää/tuuli: autokyyti tai metro suositeltava pyöräilyn sijaan';
+      } else if (isSevereWeather && distanceKm <= maxWalk) {
+        weatherWarning = '🌧️ Rankkasade: autokyyti suositeltava kävelyn sijaan';
       }
       break;
     }

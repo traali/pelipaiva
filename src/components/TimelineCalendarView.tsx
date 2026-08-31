@@ -145,6 +145,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 const tz = { hour: '2-digit' as const, minute: '2-digit' as const, timeZone: 'Europe/Helsinki' };
                 const timeStr = `${start.toLocaleTimeString('fi-FI', tz)} – ${end.toLocaleTimeString('fi-FI', tz)}`;
 
+                const isOut = ev.attendanceStatus === 'out';
                 const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
                 // Honest affordance (M-44): only matches/tournaments open stats —
                 // trainings must not present as clickable. Interactive rows are
@@ -170,7 +171,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                           }
                         : undefined
                     }
-                    className={`p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle hover:border-pitch/40 transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${isInteractive ? 'cursor-pointer' : ''}`}
+                    className={`p-3.5 rounded-2xl ${
+                      isOut
+                        ? 'bg-surface/40 border-dashed border-border-strong/60 opacity-65 grayscale-20'
+                        : 'bg-surface-elevated border border-border-subtle hover:border-pitch/40'
+                    } transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${isInteractive ? 'cursor-pointer' : ''}`}
                   >
                     {/* Left color bar indicator for child */}
                     <div
@@ -198,6 +203,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
+                        {isOut && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-stoppage/15 text-stoppage flex items-center gap-0.5">
+                            ⛔ Poisjäänti
+                          </span>
+                        )}
                         {isTournament && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-pitch/15 text-pitch flex items-center gap-0.5">
                             <Trophy className="w-3 h-3" />
@@ -210,7 +220,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     {/* Middle Row: Match Title & Opponent */}
                     <div className="pl-1.5 flex items-baseline justify-between gap-2">
-                      <div className="text-sm font-bold text-text-primary line-clamp-2 break-words leading-snug">
+                      <div className={`text-sm font-bold ${isOut ? 'line-through text-text-muted' : 'text-text-primary'} line-clamp-2 break-words leading-snug`}>
                         {ev.title}
                       </div>
                       {ev.isHomeMatch !== undefined && (
@@ -222,7 +232,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     {/* Overlap & Driving Transition Warning */}
                     {(() => {
-                      const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
+                      const related = !isOut ? conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [] : [];
                       if (related.length === 0) return null;
                       return (
                         <div className="pl-1.5 flex flex-col gap-1.5">
@@ -281,9 +291,15 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                             if (onNavigate) {
                               onNavigate(ev);
                             } else {
-                              const coords = ev.parking?.coordinates || ev.venue.coordinates;
+                              const isApprox = ev.venue?.isApproximateLocation;
+                              const coords = ev.parking?.coordinates || (!isApprox ? ev.venue.coordinates : undefined);
+                              const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                              const destination =
+                                hasValidCoords
+                                  ? `${coords.lat},${coords.lng}`
+                                  : encodeURIComponent(ev.venue?.name || 'Kenttä');
                               window.open(
-                                `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+                                `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                                 '_blank',
                                 'noopener,noreferrer'
                               );
