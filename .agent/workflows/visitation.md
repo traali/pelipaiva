@@ -1,24 +1,32 @@
-# Workflow: Visitation (Adversarial Audit)
+# Workflow: Visitation (Independent Audit)
 
-The outside inspection mechanism. Executed in a fresh session or isolated subagent context prior to merging a branch or closing a major task.
+The outside inspection mechanism. Executed in a fresh session or isolated subagent context — no conversation history from the author, no prior reasoning about the code. Run only on a clean tree (`npm run visit` passing).
 
 ---
 
 ## Preconditions (Do not inspect a broken tree)
 - [ ] Working tree committed.
-- [ ] `npm run lint` reports zero errors.
-- [ ] `npm run test` run and result recorded (Vitest).
+- [ ] `npm run visit` passes: lint 0 errors, all tests green.
 
 ---
 
 ## Prompt to the Visitor
 
 ```
-You are the Visitor conducting an adversarial audit of branch <branch> against AGENTS.md.
+You are the Visitor conducting an independent audit of branch <branch> against AGENTS.md.
 You did not write this code.
-Read AGENTS.md FIRST. Then inspect the git diff against base <base-sha>.
-Be adversarial. Do not summarize what went well or compliment the author.
-Output report to .agent/visitations/<branch>-<date>.md following the template below.
+
+Your context is: AGENTS.md, the git diff against base <base-sha>, and the test results.
+Nothing else — no author reasoning, no conversation history.
+
+Instructions:
+1. Read AGENTS.md in full before inspecting the diff.
+2. For every finding, cite the exact rule section (§N) and file:line that violates it.
+3. Classify each finding as `blocking` or `advisory` (see AGENTS.md §11).
+4. Assign fault: `house` (code violates rule) or `RULE` (rule is wrong or unclear).
+5. Zero findings is a valid and expected outcome. Do not invent findings to appear thorough.
+   Do not summarize what went well. Do not compliment the author.
+6. Write your report to .agent/visitations/<branch>-<date>.md using the template below.
 ```
 
 ---
@@ -27,31 +35,55 @@ Output report to .agent/visitations/<branch>-<date>.md following the template be
 
 ```markdown
 # Visitation: <branch> — <date>
-Visitor: <agent-type> · Implementer: <agent-type> · Base: <base-sha>
+Visitor: <agent-identity> · Implementer: <agent-identity> · Base: <base-sha>
 
 ## Verdict
-BLOCK | PASS WITH FINDINGS | PASS
+PASS | PASS WITH FINDINGS | BLOCK
 
 ## Findings
-| # | Severity | Finding | AGENTS.md § | Fault |
-|---|---|---|---|---|
-| 1 | blocker | Missing input sanitization on freeform NLP input | §5 | house |
-| 2 | nit | Dexie schema lacks index on new filter column | §10 | house |
-| 3 | note | §3 bans X, but X is standard practice for Y | §3 | RULE |
 
-### Fault Explanation:
-- **house:** The code violates the Rule. The branch author must fix the code before merge.
-- **RULE:** The Rule is impractical, outdated, or contradictory. Propose an amendment to AGENTS.md.
+| # | Class | Fault | Rule § | Location | Claim |
+|---|---|---|---|---|---|
+| F1 | blocking | house | §5 | src/lib/foo.ts:42 | Missing input sanitization on freeform NLP input |
+| F2 | advisory | house | §10 | src/lib/db.ts:88 | Dexie table missing index on `startDate` |
+| F3 | advisory | RULE | §3 | src/components/Bar.tsx:12 | Rule bans X but X is standard practice for Y — amendment needed |
 
-## Checked and Clean
-- <Explicit line per area verified>
+*(Zero findings is a complete and valid report — remove example rows and write "No findings." here.)*
 
-## Not Checked
-- <Explicit line per area skipped, and why>
+## Areas Checked
+- <explicit list of areas inspected>
+
+## Areas Not Checked
+- <explicit list skipped and why>
 ```
 
 ---
 
-## Post-Merge Cleanup
+## Finding Classes
 
-All reports in `.agent/visitations/` are **ephemeral** and must be deleted upon merging into `main`.
+| Class | Meaning | Mergeable without fix? |
+|---|---|---|
+| `blocking` | Security, data loss, contract breach, licence violation | No — never deferrable |
+| `advisory` | Rule violation without those consequences | Only with a `DEBT.md` entry (owner + deadline) |
+
+## Fault Types
+
+| Fault | Meaning | Next action |
+|---|---|---|
+| `house` | Code violates the Rule | Author fixes code, or files a rebuttal (`.agent/workflows/rebuttal.md`) |
+| `RULE` | Rule is wrong, unclear, or contradictory | Author proposes amendment to `AGENTS.md`; current Rule stands until amended |
+
+---
+
+## Right of Appeal
+
+The author may rebut any finding. See `.agent/workflows/rebuttal.md` for grounds and procedure.
+A finding is not automatically upheld because the Visitor stated it — appeal is the mechanism by which false positives are removed and bad rules are corrected.
+
+---
+
+## Retention
+
+Visitation reports in `.agent/visitations/` cover the current release cycle plus one.
+Findings that still matter after that go into `DEBT.md`, not stale audit files.
+

@@ -362,9 +362,78 @@ Follow the Monastic Operating Procedure:
 1. CHAPTER: Read `AGENTS.md` and the last 15 lines of `ROLL.md` at project root.
 2. JIT ROLES: Dynamically scope the task into specialized concerns with clear typed contracts.
 3. BUILD: Implement the feature following strict stack rules. Add deterministic unit/integration tests.
-4. PRE-FLIGHT: Run `npm run visit` (verifies word count cap ≤ 1500, 0 lint errors, 100% green tests).
-5. VISITATION: Conduct an adversarial audit of your git diff against `AGENTS.md` in a clean subagent/session. Fix any 'house' findings immediately.
+4. PRE-FLIGHT: Run `npm run visit` (verifies word count cap, 0 lint errors, 100% green tests).
+5. VISITATION: In a fresh context (no conversation history), audit your git diff against `AGENTS.md`.
+   Cite rule section and file:line for every finding. Zero findings is a valid outcome.
+   Do not invent findings. Do not compliment the author. Write the report to .agent/visitations/.
 6. CHRONICLE: On PASS, append a single-line summary of the architectural decision to `ROLL.md`.
 ```
 
+---
 
+## 8. Adoption Ladder
+
+**The most likely way this model fails is adopting all of it at once on a small project.**
+
+Start at the stage that matches your actual pain. Only move up when the stage below hurts.
+
+### Stage 1 — One repo, one or two contributors
+What you need: `AGENTS.md` (≤ 1,500 words) · `ROLL.md` · `DEBT.md` · `npm run visit` pre-flight · fresh-context Visitor (by discipline — new session, no conversation history) · Appeal grounds 1, 2, 4, 5.
+
+What you skip: offices, CODEOWNERS, federation, metrics, blind second Visitor.
+
+Ground 4 (rule wrong) is in Stage 1 on purpose. Without it, the `RULE` fault your template defines has no escape path.
+
+**This is where Pelipäivä lives.**
+
+### Stage 2 — One repo, multiple concurrent workstreams
+Add: offices with owned paths in `CODEOWNERS` · plan artifact per branch (`.agent/plans/<branch>.md`) · ground 3 (blind second Visitor, blind packet) · dispensation grep monthly.
+
+### Stage 3 — Two repositories
+Add: contracts as versioned files · consumers pin exact versions · expand → migrate → contract protocol · inbound request records (`.federation/`).
+
+Skip: consumer expectation tests, RFC process, federation repo. With one consumer a conversation is cheaper than a protocol.
+
+### Stage 4 — Three or more consumers of any one contract
+Add: consumer-declared expectation tests running in the provider's CI · RFC-with-study process · retirement rule (silence consents after declared window).
+
+This is where informal coordination stops working.
+
+### Stage 5 — Five or more repos, or two or more teams
+Add: federation repository · shared charter · consumer registry · charter change cooling-off (two review cycles minimum) · precedence clause in every `AGENTS.md`.
+
+---
+
+## 9. Known Failure Modes
+
+### 9.1 Manufactured findings
+A Visitor told to "be adversarial" invents defects to appear thorough.
+**Guard:** mandatory rule-section + file:line citation; "zero findings is a valid outcome" stated explicitly; no rotation-for-silence rule.
+
+### 9.2 The ratchet
+Every audit adds constraints. None are removed. The rule grows. Velocity dies.
+**Guard:** appeal grounds 3 and 4 actively remove constraints; the `RULE` fault; findings-per-audit tracked over time.
+
+### 9.3 Sycophantic appeal collapse
+Author pushes back informally. Visitor folds. The review is theatre.
+**Guard:** written, single-round rebuttal on a declared ground; blocking findings not deferrable; ground 3 uses a blind second Visitor.
+
+### 9.4 Costume drift
+Roles decay into names with adjectives because nothing enforces the charter.
+**Guard:** the delete-the-adjectives test — delete the name and adjectives; if nothing is left that constrains behaviour, it was a costume, not an office. Specialisation is an *effect* of partitioning information (different files, different tests), not of naming.
+
+### 9.5 Office proliferation
+A new role per subsystem. Westminster reached 28 by 1275. This is the historically attested failure.
+**Guard:** keep roles to a small stable set. Adding a new one requires retiring an existing one or a logged decision in `ROLL.md`. If every request is granted, there is no cap.
+
+### 9.6 Write-only roll
+Everyone appends. Nobody reads. The roll fills with decisions that matter to nobody.
+**Guard:** Phase 1 reads the last ~20 entries; `DEBT.md` is separate and permanent; visitation reports are pruned after two cycles. What must persist: `ROLL.md` and `DEBT.md`. Everything else is ephemeral.
+
+### 9.7 Solo enforcement limits
+A solo maintainer with one git identity cannot mechanically enforce author ≠ auditor, and cannot satisfy a required-review branch protection rule.
+**Guard:** acknowledge it in `AGENTS.md` rather than pretending the check works. Run a second bot identity for the Visitor if you want mechanical enforcement. By discipline otherwise — new session, no conversation history, diff + rule only.
+
+### 9.8 Premature federation
+Repos split before the monolith hurt. Every change becomes a cross-repo RFC.
+**Guard:** prefer a bounded module inside the existing repo first (its own directory, tests, declared internal interface). Promote to a separate repo only when the monolith actually hurts. Splitting is easy; merging is hard.

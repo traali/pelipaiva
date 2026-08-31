@@ -123,11 +123,35 @@ scripts/            # Diagnostic and PWA audit scripts
 ---
 
 ## §11 Visitation
-- **Separation of Duties:** The agent or author who wrote a change does not perform its final audit.
-- **Adversarial Audit:** Before merging a branch, a clean-session Visitor audits the diff against `AGENTS.md` using `.agent/workflows/visitation.md`.
-- **Fault Attribution:**
-  - `house`: Code violates the Rule. Fix the code.
-  - `RULE`: The Rule is contradictory, obsolete, or impractical. Propose an amendment to `AGENTS.md` at Chapter.
+
+**Separation of Duties:** The agent or author who wrote a change does not perform its final audit. Enforcement in this solo-maintainer project is by discipline (fresh context, no conversation history), not mechanical CI. That is the honest limit — do not pretend otherwise.
+
+**Visitor Framing:** The Visitor receives: this file, the diff, and the test results. Nothing else — no author reasoning, no prior conversation. It cites rule section and file:line for every finding. **Zero findings is a valid and expected outcome.** Do not summarize what went well and do not compliment the author. Do not invent findings to appear thorough.
+
+**Verdicts:** `PASS` · `PASS WITH FINDINGS` · `BLOCK`
+
+**Finding Classes:**
+- `blocking` — security, data loss, contract breach, licence violation. Not deferrable.
+- `advisory` — rule violation without those consequences. May be fixed or deferred to `DEBT.md`.
+
+**Fault Attribution:**
+- `house`: Code violates the Rule. Fix the code.
+- `RULE`: The Rule is contradictory, obsolete, or impractical. The author proposes an amendment; the current Rule stands until amended.
+
+**Right of Appeal:** The author may rebut any finding with one written response declaring exactly one ground. See `.agent/workflows/rebuttal.md`.
+
+| Ground | Claim | Decided by |
+|---|---|---|
+| 1. Misread | Visitor's factual claim about the code is wrong | Original Visitor, re-reading cited lines |
+| 2. Out of scope | Pre-existing, not introduced by this diff | Check the diff — if confirmed, withdrawn; add to `DEBT.md` |
+| 4. Rule wrong | Valid code, but the rule should change | Author amends `AGENTS.md` and logs in `ROLL.md`; finding falls |
+| 5. Deferred | Valid finding, out of scope for this change | Advisory only — merge with `DEBT.md` entry (owner + deadline) |
+
+*(Ground 3 — rule silent, blind second Visitor — is omitted at this stage. Add at Stage 2 when concurrent authors exist.)*
+
+**Dispensation:** Any rule in this file may be excepted for a single change. Must be declared before the audit (or requested in a ground-4 rebuttal), state the rule section, explain why it cannot be met, and be logged in `ROLL.md` tagged `DISPENSATION`. Never dispensable: the audit itself. Three dispensations from the same section → propose a rule amendment.
+
+**Deferred Findings:** Advisory findings not fixed before merge go to `DEBT.md` with an owner and a deadline. No `DEBT.md` entry = no merge.
 
 ---
 
