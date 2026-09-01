@@ -972,7 +972,7 @@ export function generateSyntheticOfficialTeamData(
     defaultVenue = 'Hernesaaren kupla';
   } else if (teamId === '203621' || subdomain?.includes('espooliikkuu') || canonicalUrl.includes('espooliikkuu')) {
     teamName = customTeamName && !/basket\.fi/i.test(customTeamName) ? customTeamName : 'TOPOLA';
-    leagueName = 'Espoo Liikkuu Tournament 2026 (Girls 2015 Fun)';
+    leagueName = 'Espoo Liikkuu Tournament 2026';
     defaultVenue = 'Esport Center 2';
 
     const fixtures: OfficialLeagueFixture[] = [

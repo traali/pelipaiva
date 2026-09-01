@@ -911,16 +911,17 @@ export const App: React.FC = () => {
     if (decision === 'use_official' && ev.mismatchFlags) {
       const officialIso = ev.mismatchFlags.officialStartTimeIso;
       const officialVenue = ev.mismatchFlags.officialVenueName;
+      // Only fall back to keep_calendar if there's genuinely nothing to apply.
+      // A venue-only mismatch has officialVenue but no officialIso — that is valid.
       if (!officialIso && !officialVenue) {
         return handleResolveMismatch(eventId, 'keep_calendar');
       }
       const updated: MatchdayEvent = {
         ...ev,
         startTime: officialIso || ev.startTime,
-        venue: {
-          ...ev.venue,
-          name: officialVenue || ev.venue.name
-        },
+        venue: officialVenue
+          ? { ...ev.venue, name: officialVenue }
+          : ev.venue,
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
         userOverride: {

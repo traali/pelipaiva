@@ -391,29 +391,27 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
         {/* Schedule / Venue Mismatch Warning Banner */}
         {!isOut && event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
-          <div className="mt-3 p-3.5 rounded-2xl bg-whistle/15 border border-whistle/30 flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-whistle text-xs font-bold">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>
-                {event.mismatchFlags.timeMismatch
-                  ? `Aikataulumuutos: Kalenteri ${event.mismatchFlags.calendarStartTime || ''} ➔ Liitto ${event.mismatchFlags.officialStartTime || ''} (${event.mismatchFlags.timeDiffMinutes || 0} min ero)`
-                  : `Kenttämuutos: Kalenteri ${event.mismatchFlags.calendarVenueName || ''} ➔ Liitto ${event.mismatchFlags.officialVenueName || ''}`}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 pt-1 flex-wrap">
+          <div className="mt-3 px-3 py-1.5 rounded-xl bg-whistle/10 border border-whistle/25 flex items-center gap-2 flex-wrap">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-whistle" />
+            <span className="text-whistle text-[11px] font-semibold flex-1 min-w-0 truncate">
+              {event.mismatchFlags.timeMismatch
+                ? `Aikataulumuutos: ${event.mismatchFlags.calendarStartTime || ''} ➔ ${event.mismatchFlags.officialStartTime || ''}`
+                : `Kenttämuutos: ${event.mismatchFlags.calendarVenueName || ''} ➔ ${event.mismatchFlags.officialVenueName || ''}`}
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
                 onClick={() => onResolveMismatch?.(event.id, 'use_official')}
-                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[11px] font-bold shadow-sm shadow-pitch/20 hover:brightness-110 cursor-pointer"
+                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[10px] font-bold hover:brightness-110 cursor-pointer"
               >
                 Päivitä liiton tietoon
               </button>
               <button
                 type="button"
                 onClick={() => onResolveMismatch?.(event.id, 'keep_calendar')}
-                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer"
+                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[10px] font-medium border border-border-subtle cursor-pointer"
               >
-                Säilytä oma merkintä
+                Säilytä oma
               </button>
             </div>
           </div>
@@ -512,7 +510,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="font-extrabold flex items-center justify-between gap-1">
                   <span>{group.severity === 'info' ? group.title : `⚠️ ${group.title}`}</span>
-                  {group.severity !== 'info' && (
+                  {group.severity !== 'info' && group.maxTravel > 0 && (
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
                       ~{group.maxTravel} min ajo
                     </span>
