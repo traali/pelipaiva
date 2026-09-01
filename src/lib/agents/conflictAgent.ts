@@ -92,7 +92,8 @@ export function conflictAgent(
           continue;
         }
 
-        const severity = isSameChild || drive > 25 || overlap > 40 ? 'critical' : 'warn';
+        const severity = isSameChild || (drive > 0 && drive > 25) || overlap > 40 ? 'critical' : 'warn';
+        const driveLabel = drive > 0 ? ` — siirtymä ~${drive} min` : '';
         conflicts.push({
           id: `c-${a.id}-${b.id}`,
           severity,
@@ -106,7 +107,7 @@ export function conflictAgent(
           travelMinutesEstimate: sameVenue ? 0 : drive,
           message: isSameChild
             ? `Päällekkäisyys: ${nameA} on merkitty kahteen peliin samaan aikaan (${a.venue.name} & ${b.venue.name}) päällekkäin ${overlap} min.`
-            : `Päällekkäisyys: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) päällekkäin ${overlap} min — siirtymä ~${drive} min.`,
+            : `Päällekkäisyys: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) päällekkäin ${overlap} min${driveLabel}.`,
           suggestedFix: isSameChild
             ? `Ilmoita valmentajalle valinta kumpaan peliin ${nameA} osallistuu.`
             : severity === 'critical'
@@ -159,6 +160,7 @@ export function conflictAgent(
           continue;
         }
 
+        const tightDriveLabel = drive > 0 ? ` (ajo ~${drive} min)` : '';
         conflicts.push({
           id: `c-${a.id}-${b.id}-tight`,
           severity: isDriveImpossible || isSameChild ? 'critical' : 'warn',
@@ -171,10 +173,10 @@ export function conflictAgent(
           overlapMinutes: 0,
           travelMinutesEstimate: drive,
           message: isSameChild
-            ? `${nameA}: siirtymäaika (${Math.max(0, Math.round(gapKickoff))} min) ei riitä siirtymään ${a.venue.name} ➔ ${b.venue.name} (ajo ~${drive} min).`
+            ? `${nameA}: siirtymäaika (${Math.max(0, Math.round(gapKickoff))} min) ei riitä siirtymään ${a.venue.name} ➔ ${b.venue.name}${tightDriveLabel}.`
             : isDriveImpossible
-              ? `Ajoaika ei riitä: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min, ajo ~${drive} min.`
-              : `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.max(0, Math.round(gapWarmup))} min, ajo ~${drive} min.`,
+              ? `Ajoaika ei riitä: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min${tightDriveLabel}.`
+              : `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.max(0, Math.round(gapWarmup))} min${tightDriveLabel}.`,
           suggestedFix: isSameChild
             ? `Aikataulu on liian tiukka samalle pelaajalle. Varoita valmentajaa myöhästymisestä.`
             : isDriveImpossible
