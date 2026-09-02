@@ -1041,22 +1041,19 @@ export const App: React.FC = () => {
             onClearDemo={handleClearData}
           />
         )}
-        {/* Sticky Profile Filter & View Mode Switcher Header */}
+        {/* Sticky Profile Filter & View Mode Switcher Header (Compact 2-Row Layout) */}
         <div
           ref={stickyFilterRef}
-          className="sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs"
+          className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2 shadow-xs"
         >
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          {/* Row 1: Profile Carousel + View Mode Switcher */}
+          <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="flex-1 min-w-0">
               <MultiProfileHeader
                 profiles={profiles}
                 activeProfileId={activeProfileId}
                 onSelectProfile={(id) => setActiveProfileId(id)}
                 onAddProfile={() => openAddTeam(activePlayerName)}
-                onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
-                onOpenCalendarSubscribe={() => setIsCalendarModalOpen(true)}
-                onRefresh={handleRefreshAll}
-                isSyncing={isSyncing}
               />
             </div>
 
@@ -1064,7 +1061,7 @@ export const App: React.FC = () => {
             <div
               role="tablist"
               aria-label="Näkymän valitsin"
-              className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-start"
+              className="flex items-center rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0"
             >
               <button
                 type="button"
@@ -1072,7 +1069,7 @@ export const App: React.FC = () => {
                 aria-selected={viewMode === 'cards'}
                 onClick={() => setViewMode('cards')}
                 title="Korttinäkymä"
-                className={`touch-target min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                className={`touch-target min-h-[44px] px-2.5 sm:px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                   viewMode === 'cards'
                     ? 'bg-pitch text-text-inverse shadow-xs'
                     : 'text-text-secondary hover:text-text-primary'
@@ -1087,7 +1084,7 @@ export const App: React.FC = () => {
                 aria-selected={viewMode === 'timeline'}
                 onClick={() => setViewMode('timeline')}
                 title="Tiivis aikajana"
-                className={`touch-target min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                className={`touch-target min-h-[44px] px-2.5 sm:px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                   viewMode === 'timeline'
                     ? 'bg-pitch text-text-inverse shadow-xs'
                     : 'text-text-secondary hover:text-text-primary'
@@ -1102,7 +1099,7 @@ export const App: React.FC = () => {
                 aria-selected={viewMode === 'calendar'}
                 onClick={() => setViewMode('calendar')}
                 title="Kalenteriruudukko"
-                className={`touch-target min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                className={`touch-target min-h-[44px] px-2.5 sm:px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
                   viewMode === 'calendar'
                     ? 'bg-pitch text-text-inverse shadow-xs'
                     : 'text-text-secondary hover:text-text-primary'
@@ -1114,132 +1111,113 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Composable Filters: 2-Axis Clean Facets */}
-          <div className="flex flex-col gap-2 pt-1.5 border-t border-border-subtle/40">
-            {/* Axis 1: Attendance Filter */}
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-text-muted mr-1 shrink-0">
-                Osallistuminen:
-              </span>
-              <button
-                type="button"
-                onClick={() => setAttendanceFilter('all')}
-                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                  attendanceFilter === 'all'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
-                }`}
-              >
-                Kaikki ({filterCounts.all})
-              </button>
-              <button
-                type="button"
-                onClick={() => setAttendanceFilter(attendanceFilter === 'in' ? 'all' : 'in')}
-                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  attendanceFilter === 'in'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
-                }`}
-                title="Näytä vain tapahtumat joihin osallistutaan (IN)"
-              >
-                <span>🟢 Osallistuu</span>
-                <span className="text-[10px] opacity-80">({filterCounts.attending})</span>
-              </button>
+          {/* Row 2: Combined Single Horizontal Filter Ribbon (Attendance + Event Types) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 text-xs">
+            {/* Attendance Filter Chips */}
+            <button
+              type="button"
+              onClick={() => setAttendanceFilter('all')}
+              className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                attendanceFilter === 'all'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
+              }`}
+            >
+              Kaikki ({filterCounts.all})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAttendanceFilter(attendanceFilter === 'in' ? 'all' : 'in')}
+              className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                attendanceFilter === 'in'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
+              }`}
+              title="Näytä vain tapahtumat joihin osallistutaan (IN)"
+            >
+              <span>🟢 Osallistuu</span>
+              <span className="text-[10px] opacity-80">({filterCounts.attending})</span>
+            </button>
+            {(filterCounts.out > 0 || attendanceFilter === 'out') && (
               <button
                 type="button"
                 onClick={() => setAttendanceFilter(attendanceFilter === 'out' ? 'all' : 'out')}
                 className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   attendanceFilter === 'out'
                     ? 'bg-stoppage text-text-inverse shadow-xs'
-                    : filterCounts.out > 0
-                    ? 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
-                    : 'bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle'
+                    : 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
                 }`}
                 title="Näytä vain tapahtumat mihin ei osallistuta (Poisjäännit / OUT)"
               >
-                <span>⛔ Poisjäännit</span>
+                <span>⛔ Pois</span>
                 <span className="text-[10px] opacity-80">({filterCounts.out})</span>
               </button>
-            </div>
+            )}
 
-            {/* Axis 2: Event Type Filter */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-text-muted mr-1 shrink-0">
-                Tapahtumat:
-              </span>
+            {/* Separator between attendance and event types */}
+            <div className="h-5 w-[1px] bg-border-subtle shrink-0 mx-0.5" aria-hidden="true" />
+
+            {/* Event Type Filter Chips */}
+            {filterCounts.tournaments > 0 && (
               <button
                 type="button"
-                onClick={() => setEventTypeFilter('all')}
-                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                  eventTypeFilter === 'all'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'tournaments' ? 'all' : 'tournaments')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'tournaments'
+                    ? 'bg-gold/30 text-gold border border-gold shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
                 }`}
               >
-                Kaikki tyypit
+                <Trophy className="w-3.5 h-3.5 text-gold" />
+                <span>Turnaukset</span>
+                <span className="text-[10px] opacity-80">({filterCounts.tournaments})</span>
               </button>
+            )}
 
-              {filterCounts.tournaments > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setEventTypeFilter(eventTypeFilter === 'tournaments' ? 'all' : 'tournaments')}
-                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                    eventTypeFilter === 'tournaments'
-                      ? 'bg-gold/30 text-gold border border-gold shadow-xs'
-                      : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
-                  }`}
-                >
-                  <Trophy className="w-3.5 h-3.5 text-gold" />
-                  <span>Turnaukset</span>
-                  <span className="text-[10px] opacity-80">({filterCounts.tournaments})</span>
-                </button>
-              )}
+            {filterCounts.matches > 0 && (
+              <button
+                type="button"
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'matches' ? 'all' : 'matches')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'matches'
+                    ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
+                }`}
+              >
+                <span>⚽ Sarjapelit</span>
+                <span className="text-[10px] opacity-80">({filterCounts.matches})</span>
+              </button>
+            )}
 
-              {filterCounts.matches > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setEventTypeFilter(eventTypeFilter === 'matches' ? 'all' : 'matches')}
-                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                    eventTypeFilter === 'matches'
-                      ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
-                      : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
-                  }`}
-                >
-                  <span>⚽ Sarjapelit</span>
-                  <span className="text-[10px] opacity-80">({filterCounts.matches})</span>
-                </button>
-              )}
+            {filterCounts.trainings > 0 && (
+              <button
+                type="button"
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'trainings' ? 'all' : 'trainings')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'trainings'
+                    ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
+                }`}
+              >
+                <span>🏃 Treenit</span>
+                <span className="text-[10px] opacity-80">({filterCounts.trainings})</span>
+              </button>
+            )}
 
-              {filterCounts.trainings > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setEventTypeFilter(eventTypeFilter === 'trainings' ? 'all' : 'trainings')}
-                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                    eventTypeFilter === 'trainings'
-                      ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
-                      : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
-                  }`}
-                >
-                  <span>🏃 Treenit</span>
-                  <span className="text-[10px] opacity-80">({filterCounts.trainings})</span>
-                </button>
-              )}
-
-              {filterCounts.other > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setEventTypeFilter(eventTypeFilter === 'other' ? 'all' : 'other')}
-                  className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                    eventTypeFilter === 'other'
-                      ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
-                      : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
-                  }`}
-                >
-                  <span>📋 Muu / Talkoot</span>
-                  <span className="text-[10px] opacity-80">({filterCounts.other})</span>
-                </button>
-              )}
-            </div>
+            {filterCounts.other > 0 && (
+              <button
+                type="button"
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'other' ? 'all' : 'other')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'other'
+                    ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
+                }`}
+              >
+                <span>📚 Muut</span>
+                <span className="text-[10px] opacity-80">({filterCounts.other})</span>
+              </button>
+            )}
           </div>
         </div>
 
