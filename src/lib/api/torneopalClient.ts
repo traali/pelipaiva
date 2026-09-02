@@ -17,6 +17,7 @@ import { helsinkiDateISO, addHelsinkiDays } from "../agents/time";
 const TUPA_KEY = "tpqgz8ddy2rt9w8xuyxr";
 const PALL_KEY = "4h7dznqdxwtp3hsfdyf5r793uahfxy7x";
 const SALIBANDY_KEY = "zsn3anknxzcfzc23k53jqdcd4pymutsf";
+const BASKET_KEY = "df8e84j9xtdz269euy3h";
 
 const ENDPOINTS: Partial<
   Record<AssociationType, { base: string; apiKey: string; referer: string }>
@@ -33,7 +34,7 @@ const ENDPOINTS: Partial<
   },
   basket: {
     base: "https://koripallo-api.torneopal.net/taso/rest",
-    apiKey: TUPA_KEY,
+    apiKey: BASKET_KEY,
     referer: "https://tulospalvelu.basket.fi/",
   },
   torneopal: {

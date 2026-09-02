@@ -9,7 +9,7 @@ interface SatelliteEmbedDrawerProps {
   title: string;
   subtitle?: string;
   embedUrl: string;
-  sourceRepo: 'parkkis' | 'football-stats' | 'volleyball-stats';
+  sourceRepo: 'parkkis' | 'football-stats' | 'volleyball-stats' | 'floorball-stats' | 'basketball-stats';
 }
 
 export const SatelliteEmbedDrawer: React.FC<SatelliteEmbedDrawerProps> = ({
@@ -30,13 +30,21 @@ export const SatelliteEmbedDrawer: React.FC<SatelliteEmbedDrawerProps> = ({
       ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
       : sourceRepo === 'football-stats'
       ? 'border-amber-400/30 text-amber-300 bg-amber-400/10'
-      : 'border-orange-500/30 text-orange-400 bg-orange-500/10';
+      : sourceRepo === 'floorball-stats'
+      ? 'border-[#5BC0BE]/30 text-[#6FFFE9] bg-[#5BC0BE]/10'
+      : sourceRepo === 'basketball-stats'
+      ? 'border-orange-500/30 text-orange-400 bg-orange-500/10'
+      : 'border-blue-500/30 text-blue-400 bg-blue-500/10';
 
   const repoLabel =
     sourceRepo === 'parkkis'
       ? '🅿️ ParkkiS Spatial'
       : sourceRepo === 'football-stats'
       ? '⚽ Football Stats'
+      : sourceRepo === 'floorball-stats'
+      ? '🏑 Floorball Stats'
+      : sourceRepo === 'basketball-stats'
+      ? '🏀 Basketball Stats'
       : '🏐 Volleyball Stats';
 
   return (
