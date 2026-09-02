@@ -22,7 +22,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { SportType } from '../types/matchday';
+import { SportType, type FamilyManualEvent } from '../types/matchday';
 import {
   parseMultipleSportsMessages,
   parsePastedSpreadsheetText,
@@ -32,6 +32,7 @@ import {
 } from '../lib/ai/localAiEngine';
 import { ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
 import { db } from '../lib/storage/db';
+import { recordManualFamilyEvent } from '../lib/sync/familyCloud';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
@@ -339,9 +340,22 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         });
       }
 
+      const sync = await db.syncState.get('family').catch(() => null);
       for (const extracted of usable) {
         const fullEvent = await convertExtractedToMatchdayEvent(extracted, profileId, selectedPlayer);
         await db.events.put(fullEvent);
+        const manualEvent: FamilyManualEvent = {
+          id: fullEvent.id,
+          title: fullEvent.title || `${fullEvent.homeTeam || ''} vs ${fullEvent.awayTeam || ''}`,
+          startTime: fullEvent.startTime,
+          endTime: fullEvent.endTime,
+          profileIds: [profileId],
+          notes: fullEvent.notes,
+          authorDeviceId: 'device',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await recordManualFamilyEvent(sync?.syncKey || '', manualEvent, db);
       }
 
       setSuccessMessage(`Tallennettu ${usable.length} ottelua pelaajalle ${selectedPlayer}!`);

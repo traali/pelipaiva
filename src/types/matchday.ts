@@ -591,8 +591,14 @@ export interface FamilyManualEvent {
   deletedAt?: string;
 }
 
+export interface AttendanceOverrideRecord {
+  eventId: string;
+  status: 'in' | 'out' | 'maybe';
+  updatedAt: string;
+}
+
 /**
- * KV envelope for the family manual events collection.
+ * KV envelope for the family calendar events & attendance overrides collection.
  * Stored at key `fam_events:{familyCode}` with 30-day rolling TTL.
  */
 export interface FamilyEventsV1 {
@@ -600,4 +606,5 @@ export interface FamilyEventsV1 {
   rev: number;
   updatedAt: string;
   events: FamilyManualEvent[];
+  attendanceOverrides?: AttendanceOverrideRecord[];
 }

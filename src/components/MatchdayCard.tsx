@@ -35,6 +35,7 @@ import { db } from '../lib/storage/db';
 import { resolveTransitPlan } from '../lib/geo/transitEngine';
 import type { HomeLocation } from '../types/matchday';
 import { useDismissedConflicts, groupActiveConflicts } from '../lib/agents/conflictDismissal';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
 function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return 'Sisähalli';
@@ -210,7 +211,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         ...event,
         attendanceStatus: newStatus
       };
-      await db.events.update(event.id, { attendanceStatus: newStatus });
+      const sync = await db.syncState.get('family').catch(() => null);
+      await recordAttendanceOverride(sync?.syncKey || '', event.id, newStatus, db);
       onEventUpdated?.(updated);
     } catch (err) {
       console.error('Failed to toggle attendance', err);

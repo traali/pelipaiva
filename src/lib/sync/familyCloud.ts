@@ -472,7 +472,7 @@ async function executeSyncFamilyRosterCycle(
 // KV key: fam_events:{familyCode}  TTL: 30 days rolling
 // ---------------------------------------------------------------------------
 
-import type { FamilyManualEvent, FamilyEventsV1 } from '../../types/matchday';
+import type { FamilyManualEvent, FamilyEventsV1, AttendanceOverrideRecord } from '../../types/matchday';
 
 /** GET /api/family/:code/events — returns null on 404 (first device, no events yet) */
 export async function fetchFamilyEvents(
@@ -569,31 +569,64 @@ export function mergeFamilyEvents(
 }
 
 /**
- * Full sync cycle for manual events: fetch remote, merge with local Dexie,
- * push if local has changes. Returns the merged list.
+ * Merge local and remote attendance override lists.
+ * Strategy: last-write-wins per eventId based on updatedAt.
+ */
+export function mergeAttendanceOverrides(
+  local: AttendanceOverrideRecord[],
+  remote: AttendanceOverrideRecord[]
+): AttendanceOverrideRecord[] {
+  const map = new Map<string, AttendanceOverrideRecord>();
+  for (const ov of [...remote, ...local]) {
+    const existing = map.get(ov.eventId);
+    if (!existing || ov.updatedAt > existing.updatedAt) {
+      map.set(ov.eventId, ov);
+    }
+  }
+  return [...map.values()];
+}
+
+/**
+ * Full sync cycle for family calendar data: fetch remote events & attendance overrides,
+ * merge with local Dexie, apply overrides to local events, and push any local updates.
  */
 export async function syncManualEvents(
   code: string,
   databaseInstance: import('../storage/db').PelipaivaDB,
   baseUrl: string = WORKER_BASE_URL
-): Promise<{ events: FamilyManualEvent[]; success: boolean }> {
+): Promise<{ events: FamilyManualEvent[]; overrides: AttendanceOverrideRecord[]; success: boolean }> {
   const cleanCode = normalizeFamilyCode(code);
 
   try {
-    // 1. Load local events (including live tombstones)
+    // 1. Load local events
     const localAll = await databaseInstance.manualEvents.toArray();
 
     // 2. Fetch remote
     const remote = await fetchFamilyEvents(cleanCode, baseUrl);
     const remoteEvents = remote?.events ?? [];
+    const remoteOverrides = remote?.attendanceOverrides ?? [];
 
-    // 3. Merge
-    const merged = mergeFamilyEvents(localAll, remoteEvents);
+    // 3. Merge manual events & attendance overrides
+    const mergedEvents = mergeFamilyEvents(localAll, remoteEvents);
 
-    // 4. Write merged back to Dexie (upsert all)
-    await databaseInstance.manualEvents.bulkPut(merged);
+    // 4. Write merged manual events back to Dexie
+    if (mergedEvents.length > 0) {
+      await databaseInstance.manualEvents.bulkPut(mergedEvents);
+    }
 
-    // 5. Push to KV if we have a newer local state
+    // 5. Apply remote attendance overrides to local Dexie events table
+    for (const ov of remoteOverrides) {
+      try {
+        const ev = await databaseInstance.events.get(ov.eventId);
+        if (ev && ev.attendanceStatus !== ov.status) {
+          await databaseInstance.events.update(ov.eventId, { attendanceStatus: ov.status });
+        }
+      } catch {
+        // Continue if event doesn't exist locally yet
+      }
+    }
+
+    // 6. Check if local has newer events or overrides to push
     const localHasChanges = localAll.some((ev) => {
       const remoteEv = remoteEvents.find((r) => r.id === ev.id);
       return !remoteEv || ev.updatedAt > remoteEv.updatedAt;
@@ -604,33 +637,134 @@ export async function syncManualEvents(
         v: 1,
         rev: (remote?.rev ?? 0) + 1,
         updatedAt: new Date().toISOString(),
-        events: merged
+        events: mergedEvents,
+        attendanceOverrides: remoteOverrides
       };
       const pushRes = await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
 
       if (!pushRes.success && pushRes.error === 'rev_conflict') {
-        // Retry: fetch latest, merge again, push
         const fresh = await fetchFamilyEvents(cleanCode, baseUrl);
-        const freshMerged = mergeFamilyEvents(merged, fresh?.events ?? []);
+        const freshMerged = mergeFamilyEvents(mergedEvents, fresh?.events ?? []);
+        const freshOverrides = mergeAttendanceOverrides(remoteOverrides, fresh?.attendanceOverrides ?? []);
         await databaseInstance.manualEvents.bulkPut(freshMerged);
         const retryPayload: FamilyEventsV1 = {
           v: 1,
           rev: (fresh?.rev ?? 0) + 1,
           updatedAt: new Date().toISOString(),
-          events: freshMerged
+          events: freshMerged,
+          attendanceOverrides: freshOverrides
         };
         await pushFamilyEvents(cleanCode, retryPayload, fresh?.rev, baseUrl);
-        return { events: freshMerged.filter((e) => !e.deletedAt), success: true };
+        return {
+          events: freshMerged.filter((e) => !e.deletedAt),
+          overrides: freshOverrides,
+          success: true
+        };
       }
     }
 
-    return { events: merged.filter((e) => !e.deletedAt), success: true };
+    return {
+      events: mergedEvents.filter((e) => !e.deletedAt),
+      overrides: remoteOverrides,
+      success: true
+    };
   } catch (err: any) {
     console.warn('[FAMILY_CLOUD] syncManualEvents failed:', err);
-    // Return local events even if sync failed — offline-first
     const localLive = await databaseInstance.manualEvents
       .filter((e) => !e.deletedAt)
       .toArray();
-    return { events: localLive, success: false };
+    return { events: localLive, overrides: [], success: false };
   }
+}
+
+/**
+ * Record an attendance override (IN / OUT) locally and push to Cloudflare KV in background.
+ */
+export async function recordAttendanceOverride(
+  code: string,
+  eventId: string,
+  status: 'in' | 'out' | 'maybe',
+  databaseInstance: import('../storage/db').PelipaivaDB,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<void> {
+  // 1. Update local database immediately
+  try {
+    await databaseInstance.events.update(eventId, { attendanceStatus: status });
+  } catch (e) {
+    console.warn('[FAMILY_CLOUD] Failed to update local event attendance:', e);
+  }
+
+  // If no family code, local update is sufficient
+  if (!code || code === 'local') return;
+
+  // 2. Non-blocking background sync to Cloudflare KV
+  (async () => {
+    try {
+      const cleanCode = normalizeFamilyCode(code);
+      const remote = await fetchFamilyEvents(cleanCode, baseUrl);
+      const remoteOverrides = remote?.attendanceOverrides ?? [];
+      const remoteEvents = remote?.events ?? [];
+
+      const newOverride: AttendanceOverrideRecord = {
+        eventId,
+        status,
+        updatedAt: new Date().toISOString()
+      };
+
+      const mergedOverrides = mergeAttendanceOverrides([newOverride], remoteOverrides);
+      const payload: FamilyEventsV1 = {
+        v: 1,
+        rev: (remote?.rev ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+        events: remoteEvents,
+        attendanceOverrides: mergedOverrides
+      };
+
+      await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
+    } catch (err) {
+      console.warn('[FAMILY_CLOUD] Background attendance push failed:', err);
+    }
+  })();
+}
+
+/**
+ * Record an added/imported manual family event locally and push to Cloudflare KV.
+ */
+export async function recordManualFamilyEvent(
+  code: string,
+  event: FamilyManualEvent,
+  databaseInstance: import('../storage/db').PelipaivaDB,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<void> {
+  // 1. Save to local database
+  try {
+    await databaseInstance.manualEvents.put(event);
+  } catch (e) {
+    console.warn('[FAMILY_CLOUD] Failed to save manual event locally:', e);
+  }
+
+  if (!code || code === 'local') return;
+
+  // 2. Non-blocking background sync to Cloudflare KV
+  (async () => {
+    try {
+      const cleanCode = normalizeFamilyCode(code);
+      const remote = await fetchFamilyEvents(cleanCode, baseUrl);
+      const remoteOverrides = remote?.attendanceOverrides ?? [];
+      const remoteEvents = remote?.events ?? [];
+
+      const mergedEvents = mergeFamilyEvents([event], remoteEvents);
+      const payload: FamilyEventsV1 = {
+        v: 1,
+        rev: (remote?.rev ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+        events: mergedEvents,
+        attendanceOverrides: remoteOverrides
+      };
+
+      await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
+    } catch (err) {
+      console.warn('[FAMILY_CLOUD] Background event push failed:', err);
+    }
+  })();
 }

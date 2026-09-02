@@ -7,7 +7,9 @@ import {
   mergeRosters,
   FamilyRosterV1,
   fetchFamilyRoster,
-  pushFamilyRoster
+  pushFamilyRoster,
+  mergeFamilyEvents,
+  mergeAttendanceOverrides
 } from './familyCloud';
 import { FAMILY_CODE_REGEX, existingRosterPutConflicts, parseFamilyAllowlist } from './familyCode';
 import { PlayerProfile } from '../../types/matchday';
@@ -279,4 +281,92 @@ describe('familyCloud Sync & Merge Engine', () => {
       expect((conflictPush as any).currentRev).toBe(5);
     }
   });
+
+  describe('Manual Events & Attendance Overrides Sync', () => {
+    it('mergeFamilyEvents resolves tombstones and last-write-wins', () => {
+      const local: any[] = [
+        {
+          id: 'me-1',
+          title: 'Vanhempainilta (Local Edit)',
+          startTime: '2026-09-10T18:00:00Z',
+          updatedAt: '2026-09-02T10:00:00Z',
+          authorDeviceId: 'dev-1',
+          profileIds: []
+        },
+        {
+          id: 'me-2',
+          title: 'Hammaslääkäri',
+          startTime: '2026-09-11T09:00:00Z',
+          updatedAt: '2026-09-02T10:00:00Z',
+          deletedAt: '2026-09-02T10:05:00Z',
+          authorDeviceId: 'dev-1',
+          profileIds: []
+        }
+      ];
+
+      const remote: any[] = [
+        {
+          id: 'me-1',
+          title: 'Vanhempainilta (Remote Old)',
+          startTime: '2026-09-10T18:00:00Z',
+          updatedAt: '2026-09-01T10:00:00Z',
+          authorDeviceId: 'dev-2',
+          profileIds: []
+        },
+        {
+          id: 'me-2',
+          title: 'Hammaslääkäri (Remote Active)',
+          startTime: '2026-09-11T09:00:00Z',
+          updatedAt: '2026-09-02T09:00:00Z',
+          authorDeviceId: 'dev-2',
+          profileIds: []
+        },
+        {
+          id: 'me-3',
+          title: 'Koulun myyjäiset',
+          startTime: '2026-09-12T12:00:00Z',
+          updatedAt: '2026-09-02T08:00:00Z',
+          authorDeviceId: 'dev-2',
+          profileIds: []
+        }
+      ];
+
+      const merged = mergeFamilyEvents(local, remote);
+      expect(merged.length).toBe(3);
+
+      const me1 = merged.find((e) => e.id === 'me-1');
+      expect(me1?.title).toBe('Vanhempainilta (Local Edit)');
+
+      const me2 = merged.find((e) => e.id === 'me-2');
+      expect(me2?.deletedAt).toBe('2026-09-02T10:05:00Z');
+
+      const me3 = merged.find((e) => e.id === 'me-3');
+      expect(me3?.title).toBe('Koulun myyjäiset');
+    });
+
+    it('mergeAttendanceOverrides picks latest updatedAt status per eventId', () => {
+      const local = [
+        { eventId: 'match-1', status: 'out' as const, updatedAt: '2026-09-02T11:00:00Z' },
+        { eventId: 'match-2', status: 'in' as const, updatedAt: '2026-09-01T09:00:00Z' }
+      ];
+      const remote = [
+        { eventId: 'match-1', status: 'in' as const, updatedAt: '2026-09-02T10:00:00Z' },
+        { eventId: 'match-2', status: 'out' as const, updatedAt: '2026-09-02T08:00:00Z' },
+        { eventId: 'match-3', status: 'out' as const, updatedAt: '2026-09-02T07:00:00Z' }
+      ];
+
+      const merged = mergeAttendanceOverrides(local, remote);
+      expect(merged.length).toBe(3);
+
+      const m1 = merged.find((o) => o.eventId === 'match-1');
+      expect(m1?.status).toBe('out'); // Local (11:00) beats remote (10:00)
+
+      const m2 = merged.find((o) => o.eventId === 'match-2');
+      expect(m2?.status).toBe('out'); // Remote (09-02 08:00) beats local (09-01 09:00)
+
+      const m3 = merged.find((o) => o.eventId === 'match-3');
+      expect(m3?.status).toBe('out');
+    });
+  });
 });
+

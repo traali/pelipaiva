@@ -25,7 +25,7 @@ import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
-import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
+import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
@@ -114,6 +114,7 @@ export const App: React.FC = () => {
       const sync = await db.syncState.get('family');
       if (sync && sync.syncKey) {
         await syncFamilyRosterCycle(sync.syncKey, db);
+        await syncManualEvents(sync.syncKey, db);
       }
     };
 
@@ -164,6 +165,7 @@ export const App: React.FC = () => {
         (async () => {
           const res = await syncFamilyRosterCycle(perheCode, db);
           if (res.success) {
+            await syncManualEvents(perheCode, db);
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);
             if (isAmbientRequest) {

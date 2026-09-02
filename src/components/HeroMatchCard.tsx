@@ -30,6 +30,7 @@ import { EventInlineDropIn } from './EventInlineDropIn';
 import { MoreHorizontal, FileText } from 'lucide-react';
 import { db } from '../lib/storage/db';
 import { useDismissedConflicts, groupActiveConflicts } from '../lib/agents/conflictDismissal';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -162,7 +163,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         ...event,
         attendanceStatus: newStatus
       };
-      await db.events.update(event.id, { attendanceStatus: newStatus });
+      const sync = await db.syncState.get('family').catch(() => null);
+      await recordAttendanceOverride(sync?.syncKey || '', event.id, newStatus, db);
       onEventUpdated?.(updated);
     } catch (err) {
       console.error('Failed to toggle attendance', err);

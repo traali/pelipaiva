@@ -38,12 +38,20 @@ export interface FamilyManualEvent {
   deletedAt?: string;
 }
 
+export interface AttendanceOverrideRecord {
+  eventId: string;
+  status: 'in' | 'out' | 'maybe';
+  updatedAt: string;
+}
+
 export interface FamilyEventsV1 {
   v: 1;
   rev: number;
   updatedAt: string;
   events: FamilyManualEvent[];
+  attendanceOverrides?: AttendanceOverrideRecord[];
 }
+
 
 
 async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
@@ -180,9 +188,19 @@ function prefixVeventSummary(block: string, playerName?: string): string {
   });
 }
 
-async function collectRosterIcsEvents(roster: FamilyRosterV1 | null): Promise<string[]> {
+async function collectRosterIcsEvents(
+  roster: FamilyRosterV1 | null,
+  attendanceOverrides?: AttendanceOverrideRecord[]
+): Promise<string[]> {
   if (!roster?.profiles?.length) return [];
   const out: string[] = [];
+  const outSet = new Set<string>();
+  if (Array.isArray(attendanceOverrides)) {
+    for (const ov of attendanceOverrides) {
+      if (ov.status === 'out') outSet.add(ov.eventId);
+    }
+  }
+
   for (const p of roster.profiles.slice(0, 10)) {
     const raw = String(p.calendarUrl || '').trim();
     if (!raw || !isIcsCalendarUrl(raw)) continue;
@@ -203,7 +221,16 @@ async function collectRosterIcsEvents(roster: FamilyRosterV1 | null): Promise<st
       const text = await feedRes.text();
       if (!/BEGIN:VCALENDAR/i.test(text)) continue;
       for (const block of extractVeventBlocks(text)) {
-        out.push(prefixVeventSummary(block, p.playerName));
+        // Check UID in block to see if marked out
+        const uidMatch = /^UID:(.*)$/m.exec(block);
+        const uid = uidMatch ? uidMatch[1].trim() : '';
+        if (uid && outSet.has(uid)) {
+          // If marked OUT, prefix with [EI OSALLISTU] so calendar subscriber sees attendance state
+          const modified = block.replace(/^SUMMARY:(.*)$/m, 'SUMMARY:[EI OSALLISTU] $1');
+          out.push(prefixVeventSummary(modified, p.playerName));
+        } else {
+          out.push(prefixVeventSummary(block, p.playerName));
+        }
       }
     } catch {
       // Skip unreachable club calendars; still emit the rest of the family feed.
@@ -338,6 +365,20 @@ export default {
             });
           }
 
+          // Validate and sanitize attendance overrides
+          const sanitizedOverrides: AttendanceOverrideRecord[] = [];
+          if (Array.isArray(body.attendanceOverrides)) {
+            for (const ov of body.attendanceOverrides) {
+              if (!ov?.eventId || !ov.status) continue;
+              const status = ov.status === 'out' ? 'out' : ov.status === 'maybe' ? 'maybe' : 'in';
+              sanitizedOverrides.push({
+                eventId: String(ov.eventId).slice(0, 100),
+                status,
+                updatedAt: String(ov.updatedAt || new Date().toISOString()).slice(0, 32)
+              });
+            }
+          }
+
           // Optimistic concurrency via If-Match
           const existingStr = await env.MATCHDAY_KV.get(eventsKvKey);
           let currentRev = 0;
@@ -352,7 +393,13 @@ export default {
           }
 
           const nextRev = Math.max(body.rev || 0, currentRev + 1);
-          const toStore: FamilyEventsV1 = { v: 1, rev: nextRev, updatedAt: new Date().toISOString(), events: sanitized };
+          const toStore: FamilyEventsV1 = {
+            v: 1,
+            rev: nextRev,
+            updatedAt: new Date().toISOString(),
+            events: sanitized,
+            attendanceOverrides: sanitizedOverrides
+          };
           await env.MATCHDAY_KV.put(eventsKvKey, JSON.stringify(toStore), { expirationTtl: 2592000 }); // 30 days
           return new Response(JSON.stringify({ success: true, rev: nextRev, updatedAt: toStore.updatedAt }), {
             headers: { ...corsHeaders, ETag: `"${nextRev}"` }
@@ -573,12 +620,24 @@ export default {
       }
 
       // Read customized family events / notes from KV
-      const eventsKey = `fam_events_${familyCode}`;
-      const existingEventsStr = await env.MATCHDAY_KV.get(eventsKey);
-      let customEvents: any[] = [];
+      const eventsKey = `fam_events:${familyCode}`;
+      let existingEventsStr = await env.MATCHDAY_KV.get(eventsKey);
+      if (!existingEventsStr) {
+        existingEventsStr = await env.MATCHDAY_KV.get(`fam_events_${familyCode}`);
+      }
+
+      let customEvents: FamilyManualEvent[] = [];
+      let attendanceOverrides: AttendanceOverrideRecord[] = [];
+
       if (existingEventsStr) {
         try {
-          customEvents = JSON.parse(existingEventsStr) || [];
+          const parsed = JSON.parse(existingEventsStr);
+          if (parsed && parsed.v === 1 && Array.isArray(parsed.events)) {
+            customEvents = (parsed.events as FamilyManualEvent[]).filter((e) => !e.deletedAt);
+            attendanceOverrides = parsed.attendanceOverrides || [];
+          } else if (Array.isArray(parsed)) {
+            customEvents = parsed;
+          }
         } catch {
           customEvents = [];
         }
@@ -602,16 +661,12 @@ export default {
         if (!ev.startTime || !ev.title) continue;
         const uid = `famday-${ev.id || Math.random().toString(36).slice(2)}@famday.app`;
         const startUtc = new Date(ev.startTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        let endUtc = ev.endTime
+        const endUtc = ev.endTime
           ? new Date(ev.endTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
           : new Date(new Date(ev.startTime).getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
         const descLines: string[] = [];
-        if (ev.isTraining) descLines.push('🏃 HARJOITUKSET');
-        if (ev.eventType === 'school') descLines.push('📚 KOULU / WILMA');
-        if (ev.notes) descLines.push(`📝 Huomiot & Kyydit: ${ev.notes}`);
-        if (ev.volunteerDuty) descLines.push(`☕ Talkoovuoro: ${ev.volunteerDuty}`);
-        if (ev.kitAdvice) descLines.push(`👕 Peliasu: ${ev.kitAdvice.primaryJerseyColor || ''}`);
+        if (ev.notes) descLines.push(`📝 Huomiot: ${ev.notes}`);
         descLines.push(`FamDay: https://pelipaiva.pages.dev/?perhe=${familyCode}`);
 
         lines.push('BEGIN:VEVENT');
@@ -620,13 +675,12 @@ export default {
         lines.push(`DTSTART:${startUtc}`);
         lines.push(`DTEND:${endUtc}`);
         lines.push(`SUMMARY:${(ev.title || 'Tapahtuma').replace(/,/g, '\\,')}`);
-        if (ev.venue?.name) lines.push(`LOCATION:${(ev.venue.name).replace(/,/g, '\\,')}`);
         lines.push(`DESCRIPTION:${descLines.join('\\n')}`);
         lines.push('STATUS:CONFIRMED');
         lines.push('END:VEVENT');
       }
 
-      const rosterEvents = await collectRosterIcsEvents(roster);
+      const rosterEvents = await collectRosterIcsEvents(roster, attendanceOverrides);
       for (const block of rosterEvents) {
         lines.push(block);
       }
