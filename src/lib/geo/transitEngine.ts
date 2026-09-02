@@ -40,8 +40,14 @@ export function resolveTransitPlan(
   overrideMode?: TransitMode,
   defaultDrivingMinutes = 20
 ): TransitPlan {
-  // If no home or venue coordinates available, fallback to car
-  if (!home || !venueCoords || !home.coordinates) {
+  // If no home or venue coordinates available, or coordinates are at (0,0) fallback, fallback to car
+  if (
+    !home ||
+    !venueCoords ||
+    !home.coordinates ||
+    (home.coordinates.lat === 0 && home.coordinates.lng === 0) ||
+    (venueCoords.lat === 0 && venueCoords.lng === 0)
+  ) {
     return {
       mode: 'car',
       distanceKm: 0,
