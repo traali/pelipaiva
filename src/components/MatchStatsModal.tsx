@@ -67,7 +67,8 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   onSavePlayerLog
 }) => {
   const stats: FullMatchStats = statsProp ?? {
-    leagueName: 'Ei virallisia tilastoja',
+    leagueName: 'Sarjaottelu',
+    isSynthetic: true,
     homeStanding: blankStanding(homeTeam),
     awayStanding: blankStanding(awayTeam),
     standingsTable: [],
@@ -84,6 +85,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
   const [isSatelliteDrawerOpen, setIsSatelliteDrawerOpen] = useState(false);
+  const footballMatchParam = `${homeTeam.replace(/\//g, ' ')} - ${awayTeam.replace(/\//g, ' ')}`;
 
   // Local state for recording player stats
   const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
@@ -260,22 +262,26 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
 
                 {/* Score / Live Clock */}
                 <div className="flex flex-col items-center">
-                  {stats.isSynthetic ? (
+                  {stats.isSynthetic || (!score && !stats.liveScore) ? (
                     <>
                       <span className="text-2xl md:text-3xl font-black text-text-secondary">vs</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
-                        Ei tuloksia vielä
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-pitch/15 border border-pitch/30 text-pitch mt-1">
+                        📅 Tuleva ottelu
                       </span>
                     </>
                   ) : (
                     <>
                       <div className="text-3xl md:text-4xl font-black font-tabular tracking-tight text-text-primary flex items-center justify-center gap-2">
-                        <span className="text-pitch">{stats.liveScore?.home ?? 0}</span>
+                        <span className="text-pitch">
+                          {stats.liveScore?.home ?? (score ? score.split('–')[0]?.trim() || score.split('-')[0]?.trim() : 0)}
+                        </span>
                         <span className="text-text-muted text-xl font-normal">-</span>
-                        <span className="text-radar">{stats.liveScore?.away ?? 0}</span>
+                        <span className="text-radar">
+                          {stats.liveScore?.away ?? (score ? score.split('–')[1]?.trim() || score.split('-')[1]?.trim() : 0)}
+                        </span>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
-                        {stats.liveScore?.period || 'Päättynyt'}
+                        {stats.liveScore?.period || (score ? 'Päättynyt' : '📅 Tuleva ottelu')}
                       </span>
                     </>
                   )}
@@ -328,7 +334,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   repo: 'football-stats',
                   name: '⚽ Football Stats (Night Captain)',
                   subtitle: 'Syväanalyysi, H2H & pelaajakortit',
-                  url: `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  url: `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(footballMatchParam)}`,
                   btnColor: 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
                 },
                 floorball: {
@@ -1057,7 +1063,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
             : sport === 'volleyball'
             ? `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
-            : `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`;
+            : `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(footballMatchParam)}?embed=true`;
 
         const title =
           sport === 'floorball'
