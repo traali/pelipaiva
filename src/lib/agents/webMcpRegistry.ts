@@ -13,6 +13,8 @@ import { calculateParkingRiskContract } from '../../types/contracts';
 export interface ModelContextTool {
   name: string;
   description: string;
+  readOnlyHint?: boolean;
+  untrustedContentHint?: boolean;
   inputSchema: {
     type: string;
     properties?: Record<string, unknown>;
@@ -25,7 +27,15 @@ export interface ModelContextRegistry {
   registerTool: (tool: ModelContextTool) => Promise<void> | void;
   unregisterTool?: (name: string) => Promise<void> | void;
   getTools: () => ModelContextTool[];
-  listTools: () => Promise<{ tools: Array<{ name: string; description: string; inputSchema: ModelContextTool['inputSchema'] }> }>;
+  listTools: () => Promise<{
+    tools: Array<{
+      name: string;
+      description: string;
+      readOnlyHint?: boolean;
+      untrustedContentHint?: boolean;
+      inputSchema: ModelContextTool['inputSchema'];
+    }>;
+  }>;
   callTool: (params: { name: string; arguments?: Record<string, unknown> }) => Promise<{
     content: Array<{ type: 'text'; text: string }>;
     isError?: boolean;
@@ -81,6 +91,8 @@ function ensureModelContextRegistry(): ModelContextRegistry {
       tools: Array.from(registeredTools.values()).map((t) => ({
         name: t.name,
         description: t.description,
+        readOnlyHint: t.readOnlyHint ?? true,
+        untrustedContentHint: t.untrustedContentHint ?? false,
         inputSchema: t.inputSchema,
       })),
     }),
@@ -182,6 +194,8 @@ export async function registerPelipaivaWebMCP(): Promise<ModelContextRegistry | 
     await registry.registerTool({
       name: 'get_matchday_schedule',
       description: 'Returns the list of junior sports matches, training sessions, and school events for the family matchday schedule.',
+      readOnlyHint: true,
+      untrustedContentHint: false,
       inputSchema: {
         type: 'object',
         properties: {
@@ -232,6 +246,8 @@ export async function registerPelipaivaWebMCP(): Promise<ModelContextRegistry | 
     await registry.registerTool({
       name: 'check_parking_risk',
       description: 'Calculates parking safety score (1-10 risk rating), zone rules, and fine likelihood for a sports venue via ParkkiS data contract.',
+      readOnlyHint: true,
+      untrustedContentHint: false,
       inputSchema: {
         type: 'object',
         properties: {
@@ -267,6 +283,8 @@ export async function registerPelipaivaWebMCP(): Promise<ModelContextRegistry | 
     await registry.registerTool({
       name: 'get_family_profiles',
       description: 'Lists all registered child/family player profiles in the local Pelipäivä PWA database.',
+      readOnlyHint: true,
+      untrustedContentHint: false,
       inputSchema: {
         type: 'object',
         properties: {},
