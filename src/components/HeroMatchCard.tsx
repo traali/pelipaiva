@@ -38,6 +38,7 @@ interface HeroMatchCardProps {
   profile?: PlayerProfile;
   kit?: SportKitPlan;
   conflicts: FamilyConflict[];
+  showConflictWarnings?: boolean;
   homeLocation?: import('../types/matchday').HomeLocation;
   onNavigate?: () => void;
   onOpenStats?: () => void;
@@ -55,6 +56,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   profile,
   kit,
   conflicts,
+  showConflictWarnings = true,
   homeLocation,
   onNavigate,
   onOpenStats,
@@ -495,7 +497,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         )}
 
         {/* Conflicts Alert with Acknowledge / Dismiss Action (Consolidated) */}
-        {!isOut && consolidatedConflictGroups.map((group) => (
+        {!isOut && showConflictWarnings && consolidatedConflictGroups.map((group) => (
           <div
             key={group.id}
             role="alert"

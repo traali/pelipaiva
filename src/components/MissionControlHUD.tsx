@@ -27,6 +27,8 @@ interface MissionControlHUDProps {
   onAmbient: () => void;
   onLogistics: () => void;
   onImport: () => void;
+  showConflictWarnings?: boolean;
+  onToggleConflictWarnings?: () => void;
   onOpenHomeLocation?: () => void;
   onAsk?: () => void;
   onClear: () => void;
@@ -37,6 +39,8 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
   isOffline,
   isSyncing,
   isDemo,
+  showConflictWarnings = true,
+  onToggleConflictWarnings,
   onRefresh,
   onShare,
   onAmbient,
@@ -180,6 +184,15 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                     onClick={() => {
                       onAsk();
                       setMenuOpen(false);
+                    }}
+                  />
+                )}
+                {onToggleConflictWarnings && (
+                  <MenuItem
+                    icon={<AlertTriangle className={`h-4 w-4 ${showConflictWarnings ? 'text-whistle' : 'text-text-muted'}`} />}
+                    label={showConflictWarnings ? 'Varoitukset: Päällä' : 'Varoitukset: Piilotettu'}
+                    onClick={() => {
+                      onToggleConflictWarnings();
                     }}
                   />
                 )}

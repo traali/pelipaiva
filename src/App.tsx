@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo, useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteOfficialTeamData, ensureStoragePersistence, clearAllDatabaseData } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
@@ -99,6 +99,22 @@ export const App: React.FC = () => {
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
   const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
+  const [showConflictWarnings, setShowConflictWarnings] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pelipaiva_show_conflict_warnings') !== 'false';
+    }
+    return true;
+  });
+
+  const toggleConflictWarnings = useCallback(() => {
+    setShowConflictWarnings((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pelipaiva_show_conflict_warnings', String(next));
+      }
+      return next;
+    });
+  }, []);
 
   // Listen to network status changes & background family sync
   useEffect(() => {
@@ -1032,6 +1048,8 @@ export const App: React.FC = () => {
         isOffline={isOffline}
         isSyncing={isSyncing}
         isDemo={isDemoActive}
+        showConflictWarnings={showConflictWarnings}
+        onToggleConflictWarnings={toggleConflictWarnings}
         onRefresh={handleRefreshAll}
         onShare={() => setIsFamilyShareOpen(true)}
         onAmbient={() => setIsAmbientMode(true)}
@@ -1229,7 +1247,7 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {unDismissedConflicts.length > 0 && (() => {
+        {showConflictWarnings && unDismissedConflicts.length > 0 && (() => {
           const firstConflict = unDismissedConflicts[0]!;
           const dateLabel = firstConflict.formattedDate || (firstConflict.date ? firstConflict.date.slice(5) : '');
 
@@ -1388,6 +1406,7 @@ export const App: React.FC = () => {
                               profile={snapshot.nextPlayer || profile}
                               kit={snapshot.kitByEventId[event.id]}
                               conflicts={snapshot.conflicts}
+                              showConflictWarnings={showConflictWarnings}
                               homeLocation={homeLocation}
                               onOpenHomeModal={() => setIsHomeLocationOpen(true)}
                               onNavigate={() => {
@@ -1428,6 +1447,7 @@ export const App: React.FC = () => {
                             profile={profile}
                             compact
                             conflicts={snapshot.conflicts}
+                            showConflictWarnings={showConflictWarnings}
                             homeLocation={homeLocation}
                             onOpenHomeModal={() => setIsHomeLocationOpen(true)}
                             onResolveMismatch={handleResolveMismatch}
@@ -1591,6 +1611,8 @@ export const App: React.FC = () => {
         onClose={() => setIsFamilyManageOpen(false)}
         profiles={profiles}
         homeLocation={homeLocation}
+        showConflictWarnings={showConflictWarnings}
+        onToggleConflictWarnings={toggleConflictWarnings}
         onOpenHomeLocation={() => {
           setIsFamilyManageOpen(false);
           setIsHomeLocationOpen(true);

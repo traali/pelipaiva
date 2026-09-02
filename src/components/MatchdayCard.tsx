@@ -68,6 +68,7 @@ interface MatchdayCardProps {
   profile?: PlayerProfile;
   compact?: boolean;
   conflicts?: FamilyConflict[];
+  showConflictWarnings?: boolean;
   homeLocation?: HomeLocation;
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
@@ -86,6 +87,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   profile,
   compact = false,
   conflicts,
+  showConflictWarnings = true,
   homeLocation,
   onNavigateToVenue,
   onResolveMismatch,
@@ -601,7 +603,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         </div>
 
         {/* Overlap & Driving Buffer Conflict Warning Banner (Consolidated) */}
-        {!isOut && consolidatedConflictGroups.length > 0 && (
+        {!isOut && showConflictWarnings && consolidatedConflictGroups.length > 0 && (
           <div className="mb-4 flex flex-col gap-2.5">
             {consolidatedConflictGroups.map((group) => (
               <div

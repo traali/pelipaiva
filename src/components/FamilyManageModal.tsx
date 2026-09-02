@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2 } from 'lucide-react';
+import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2, AlertTriangle } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { formatHomeTransitSummary } from '../lib/storage/homeLocation';
@@ -15,6 +15,8 @@ interface FamilyManageModalProps {
   onClose: () => void;
   profiles: PlayerProfile[];
   homeLocation?: HomeLocation;
+  showConflictWarnings?: boolean;
+  onToggleConflictWarnings?: () => void;
   onOpenHomeLocation?: () => void;
   onOpenImportForPlayer: (playerName: string) => void;
   onEditProfile: (profile: PlayerProfile) => void;
@@ -27,6 +29,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   onClose,
   profiles,
   homeLocation,
+  showConflictWarnings = true,
+  onToggleConflictWarnings,
   onOpenHomeLocation,
   onOpenImportForPlayer,
   onEditProfile,
@@ -502,6 +506,37 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 className="px-3 py-1 rounded-xl bg-stoppage text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer shadow-sm"
               >
                 Kumoa
+              </button>
+            </div>
+          )}
+
+          {/* Settings Section: Conflict & Logistics Warnings Toggle */}
+          {onToggleConflictWarnings && (
+            <div className="p-3.5 rounded-2xl bg-surface-elevated/60 border border-border-subtle flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`p-2 rounded-xl shrink-0 ${showConflictWarnings ? 'bg-whistle/15 text-whistle' : 'bg-surface-base text-text-muted'}`}>
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-text-primary">
+                    Päällekkäisyys- ja kyytivaroitukset
+                  </div>
+                  <div className="text-[11px] text-text-secondary">
+                    {showConflictWarnings ? 'Varoitukset näkyvät aikataulussa ja peleissä' : 'Varoitukset on piilotettu näkyvistä'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleConflictWarnings}
+                className={`touch-target min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  showConflictWarnings
+                    ? 'bg-whistle text-text-inverse border-whistle shadow-xs hover:brightness-105'
+                    : 'bg-surface-base text-text-muted border-border-strong hover:text-text-primary'
+                }`}
+                title="Kytke päälle tai pois"
+              >
+                {showConflictWarnings ? 'Päällä' : 'Pois'}
               </button>
             </div>
           )}
