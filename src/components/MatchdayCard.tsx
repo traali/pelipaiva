@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Clock,
@@ -27,35 +27,14 @@ import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventChatModal } from './EventChatModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
 import { Edit3, FileText } from 'lucide-react';
-import type { PitchSurface } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
 import { resolveTransitPlan } from '../lib/geo/transitEngine';
 import type { HomeLocation } from '../types/matchday';
-import { useDismissedConflicts, groupActiveConflicts } from '../lib/agents/conflictDismissal';
-import { recordAttendanceOverride } from '../lib/sync/familyCloud';
-
-function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
-  if (indoor) return 'Sisähalli';
-  switch (surface) {
-    case 'artificial_turf_3g':
-      return 'Tekonurmi 3G';
-    case 'sand_artificial_turf':
-      return 'Hiekkatekonurmi';
-    case 'natural_grass':
-      return 'Luonnonnurmi';
-    case 'indoor_parquet':
-      return 'Parketti';
-    case 'indoor_synthetic':
-      return 'Sisäalusta';
-    case 'gravel':
-      return 'Hiekka';
-    default:
-      return 'Kenttä';
-  }
-}
+import { useMatchdayLogistics, surfaceLabel } from '../hooks/useMatchdayLogistics';
+import { TalkooDutyTag } from './matchday';
 
 import { EventMergeModal } from './EventMergeModal';
 import { MoreHorizontal } from 'lucide-react';
@@ -106,51 +85,34 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
   const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
 
-  const { isDismissed, dismiss: dismissConflict, restore: restoreConflict } = useDismissedConflicts();
-  const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
-  const [isOutExpanded, setIsOutExpanded] = useState(false);
-
-  const { activeConflicts, dismissedConflicts } = useMemo(() => {
-    const raw = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
-    const related = Array.from(
-      new Map(raw.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
-    );
-    const active = related.filter((c) => !isDismissed(c));
-    const dismissed = related.filter((c) => isDismissed(c));
-    return {
-      rawConflicts: raw,
-      relatedConflicts: related,
-      activeConflicts: active,
-      dismissedConflicts: dismissed
-    };
-  }, [conflicts, event.id, isDismissed]);
-
-  const consolidatedConflictGroups = useMemo(() => groupActiveConflicts(activeConflicts), [activeConflicts]);
-
-  const transitPlan = useMemo(
-    () => event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather),
-    [event.transit, homeLocation, event.venue?.coordinates, event.weather]
-  );
+  const {
+    transitPlan,
+    isLive,
+    isPast,
+    formattedKickoff,
+    formattedWarmup,
+    isTraining,
+    isSchool,
+    isOther,
+    isOut,
+    isOutExpanded,
+    setIsOutExpanded,
+    handleToggleAttendance,
+    dismissedConflicts,
+    consolidatedConflictGroups,
+    dismissConflict,
+    restoreConflict,
+    showDismissedConflicts,
+    setShowDismissedConflicts,
+  } = useMatchdayLogistics({
+    event,
+    conflicts,
+    homeLocation,
+    currentScore,
+    onEventUpdated,
+  });
 
   const venue = isVenueModalOpen ? localVenue : event.venue;
-  const isLive =
-    new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
-  const isPast =
-    new Date(event.endTime) <= new Date() || currentScore !== undefined;
-  const formattedKickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Helsinki'
-  });
-  const formattedWarmup = new Date(event.warmupTime).toLocaleTimeString('fi-FI', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Helsinki'
-  });
-
-  const isTraining = event.isTraining || event.eventType === 'training';
-  const isSchool = event.sport === 'school' || event.eventType === 'school';
-  const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
 
   const handleOpenStats = () => {
     let resolved = stats;
@@ -201,23 +163,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     if (event.briefing?.postMatchWhatsAppTemplate) {
       const text = encodeURIComponent(event.briefing.postMatchWhatsAppTemplate);
       window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  const isOut = event.attendanceStatus === 'out';
-
-  const handleToggleAttendance = async (newStatus: 'in' | 'out') => {
-    try {
-      setIsOutExpanded(false);
-      const updated: MatchdayEvent = {
-        ...event,
-        attendanceStatus: newStatus
-      };
-      const sync = await db.syncState.get('family').catch(() => null);
-      await recordAttendanceOverride(sync?.syncKey || '', event.id, newStatus, db);
-      onEventUpdated?.(updated);
-    } catch (err) {
-      console.error('Failed to toggle attendance', err);
     }
   };
 
@@ -406,9 +351,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </span>
 
             {event.volunteerDuty && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-whistle/15 text-whistle border border-whistle/25">
-                {event.volunteerDuty}
-              </span>
+              <TalkooDutyTag duty={event.volunteerDuty} />
             )}
 
             {(event.isTournament || event.tournamentName || /turnaus|tournament|cup\b|memorial/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)) && (

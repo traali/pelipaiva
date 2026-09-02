@@ -8,17 +8,8 @@ import {
   Calendar,
   Sparkles,
   CheckCircle2,
-  Loader2,
-  Upload,
-  Plus,
-  Trophy,
   AlertTriangle,
-  HelpCircle,
   ShieldCheck,
-  Search,
-  Filter,
-  Save,
-  RefreshCw,
   Edit3
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
@@ -36,11 +27,16 @@ import { recordManualFamilyEvent } from '../lib/sync/familyCloud';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
-import { searchPopularClubs, type ClubPreset } from '../lib/clubs/popularClubsCatalog';
-import { parseAssociationUrl, getAssociationName } from '../lib/stats/statsEngine';
+import { type ClubPreset } from '../lib/clubs/popularClubsCatalog';
+import { parseAssociationUrl } from '../lib/stats/statsEngine';
 import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsParser';
 import { fetchRawIcsFeed } from '../lib/clubs/ingestOfficial';
-import { TeamColorPicker } from './TeamColorPicker';
+import {
+  ClassicUrlImportTab,
+  MessageNlpImportTab,
+  SpreadsheetImportTab,
+  CameraOcrImportTab
+} from './import/tabs';
 
 export type ImportTab = 'classic' | 'message' | 'table' | 'ocr';
 
@@ -108,7 +104,6 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [classicUrl, setClassicUrl] = useState(initialTeamUrl || '');
   const [classicTeamName, setClassicTeamName] = useState(initialTeamName || '');
   const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
-  const [showGuide, setShowGuide] = useState(false);
   const [clubSearchQuery, setClubSearchQuery] = useState('');
   const [clubMatches, setClubMatches] = useState<ClubPreset[]>([]);
   const [discoveredCategories, setDiscoveredCategories] = useState<FeedCategory[]>([]);
@@ -227,8 +222,6 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     }
     scanIcsCategories(val);
   };
-
-  const detectedAssoc = parseAssociationUrl(classicUrl);
 
   // Parse multi-match freeform text
   const handleParseMessage = () => {
@@ -656,466 +649,72 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
               </div>
             )}
 
-            {/* TAB 1: Classic URL & Preset Cups & Club Search */}
             {activeTab === 'classic' && (
-              <div className="flex flex-col gap-4">
-                {/* Preset Cups Carousel & Club Quick Finder (shown when adding new team) */}
-                {!isEditing && (
-                  <>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-bold text-text-secondary">
-                        Valmiit turnaukset (1-napin liitos):
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                        {EXAMPLE_TOURNAMENTS.map((cup) => (
-                          <button
-                            key={cup.id}
-                            type="button"
-                            onClick={() => handleSelectCupPreset(cup)}
-                            className="flex items-center gap-2 p-2 rounded-xl border border-border-subtle bg-surface-elevated text-left hover:border-pitch cursor-pointer transition-all"
-                          >
-                            <span
-                              className="h-3 w-3 shrink-0 rounded-full"
-                              style={{ background: cup.colorHex }}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-xs font-bold text-text-primary">{cup.name}</div>
-                              <div className="truncate text-[10px] text-text-muted">{cup.teamName}</div>
-                            </div>
-                            <Plus className="h-3.5 w-3.5 shrink-0 text-pitch" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Club Quick Finder */}
-                    <div>
-                      <label className="mb-1 block text-xs font-semibold text-text-secondary flex items-center gap-1">
-                        <Search className="w-3.5 h-3.5 text-pitch" />
-                        <span>Pikahaku seuroista (HJK, Honka, ErVi, TOPOLA...):</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={clubSearchQuery}
-                        placeholder="Kirjoita seuran nimi..."
-                        onChange={(e) => {
-                          const q = e.target.value;
-                          setClubSearchQuery(q);
-                          setClubMatches(q.trim().length > 1 ? searchPopularClubs(q).slice(0, 5) : []);
-                        }}
-                        className="w-full rounded-xl border border-pitch/30 bg-pitch/10 px-3.5 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-pitch focus:outline-none"
-                      />
-                      {clubMatches.length > 0 && (
-                        <div className="mt-1.5 flex flex-col gap-1" role="listbox" aria-label="Seuraehdotukset">
-                          {clubMatches.map((club) => (
-                            <button
-                              key={club.id}
-                              type="button"
-                              role="option"
-                              aria-selected={false}
-                              onClick={() => {
-                                setClassicTeamName(club.name);
-                                setSelectedSport(club.sport);
-                                setClassicUrl(club.sampleTeamUrl);
-                                setColorHex(club.colorHex);
-                                setClubMatches([]);
-                                setClubSearchQuery('');
-                              }}
-                              className="text-left p-2 rounded-lg bg-surface-elevated border border-border-subtle hover:border-pitch/50 text-[11px] text-text-primary cursor-pointer"
-                            >
-                              <span className="font-bold">{club.name}</span>
-                              <span className="text-text-secondary"> · {club.city}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                <form onSubmit={handleClassicSubmit} className="flex flex-col gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-text-secondary mb-1">
-                      Joukkueen nimi *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="esim. HJK T13 Sininen tai PPJ/Laru"
-                      value={classicTeamName}
-                      onChange={(e) => setClassicTeamName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch font-medium"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-text-secondary">
-                        Liiton joukkuesivu tai .ics-osoite *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowGuide(!showGuide)}
-                        className="flex cursor-pointer items-center gap-0.5 text-[11px] text-pitch hover:underline"
-                      >
-                        <HelpCircle className="h-3 w-3" />
-                        <span>Tuetut osoitteet</span>
-                      </button>
-                    </div>
-
-                    <input
-                      id="classic-cal-url"
-                      name="classicCalendarUrl"
-                      type="url"
-                      placeholder="Liitä linkki (esim. *.torneopal.fi/taso/joukkue.php?joukkue=... tai webcal://...)"
-                      value={classicUrl}
-                      onChange={(e) => handleUrlChange(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border-strong text-text-primary font-mono text-xs focus:outline-none focus:border-pitch"
-                    />
-
-                    {detectedAssoc && (
-                      <div className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-pitch/10 px-3 py-1.5 text-xs font-medium text-pitch">
-                        <Trophy className="h-3.5 w-3.5" />
-                        <span>
-                          {getAssociationName(detectedAssoc.association)} · Tiimi #{detectedAssoc.teamId}
-                        </span>
-                      </div>
-                    )}
-
-                    {showGuide && (
-                      <div className="mt-2 flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-elevated p-3 text-[11px] text-text-secondary">
-                        <div>🏆 Torneopal turnaukset & sarjat: *.torneopal.fi/taso/joukkue.php?joukkue={'{id}'}</div>
-                        <div>⚽ Palloliitto: tulospalvelu.palloliitto.fi/team/{'{id}'}</div>
-                        <div>🏑 Salibandy: tulospalvelu.salibandy.fi/team/{'{id}'}</div>
-                        <div>🏀 Basket.fi: basket.fi/.../?team_id={'{id}'}</div>
-                        <div>🏐 Lentopallo: tulospalvelu.lentopallo.fi/team/{'{id}'}</div>
-                        <div>📅 Kalenterit: Nimenhuuto, MyClub, Jopox (.ics / webcal://)</div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-text-secondary">
-                      Joukkueen väri
-                    </label>
-                    <TeamColorPicker value={colorHex} onChange={(hex) => setColorHex(hex)} />
-                  </div>
-
-                  {/* Discovered Categories / Squads & Re-fetch Action (Nimenhuuto / MyClub / .ics) */}
-                  {/\.ics|webcal:|nimenhuuto\.com|myclub\.fi|jopox\.fi/i.test(classicUrl) && (
-                    <div className="p-3.5 rounded-2xl bg-surface border border-pitch/30 flex flex-col gap-2.5 shadow-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
-                          <Filter className="w-3.5 h-3.5 text-pitch" />
-                          <span>
-                            {discoveredCategories.length > 0
-                              ? `Tunnistetut tapahtumaluokat (${discoveredCategories.length}):`
-                              : 'Kalenterin tapahtumaluokat:'}
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => scanIcsCategories(classicUrl)}
-                          disabled={isScanningCategories}
-                          className="text-xs font-bold text-pitch hover:underline flex items-center gap-1 px-2.5 py-1 rounded-lg bg-pitch/10 cursor-pointer disabled:opacity-50 transition-colors"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isScanningCategories ? 'animate-spin' : ''}`} />
-                          <span>{isScanningCategories ? 'Haetaan…' : 'Hae luokat uudelleen'}</span>
-                        </button>
-                      </div>
-
-                      {isScanningCategories ? (
-                        <div className="py-2 flex items-center gap-2 text-xs text-text-muted">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-pitch" />
-                          <span>Haetaan ja analysoidaan kalenterin tapahtumaluokat...</span>
-                        </div>
-                      ) : discoveredCategories.length > 0 ? (
-                        <>
-                          <p className="text-[11px] text-text-muted">
-                            Valitse mitä haluat mukaan (vihreä = mukana, yliviivattu = jätetään pois):
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {discoveredCategories.map((cat) => {
-                              const isExcluded = excludedCategories.includes(cat.name);
-                              return (
-                                <button
-                                  key={cat.name}
-                                  type="button"
-                                  onClick={() => {
-                                    setExcludedCategories((prev) =>
-                                      prev.includes(cat.name)
-                                        ? prev.filter((c) => c !== cat.name)
-                                        : [...prev, cat.name]
-                                    );
-                                  }}
-                                  className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    isExcluded
-                                      ? 'bg-surface-elevated text-text-muted line-through border border-dashed border-border-strong opacity-60'
-                                      : 'bg-pitch/15 text-pitch border border-pitch/30 hover:bg-pitch/25'
-                                  }`}
-                                >
-                                  <span>{isExcluded ? '✕' : '✓'}</span>
-                                  <span>{cat.name}</span>
-                                  <span className="text-[10px] opacity-75">({cat.count})</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-[11px] text-text-muted">
-                          Paina <strong>"Hae luokat uudelleen"</strong> lukeaksesi MyClub / Nimenhuuto -tapahtumaluokat (treenit, pelit, peliryhmät) ja valitaksesi mitä haluat mukaan.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="mt-2 py-3 px-4 rounded-xl bg-pitch text-text-inverse font-black text-xs flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-md shadow-pitch/25 disabled:opacity-50 transition-all"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : isEditing ? (
-                      <Save className="w-4 h-4" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                    <span>
-                      {isSaving
-                        ? isEditing
-                          ? 'Tallennetaan muutoksia…'
-                          : 'Haetaan otteluita…'
-                        : isEditing
-                        ? `Tallenna muutokset · ${selectedPlayer}`
-                        : `Tuo joukkue · ${selectedPlayer}`}
-                    </span>
-                  </button>
-                </form>
-              </div>
+              <ClassicUrlImportTab
+                isEditing={isEditing}
+                exampleTournaments={EXAMPLE_TOURNAMENTS}
+                handleSelectCupPreset={handleSelectCupPreset}
+                clubSearchQuery={clubSearchQuery}
+                setClubSearchQuery={setClubSearchQuery}
+                clubMatches={clubMatches as any}
+                setClubMatches={setClubMatches as any}
+                setClassicTeamName={setClassicTeamName}
+                setSelectedSport={setSelectedSport}
+                setClassicUrl={handleUrlChange}
+                setColorHex={setColorHex}
+                classicUrl={classicUrl}
+                classicTeamName={classicTeamName}
+                colorHex={colorHex}
+                discoveredCategories={discoveredCategories}
+                excludedCategories={excludedCategories}
+                setExcludedCategories={setExcludedCategories}
+                isScanningCategories={isScanningCategories}
+                scanIcsCategories={scanIcsCategories}
+                handleClassicSubmit={handleClassicSubmit}
+                isSaving={isSaving}
+                selectedPlayer={selectedPlayer}
+              />
             )}
 
-            {/* TAB 2: WhatsApp Multi-Match Parser */}
             {activeTab === 'message' && (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-text-secondary">
-                  Liitä valmentajan WhatsApp-viesti (tukee myös koko viikonlopun turnausviestejä):
-                </p>
-                <textarea
-                  rows={4}
-                  value={pastedMessage}
-                  onChange={(e) => setPastedMessage(e.target.value)}
-                  placeholder="Esim: Lauantaina 24.8. turnaus Väiskillä:&#10;klo 10:00 vs KäPa&#10;klo 13:00 vs Honka&#10;Mustat paidat päälle. Maijalla kahviovuoro klo 12-14."
-                  className="w-full p-3 rounded-2xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
-                />
-
-                <button
-                  type="button"
-                  onClick={handleParseMessage}
-                  disabled={!pastedMessage.trim()}
-                  className="py-2.5 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer disabled:opacity-50 shadow-sm"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Jäsennä ottelutiedot tekoälyllä</span>
-                </button>
-
-                {parseNotice && (
-                  <p role="status" className="p-2.5 rounded-xl bg-whistle/15 border border-whistle/40 text-[11px] font-semibold text-text-primary">
-                    {parseNotice}
-                  </p>
-                )}
-
-                <div aria-live="polite">
-                  {extractedMessageEvents.length > 0 && (
-                    <div className="mt-3 p-4 rounded-2xl bg-surface border border-pitch/40 flex flex-col gap-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-pitch flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>Tunnistettu {extractedMessageEvents.length} {extractedMessageEvents.length === 1 ? 'tapahtuma' : 'ottelua'}:</span>
-                        </span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-pitch/15 text-pitch font-bold">
-                          {extractedMessageEvents[0]?.dateStr}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 max-h-56 overflow-y-auto">
-                        {extractedMessageEvents.map((ev, idx) => (
-                          <div key={idx} className="p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-xs">
-                            <div className="font-bold text-text-primary">{ev.title}</div>
-                            <div className="text-[11px] text-text-secondary mt-0.5">
-                              📍 {ev.venueHint || (ev.sport === 'school' ? 'Koulu' : 'Paikka ilmoitetaan')} • ⏰ {ev.sport === 'school' || ev.sport === 'other' || ev.eventType === 'school' || ev.eventType === 'meeting' || ev.eventType === 'other' ? `Klo ${ev.kickoffTime}` : `Klo ${ev.kickoffTime} (Alkulämpö ${ev.warmupTime})`}
-                            </div>
-                            {ev.volunteerDuties.length > 0 && (
-                              <div className="text-[11px] text-whistle font-semibold mt-0.5">
-                                {ev.volunteerDuties.join(' • ')}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSaveEvents(extractedMessageEvents)}
-                        disabled={isSaving}
-                        className="mt-1 py-2.5 px-3 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer shadow-md shadow-pitch/20"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Tallenna kaikki {extractedMessageEvents.length} ottelua ({selectedPlayer})</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MessageNlpImportTab
+                pastedMessage={pastedMessage}
+                setPastedMessage={setPastedMessage}
+                handleParseMessage={handleParseMessage}
+                parseNotice={parseNotice}
+                extractedMessageEvents={extractedMessageEvents}
+                handleSaveEvents={handleSaveEvents}
+                isSaving={isSaving}
+                selectedPlayer={selectedPlayer}
+              />
             )}
 
-            {/* TAB 3: Table / Excel */}
             {activeTab === 'table' && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-text-secondary">
-                    Kopioi taulukko Sheetsistä/Excelistä tai lataa tiedosto (.csv, .tsv, .txt):
-                  </p>
-                  <label className="px-2.5 py-1 rounded-lg bg-surface text-text-primary text-[11px] font-bold border border-border-strong hover:border-pitch cursor-pointer flex items-center gap-1">
-                    <Upload className="w-3 h-3" />
-                    <span>Lataa tiedosto</span>
-                    <input type="file" accept=".csv,.tsv,.txt" onChange={handleFileUpload} className="hidden" />
-                  </label>
-                </div>
-
-                <textarea
-                  rows={4}
-                  value={pastedTableText}
-                  onChange={(e) => setPastedTableText(e.target.value)}
-                  placeholder="Pvm&#9;Klo&#9;Ottelu&#9;Kenttä&#9;Kahviovuoro&#10;24.8.&#9;15:00&#9;HJK vs Honka&#9;Väiski&#9;Maija&#10;31.8.&#9;12:00&#9;EPS vs HJK&#9;Tapiola 2&#9;Eemil"
-                  className="w-full p-3 rounded-2xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch resize-none font-mono"
-                />
-
-                <button
-                  type="button"
-                  onClick={handleParseTable}
-                  disabled={!pastedTableText.trim()}
-                  className="py-2.5 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Jäsennä taulukon ottelut</span>
-                </button>
-
-                {parseNotice && (
-                  <p role="status" className="p-2.5 rounded-xl bg-whistle/15 border border-whistle/40 text-[11px] font-semibold text-text-primary">
-                    {parseNotice}
-                  </p>
-                )}
-
-                <div aria-live="polite">
-                  {extractedTableEvents.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      <div className="text-xs font-bold text-text-primary">
-                        Löydetty {extractedTableEvents.length} ottelua:
-                      </div>
-                      <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5">
-                        {extractedTableEvents.map((ev, idx) => (
-                          <div key={idx} className="p-2.5 rounded-xl bg-surface border border-border-subtle text-xs flex items-center justify-between">
-                            <div>
-                              <span className="font-bold">{ev.dateStr} klo {ev.kickoffTime}</span>: {ev.title} @ {ev.venueHint}
-                              {ev.volunteerDuties.length > 0 && (
-                                <div className="text-[11px] text-whistle font-semibold">{ev.volunteerDuties.join(', ')}</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSaveEvents(extractedTableEvents)}
-                        disabled={isSaving}
-                        className="py-2.5 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Tallenna kaikki {extractedTableEvents.length} ottelua</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <SpreadsheetImportTab
+                pastedTableText={pastedTableText}
+                setPastedTableText={setPastedTableText}
+                handleFileUpload={handleFileUpload}
+                handleParseTable={handleParseTable}
+                parseNotice={parseNotice}
+                extractedTableEvents={extractedTableEvents}
+                handleSaveEvents={handleSaveEvents}
+                isSaving={isSaving}
+              />
             )}
 
-            {/* TAB 4: OCR Screenshot */}
             {activeTab === 'ocr' && (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-text-secondary">
-                  Lataa kuvakaappaus otteluohjelmasta tai kahviovuorolistasta:
-                </p>
-
-                <div className="p-6 rounded-2xl border-2 border-dashed border-border-strong hover:border-pitch transition-all flex flex-col items-center justify-center gap-2 text-center bg-surface-elevated/40">
-                  <Camera className="w-8 h-8 text-pitch" />
-                  <div className="text-xs font-bold text-text-primary">Valitse tai pudota kuva tähän</div>
-                  <p className="text-[11px] text-text-muted">PNG, JPG, WebP, Screenshot</p>
-                  <label className="mt-2 px-3 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer">
-                    <span>Valitse kuvatiedosto</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleImageOcr(f);
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                <div aria-live="polite">
-                  {isOcrProcessing && (
-                    <div className="p-4 rounded-2xl bg-surface border border-pitch/30 flex items-center gap-3">
-                      <Loader2 className="w-5 h-5 text-pitch animate-spin shrink-0" />
-                      <div className="flex-1">
-                        <div className="text-xs font-bold text-text-primary">{ocrStatus}</div>
-                        <div className="w-full bg-border-subtle h-1.5 rounded-full mt-1.5 overflow-hidden">
-                          <div
-                            className="bg-pitch h-full transition-all duration-300"
-                            style={{ width: `${Math.round(ocrProgress * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!isOcrProcessing && parseNotice && (
-                    <p role="status" className="mt-3 p-2.5 rounded-xl bg-whistle/15 border border-whistle/40 text-[11px] font-semibold text-text-primary">
-                      {parseNotice}
-                    </p>
-                  )}
-
-                  {ocrExtractedEvents.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      <div className="text-xs font-bold text-text-primary">
-                        OCR tunnisti {ocrExtractedEvents.length} ottelua:
-                      </div>
-                      <div className="max-h-48 overflow-y-auto flex flex-col gap-1.5">
-                        {ocrExtractedEvents.map((ev, idx) => (
-                          <div key={idx} className="p-2.5 rounded-xl bg-surface border border-border-subtle text-xs">
-                            <span className="font-bold">{ev.dateStr} klo {ev.kickoffTime}</span>: {ev.title} @ {ev.venueHint}
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSaveEvents(ocrExtractedEvents)}
-                        disabled={isSaving}
-                        className="py-2.5 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Tallenna {ocrExtractedEvents.length} ottelua</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <CameraOcrImportTab
+                handleImageOcr={handleImageOcr}
+                isOcrProcessing={isOcrProcessing}
+                ocrStatus={ocrStatus}
+                ocrProgress={ocrProgress}
+                parseNotice={parseNotice}
+                ocrExtractedEvents={ocrExtractedEvents}
+                handleSaveEvents={handleSaveEvents}
+                isSaving={isSaving}
+                selectedPlayer={selectedPlayer}
+              />
             )}
-
 
             {/* Success Message Banner */}
             {successMessage && (

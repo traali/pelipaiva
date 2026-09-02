@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteOfficialTeamData, ensureStoragePersistence, clearAllDatabaseData } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
@@ -9,7 +9,6 @@ import { MatchdayEvent, SportType, PlayerProfile, HomeLocation } from './types/m
 import { LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon, Trophy } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
-import { MatchStatsModal } from './components/MatchStatsModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
 import { DifficultDayAlert } from './components/DifficultDayAlert';
@@ -32,46 +31,14 @@ import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 import { LiveMatchToast } from './components/LiveMatchToast';
-import { SatelliteEmbedDrawer } from './components/SatelliteEmbedDrawer';
+import { useModalStore } from './lib/modals/useModalStore';
+import { GlobalModalHost } from './components/modals';
 
-const SmartImportModal = lazy(() =>
-  import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
-);
-const FamilyLogisticsModal = lazy(() =>
-  import('./components/FamilyLogisticsModal').then((m) => ({ default: m.FamilyLogisticsModal }))
-);
-const AskCopilotModal = lazy(() =>
-  import('./components/AskCopilotModal').then((m) => ({ default: m.AskCopilotModal }))
-);
-const FamilyShareModal = lazy(() =>
-  import('./components/FamilyShareModal').then((m) => ({ default: m.FamilyShareModal }))
-);
-const FamilyManageModal = lazy(() =>
-  import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
-);
-const FamilyCalendarModal = lazy(() =>
-  import('./components/FamilyCalendarModal').then((m) => ({ default: m.FamilyCalendarModal }))
-);
-const HomeLocationModal = lazy(() =>
-  import('./components/HomeLocationModal').then((m) => ({ default: m.HomeLocationModal }))
-);
+
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
-  const [isSmartImportOpen, setIsSmartImportOpen] = useState<boolean>(false);
-  const [isLogisticsOpen, setIsLogisticsOpen] = useState<boolean>(false);
-  const [isHomeLocationOpen, setIsHomeLocationOpen] = useState<boolean>(false);
-  const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
-  const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
-  const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState<boolean>(false);
-  const [selectedStatsEvent, setSelectedStatsEvent] = useState<MatchdayEvent | null>(null);
-  const [liveDrawer, setLiveDrawer] = useState<{
-    isOpen: boolean;
-    sport: 'parkkis' | 'football-stats' | 'volleyball-stats' | 'floorball-stats' | 'basketball-stats';
-    matchId: string;
-    title: string;
-  } | null>(null);
+  const modalStore = useModalStore();
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
@@ -86,15 +53,6 @@ export const App: React.FC = () => {
   const [eventTypeFilter, setEventTypeFilter] = useState<
     'all' | 'tournaments' | 'matches' | 'trainings' | 'other'
   >('all');
-  const [importDefaults, setImportDefaults] = useState<{
-    sport?: SportType;
-    url?: string;
-    name?: string;
-    playerName?: string;
-    colorHex?: string;
-    squadFilters?: string[];
-    profileId?: string;
-  }>({});
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
@@ -460,8 +418,8 @@ export const App: React.FC = () => {
 
   const handleEventUpdated = async (updated: MatchdayEvent) => {
     await db.events.put(updated).catch(console.warn);
-    if (selectedStatsEvent?.id === updated.id) {
-      setSelectedStatsEvent(updated);
+    if (modalStore.activeModal?.type === 'stats' && modalStore.activeModal.event.id === updated.id) {
+      modalStore.openStats(updated);
     }
   };
 
@@ -794,12 +752,11 @@ export const App: React.FC = () => {
   const playerNames = Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)));
 
   const openAddTeam = (playerName?: string) => {
-    setImportDefaults({ playerName });
-    setIsSmartImportOpen(true);
+    modalStore.openSmartImport({ playerName });
   };
 
   const openEditProfile = (profile: PlayerProfile) => {
-    setImportDefaults({
+    modalStore.openSmartImport({
       profileId: profile.id,
       playerName: profile.playerName,
       name: profile.teamName,
@@ -808,8 +765,6 @@ export const App: React.FC = () => {
       colorHex: profile.colorHex,
       squadFilters: profile.squadFilters
     });
-    setIsFamilyManageOpen(false);
-    setIsSmartImportOpen(true);
   };
 
   const activePlayerName = activeProfileId.startsWith('player:')
@@ -1009,41 +964,32 @@ export const App: React.FC = () => {
             setIsOnboardingActive(false);
           }}
           existingProfilesCount={profiles.length}
-          onOpenImportModal={(sport, url, name) => {
-            setImportDefaults({ sport, url, name });
-            setIsSmartImportOpen(true);
-          }}
-          onOpenFamilyShare={() => setIsFamilyShareOpen(true)}
-          onOpenSmartImport={() => setIsSmartImportOpen(true)}
+          onOpenImportModal={(sport, url, name) => modalStore.openSmartImport({ sport, url, name })}
+          onOpenFamilyShare={modalStore.openFamilyShare}
+          onOpenSmartImport={modalStore.openSmartImport}
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
             return await handleImportCalendar(playerName, teamName, sport, url);
           }}
           onRemoveTeam={handleRemoveImportedTeam}
         />
-        <Suspense fallback={null}>
-        <SmartImportModal
-          isOpen={isSmartImportOpen}
-          onClose={() => {
-            setIsSmartImportOpen(false);
-            setImportDefaults({});
-          }}
-          existingPlayers={playerNames}
-          onImportClassic={handleImportCalendar}
-          initialSport={importDefaults.sport}
-          initialTeamUrl={importDefaults.url}
-          initialTeamName={importDefaults.name}
-          initialPlayerName={importDefaults.playerName}
-          initialColorHex={importDefaults.colorHex}
-          initialSquadFilters={importDefaults.squadFilters}
-          editingProfileId={importDefaults.profileId}
-        />
-        <FamilyShareModal
-          isOpen={isFamilyShareOpen}
-          onClose={() => setIsFamilyShareOpen(false)}
+        <GlobalModalHost
+          activeModal={modalStore.activeModal}
+          onClose={modalStore.closeModal}
+          allStitchedEvents={allStitchedEvents}
           profiles={profiles}
-          onDataImported={() => setActiveProfileId('all')}
+          homeLocation={homeLocation}
+          saveHomeLocation={saveHomeLocation}
+          existingPlayers={playerNames}
+          handleImportCalendar={handleImportCalendar}
+          openAddTeam={openAddTeam}
+          openEditProfile={openEditProfile}
+          showConflictWarnings={showConflictWarnings}
+          toggleConflictWarnings={toggleConflictWarnings}
+          setIsOnboardingActive={setIsOnboardingActive}
+          setActiveProfileId={setActiveProfileId}
+          openHomeLocation={modalStore.openHomeLocation}
+          openFamilyShare={modalStore.openFamilyShare}
         />
-        </Suspense>
       </>
     );
   }
@@ -1058,19 +1004,19 @@ export const App: React.FC = () => {
         showConflictWarnings={showConflictWarnings}
         onToggleConflictWarnings={toggleConflictWarnings}
         onRefresh={handleRefreshAll}
-        onShare={() => setIsFamilyShareOpen(true)}
+        onShare={modalStore.openFamilyShare}
         onAmbient={() => setIsAmbientMode(true)}
-        onLogistics={() => setIsLogisticsOpen(true)}
-        onImport={() => setIsSmartImportOpen(true)}
-        onOpenHomeLocation={() => setIsHomeLocationOpen(true)}
-        onAsk={() => setIsAskCopilotOpen(true)}
+        onLogistics={modalStore.openLogistics}
+        onImport={modalStore.openSmartImport}
+        onOpenHomeLocation={modalStore.openHomeLocation}
+        onAsk={modalStore.openCopilot}
         onClear={handleClearData}
       />
 
       <main className="mx-auto max-w-5xl px-4 pt-2">
         {isDemoActive && (
           <DemoBanner
-            onOpenImport={() => setIsSmartImportOpen(true)}
+            onOpenImport={modalStore.openSmartImport}
             onClearDemo={handleClearData}
           />
         )}
@@ -1262,7 +1208,7 @@ export const App: React.FC = () => {
             <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 shadow-xs">
               <button
                 type="button"
-                onClick={() => setIsLogisticsOpen(true)}
+                onClick={modalStore.openLogistics}
                 aria-label={`Logistiikkaristiriita: ${firstConflict.message}. Avaa kuskijako.`}
                 className="flex min-h-[44px] flex-1 items-start gap-2.5 text-left cursor-pointer hover:brightness-105 transition-all focus-visible:ring-2 focus-visible:ring-whistle"
               >
@@ -1325,7 +1271,7 @@ export const App: React.FC = () => {
             {snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
               <DifficultDayAlert
                 warnings={snapshot.difficultDays}
-                onOpenLogistics={() => setIsLogisticsOpen(true)}
+                onOpenLogistics={modalStore.openLogistics}
               />
             )}
 
@@ -1364,7 +1310,7 @@ export const App: React.FC = () => {
                           // Wire the previously-dead strip buttons (M-44):
                           // select the event so it opens the stats modal.
                           const ev = rawEvents.find((e) => e.id === eventId);
-                          if (ev && !ev.isTraining) setSelectedStatsEvent(ev);
+                          if (ev && !ev.isTraining) modalStore.openStats(ev);
                         }}
                       />
                     )}
@@ -1415,7 +1361,7 @@ export const App: React.FC = () => {
                               conflicts={snapshot.conflicts}
                               showConflictWarnings={showConflictWarnings}
                               homeLocation={homeLocation}
-                              onOpenHomeModal={() => setIsHomeLocationOpen(true)}
+                              onOpenHomeModal={modalStore.openHomeLocation}
                               onNavigate={() => {
                                   const isApprox = event.venue?.isApproximateLocation;
                                   const coords = event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined);
@@ -1430,7 +1376,7 @@ export const App: React.FC = () => {
                                     'noopener,noreferrer'
                                   );
                                 }}
-                              onOpenStats={() => setSelectedStatsEvent(event)}
+                              onOpenStats={() => modalStore.openStats(event)}
                               onResolveMismatch={handleResolveMismatch}
                               onEventUpdated={handleEventUpdated}
                               onEventMerged={handleEventUpdated}
@@ -1456,7 +1402,7 @@ export const App: React.FC = () => {
                             conflicts={snapshot.conflicts}
                             showConflictWarnings={showConflictWarnings}
                             homeLocation={homeLocation}
-                            onOpenHomeModal={() => setIsHomeLocationOpen(true)}
+                            onOpenHomeModal={modalStore.openHomeLocation}
                             onResolveMismatch={handleResolveMismatch}
                             onEventUpdated={handleEventUpdated}
                             onEventMerged={handleEventUpdated}
@@ -1528,7 +1474,7 @@ export const App: React.FC = () => {
               profiles={profiles}
               viewMode={viewMode}
               conflicts={snapshot.conflicts}
-              onSelectEvent={(ev) => setSelectedStatsEvent(ev)}
+              onSelectEvent={(ev) => modalStore.openStats(ev)}
               onClearFilter={() => setActiveProfileId('all')}
               onNavigate={(ev) => {
                 const isApprox = ev.venue?.isApproximateLocation;
@@ -1566,178 +1512,37 @@ export const App: React.FC = () => {
         </footer>
       </main>
 
-      {/* Unified Smart Multi-Tab Importer (Federation URL, Cups, WhatsApp, Excel, OCR) */}
-      <Suspense fallback={null}>
-      <SmartImportModal
-        isOpen={isSmartImportOpen}
-        onClose={() => {
-          setIsSmartImportOpen(false);
-          setImportDefaults({});
-        }}
+      <GlobalModalHost
+        activeModal={modalStore.activeModal}
+        onClose={modalStore.closeModal}
+        allStitchedEvents={allStitchedEvents}
+        profiles={profiles}
+        homeLocation={homeLocation}
+        saveHomeLocation={saveHomeLocation}
         existingPlayers={playerNames}
-        initialSport={importDefaults.sport}
-        initialTeamUrl={importDefaults.url}
-        initialTeamName={importDefaults.name}
-        initialPlayerName={importDefaults.playerName}
-        initialColorHex={importDefaults.colorHex}
-        initialSquadFilters={importDefaults.squadFilters}
-        editingProfileId={importDefaults.profileId}
-        onImportClassic={handleImportCalendar}
-      />
-
-      {/* Family Logistics & Carpooling Modal */}
-      <FamilyLogisticsModal
-        isOpen={isLogisticsOpen}
-        onClose={() => setIsLogisticsOpen(false)}
-        events={allStitchedEvents}
-        profiles={profiles}
-        homeLocation={homeLocation}
-        onOpenHomeModal={() => {
-          setIsLogisticsOpen(false);
-          setIsHomeLocationOpen(true);
-        }}
-      />
-
-      {/* Home Location & Active Transit Modal */}
-      <HomeLocationModal
-        isOpen={isHomeLocationOpen}
-        onClose={() => setIsHomeLocationOpen(false)}
-        currentHome={homeLocation}
-        onSaveHome={async (h) => {
-          await saveHomeLocation(h);
-          // Recalculate transit & venue coordinates immediately for all events
-          const all = await db.events.toArray();
-          for (const ev of all) {
-            let currentVenue = ev.venue;
-            if (ev.venue?.name) {
-              const freshVenue = await resolveSportsVenue(ev.venue.name);
-              currentVenue = freshVenue;
-            }
-            if (currentVenue?.coordinates) {
-              const freshTransit = resolveTransitPlan(h, currentVenue.coordinates, ev.weather);
-              await db.events.update(ev.id, { venue: currentVenue, transit: freshTransit });
-            }
-          }
-        }}
-      />
-
-      {/* Natural Language Q&A Modal */}
-      <AskCopilotModal
-        isOpen={isAskCopilotOpen}
-        onClose={() => setIsAskCopilotOpen(false)}
-        events={allStitchedEvents}
-        profiles={profiles}
-      />
-
-      {/* Family Management & Child Roster Modal */}
-      <FamilyManageModal
-        isOpen={isFamilyManageOpen}
-        onClose={() => setIsFamilyManageOpen(false)}
-        profiles={profiles}
-        homeLocation={homeLocation}
+        handleImportCalendar={handleImportCalendar}
+        openAddTeam={openAddTeam}
+        openEditProfile={openEditProfile}
         showConflictWarnings={showConflictWarnings}
-        onToggleConflictWarnings={toggleConflictWarnings}
-        onOpenHomeLocation={() => {
-          setIsFamilyManageOpen(false);
-          setIsHomeLocationOpen(true);
-        }}
-        onOpenImportForPlayer={(playerName) => {
-          setIsFamilyManageOpen(false);
-          openAddTeam(playerName);
-        }}
-        onEditProfile={(profile) => openEditProfile(profile)}
-        onOpenFamilyShare={() => {
-          setIsFamilyManageOpen(false);
-          setIsFamilyShareOpen(true);
-        }}
-        onOpenOnboardingWizard={() => {
-          localStorage.removeItem('pelipaiva_onboarding_done');
-          setIsOnboardingActive(true);
-          setIsFamilyManageOpen(false);
-        }}
+        toggleConflictWarnings={toggleConflictWarnings}
+        setIsOnboardingActive={setIsOnboardingActive}
+        setActiveProfileId={setActiveProfileId}
+        openHomeLocation={modalStore.openHomeLocation}
+        openFamilyShare={modalStore.openFamilyShare}
       />
-
-      {/* Zero-Auth Family Share & Backup Modal */}
-      <FamilyShareModal
-        isOpen={isFamilyShareOpen}
-        onClose={() => setIsFamilyShareOpen(false)}
-        profiles={profiles}
-        onDataImported={() => setActiveProfileId('all')}
-      />
-
-      {/* Live Family Calendar Subscription Modal (webcal://) */}
-      <FamilyCalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-        events={allStitchedEvents}
-        profiles={profiles}
-      />
-
-      {/* Global Interactive Match Stats Modal (for Timeline & Calendar selections) */}
-      {selectedStatsEvent && !selectedStatsEvent.isTraining && (
-        <MatchStatsModal
-          isOpen={true}
-          onClose={() => setSelectedStatsEvent(null)}
-          stats={selectedStatsEvent.stats}
-          homeTeam={selectedStatsEvent.homeTeam}
-          awayTeam={selectedStatsEvent.awayTeam || 'Vastustaja'}
-          playerName={profiles.find((p) => p.id === selectedStatsEvent.profileId)?.playerName}
-          playerLog={selectedStatsEvent.playerLog}
-          score={selectedStatsEvent.score}
-          sport={selectedStatsEvent.sport}
-          onSavePlayerLog={async (log, updatedScore) => {
-            const updates: Partial<MatchdayEvent> = {
-              playerLog: log,
-              score: updatedScore || selectedStatsEvent.score
-            };
-            // Persist only the player's own log/score — never the synthetic
-            // preview stats (M-05).
-            await db.events.update(selectedStatsEvent.id, updates).catch(console.warn);
-            setSelectedStatsEvent((prev) => (prev ? { ...prev, ...updates } : null));
-          }}
-        />
-      )}
 
       {/* Real-Time Live Goal & Event Toast Alert Banner */}
       <LiveMatchToast
         onOpenSatelliteDrawer={(sport, matchId, title) => {
-          const repoMap: Record<string, 'parkkis' | 'football-stats' | 'volleyball-stats' | 'floorball-stats' | 'basketball-stats'> = {
+          const repoMap: Record<string, string> = {
             football: 'football-stats',
             floorball: 'floorball-stats',
             basketball: 'basketball-stats',
             volleyball: 'volleyball-stats',
           };
-          const targetRepo = repoMap[sport] || 'floorball-stats';
-          setLiveDrawer({
-            isOpen: true,
-            sport: targetRepo,
-            matchId,
-            title,
-          });
+          modalStore.openDrawer(repoMap[sport] || 'floorball-stats', matchId, title);
         }}
       />
-
-      {/* Satellite Slide-Over Embed Drawer */}
-      {liveDrawer?.isOpen && (
-        <SatelliteEmbedDrawer
-          isOpen={true}
-          onClose={() => setLiveDrawer(null)}
-          title={liveDrawer.title}
-          embedUrl={
-            liveDrawer.sport === 'football-stats'
-              ? `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
-              : liveDrawer.sport === 'volleyball-stats'
-              ? `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
-              : liveDrawer.sport === 'basketball-stats'
-              ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
-              : liveDrawer.sport === 'parkkis'
-              ? `https://parkkis.pages.dev/?embed=true`
-              : `https://floorball-stats.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
-          }
-          sourceRepo={liveDrawer.sport}
-        />
-      )}
-      </Suspense>
     </div>
   );
 };

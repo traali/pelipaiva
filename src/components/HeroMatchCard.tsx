@@ -28,9 +28,7 @@ import { EventChatModal } from './EventChatModal';
 import { EventMergeModal } from './EventMergeModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
 import { MoreHorizontal, FileText } from 'lucide-react';
-import { db } from '../lib/storage/db';
-import { useDismissedConflicts, groupActiveConflicts } from '../lib/agents/conflictDismissal';
-import { recordAttendanceOverride } from '../lib/sync/familyCloud';
+import { useMatchdayLogistics } from '../hooks/useMatchdayLogistics';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -85,93 +83,35 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
     homeLocation
   );
   
-  const kickoff = new Date(event.startTime).toLocaleTimeString('fi-FI', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Helsinki'
+  const {
+    isLive,
+    formattedKickoff: kickoff,
+    formattedWarmup: warmup,
+    dateLabel,
+    mapsUrl,
+    transitEmoji,
+    isOut,
+    isOutExpanded,
+    setIsOutExpanded,
+    handleToggleAttendance,
+    dismissedConflicts,
+    consolidatedConflictGroups,
+    dismissConflict,
+    restoreConflict,
+    showDismissedConflicts,
+    setShowDismissedConflicts,
+  } = useMatchdayLogistics({
+    event,
+    conflicts,
+    homeLocation,
+    onEventUpdated,
   });
-  
-  const warmup = event.warmupTime
-    ? new Date(event.warmupTime).toLocaleTimeString('fi-FI', {
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Europe/Helsinki'
-      })
-    : kickoff;
 
-  const dateLabel = new Date(event.startTime).toLocaleDateString('fi-FI', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'numeric',
-    timeZone: 'Europe/Helsinki'
-  });
-  
-  const { isDismissed, dismiss: dismissConflict, restore: restoreConflict } = useDismissedConflicts();
-  const [showDismissedConflicts, setShowDismissedConflicts] = useState(false);
-  const [isOutExpanded, setIsOutExpanded] = useState(false);
-
-  const { activeConflicts, dismissedConflicts } = useMemo(() => {
-    const related = conflicts?.filter((c) => c.eventAId === event.id || c.eventBId === event.id) || [];
-    const unique = Array.from(
-      new Map(related.map((c) => [`${c.message}-${c.suggestedFix}`, c])).values()
-    );
-    const active = unique.filter((c) => !isDismissed(c));
-    const dismissed = unique.filter((c) => isDismissed(c));
-    return {
-      activeConflicts: active,
-      dismissedConflicts: dismissed
-    };
-  }, [conflicts, event.id, isDismissed]);
-
-  const consolidatedConflictGroups = useMemo(() => groupActiveConflicts(activeConflicts), [activeConflicts]);
-  const isLive =
-    new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
   const temp = event.weather?.isForecastLongRange ? undefined : event.weather?.temperatureC;
   const isWetOrCold = event.weather && (event.weather.precipitationMmh > 0.2 || (temp !== undefined && temp <= 3));
 
-  // Prioritize parking coordinates for driving navigation over pitch center (only if verified)
-  // Destination coordinates: walking/cycling goes directly to venue; car driving goes to parking lot
-  const isApprox = event.venue?.isApproximateLocation;
-  const isSelfTransit = transitPlan?.isSelfTransit;
-  const targetCoords = isSelfTransit
-    ? (!isApprox ? event.venue?.coordinates : undefined)
-    : (event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined));
-  const hasValidCoords = targetCoords && (targetCoords.lat !== 0 || targetCoords.lng !== 0);
-  const destination =
-    hasValidCoords
-      ? `${targetCoords.lat},${targetCoords.lng}`
-      : encodeURIComponent(event.venue?.name || 'Kenttä');
-  const travelModeParam = transitPlan?.mode === 'walk' ? '&travelmode=walking' : transitPlan?.mode === 'bicycle' ? '&travelmode=bicycling' : '';
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}${travelModeParam}`;
-
   const jerseyColor = kit?.kitColors?.primary || profile?.colorHex || '#3b82f6';
   const jerseyText = event.isHomeMatch === false ? 'Vieraspaita (+ varapaita)' : 'Kotipeliasu (ykkönen)';
-
-  const transitEmoji =
-    transitPlan?.mode === 'walk'
-      ? '🚶 Kävely'
-      : transitPlan?.mode === 'bicycle'
-      ? '🚴 Pyörä'
-      : transitPlan?.mode === 'transit'
-      ? '🚌 Bussi'
-      : '🚗 Lähde';
-
-  const isOut = event.attendanceStatus === 'out';
-
-  const handleToggleAttendance = async (newStatus: 'in' | 'out') => {
-    try {
-      setIsOutExpanded(false);
-      const updated: MatchdayEvent = {
-        ...event,
-        attendanceStatus: newStatus
-      };
-      const sync = await db.syncState.get('family').catch(() => null);
-      await recordAttendanceOverride(sync?.syncKey || '', event.id, newStatus, db);
-      onEventUpdated?.(updated);
-    } catch (err) {
-      console.error('Failed to toggle attendance', err);
-    }
-  };
 
   if (isOut && !isOutExpanded) {
     return (

@@ -356,8 +356,15 @@ async function executeSyncFamilyRosterCycle(
       (p) => !isDemoProfileId(p.id)
     );
     const syncRecord = await databaseInstance.syncState.get('family');
-    const localTombstonesStr = localStorage.getItem(`pelipaiva_tombstones_${cleanCode}`);
-    const localTombstones: TombstoneRecord[] = localTombstonesStr ? JSON.parse(localTombstonesStr) : [];
+    let localTombstones: TombstoneRecord[] = [];
+    try {
+      const localTombstonesStr = localStorage.getItem(`pelipaiva_tombstones_${cleanCode}`);
+      if (localTombstonesStr) {
+        localTombstones = JSON.parse(localTombstonesStr);
+      }
+    } catch {
+      localTombstones = [];
+    }
 
     const remote = await fetchFamilyRoster(cleanCode, baseUrl);
 
@@ -367,7 +374,11 @@ async function executeSyncFamilyRosterCycle(
       localTombstones
     );
 
-    localStorage.setItem(`pelipaiva_tombstones_${cleanCode}`, JSON.stringify(tombstones));
+    try {
+      localStorage.setItem(`pelipaiva_tombstones_${cleanCode}`, JSON.stringify(tombstones));
+    } catch {
+      // Ignore quota / private browsing storage restrictions
+    }
 
     const tombstoneIds = new Set(tombstones.map((t) => t.id));
     for (const lp of localProfiles) {
