@@ -42,7 +42,20 @@ try {
   process.exit(1);
 }
 
-// 4. Ensure visitations directory exists
+// 4. Check Cross-Repo Contract Compatibility
+const contractsScript = path.resolve(ROOT, '..', 'contracts', 'verify-contracts.mjs');
+if (fs.existsSync(contractsScript)) {
+  try {
+    console.log('🔗 Running cross-repo contract verification...');
+    execSync(`node "${contractsScript}" pelipaiva`, { stdio: 'inherit', cwd: ROOT });
+    console.log('✅ Cross-repo contracts verified (100% compatible).\n');
+  } catch {
+    console.error('❌ [BLOCKER] Contract compatibility failed. Do not break peer services.');
+    process.exit(1);
+  }
+}
+
+// 5. Ensure visitations directory exists
 if (!fs.existsSync(VISITATIONS_DIR)) {
   fs.mkdirSync(VISITATIONS_DIR, { recursive: true });
 }

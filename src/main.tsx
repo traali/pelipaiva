@@ -2,7 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { registerPelipaivaWebMCP } from './lib/agents/webMcpRegistry';
 import './index.css';
+
+// Register WebMCP browser tools for AI agents
+registerPelipaivaWebMCP().catch((err) => console.warn('[WebMCP] Boot failed', err));
 
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[PELIPAIVA:UNHANDLED]', e.reason);

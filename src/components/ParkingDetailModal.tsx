@@ -15,11 +15,13 @@ import {
   CheckCircle2,
   Ticket,
   Flame,
-  Info
+  Info,
+  ExternalLink
 } from 'lucide-react';
 import { ParkingInfo } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { calculateParkingDiscTime } from '../lib/parking/parkingEaseEngine';
+import { SatelliteEmbedDrawer } from './SatelliteEmbedDrawer';
 
 interface ParkingDetailModalProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
   venueName
 }) => {
   const [activeTab, setActiveTab] = useState<'map' | 'spots' | 'signs' | 'fines'>('map');
+  const [isParkkisDrawerOpen, setIsParkkisDrawerOpen] = useState(false);
 
   if (!parking) return null;
 
@@ -483,6 +486,16 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
                     </ul>
                   </div>
                 )}
+
+                {/* ParkkiS Spatial Live Map Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsParkkisDrawerOpen(true)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer mt-1"
+                >
+                  <span>🅿️ Avaa ParkkiS Live Sakkokartta (PMTiles & Riski-indeksi)</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 
@@ -519,6 +532,16 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
           </motion.div>
         </div>
       )}
+
+      {/* Embedded ParkkiS Spatial Satellite Drawer */}
+      <SatelliteEmbedDrawer
+        isOpen={isParkkisDrawerOpen}
+        onClose={() => setIsParkkisDrawerOpen(false)}
+        title={`ParkkiS: ${venueName}`}
+        subtitle="Helsingin kaupungin 165k pysäköintivirhettä & PMTiles-vektorikartta"
+        embedUrl={`https://parkkis.pages.dev/venue/${encodeURIComponent(venueName)}?lat=${lat}&lon=${lng}&embed=true&theme=night-captain`}
+        sourceRepo="parkkis"
+      />
     </AnimatePresence>
   );
 };

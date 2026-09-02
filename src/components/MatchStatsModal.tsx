@@ -16,10 +16,12 @@ import {
   Minus,
   Save,
   Target,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { FullMatchStats, PlayerMatchLog, SportType } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
+import { SatelliteEmbedDrawer } from './SatelliteEmbedDrawer';
 
 interface MatchStatsModalProps {
   isOpen: boolean;
@@ -81,6 +83,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   };
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
+  const [isSatelliteDrawerOpen, setIsSatelliteDrawerOpen] = useState(false);
 
   // Local state for recording player stats
   const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
@@ -308,6 +311,30 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Quick Satellite Launcher Banner */}
+            <div className="mb-4 flex items-center justify-between p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold text-text-primary">
+                  {sport === 'volleyball' ? '🏐 Volleyball Stats Pro' : '⚽ Football Stats (Night Captain)'}
+                </span>
+                <span className="text-[10px] text-text-muted hidden sm:inline">
+                  {sport === 'volleyball' ? 'Erätilastot & joukkuemuodot' : 'Syväanalyysi, H2H & pelaajakortit'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSatelliteDrawerOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${
+                  sport === 'volleyball'
+                    ? 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25'
+                    : 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
+                }`}
+              >
+                <span>Avaa tilastot</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {/* Navigation Sub-Tabs */}
@@ -964,6 +991,20 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
           </motion.div>
         </div>
       )}
+
+      {/* Embedded Satellite Analytics Drawer */}
+      <SatelliteEmbedDrawer
+        isOpen={isSatelliteDrawerOpen}
+        onClose={() => setIsSatelliteDrawerOpen(false)}
+        title={sport === 'volleyball' ? `Volleyball Stats: ${homeTeam} vs ${awayTeam}` : `Football Stats: ${homeTeam} vs ${awayTeam}`}
+        subtitle="Interaktiivinen syväanalyysi & Night Captain -tilastot"
+        embedUrl={
+          sport === 'volleyball'
+            ? `https://volleyball-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true&theme=night-captain`
+            : `https://football-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true&theme=night-captain`
+        }
+        sourceRepo={sport === 'volleyball' ? 'volleyball-stats' : 'football-stats'}
+      />
     </AnimatePresence>
   );
 };
