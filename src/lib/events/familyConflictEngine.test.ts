@@ -72,10 +72,10 @@ describe('familyConflictEngine', () => {
 
     const conflicts = detectFamilyConflicts([e1, e2], [p1, p2])
     expect(conflicts).toHaveLength(1)
-    expect(conflicts[0].conflictType).toBe('direct_overlap')
-    expect(conflicts[0].playerName1).toBe('Tuomas')
-    expect(conflicts[0].playerName2).toBe('Aino')
-    expect(conflicts[0].advisoryFinnish).toContain('Päällekkäisyys')
+    expect(conflicts[0]!.conflictType).toBe('direct_overlap')
+    expect(conflicts[0]!.playerName1).toBe('Tuomas')
+    expect(conflicts[0]!.playerName2).toBe('Aino')
+    expect(conflicts[0]!.advisoryFinnish).toContain('Päällekkäisyys')
   })
 
   it('detects tight transit bottleneck when driving time exceeds available gap', () => {
@@ -127,7 +127,7 @@ describe('familyConflictEngine', () => {
 
     const conflicts = detectFamilyConflicts([e1, e2], [p1, p2])
     expect(conflicts).toHaveLength(1)
-    expect(conflicts[0].conflictType).toBe('tight_transit')
-    expect(conflicts[0].advisoryFinnish).toContain('Tiukka siirtymä')
+    expect(conflicts[0]!.conflictType).toBe('tight_transit')
+    expect(conflicts[0]!.advisoryFinnish).toContain('Tiukka siirtymä')
   })
 })

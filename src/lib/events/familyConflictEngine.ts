@@ -67,9 +67,12 @@ export function detectFamilyConflicts(
   const validEvents = events.filter((e) => e.startTime && !e.isHidden)
 
   for (let i = 0; i < validEvents.length; i++) {
+    const e1 = validEvents[i]
+    if (!e1) continue
+
     for (let j = i + 1; j < validEvents.length; j++) {
-      const e1 = validEvents[i]
       const e2 = validEvents[j]
+      if (!e2) continue
 
       // Only check events belonging to different players or different events
       if (e1.id === e2.id) continue
@@ -107,13 +110,14 @@ export function detectFamilyConflicts(
       }
 
       // 2. Tight Transit Gap Check (Consecutive matches with insufficient travel time)
-      const [first, second] = e1End <= e2Start ? [e1, e2] : [e2, e1]
+      const first = e1End <= e2Start ? e1 : e2
+      const second = e1End <= e2Start ? e2 : e1
       const firstEnd = Math.min(e1End, e2End)
       const secondStart = Math.max(e1Start, e2Start)
       const gapMinutes = Math.floor((secondStart - firstEnd) / (60 * 1000))
 
       // If venues are different and gap is under 45 minutes
-      const sameVenue = first.venue?.name && second.venue?.name && first.venue.name.toLowerCase() === second.venue.name.toLowerCase()
+      const sameVenue = Boolean(first.venue?.name && second.venue?.name && first.venue.name.toLowerCase() === second.venue.name.toLowerCase())
 
       if (!sameVenue && gapMinutes >= 0 && gapMinutes < 40) {
         const neededTransit = estimateDrivingMinutes(first.venue?.coordinates, second.venue?.coordinates)
