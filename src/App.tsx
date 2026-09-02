@@ -1656,13 +1656,13 @@ export const App: React.FC = () => {
           title={liveDrawer.title}
           embedUrl={
             liveDrawer.sport === 'football-stats'
-              ? `https://football-stats-agk.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
+              ? `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
               : liveDrawer.sport === 'volleyball-stats'
               ? `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
               : liveDrawer.sport === 'basketball-stats'
               ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
               : liveDrawer.sport === 'parkkis'
-              ? `https://sakkoja.pages.dev/?embed=true`
+              ? `https://parkkis.pages.dev/?embed=true`
               : `https://floorball-stats.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`
           }
           sourceRepo={liveDrawer.sport}

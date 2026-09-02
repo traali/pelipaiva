@@ -47,6 +47,8 @@ export const SatelliteEmbedDrawer: React.FC<SatelliteEmbedDrawerProps> = ({
       ? '🏀 Basketball Stats'
       : '🏐 Volleyball Stats';
 
+  const standaloneUrl = embedUrl.replace(/[?&]embed=true/, '');
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex justify-end">
@@ -82,14 +84,15 @@ export const SatelliteEmbedDrawer: React.FC<SatelliteEmbedDrawerProps> = ({
 
             <div className="flex items-center gap-1 shrink-0">
               <a
-                href={embedUrl}
+                href={standaloneUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Avaa erillisessä välilehdessä"
-                className="p-2 text-text-muted hover:text-text-primary hover:bg-surface rounded-lg transition-colors"
-                title="Avaa erillisessä välilehdessä"
+                aria-label="Avaa täysi näkymä uudessa välilehdessä"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-pitch hover:bg-surface-base rounded-lg border border-pitch/30 hover:border-pitch transition-colors"
+                title="Avaa täysi näkymä uudessa välilehdessä"
               >
-                <ExternalLink className="h-4 w-4" />
+                <span>Avaa sivusto</span>
+                <ExternalLink className="h-3.5 w-3.5" />
               </a>
               <button
                 type="button"

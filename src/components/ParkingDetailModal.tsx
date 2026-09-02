@@ -260,6 +260,16 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
                     </ul>
                   </div>
                 )}
+
+                {/* Direct 1-Tap ParkkiS Satellite Map Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsParkkisDrawerOpen(true)}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition-all text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+                >
+                  <span>🅿️ Avaa ParkkiS Täysi Sakkotutka & Kartta</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
 

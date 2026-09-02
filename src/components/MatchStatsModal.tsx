@@ -314,28 +314,75 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             </div>
 
             {/* Quick Satellite Launcher Banner */}
-            <div className="mb-4 flex items-center justify-between p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle">
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-bold text-text-primary">
-                  {sport === 'volleyball' ? '🏐 Volleyball Stats Pro' : '⚽ Football Stats (Night Captain)'}
-                </span>
-                <span className="text-[10px] text-text-muted hidden sm:inline">
-                  {sport === 'volleyball' ? 'Erätilastot & joukkuemuodot' : 'Syväanalyysi, H2H & pelaajakortit'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSatelliteDrawerOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${
-                  sport === 'volleyball'
-                    ? 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25'
-                    : 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
-                }`}
-              >
-                <span>Avaa tilastot</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {(() => {
+              type SportConfigItem = {
+                repo: 'football-stats' | 'floorball-stats' | 'basketball-stats' | 'volleyball-stats';
+                name: string;
+                subtitle: string;
+                url: string;
+                btnColor: string;
+              };
+
+              const sportConfig: Record<string, SportConfigItem> = {
+                football: {
+                  repo: 'football-stats',
+                  name: '⚽ Football Stats (Night Captain)',
+                  subtitle: 'Syväanalyysi, H2H & pelaajakortit',
+                  url: `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  btnColor: 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
+                },
+                floorball: {
+                  repo: 'floorball-stats',
+                  name: '🏑 Floorball Stats (SSBL)',
+                  subtitle: '3 erää, YV/AV radar & torjunnat',
+                  url: `https://floorball-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  btnColor: 'bg-[#5BC0BE]/15 border-[#5BC0BE]/30 text-[#6FFFE9] hover:bg-[#5BC0BE]/25'
+                },
+                basketball: {
+                  repo: 'basketball-stats',
+                  name: '🏀 Basketball Stats (Basket.fi)',
+                  subtitle: '4 neljännestä, virheet & pistemiehet',
+                  url: `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  btnColor: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25'
+                },
+                volleyball: {
+                  repo: 'volleyball-stats',
+                  name: '🏐 Volleyball Stats Pro',
+                  subtitle: '25 pisteen erät & momenttivirta',
+                  url: `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  btnColor: 'bg-blue-500/15 border-blue-500/30 text-blue-400 hover:bg-blue-500/25'
+                }
+              };
+              const active: SportConfigItem = (sport && sportConfig[sport]) || sportConfig['football']!;
+
+              return (
+                <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-bold text-text-primary">{active.name}</span>
+                    <span className="text-[10px] text-text-muted hidden sm:inline">{active.subtitle}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 self-end sm:self-center">
+                    <a
+                      href={active.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-strong transition-all"
+                      title="Avaa täysi ottelusivu uudessa välilehdessä"
+                    >
+                      <span>Uuteen välilehteen</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setIsSatelliteDrawerOpen(true)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${active.btnColor}`}
+                    >
+                      <span>Avaa drawer</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Navigation Sub-Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none border-b border-border-subtle">
@@ -993,18 +1040,45 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
       )}
 
       {/* Embedded Satellite Analytics Drawer */}
-      <SatelliteEmbedDrawer
-        isOpen={isSatelliteDrawerOpen}
-        onClose={() => setIsSatelliteDrawerOpen(false)}
-        title={sport === 'volleyball' ? `Volleyball Stats: ${homeTeam} vs ${awayTeam}` : `Football Stats: ${homeTeam} vs ${awayTeam}`}
-        subtitle="Interaktiivinen syväanalyysi & Night Captain -tilastot"
-        embedUrl={
-          sport === 'volleyball'
-            ? `https://volleyball-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true&theme=night-captain`
-            : `https://football-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true&theme=night-captain`
-        }
-        sourceRepo={sport === 'volleyball' ? 'volleyball-stats' : 'football-stats'}
-      />
+      {(() => {
+        const repo =
+          sport === 'floorball'
+            ? 'floorball-stats'
+            : sport === 'basketball'
+            ? 'basketball-stats'
+            : sport === 'volleyball'
+            ? 'volleyball-stats'
+            : 'football-stats';
+
+        const url =
+          sport === 'floorball'
+            ? `https://floorball-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
+            : sport === 'basketball'
+            ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
+            : sport === 'volleyball'
+            ? `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
+            : `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`;
+
+        const title =
+          sport === 'floorball'
+            ? `Floorball Stats: ${homeTeam} vs ${awayTeam}`
+            : sport === 'basketball'
+            ? `Basketball Stats: ${homeTeam} vs ${awayTeam}`
+            : sport === 'volleyball'
+            ? `Volleyball Stats: ${homeTeam} vs ${awayTeam}`
+            : `Football Stats: ${homeTeam} vs ${awayTeam}`;
+
+        return (
+          <SatelliteEmbedDrawer
+            isOpen={isSatelliteDrawerOpen}
+            onClose={() => setIsSatelliteDrawerOpen(false)}
+            title={title}
+            subtitle="Interaktiivinen syväanalyysi & lajikohtainen tilastokeskus"
+            embedUrl={url}
+            sourceRepo={repo}
+          />
+        );
+      })()}
     </AnimatePresence>
   );
 };
