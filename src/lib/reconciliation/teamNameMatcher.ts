@@ -41,6 +41,8 @@ export const MULTILINGUAL_COLORS: Record<string, string> = {
   // Orange
   oranssi: 'oranssi',
   orange: 'oranssi',
+  oran: 'oranssi',
+  orans: 'oranssi',
   ora: 'oranssi',
   or: 'oranssi',
 

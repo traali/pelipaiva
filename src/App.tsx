@@ -341,7 +341,9 @@ export const App: React.FC = () => {
             const fixDate = new Date(fix.startTime);
             const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
             if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
-              const sim = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+              const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+              const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
+              const sim = Math.max(simHome, simAway);
               if (sim >= 0.70) {
                 const enriched: MatchdayEvent = {
                   ...cal,
@@ -448,7 +450,9 @@ export const App: React.FC = () => {
         const fixDate = new Date(fix.startTime);
         const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
         if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
-          const sim = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+          const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+          const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
+          const sim = Math.max(simHome, simAway);
           if (sim >= 0.70) {
             cal.homeTeam = fix.homeTeam;
             cal.awayTeam = fix.awayTeam;
