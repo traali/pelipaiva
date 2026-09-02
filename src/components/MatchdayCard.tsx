@@ -720,58 +720,72 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 {isPast ? <BarChart3 className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-text-primary flex items-center gap-2">
-                  {stats ? (
+                {(() => {
+                  const hasValidStanding = Boolean(
+                    stats &&
+                    !stats.isSynthetic &&
+                    stats.homeStanding &&
+                    stats.homeStanding.rank > 0 &&
+                    stats.homeStanding.played > 0
+                  );
+
+                  return (
                     <>
-                      <span>
-                        {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
-                      </span>
-                      {event.awayTeam && (
-                        <>
-                          <span className="text-text-muted font-normal">vs</span>
-                          <span>
-                            {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                      <div className="text-xs font-bold text-text-primary flex items-center gap-2">
+                        {hasValidStanding && stats ? (
+                          <>
+                            <span>
+                              {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
+                            </span>
+                            {event.awayTeam && (
+                              <>
+                                <span className="text-text-muted font-normal">vs</span>
+                                <span>
+                                  {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                                </span>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <span>{isPast ? 'Ottelutilastot & Kirjaa suoritus' : 'Otteluennakko & Sarjatilastot'}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5 flex-wrap">
+                        {hasValidStanding && stats ? (
+                          <>
+                            <span>
+                              {stats.homeStanding.won}V–{stats.homeStanding.drawn}T–{stats.homeStanding.lost}H (Maalit {stats.homeStanding.goalsFor}–{stats.homeStanding.goalsAgainst})
+                            </span>
+                            {stats.homeStanding.form && stats.homeStanding.form.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-text-muted">Kunto:</span>
+                                <div className="flex items-center gap-0.5">
+                                  {stats.homeStanding.form.slice(-3).map((f, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`h-1.5 w-1.5 rounded-full ${
+                                        f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="flex items-center gap-1 text-pitch font-medium">
+                            <Sparkles className="w-3 h-3" />
+                            {isPast ? 'Päättynyt ottelu • Klikkaa tilastoihin' : 'Sarjataulukko, H2H & kokoonpanot'}
                           </span>
-                        </>
-                      )}
+                        )}
+                        <span>•</span>
+                        <span className="truncate text-pitch font-medium">
+                          {isPast ? 'Kirjaa omat tilastot & raportti' : 'Avaa tilastokeskus'}
+                        </span>
+                      </div>
                     </>
-                  ) : (
-                    <span>{isPast ? 'Ottelutilastot & Kirjaa suoritus' : 'Avaa sarjatilastot & ennakko'}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5 flex-wrap">
-                  {stats ? (
-                    <>
-                      <span>
-                        {stats.homeStanding.won}V–{stats.homeStanding.drawn}T–{stats.homeStanding.lost}H (Maalit {stats.homeStanding.goalsFor}–{stats.homeStanding.goalsAgainst})
-                      </span>
-                      {stats.homeStanding.form && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-text-muted">Kunto:</span>
-                          <div className="flex items-center gap-0.5">
-                            {stats.homeStanding.form.slice(-3).map((f, idx) => (
-                              <span
-                                key={idx}
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <span className="flex items-center gap-1 text-pitch font-medium">
-                      <Sparkles className="w-3 h-3" />
-                      {isPast ? 'Päättynyt ottelu • Klikkaa tilastoihin' : 'Sarjataulukko & pelaajatilastot'}
-                    </span>
-                  )}
-                  <span>•</span>
-                  <span className="truncate text-pitch font-medium">
-                    {isPast ? 'Kirjaa omat tilastot & raportti' : 'Avaa kokoonpanot'}
-                  </span>
-                </div>
+                  );
+                })()}
               </div>
             </div>
 
