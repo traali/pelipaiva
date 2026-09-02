@@ -802,6 +802,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           </button>
         </div>
       )}
+
+      {/* Global Version Badge Landmark */}
+      <div className="mt-8 pb-4 flex items-center justify-center gap-2 text-[11px] text-text-muted">
+        <span className="font-bold text-text-secondary">PELIPÄIVÄ</span>
+        <span>•</span>
+        <span
+          data-testid="app-version-badge"
+          className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-subtle font-mono text-[10px] text-text-secondary"
+        >
+          v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'} (git:{typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'})
+        </span>
+      </div>
     </div>
   );
 };
