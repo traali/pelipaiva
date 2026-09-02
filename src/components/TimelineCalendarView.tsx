@@ -15,6 +15,8 @@ import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { FamilyVisualCalendar } from './FamilyVisualCalendar';
+import { db } from '../lib/storage/db';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
@@ -263,8 +265,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       );
                     })()}
 
-                    {/* Bottom Row: Venue, Nappisvahti & Navigation / Result */}
-                    <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2">
+                    {/* Bottom Row: Venue, Nappisvahti & Navigation / Result / Attendance */}
+                    <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2 flex-wrap sm:flex-nowrap">
                       <div className="flex items-center gap-1.5 truncate min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
                         <span className="truncate font-medium">{ev.venue.name}</span>
@@ -275,42 +277,66 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         )}
                       </div>
 
-                      {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="min-h-[36px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Attendance Toggle Button (Osallistuu / Poisjäänti) */}
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const nextStatus = isOut ? 'in' : 'out';
+                            await db.events.update(ev.id, { attendanceStatus: nextStatus });
+                            const sync = await db.syncState.get('family').catch(() => null);
+                            await recordAttendanceOverride(sync?.syncKey || '', ev.id, nextStatus, db);
+                          }}
+                          className={`touch-target min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border shadow-2xs ${
+                            isOut
+                              ? 'bg-pitch text-text-inverse border-pitch hover:brightness-110'
+                              : 'bg-surface-elevated text-stoppage hover:bg-stoppage/15 border-border-strong hover:border-stoppage/40'
+                          }`}
+                          title={
+                            isOut
+                              ? 'Pelaaja on merkitty poisjääneeksi — klikkaa merkitäksesi osallistuvaksi'
+                              : 'Merkitse poisjäänti tähän tapahtumaan'
+                          }
+                        >
+                          <span>{isOut ? '↩️ Osallistuu' : '⛔ Ei osallistu'}</span>
+                        </button>
+
+                        {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
+                          <span className="min-h-[44px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
                             <Trophy className="w-3.5 h-3.5 text-pitch" />
                             <span>{ev.score ? `Tulos: ${ev.score}` : 'Päättynyt'}</span>
                           </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          aria-label={`Navigoi kentälle ${ev.venue.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onNavigate) {
-                              onNavigate(ev);
-                            } else {
-                              const isApprox = ev.venue?.isApproximateLocation;
-                              const coords = ev.parking?.coordinates || (!isApprox ? ev.venue.coordinates : undefined);
-                              const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
-                              const destination =
-                                hasValidCoords
-                                  ? `${coords.lat},${coords.lng}`
-                                  : encodeURIComponent(ev.venue?.name || 'Kenttä');
-                              window.open(
-                                `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                                '_blank',
-                                'noopener,noreferrer'
-                              );
-                            }
-                          }}
-                          className="min-h-[44px] px-3 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
-                        >
-                          <Navigation className="w-3.5 h-3.5" />
-                          <span>Reitti</span>
-                        </button>
-                      )}
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`Navigoi kentälle ${ev.venue.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onNavigate) {
+                                onNavigate(ev);
+                              } else {
+                                const isApprox = ev.venue?.isApproximateLocation;
+                                const coords = ev.parking?.coordinates || (!isApprox ? ev.venue.coordinates : undefined);
+                                const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                                const destination =
+                                  hasValidCoords
+                                    ? `${coords.lat},${coords.lng}`
+                                    : encodeURIComponent(ev.venue?.name || 'Kenttä');
+                                window.open(
+                                  `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+                                  '_blank',
+                                  'noopener,noreferrer'
+                                );
+                              }
+                            }}
+                            className="min-h-[44px] px-3.5 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
+                          >
+                            <Navigation className="w-3.5 h-3.5" />
+                            <span>Reitti</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 );
