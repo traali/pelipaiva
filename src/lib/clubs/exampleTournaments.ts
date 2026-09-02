@@ -29,18 +29,6 @@ export interface ExampleTournament {
   fixtures: CupFixtureSeed[];
 }
 
-function weekendAt(dow: number, hour: number, minute = 0): string {
-  const now = new Date();
-  const hel = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Helsinki' }));
-  const today = hel.getDay();
-  let add = dow - today;
-  if (dow === 0 && today !== 0) add = 7 - today;
-  const d = new Date(hel);
-  d.setDate(d.getDate() + add);
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
-}
-
 /**
  * Real cups the parent asked to test with.
  * Helsinki Cup is NOT the Palloliitto league page for team 185085 (P13 Kolmonen).
@@ -65,19 +53,23 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
         id: 'hc1',
         home: 'PPJ/Laru sin',
         away: 'HJK',
-        start: weekendAt(6, 10, 0),
+        start: '2026-07-08T10:00:00+03:00',
         venueName: 'Käpylän Urheilupuisto TN 1',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 3,
+        awayScore: 1
       },
       {
         id: 'hc2',
         home: 'PPJ/Laru sin',
         away: 'KäPa',
-        start: weekendAt(6, 13, 0),
+        start: '2026-07-08T13:00:00+03:00',
         venueName: 'Käpylän Urheilupuisto TN 1',
         venueCity: 'Helsinki',
-        status: 'upcoming'
+        status: 'played',
+        homeScore: 2,
+        awayScore: 2
       }
     ]
   },
