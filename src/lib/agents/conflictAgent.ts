@@ -11,6 +11,35 @@ function plusMinutes(iso: string, minutes: number): string {
   return new Date(new Date(iso).getTime() + minutes * 60000).toISOString();
 }
 
+function formatShortWeekdayDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    const days = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
+    return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
+  } catch {
+    return '';
+  }
+}
+
+function formatTime(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  } catch {
+    return '';
+  }
+}
+
+function eventTitle(e: MatchdayEvent): string {
+  if (e.homeTeam && e.awayTeam) return `${e.homeTeam} vs ${e.awayTeam}`;
+  if (e.title) return e.title;
+  return e.venue?.name || 'Tapahtuma';
+}
+
 export function conflictAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
@@ -53,6 +82,11 @@ export function conflictAgent(
       const nameA = childName(a, profiles);
       const nameB = childName(b, profiles);
       const isSameChild = nameA.toLowerCase() === nameB.toLowerCase();
+      const dateLabel = formatShortWeekdayDate(a.startTime);
+      const titleA = eventTitle(a);
+      const titleB = eventTitle(b);
+      const timeA = formatTime(a.startTime);
+      const timeB = formatTime(b.startTime);
 
       // Check active transit mode for both events from home
       const transitA = a.transit || resolveTransitPlan(homeLocation, a.venue.coordinates, a.weather);
@@ -91,7 +125,15 @@ export function conflictAgent(
             overlapMinutes: overlap,
             travelMinutesEstimate: sameVenue ? 0 : drive,
             isResolvedByActiveTransit: true,
-            message: `🟢 Päällekkäisyys ratkaistu: ${activeChild} kulkee kentälle ${activeVenue} ${transitWord} (${activePlan.distanceKm < 1 ? Math.round(activePlan.distanceKm * 1000) + ' m' : activePlan.distanceKm + ' km'}), auto vapaana pelaajalle ${carChild}.`,
+            date: dateA,
+            formattedDate: dateLabel,
+            eventATitle: titleA,
+            eventBTitle: titleB,
+            eventATime: timeA,
+            eventBTime: timeB,
+            eventASport: a.sport,
+            eventBSport: b.sport,
+            message: `🟢 Päällekkäisyys ratkaistu (${dateLabel}): ${activeChild} kulkee kentälle ${activeVenue} ${transitWord} (${activePlan.distanceKm < 1 ? Math.round(activePlan.distanceKm * 1000) + ' m' : activePlan.distanceKm + ' km'}), auto vapaana pelaajalle ${carChild}.`,
             suggestedFix: `${activeChild} menee ${transitWord} lähikentälle (${activePlan.travelMinutes} min). Ei tarvita toista kuskia.`
           });
           continue;
@@ -110,9 +152,17 @@ export function conflictAgent(
           venueB: b.venue.name,
           overlapMinutes: overlap,
           travelMinutesEstimate: sameVenue ? 0 : drive,
+          date: dateA,
+          formattedDate: dateLabel,
+          eventATitle: titleA,
+          eventBTitle: titleB,
+          eventATime: timeA,
+          eventBTime: timeB,
+          eventASport: a.sport,
+          eventBSport: b.sport,
           message: isSameChild
-            ? `Päällekkäisyys: ${nameA} on merkitty kahteen peliin samaan aikaan (${a.venue.name} & ${b.venue.name}) päällekkäin ${overlap} min.`
-            : `Päällekkäisyys: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) päällekkäin ${overlap} min${driveLabel}.`,
+            ? `Päällekkäisyys (${dateLabel}): ${nameA} on merkitty kahteen peliin samaan aikaan: ${titleA} (klo ${timeA} @ ${a.venue.name}) ja ${titleB} (klo ${timeB} @ ${b.venue.name}) — päällekkäin ${overlap} min.`
+            : `Päällekkäisyys (${dateLabel}): ${nameA} (${titleA}, klo ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, klo ${timeB} @ ${b.venue.name}) päällekkäin ${overlap} min${driveLabel}.`,
           suggestedFix: isSameChild
             ? `Ilmoita valmentajalle valinta kumpaan peliin ${nameA} osallistuu.`
             : severity === 'critical'
@@ -159,7 +209,15 @@ export function conflictAgent(
             overlapMinutes: 0,
             travelMinutesEstimate: drive,
             isResolvedByActiveTransit: true,
-            message: `🟢 Siirtymä ratkaistu: ${activeChild} kulkee ${transitWord} omatoimisesti, auto vapaana pelaajalle ${carChild}.`,
+            date: dateA,
+            formattedDate: dateLabel,
+            eventATitle: titleA,
+            eventBTitle: titleB,
+            eventATime: timeA,
+            eventBTime: timeB,
+            eventASport: a.sport,
+            eventBSport: b.sport,
+            message: `🟢 Siirtymä ratkaistu (${dateLabel}): ${activeChild} kulkee ${transitWord} omatoimisesti, auto vapaana pelaajalle ${carChild}.`,
             suggestedFix: `${activeChild} siirtyy ${transitWord} omatoimisesti.`
           });
           continue;
@@ -177,11 +235,19 @@ export function conflictAgent(
           venueB: b.venue.name,
           overlapMinutes: 0,
           travelMinutesEstimate: drive,
+          date: dateA,
+          formattedDate: dateLabel,
+          eventATitle: titleA,
+          eventBTitle: titleB,
+          eventATime: timeA,
+          eventBTime: timeB,
+          eventASport: a.sport,
+          eventBSport: b.sport,
           message: isSameChild
-            ? `${nameA}: siirtymäaika (${Math.max(0, Math.round(gapKickoff))} min) ei riitä siirtymään ${a.venue.name} ➔ ${b.venue.name}${tightDriveLabel}.`
+            ? `Tiukka siirtymä (${dateLabel}): ${nameA} siirtyy pelistä ${titleA} (${timeA} @ ${a.venue.name}) peliin ${titleB} (${timeB} @ ${b.venue.name}) — väli ${Math.max(0, Math.round(gapKickoff))} min${tightDriveLabel}.`
             : isDriveImpossible
-              ? `Ajoaika ei riitä: ${nameA} (${a.venue.name}) ja ${nameB} (${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min${tightDriveLabel}.`
-              : `${nameA} lopettaa ${a.venue.name}, ${nameB} alkulämpö ${b.venue.name} — väli ${Math.max(0, Math.round(gapWarmup))} min${tightDriveLabel}.`,
+              ? `Ajoaika ei riitä (${dateLabel}): ${nameA} (${titleA}, ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, ${timeB} @ ${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min${tightDriveLabel}.`
+              : `Tiukka aikataulu (${dateLabel}): ${nameA} (${titleA}, ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, ${timeB} @ ${b.venue.name}) — väli ${Math.max(0, Math.round(gapWarmup))} min${tightDriveLabel}.`,
           suggestedFix: isSameChild
             ? `Aikataulu on liian tiukka samalle pelaajalle. Varoita valmentajaa myöhästymisestä.`
             : isDriveImpossible

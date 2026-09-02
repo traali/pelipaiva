@@ -29,6 +29,14 @@ export interface FamilyConflict {
   message: string;
   suggestedFix: string;
   isResolvedByActiveTransit?: boolean;
+  date?: string;
+  formattedDate?: string;
+  eventATitle?: string;
+  eventBTitle?: string;
+  eventATime?: string;
+  eventBTime?: string;
+  eventASport?: SportType;
+  eventBSport?: SportType;
 }
 
 export interface CarpoolLeg {

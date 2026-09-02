@@ -1229,37 +1229,60 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {unDismissedConflicts.length > 0 && (
-          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setIsLogisticsOpen(true)}
-              aria-label={`Logistiikkaristiriita: ${unDismissedConflicts[0]?.message}. Avaa kuskijako.`}
-              className="flex min-h-[44px] flex-1 items-start gap-2.5 text-left cursor-pointer hover:brightness-105 transition-all focus-visible:ring-2 focus-visible:ring-whistle"
-            >
-              <span className="mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse shrink-0">
-                Ristiriita
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text-primary leading-snug">
-                  {unDismissedConflicts[0]?.message}
+        {unDismissedConflicts.length > 0 && (() => {
+          const firstConflict = unDismissedConflicts[0]!;
+          const dateLabel = firstConflict.formattedDate || (firstConflict.date ? firstConflict.date.slice(5) : '');
+
+          return (
+            <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setIsLogisticsOpen(true)}
+                aria-label={`Logistiikkaristiriita: ${firstConflict.message}. Avaa kuskijako.`}
+                className="flex min-h-[44px] flex-1 items-start gap-2.5 text-left cursor-pointer hover:brightness-105 transition-all focus-visible:ring-2 focus-visible:ring-whistle"
+              >
+                <div className="flex flex-col gap-1 items-start shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse">
+                    Ristiriita
+                  </span>
+                  {dateLabel && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-surface-elevated text-whistle border border-whistle/30">
+                      📅 {dateLabel}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs font-bold text-whistle mt-1 flex items-center gap-1">
-                  <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-text-primary leading-snug">
+                    {firstConflict.message}
+                  </div>
+                  {firstConflict.eventATitle && firstConflict.eventBTitle && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+                      <span className="px-2 py-0.5 rounded-lg bg-surface-elevated/70 border border-border-subtle font-medium text-[11px] truncate max-w-[240px]">
+                        1️⃣ {firstConflict.eventATitle} ({firstConflict.eventATime} @ {firstConflict.venueA})
+                      </span>
+                      <span className="text-text-muted text-[10px]">⚔️</span>
+                      <span className="px-2 py-0.5 rounded-lg bg-surface-elevated/70 border border-border-subtle font-medium text-[11px] truncate max-w-[240px]">
+                        2️⃣ {firstConflict.eventBTitle} ({firstConflict.eventBTime} @ {firstConflict.venueB})
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-xs font-bold text-whistle mt-1.5 flex items-center gap-1">
+                    <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
+                  </div>
                 </div>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => unDismissedConflicts[0] && dismissConflict(unDismissedConflicts[0])}
-              className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
-              title="Merkitse tämä huomio hoidetuksi ja piilota se"
-            >
-              <span>✓</span>
-              <span>Kuittaa hoidetuksi</span>
-            </button>
-          </div>
-        )}
+              </button>
+              <button
+                type="button"
+                onClick={() => dismissConflict(firstConflict)}
+                className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
+                title="Merkitse tämä huomio hoidetuksi ja piilota se"
+              >
+                <span>✓</span>
+                <span>Kuittaa hoidetuksi</span>
+              </button>
+            </div>
+          );
+        })()}
 
         {viewMode === 'cards' ? (
           <>
