@@ -9,52 +9,177 @@
 import { db } from '../storage/db';
 import { calculateParkingRiskContract } from '../../types/contracts';
 
-// WebMCP Type Declarations (W3C Standard Draft)
+// WebMCP Type Declarations (W3C Standard Draft & Anthropic MCP Protocol)
+export interface ModelContextTool {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
+  execute: (args: Record<string, unknown>) => Promise<unknown>;
+}
+
+export interface ModelContextRegistry {
+  registerTool: (tool: ModelContextTool) => Promise<void> | void;
+  unregisterTool?: (name: string) => Promise<void> | void;
+  getTools: () => ModelContextTool[];
+  listTools: () => Promise<{ tools: Array<{ name: string; description: string; inputSchema: ModelContextTool['inputSchema'] }> }>;
+  callTool: (params: { name: string; arguments?: Record<string, unknown> }) => Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    isError?: boolean;
+  }>;
+  executeTool: (name: string, args?: Record<string, unknown>) => Promise<unknown>;
+}
+
 declare global {
-  interface ModelContextTool {
-    name: string;
-    description: string;
-    inputSchema: {
-      type: string;
-      properties?: Record<string, unknown>;
-      required?: string[];
-    };
-    execute: (args: Record<string, unknown>) => Promise<unknown>;
+  interface Document {
+    modelContext?: ModelContextRegistry;
+  }
+  interface Navigator {
+    modelContext?: ModelContextRegistry;
+  }
+  interface Window {
+    modelContext?: ModelContextRegistry;
+  }
+}
+
+/**
+ * Ensures a shared ModelContextRegistry instance is mounted on document, navigator, and window.
+ */
+function ensureModelContextRegistry(): ModelContextRegistry {
+  const existing = (typeof document !== 'undefined' && document.modelContext) ||
+    (typeof navigator !== 'undefined' && (navigator as any).modelContext) ||
+    (typeof window !== 'undefined' && (window as any).modelContext);
+
+  if (existing && typeof existing.registerTool === 'function' && typeof existing.callTool === 'function') {
+    return existing;
   }
 
-  interface Document {
-    modelContext?: {
-      registerTool: (tool: ModelContextTool) => Promise<void> | void;
-      unregisterTool?: (name: string) => Promise<void> | void;
-      getTools?: () => ModelContextTool[];
-    };
+  const registeredTools = new Map<string, ModelContextTool>();
+
+  const registry: ModelContextRegistry = {
+    registerTool: async (tool: ModelContextTool) => {
+      registeredTools.set(tool.name, tool);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('webmcp:tool_registered', { detail: { toolName: tool.name } })
+        );
+      }
+    },
+    unregisterTool: async (name: string) => {
+      registeredTools.delete(name);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('webmcp:tool_unregistered', { detail: { toolName: name } })
+        );
+      }
+    },
+    getTools: () => Array.from(registeredTools.values()),
+    listTools: async () => ({
+      tools: Array.from(registeredTools.values()).map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+      })),
+    }),
+    callTool: async (params: { name: string; arguments?: Record<string, unknown> }) => {
+      const tool = registeredTools.get(params.name);
+      if (!tool) {
+        return {
+          content: [{ type: 'text', text: `Error: Tool '${params.name}' not found in WebMCP registry.` }],
+          isError: true,
+        };
+      }
+      try {
+        const rawResult = await tool.execute(params.arguments || {});
+        return {
+          content: [{
+            type: 'text',
+            text: typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult, null, 2),
+          }],
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          content: [{ type: 'text', text: `Error executing '${params.name}': ${err?.message || String(err)}` }],
+          isError: true,
+        };
+      }
+    },
+    executeTool: async (name: string, args: Record<string, unknown> = {}) => {
+      const tool = registeredTools.get(name);
+      if (!tool) {
+        throw new Error(`WebMCP Tool '${name}' is not registered.`);
+      }
+      return tool.execute(args);
+    },
+  };
+
+  // Bind to document.modelContext
+  if (typeof document !== 'undefined') {
+    document.modelContext = registry;
   }
+
+  // Bind to navigator.modelContext for standard browser detection
+  if (typeof navigator !== 'undefined') {
+    try {
+      Object.defineProperty(navigator, 'modelContext', {
+        value: registry,
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
+    } catch {
+      (navigator as any).modelContext = registry;
+    }
+  }
+
+  // Bind to window.modelContext and enable cross-boundary message listeners
+  if (typeof window !== 'undefined') {
+    (window as any).modelContext = registry;
+
+    window.addEventListener('message', async (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== 'webmcp:request' || !data.id) return;
+
+      try {
+        if (data.method === 'tools/list' || data.method === 'listTools') {
+          const result = await registry.listTools();
+          window.postMessage({ type: 'webmcp:response', id: data.id, result }, '*');
+        } else if (data.method === 'tools/call' || data.method === 'callTool') {
+          const result = await registry.callTool(data.params || { name: '', arguments: {} });
+          window.postMessage({ type: 'webmcp:response', id: data.id, result }, '*');
+        }
+      } catch (err: any) {
+        window.postMessage({
+          type: 'webmcp:response',
+          id: data.id,
+          error: { message: err?.message || 'WebMCP execution failed' },
+        }, '*');
+      }
+    });
+
+    window.dispatchEvent(
+      new CustomEvent('webmcp:ready', { detail: { location: 'navigator.modelContext & document.modelContext' } })
+    );
+  }
+
+  return registry;
 }
 
 /**
  * Register all Pelipäivä WebMCP tools with the browser agent context.
  */
-export async function registerPelipaivaWebMCP(): Promise<void> {
+export async function registerPelipaivaWebMCP(): Promise<ModelContextRegistry | undefined> {
   if (typeof window === 'undefined') return;
 
-  // Polyfill / Mock container for inspection if native browser agent runtime is not yet active
-  if (!document.modelContext) {
-    const registeredTools: ModelContextTool[] = [];
-    document.modelContext = {
-      registerTool: async (tool: ModelContextTool) => {
-        registeredTools.push(tool);
-        // Dispatch custom event for browser extensions or AI agent sidecars
-        window.dispatchEvent(
-          new CustomEvent('webmcp:tool_registered', { detail: { toolName: tool.name } })
-        );
-      },
-      getTools: () => [...registeredTools],
-    };
-  }
+  const registry = ensureModelContextRegistry();
 
   try {
     // 1. Tool: get_matchday_schedule
-    await document.modelContext.registerTool({
+    await registry.registerTool({
       name: 'get_matchday_schedule',
       description: 'Returns the list of junior sports matches, training sessions, and school events for the family matchday schedule.',
       inputSchema: {
@@ -104,7 +229,7 @@ export async function registerPelipaivaWebMCP(): Promise<void> {
     });
 
     // 2. Tool: check_parking_risk
-    await document.modelContext.registerTool({
+    await registry.registerTool({
       name: 'check_parking_risk',
       description: 'Calculates parking safety score (1-10 risk rating), zone rules, and fine likelihood for a sports venue via ParkkiS data contract.',
       inputSchema: {
@@ -139,7 +264,7 @@ export async function registerPelipaivaWebMCP(): Promise<void> {
     });
 
     // 3. Tool: get_family_profiles
-    await document.modelContext.registerTool({
+    await registry.registerTool({
       name: 'get_family_profiles',
       description: 'Lists all registered child/family player profiles in the local Pelipäivä PWA database.',
       inputSchema: {
@@ -161,8 +286,10 @@ export async function registerPelipaivaWebMCP(): Promise<void> {
       },
     });
 
-    console.log('✨ [WebMCP] Successfully registered Pelipäivä AI agent tools into document.modelContext');
+    console.log('✨ [WebMCP] Successfully registered Pelipäivä AI agent tools into navigator.modelContext & document.modelContext');
+    return registry;
   } catch (err) {
     console.warn('[WebMCP] Failed to register WebMCP tools:', err);
+    return registry;
   }
 }
