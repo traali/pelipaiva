@@ -216,6 +216,10 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                     }}
                   />
                 )}
+                <div className="px-3 py-1.5 text-[10px] font-mono text-text-muted border-t border-border-subtle bg-surface-elevated/40 flex items-center justify-between">
+                  <span>v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'}</span>
+                  <span>git:{typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'}</span>
+                </div>
               </motion.div>
               </React.Fragment>
             )}

@@ -230,9 +230,16 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Request persistent storage on startup
+  // Request persistent storage on startup & expose build info
   useEffect(() => {
     ensureStoragePersistence();
+    if (typeof window !== 'undefined') {
+      window.__APP_BUILD_INFO__ = {
+        version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0',
+        commit: typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev',
+        buildTime: typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString()
+      };
+    }
   }, []);
 
   // Self-healing sport and indoor venue harmonization for multi-sport child profiles
@@ -1540,6 +1547,23 @@ export const App: React.FC = () => {
             />
           </div>
         )}
+
+        {/* Persistent Build & Version Footer */}
+        <footer className="mt-8 mb-4 pt-4 border-t border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-text-muted">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-text-secondary">PELIPÄIVÄ</span>
+            <span>•</span>
+            <span
+              data-testid="app-version-badge"
+              className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-subtle font-mono text-[10px] text-text-secondary"
+            >
+              v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'} (git:{typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'})
+            </span>
+          </div>
+          <div className="text-[10px] opacity-75">
+            Suomen mestaruustason perheurheilun tilannekeskus
+          </div>
+        </footer>
       </main>
 
       {/* Unified Smart Multi-Tab Importer (Federation URL, Cups, WhatsApp, Excel, OCR) */}
