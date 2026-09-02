@@ -72,12 +72,15 @@ export async function registerPelipaivaWebMCP(): Promise<void> {
       },
       execute: async ({ date, playerName }) => {
         const targetDate = typeof date === 'string' ? date : new Date().toISOString().split('T')[0];
-        const allEvents = await db.events.toArray();
+        const [allEvents, allProfiles] = await Promise.all([db.events.toArray(), db.profiles.toArray()]);
+        const profileMap = new Map(allProfiles.map((p) => [p.id, p]));
+
         const filtered = allEvents.filter((ev) => {
           const matchDate = ev.startTime ? ev.startTime.split('T')[0] : '';
           const matchesDate = !date || matchDate === targetDate;
+          const pName = profileMap.get(ev.profileId)?.playerName || '';
           const matchesPlayer =
-            !playerName || (typeof playerName === 'string' && ev.playerName?.toLowerCase().includes(playerName.toLowerCase()));
+            !playerName || (typeof playerName === 'string' && pName.toLowerCase().includes(playerName.toLowerCase()));
           return matchesDate && matchesPlayer;
         });
 
@@ -93,7 +96,8 @@ export async function registerPelipaivaWebMCP(): Promise<void> {
             startTime: e.startTime,
             venue: e.venue?.name || 'Kenttä',
             attendanceStatus: e.attendanceStatus || 'in',
-            source: e.source,
+            playerName: profileMap.get(e.profileId)?.playerName || '',
+            isOfficial: Boolean(e.officialFixtureId),
           })),
         };
       },
@@ -148,8 +152,9 @@ export async function registerPelipaivaWebMCP(): Promise<void> {
           count: profiles.length,
           profiles: profiles.map((p) => ({
             id: p.id,
-            name: p.name,
-            defaultSport: p.defaultSport,
+            playerName: p.playerName,
+            teamName: p.teamName,
+            sport: p.sport,
             colorHex: p.colorHex,
           })),
         };
