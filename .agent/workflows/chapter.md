@@ -30,3 +30,12 @@ Work must be divided and delegated to specialized subagents according to domain 
 | **Sacrist** | `sacrist_office` | Vitest suites, deterministic mock fixtures, Playwright E2E specs | `flash` (fast test runs) or `pro` (adversarial suites) |
 | **Visitor** | `visitor_office` | Clean-room adversarial audit against `AGENTS.md` (independent, no author bias) | `pro` / `inherit` (strict non-biased verification) |
 
+---
+
+## Dynamic Office Creation & Expansion Protocol
+
+1. **New Specialized Domains:** If a task introduces a new specialized domain (e.g. FMI Weather Radar & Geo routing, On-device Local LLM / WebLLM, WhatsApp bot integrations, or telemetry diagnostics), the agent MUST dynamically create a new dedicated Office via `define_subagent` and assign the appropriate model tier (`flash`, `pro`, or `inherit`).
+2. **Charter Expansion:** When a task is tightly coupled across sub-domains, the lead Office may expand its scope for that specific mission while maintaining clear accountability.
+3. **Accountability Principle:** Every file change and test MUST be owned by an accountable Office. No anonymous or untracked changes are permitted.
+
+
