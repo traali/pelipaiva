@@ -29,13 +29,12 @@ jobs:
         run: npm run build
 
       - name: Deploy Cloudflare Pages PWA
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: 'pelipaiva'
-          directory: 'dist'
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy dist --project-name=pelipaiva --branch=main --commit-dirty=true
 
       - name: Deploy Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
