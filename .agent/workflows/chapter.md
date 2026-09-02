@@ -17,11 +17,16 @@ The opening rite for any agent session in `pelipaiva`. Takes ~10 seconds.
 
 ---
 
-## Monastic Role Selection (Optional)
+## Monastic Offices & Accountable Domains
 
-If the task is specialized, assume the appropriate obedientiary scope:
-- **Cellarer:** Dependencies, package.json, build configs, CI.
-- **Sacrist:** Vitest test suites, Playwright E2E specs, test fixtures.
-- **Precentor:** Documentation, CHANGELOG, llms.txt, Rule amendments.
-- **Infirmarian:** Bug triage, error diagnostics, regression fixes.
-- **Visitor:** Adversarial audit (must NOT have written the code).
+Work must be divided and delegated to specialized subagents according to domain accountability and model tier:
+
+| Office | Subagent Name | Accountable Domain | Recommended Model Tier |
+|---|---|---|---|
+| **Cellarer** | `cellarer_office` | Edge proxy, Cloudflare Workers, KV sync, Webcal RFC 5545 feed | `inherit` / `pro` (security/crypto) or `flash` (lookups) |
+| **Scriptorium** | `scriptorium_office` | Parsers (ICS, WhatsApp NLP, Excel/table, OCR) & Sports Federation APIs | `pro` / `inherit` (complex extraction) or `flash` (regex) |
+| **Prior** | `prior_office` | Core domain state, Dexie schemas, conflict reasoning, transit & arrival rules | `pro` / `inherit` (graph traversal & concurrency) |
+| **Master of Works** | `works_office` | UI components, Radix primitives, Tailwind 4 tokens, Nova Design Protocol | `inherit` / `pro` (component architecture) or `flash` (styling) |
+| **Sacrist** | `sacrist_office` | Vitest suites, deterministic mock fixtures, Playwright E2E specs | `flash` (fast test runs) or `pro` (adversarial suites) |
+| **Visitor** | `visitor_office` | Clean-room adversarial audit against `AGENTS.md` (independent, no author bias) | `pro` / `inherit` (strict non-biased verification) |
+
