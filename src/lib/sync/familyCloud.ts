@@ -466,3 +466,171 @@ async function executeSyncFamilyRosterCycle(
     return { success: false, error: err?.message || 'Sync failed' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Manual Events Sync — cross-device freeform event sharing
+// KV key: fam_events:{familyCode}  TTL: 30 days rolling
+// ---------------------------------------------------------------------------
+
+import type { FamilyManualEvent, FamilyEventsV1 } from '../../types/matchday';
+
+/** GET /api/family/:code/events — returns null on 404 (first device, no events yet) */
+export async function fetchFamilyEvents(
+  code: string,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<FamilyEventsV1 | null> {
+  const cleanCode = normalizeFamilyCode(code);
+  try {
+    const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}/events`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (res.status === 404) return null;
+    if (res.status === 403) throw new Error('unknown_family');
+    if (!res.ok) throw new Error(`Worker events GET failed: ${res.status}`);
+    const data = (await res.json()) as FamilyEventsV1;
+    if (!data || data.v !== 1 || !Array.isArray(data.events)) throw new Error('invalid_events_schema');
+    return data;
+  } catch (err: any) {
+    console.warn('[FAMILY_CLOUD] fetchFamilyEvents failed:', err);
+    return null;
+  }
+}
+
+export type PushEventsResult =
+  | { success: true; rev: number; updatedAt: string }
+  | { success: false; error: 'rev_conflict'; currentRev: number }
+  | { success: false; error: string };
+
+/** PUT /api/family/:code/events — uploads merged event list with If-Match concurrency */
+export async function pushFamilyEvents(
+  code: string,
+  payload: FamilyEventsV1,
+  ifMatchRev?: number,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<PushEventsResult> {
+  const cleanCode = normalizeFamilyCode(code);
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (ifMatchRev !== undefined) headers['If-Match'] = `"${ifMatchRev}"`;
+
+    const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}/events`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000)
+    });
+
+    if (res.status === 409) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: 'rev_conflict', currentRev: (err as any).currentRev || 0 };
+    }
+    if (res.status === 403) return { success: false, error: 'unknown_family' };
+    if (!res.ok) return { success: false, error: `Worker error ${res.status}` };
+
+    const data = await res.json();
+    return { success: true, rev: data.rev, updatedAt: data.updatedAt };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error' };
+  }
+}
+
+/**
+ * Merge local and remote manual event lists.
+ * Strategy: last-write-wins per event ID; tombstone (deletedAt) always beats live.
+ * Prunes tombstones older than 30 days to keep payload compact.
+ */
+export function mergeFamilyEvents(
+  local: FamilyManualEvent[],
+  remote: FamilyManualEvent[]
+): FamilyManualEvent[] {
+  const map = new Map<string, FamilyManualEvent>();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  for (const ev of [...remote, ...local]) {
+    const existing = map.get(ev.id);
+    // Tombstone always wins; among live events, later updatedAt wins
+    if (!existing) {
+      map.set(ev.id, ev);
+    } else if (ev.deletedAt && !existing.deletedAt) {
+      map.set(ev.id, ev);
+    } else if (!ev.deletedAt && existing.deletedAt) {
+      // keep tombstone
+    } else if (ev.updatedAt > existing.updatedAt) {
+      map.set(ev.id, ev);
+    }
+  }
+
+  // Prune tombstones older than 30 days — they've served their purpose
+  return [...map.values()].filter(
+    (ev) => !ev.deletedAt || ev.deletedAt > thirtyDaysAgo
+  );
+}
+
+/**
+ * Full sync cycle for manual events: fetch remote, merge with local Dexie,
+ * push if local has changes. Returns the merged list.
+ */
+export async function syncManualEvents(
+  code: string,
+  databaseInstance: import('../storage/db').PelipaivaDB,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<{ events: FamilyManualEvent[]; success: boolean }> {
+  const cleanCode = normalizeFamilyCode(code);
+
+  try {
+    // 1. Load local events (including live tombstones)
+    const localAll = await databaseInstance.manualEvents.toArray();
+
+    // 2. Fetch remote
+    const remote = await fetchFamilyEvents(cleanCode, baseUrl);
+    const remoteEvents = remote?.events ?? [];
+
+    // 3. Merge
+    const merged = mergeFamilyEvents(localAll, remoteEvents);
+
+    // 4. Write merged back to Dexie (upsert all)
+    await databaseInstance.manualEvents.bulkPut(merged);
+
+    // 5. Push to KV if we have a newer local state
+    const localHasChanges = localAll.some((ev) => {
+      const remoteEv = remoteEvents.find((r) => r.id === ev.id);
+      return !remoteEv || ev.updatedAt > remoteEv.updatedAt;
+    });
+
+    if (localHasChanges) {
+      const payload: FamilyEventsV1 = {
+        v: 1,
+        rev: (remote?.rev ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+        events: merged
+      };
+      const pushRes = await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
+
+      if (!pushRes.success && pushRes.error === 'rev_conflict') {
+        // Retry: fetch latest, merge again, push
+        const fresh = await fetchFamilyEvents(cleanCode, baseUrl);
+        const freshMerged = mergeFamilyEvents(merged, fresh?.events ?? []);
+        await databaseInstance.manualEvents.bulkPut(freshMerged);
+        const retryPayload: FamilyEventsV1 = {
+          v: 1,
+          rev: (fresh?.rev ?? 0) + 1,
+          updatedAt: new Date().toISOString(),
+          events: freshMerged
+        };
+        await pushFamilyEvents(cleanCode, retryPayload, fresh?.rev, baseUrl);
+        return { events: freshMerged.filter((e) => !e.deletedAt), success: true };
+      }
+    }
+
+    return { events: merged.filter((e) => !e.deletedAt), success: true };
+  } catch (err: any) {
+    console.warn('[FAMILY_CLOUD] syncManualEvents failed:', err);
+    // Return local events even if sync failed — offline-first
+    const localLive = await databaseInstance.manualEvents
+      .filter((e) => !e.deletedAt)
+      .toArray();
+    return { events: localLive, success: false };
+  }
+}

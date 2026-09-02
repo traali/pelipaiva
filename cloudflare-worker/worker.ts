@@ -24,6 +24,28 @@ export interface FamilyRosterV1 {
   tombstones: Array<{ id: string; deletedAt: string }>;
 }
 
+export interface FamilyManualEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime?: string;
+  allDay?: boolean;
+  profileIds: string[];
+  notes?: string;
+  authorDeviceId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface FamilyEventsV1 {
+  v: 1;
+  rev: number;
+  updatedAt: string;
+  events: FamilyManualEvent[];
+}
+
+
 async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
   const set = new Set<string>();
   if (!raw) return set;
@@ -219,9 +241,16 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // 0. Family Sync Roster API (/api/family/:code)
+    // 0. Family Sync API (/api/family/:code and /api/family/:code/events)
     if (url.pathname.startsWith('/api/family/')) {
-      const rawCode = url.pathname.replace('/api/family/', '').trim().toUpperCase();
+      // Parse: /api/family/SB6EV-2  → code=SB6EV-2, subPath=''
+      //        /api/family/SB6EV-2/events → code=SB6EV-2, subPath='events'
+      const afterPrefix = url.pathname.slice('/api/family/'.length);
+      const slashIdx = afterPrefix.indexOf('/');
+      const rawCode = slashIdx === -1
+        ? afterPrefix.trim().toUpperCase()
+        : afterPrefix.slice(0, slashIdx).trim().toUpperCase();
+      const subPath = slashIdx === -1 ? '' : afterPrefix.slice(slashIdx + 1);
       const code = rawCode.includes('-')
         ? rawCode
         : rawCode.length === 6
@@ -248,6 +277,94 @@ export default {
         });
       }
 
+      // ---------------------------------------------------------------
+      // /api/family/:code/events — Manual freeform family event sync
+      // KV key: fam_events:{code}  TTL: 30 days
+      // ---------------------------------------------------------------
+      if (subPath === 'events') {
+        const eventsKvKey = `fam_events:${code}`;
+
+        if (request.method === 'GET') {
+          const dataStr = await env.MATCHDAY_KV.get(eventsKvKey);
+          if (!dataStr) {
+            return new Response(JSON.stringify({ v: 1, rev: 0, updatedAt: new Date().toISOString(), events: [] }), {
+              headers: { ...corsHeaders, 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            });
+          }
+          let data: FamilyEventsV1;
+          try {
+            data = JSON.parse(dataStr) as FamilyEventsV1;
+          } catch {
+            return new Response(JSON.stringify({ error: 'corrupt_data' }), { status: 500, headers: corsHeaders });
+          }
+          return new Response(dataStr, {
+            headers: { ...corsHeaders, ETag: `"${data.rev}"`, 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
+        }
+
+        if (request.method === 'PUT') {
+          // Size guard: reject payloads > 64 KB (≈130 events at 500 bytes each)
+          const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
+          if (contentLength > 65536) {
+            return new Response(JSON.stringify({ error: 'payload_too_large' }), { status: 413, headers: corsHeaders });
+          }
+
+          let body: FamilyEventsV1;
+          try {
+            body = (await request.json()) as FamilyEventsV1;
+          } catch {
+            return new Response(JSON.stringify({ error: 'invalid_json' }), { status: 400, headers: corsHeaders });
+          }
+          if (!body || body.v !== 1 || !Array.isArray(body.events)) {
+            return new Response(JSON.stringify({ error: 'invalid_events_schema' }), { status: 400, headers: corsHeaders });
+          }
+
+          // Validate and sanitize events
+          const sanitized: FamilyManualEvent[] = [];
+          for (const ev of body.events) {
+            if (!ev?.id || !ev.title || !ev.startTime || !ev.authorDeviceId) continue;
+            sanitized.push({
+              id: String(ev.id).slice(0, 64),
+              title: String(ev.title).slice(0, 200),
+              startTime: String(ev.startTime).slice(0, 32),
+              endTime: ev.endTime ? String(ev.endTime).slice(0, 32) : undefined,
+              allDay: Boolean(ev.allDay),
+              profileIds: Array.isArray(ev.profileIds) ? ev.profileIds.map((p) => String(p).slice(0, 64)) : [],
+              notes: ev.notes ? String(ev.notes).slice(0, 500) : undefined,
+              authorDeviceId: String(ev.authorDeviceId).slice(0, 64),
+              createdAt: String(ev.createdAt || new Date().toISOString()).slice(0, 32),
+              updatedAt: String(ev.updatedAt || new Date().toISOString()).slice(0, 32),
+              deletedAt: ev.deletedAt ? String(ev.deletedAt).slice(0, 32) : undefined
+            });
+          }
+
+          // Optimistic concurrency via If-Match
+          const existingStr = await env.MATCHDAY_KV.get(eventsKvKey);
+          let currentRev = 0;
+          if (existingStr) {
+            try {
+              currentRev = (JSON.parse(existingStr) as FamilyEventsV1).rev || 0;
+            } catch { /* treat as rev 0 */ }
+            const ifMatch = request.headers.get('If-Match')?.replace(/"/g, '');
+            if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
+              return new Response(JSON.stringify({ error: 'rev_conflict', currentRev }), { status: 409, headers: corsHeaders });
+            }
+          }
+
+          const nextRev = Math.max(body.rev || 0, currentRev + 1);
+          const toStore: FamilyEventsV1 = { v: 1, rev: nextRev, updatedAt: new Date().toISOString(), events: sanitized };
+          await env.MATCHDAY_KV.put(eventsKvKey, JSON.stringify(toStore), { expirationTtl: 2592000 }); // 30 days
+          return new Response(JSON.stringify({ success: true, rev: nextRev, updatedAt: toStore.updatedAt }), {
+            headers: { ...corsHeaders, ETag: `"${nextRev}"` }
+          });
+        }
+
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
+      }
+
+      // ---------------------------------------------------------------
+      // /api/family/:code — Roster (original logic unchanged)
+      // ---------------------------------------------------------------
       const kvKey = `family:${code}`;
 
       // GET /api/family/:code

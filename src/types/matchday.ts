@@ -566,3 +566,38 @@ export interface MatchdayEvent {
 
 
 
+
+// ---------------------------------------------------------------------------
+// Manual (family-authored) events — cross-device sync via Cloudflare KV
+// ---------------------------------------------------------------------------
+
+/**
+ * A freeform event added by a parent, not from any sports ICS feed.
+ * Examples: vanhempainilta, hammaslääkäri, 'muista shortsit', extra practice.
+ * These are synced to all devices sharing the same family code.
+ */
+export interface FamilyManualEvent {
+  /** Stable ID: me-{authorDeviceId}-{timestamp} */
+  id: string;
+  title: string;
+  startTime: string;
+  endTime?: string;
+  allDay?: boolean;
+  profileIds: string[];
+  notes?: string;
+  authorDeviceId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+/**
+ * KV envelope for the family manual events collection.
+ * Stored at key `fam_events:{familyCode}` with 30-day rolling TTL.
+ */
+export interface FamilyEventsV1 {
+  v: 1;
+  rev: number;
+  updatedAt: string;
+  events: FamilyManualEvent[];
+}
