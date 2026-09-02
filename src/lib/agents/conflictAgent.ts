@@ -27,6 +27,11 @@ export function conflictAgent(
       const b = upcoming[j]!;
       if (a.id === b.id) continue;
 
+      // Only check conflicts between events occurring on the same local calendar day
+      const dateA = a.startTime.slice(0, 10);
+      const dateB = b.startTime.slice(0, 10);
+      if (dateA !== dateB) continue;
+
       // Skip reconciled duplicates: if both events represent the same real-world
       // match from different calendar sources (e.g. MyClub + Torneopal), they share
       // an officialFixtureId or one is a bare fixture of the other. Never conflict.
@@ -40,10 +45,10 @@ export function conflictAgent(
 
       const sameVenue = a.venue.normalizedName === b.venue.normalizedName || a.venue.name === b.venue.name;
       const drive = estimateDriveMinutes(
-        a.venue.coordinates.lat,
-        a.venue.coordinates.lng,
-        b.venue.coordinates.lat,
-        b.venue.coordinates.lng
+        a.venue?.coordinates?.lat,
+        a.venue?.coordinates?.lng,
+        b.venue?.coordinates?.lat,
+        b.venue?.coordinates?.lng
       );
       const nameA = childName(a, profiles);
       const nameB = childName(b, profiles);

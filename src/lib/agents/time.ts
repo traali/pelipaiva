@@ -117,19 +117,35 @@ export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: numb
 }
 
 /** Urban Helsinki driving estimate: ~2.1 min/km + 8 min parkki.
- *  Returns 0 when either venue has no geocoded coordinates (lat=0, lng=0),
+ *  Returns 0 when either venue has no geocoded coordinates (lat=0, lng=0 or undefined/NaN),
  *  which is the fallback sentinel from resolveSportsVenue for unknown venues.
  *  Callers must treat 0 as "unknown", not "same location". */
 export function estimateDriveMinutes(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
+  lat1?: number,
+  lng1?: number,
+  lat2?: number,
+  lng2?: number
 ): number {
-  // (0, 0) is the null-island fallback from resolveSportsVenue when geocoding fails.
-  // Computing haversine against the equator gives ~7 000 km → ~15 000 min. Guard it.
-  if ((lat1 === 0 && lng1 === 0) || (lat2 === 0 && lng2 === 0)) return 0;
+  if (
+    lat1 == null ||
+    lng1 == null ||
+    lat2 == null ||
+    lng2 == null ||
+    isNaN(lat1) ||
+    isNaN(lng1) ||
+    isNaN(lat2) ||
+    isNaN(lng2) ||
+    (lat1 === 0 && lng1 === 0) ||
+    (lat2 === 0 && lng2 === 0) ||
+    lat1 < 50 || // Sanity check for Finland coordinates (lat ~60)
+    lat2 < 50 ||
+    lng1 < 15 ||
+    lng2 < 15
+  ) {
+    return 0;
+  }
   const km = haversineKm(lat1, lng1, lat2, lng2);
   if (km < 0.25) return 4;
-  return Math.round(km * 2.1 + 8);
+  // Cap at 90 min max for regional sports transit
+  return Math.min(90, Math.round(km * 2.1 + 8));
 }

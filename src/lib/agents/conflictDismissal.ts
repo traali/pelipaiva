@@ -183,6 +183,29 @@ export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedC
         travel: c.travelMinutesEstimate
       }));
 
+      const hasOverlap = maxOverlap > 0;
+      const title = isSameChild
+        ? hasOverlap
+          ? `Päällekkäisyys: ${groupList.length} päällekkäistä peliaikaa (max ${maxOverlap} min)`
+          : `Tiukka siirtymä: ${groupList.length} peräkkäistä tapahtumaa`
+        : hasOverlap
+          ? `Päällekkäisyys: ${groupList.length} aikatauluristeystä (${groupList[0]!.childA} & ${groupList[0]!.childB})`
+          : `Tiukka siirtymä: ${groupList.length} tapahtumaa (${groupList[0]!.childA} & ${groupList[0]!.childB})`;
+
+      const message = isSameChild
+        ? hasOverlap
+          ? `${childName} on merkitty ${groupList.length} päällekkäiseen tapahtumaan samana päivänä.`
+          : `${childName} on merkitty ${groupList.length} peräkkäiseen tapahtumaan samana päivänä. Tarkista siirtymäajat.`
+        : hasOverlap
+          ? `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat samaan aikaan ${groupList.length} ottelussa.`
+          : `${groupList[0]!.childA} ja ${groupList[0]!.childB} siirtyvät eri kentille samana päivänä.`;
+
+      const suggestedFix = isSameChild
+        ? hasOverlap
+          ? `Ilmoita valmentajille valinta mihin tapahtumiin ${childName} osallistuu.`
+          : `Tarkista että siirtymäaika kenttien välillä riittää.`
+        : 'Sovi kuskijako ja kyydit etukäteen turnauspäivälle.';
+
       result.push({
         id: `group-${key}`,
         conflicts: groupList,
@@ -192,15 +215,9 @@ export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedC
         childA: groupList[0]!.childA,
         childB: groupList[0]!.childB,
         isSameChild,
-        title: isSameChild
-          ? `Päällekkäisyys: ${groupList.length} päällekkäistä peliaikaa (max ${maxOverlap} min)`
-          : `Päällekkäisyys: ${groupList.length} aikatauluristeystä (${groupList[0]!.childA} & ${groupList[0]!.childB})`,
-        message: isSameChild
-          ? `${childName} on merkitty ${groupList.length} turnauspeliin päällekkäin toisen joukkueen kanssa samana iltapäivänä.`
-          : `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat samaan aikaan ${groupList.length} ottelussa.`,
-        suggestedFix: isSameChild
-          ? `Ilmoita valmentajille valinta mihin peleihin ${childName} osallistuu.`
-          : 'Sovi kuskijako ja kyydit etukäteen turnauspäivälle.',
+        title,
+        message,
+        suggestedFix,
         subItems
       });
     }

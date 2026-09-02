@@ -31,6 +31,8 @@ import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
+import { LiveMatchToast } from './components/LiveMatchToast';
+import { SatelliteEmbedDrawer } from './components/SatelliteEmbedDrawer';
 
 const SmartImportModal = lazy(() =>
   import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
@@ -64,6 +66,12 @@ export const App: React.FC = () => {
   const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState<boolean>(false);
   const [selectedStatsEvent, setSelectedStatsEvent] = useState<MatchdayEvent | null>(null);
+  const [liveDrawer, setLiveDrawer] = useState<{
+    isOpen: boolean;
+    sport: 'parkkis' | 'football-stats' | 'volleyball-stats' | 'floorball-stats' | 'basketball-stats';
+    matchId: string;
+    title: string;
+  } | null>(null);
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
@@ -1618,6 +1626,36 @@ export const App: React.FC = () => {
             await db.events.update(selectedStatsEvent.id, updates).catch(console.warn);
             setSelectedStatsEvent((prev) => (prev ? { ...prev, ...updates } : null));
           }}
+        />
+      )}
+
+      {/* Real-Time Live Goal & Event Toast Alert Banner */}
+      <LiveMatchToast
+        onOpenSatelliteDrawer={(sport, matchId, title) => {
+          const repoMap: Record<string, 'parkkis' | 'football-stats' | 'volleyball-stats' | 'floorball-stats' | 'basketball-stats'> = {
+            football: 'football-stats',
+            floorball: 'floorball-stats',
+            basketball: 'basketball-stats',
+            volleyball: 'volleyball-stats',
+          };
+          const targetRepo = repoMap[sport] || 'floorball-stats';
+          setLiveDrawer({
+            isOpen: true,
+            sport: targetRepo,
+            matchId,
+            title,
+          });
+        }}
+      />
+
+      {/* Satellite Slide-Over Embed Drawer */}
+      {liveDrawer?.isOpen && (
+        <SatelliteEmbedDrawer
+          isOpen={true}
+          onClose={() => setLiveDrawer(null)}
+          title={liveDrawer.title}
+          embedUrl={`https://${liveDrawer.sport}.pages.dev/match/${encodeURIComponent(liveDrawer.matchId)}?embed=true`}
+          sourceRepo={liveDrawer.sport}
         />
       )}
       </Suspense>
