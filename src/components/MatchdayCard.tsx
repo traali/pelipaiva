@@ -925,7 +925,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           isOpen={isStatsModalOpen}
           onClose={() => setIsStatsModalOpen(false)}
           stats={stats}
-          homeTeam={event.homeTeam}
+          homeTeam={event.homeTeam || event.title || 'Kotijoukkue'}
           awayTeam={event.awayTeam || 'Vastustaja'}
           playerName={playerName}
           playerLog={playerLog}

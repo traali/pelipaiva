@@ -59,8 +59,8 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   isOpen,
   onClose,
   stats: statsProp,
-  homeTeam,
-  awayTeam,
+  homeTeam: rawHomeTeam,
+  awayTeam: rawAwayTeam,
   playerName,
   playerLog,
   score,
@@ -68,6 +68,8 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   showTacticalScout = false,
   onSavePlayerLog
 }) => {
+  const homeTeam = rawHomeTeam || 'Kotijoukkue';
+  const awayTeam = rawAwayTeam || 'Vastustaja';
   const stats: FullMatchStats = statsProp ?? {
     leagueName: 'Sarjaottelu',
     isSynthetic: true,
