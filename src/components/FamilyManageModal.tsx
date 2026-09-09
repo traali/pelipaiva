@@ -29,7 +29,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   onClose,
   profiles,
   homeLocation,
-  showConflictWarnings = true,
+  showConflictWarnings = false,
   onToggleConflictWarnings,
   onOpenHomeLocation,
   onOpenImportForPlayer,

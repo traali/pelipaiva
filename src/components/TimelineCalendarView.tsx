@@ -23,6 +23,7 @@ interface TimelineCalendarViewProps {
   profiles: PlayerProfile[];
   viewMode: 'timeline' | 'calendar';
   conflicts?: FamilyConflict[];
+  showConflictWarnings?: boolean;
   onNavigate?: (event: MatchdayEvent) => void;
   onSelectEvent?: (event: MatchdayEvent) => void;
   onClearFilter?: () => void;
@@ -58,6 +59,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   profiles,
   viewMode,
   conflicts,
+  showConflictWarnings = false,
   onNavigate,
   onSelectEvent,
   onClearFilter
@@ -190,7 +192,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-black font-mono tracking-tight text-text-primary flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
-                          {timeStr}
+                          <span>{ev.isTraining ? 'Treeni alkaa' : ev.sport === 'school' ? 'Koulu' : ev.sport === 'other' ? 'Alkaa' : 'Ottelu alkaa'} klo {timeStr}</span>
                         </span>
 
                         <span
@@ -234,7 +236,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     {/* Overlap & Driving Transition Warning */}
                     {(() => {
-                      const related = !isOut ? conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [] : [];
+                      const related = (!isOut && showConflictWarnings) ? conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [] : [];
                       if (related.length === 0) return null;
                       return (
                         <div className="pl-1.5 flex flex-col gap-1.5">
@@ -354,6 +356,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
       events={events}
       profiles={profiles}
       conflicts={conflicts}
+      showConflictWarnings={showConflictWarnings}
       onSelectEvent={onSelectEvent}
       onNavigate={onNavigate}
       onClearFilter={onClearFilter}

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Clock,
   Swords,
   MessageSquare
 } from 'lucide-react';
@@ -54,7 +55,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   profile,
   kit,
   conflicts,
-  showConflictWarnings = true,
+  showConflictWarnings = false,
   homeLocation,
   onNavigate,
   onOpenStats,
@@ -134,7 +135,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               {event.isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
-              klo {kickoff} • {event.venue?.name || 'Kenttä'}
+              {event.isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {kickoff} • {event.venue?.name || 'Kenttä'}
             </span>
           </div>
         </div>
@@ -323,6 +324,27 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             )}
           </div>
         )}
+
+        {/* Clearly Stated Kickoff / Exercise Start Time */}
+        <div className="mt-2.5 mb-1.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-elevated/90 border border-border-strong text-text-primary shadow-xs flex-wrap">
+          <div className="flex items-center gap-1.5 font-black text-sm sm:text-base">
+            <Clock className="w-4 h-4 text-pitch shrink-0" />
+            <span className="text-pitch">
+              {event.isTraining
+                ? `🏃 Harjoitus alkaa klo ${kickoff}`
+                : event.sport === 'school'
+                ? `🏫 Koulu alkaa klo ${kickoff}`
+                : event.sport === 'other'
+                ? `📌 Alkaa klo ${kickoff}`
+                : `⚽ Ottelu alkaa klo ${kickoff}`}
+            </span>
+          </div>
+          {warmup && warmup !== kickoff && (
+            <span className="text-xs font-semibold text-text-secondary pl-1.5 border-l border-border-subtle">
+              Kokoontuminen klo {warmup}
+            </span>
+          )}
+        </div>
         
         {/* Venue Info */}
         <div className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">
@@ -397,13 +419,13 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1">
-              {event.sport === 'school' ? '🏫 Alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Treeni' : '⏱️ Aloitus'}
+              {event.sport === 'school' ? '🏫 Koulu alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Harjoitus alkaa' : '⏱️ Ottelu alkaa'}
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-text-primary mt-0.5">
               {kickoff}
             </span>
             <span className="text-[10px] text-text-muted mt-0.5">
-              Ottelu
+              {event.isTraining ? 'Harjoitus' : event.sport === 'school' ? 'Koulu' : event.sport === 'other' ? 'Meno' : 'Ottelu'}
             </span>
           </div>
         </div>

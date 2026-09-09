@@ -59,9 +59,9 @@ export const App: React.FC = () => {
   const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
   const [showConflictWarnings, setShowConflictWarnings] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('pelipaiva_show_conflict_warnings') !== 'false';
+      return localStorage.getItem('pelipaiva_show_conflict_warnings') === 'true';
     }
-    return true;
+    return false;
   });
 
   const toggleConflictWarnings = useCallback(() => {
@@ -1272,7 +1272,7 @@ export const App: React.FC = () => {
               onEventCreated={() => setActiveProfileId('all')}
             />
 
-            {snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
+            {showConflictWarnings && snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
               <DifficultDayAlert
                 warnings={snapshot.difficultDays}
                 onOpenLogistics={modalStore.openLogistics}
@@ -1478,6 +1478,7 @@ export const App: React.FC = () => {
               profiles={profiles}
               viewMode={viewMode}
               conflicts={snapshot.conflicts}
+              showConflictWarnings={showConflictWarnings}
               onSelectEvent={(ev) => modalStore.openStats(ev)}
               onClearFilter={() => setActiveProfileId('all')}
               onNavigate={(ev) => {

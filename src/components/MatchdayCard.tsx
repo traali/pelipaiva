@@ -66,7 +66,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   profile,
   compact = false,
   conflicts,
-  showConflictWarnings = true,
+  showConflictWarnings = false,
   homeLocation,
   onNavigateToVenue,
   onResolveMismatch,
@@ -192,7 +192,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               {isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
-              klo {formattedKickoff} • {venue?.name || 'Kenttä'}
+              {isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {formattedKickoff} • {venue?.name || 'Kenttä'}
             </span>
           </div>
         </div>
@@ -438,15 +438,22 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 KÄYNNISSÄ
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-text-secondary text-xs md:text-sm font-medium font-tabular">
-                <Clock className="w-3.5 h-3.5 text-pitch" />
-                <span>
-                  {isSchool || isOther
-                    ? `Klo ${formattedKickoff}`
+              <div className="flex items-center gap-1.5 text-text-primary text-xs md:text-sm font-bold font-tabular">
+                <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
+                <span className="text-pitch">
+                  {isSchool
+                    ? `Koulu klo ${formattedKickoff}`
+                    : isOther
+                    ? `Alkaa klo ${formattedKickoff}`
                     : isTraining
-                    ? `Kokoontuminen klo ${formattedWarmup} • Treeni klo ${formattedKickoff}`
-                    : `Alkulämpö klo ${formattedWarmup} · klo ${formattedKickoff}`}
+                    ? `Harjoitus alkaa klo ${formattedKickoff}`
+                    : `Ottelu alkaa klo ${formattedKickoff}`}
                 </span>
+                {formattedWarmup && formattedWarmup !== formattedKickoff && (
+                  <span className="text-[11px] font-medium text-text-secondary">
+                    (Kokoontuminen {formattedWarmup})
+                  </span>
+                )}
               </div>
             )}
             <button
@@ -522,6 +529,27 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               )}
             </div>
           )}
+
+          {/* Clearly Stated Kickoff / Exercise Start Time */}
+          <div className="mt-2 mb-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-elevated/90 border border-border-strong text-text-primary shadow-xs flex-wrap">
+            <div className="flex items-center gap-1.5 font-black text-sm">
+              <Clock className="w-4 h-4 text-pitch shrink-0" />
+              <span className="text-pitch">
+                {isTraining
+                  ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
+                  : isSchool
+                  ? `🏫 Koulu alkaa klo ${formattedKickoff}`
+                  : isOther
+                  ? `📌 Alkaa klo ${formattedKickoff}`
+                  : `⚽ Ottelu alkaa klo ${formattedKickoff}`}
+              </span>
+            </div>
+            {formattedWarmup && formattedWarmup !== formattedKickoff && (
+              <span className="text-xs font-semibold text-text-secondary pl-1.5 border-l border-border-subtle">
+                Kokoontuminen klo {formattedWarmup}
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />

@@ -39,7 +39,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
   isOffline,
   isSyncing,
   isDemo,
-  showConflictWarnings = true,
+  showConflictWarnings = false,
   onToggleConflictWarnings,
   onRefresh,
   onShare,
@@ -79,7 +79,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
           )}
         </div>
 
-        {conflictCount > 0 && (
+        {showConflictWarnings && conflictCount > 0 && (
           <button
             type="button"
             onClick={onLogistics}

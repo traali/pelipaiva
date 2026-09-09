@@ -24,6 +24,7 @@ export interface FamilyVisualCalendarProps {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
   conflicts?: FamilyConflict[];
+  showConflictWarnings?: boolean;
   onSelectEvent?: (event: MatchdayEvent) => void;
   onNavigate?: (event: MatchdayEvent) => void;
   onClearFilter?: () => void;
@@ -57,6 +58,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
   events,
   profiles,
   conflicts,
+  showConflictWarnings = false,
   onSelectEvent,
   onNavigate,
   onClearFilter
@@ -106,10 +108,10 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
     return map;
   }, [events]);
 
-  // Conflict days map for instant lookup
+  // Conflict days map for instant lookup (only when showConflictWarnings is true)
   const conflictDateSet = useMemo(() => {
     const set = new Set<string>();
-    if (!conflicts) return set;
+    if (!showConflictWarnings || !conflicts) return set;
     for (const c of conflicts) {
       const evA = events.find((e) => e.id === c.eventAId);
       if (evA) {
@@ -117,7 +119,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
       }
     }
     return set;
-  }, [conflicts, events]);
+  }, [showConflictWarnings, conflicts, events]);
 
   // Month stats calculation
   const currentMonthStats = useMemo(() => {
@@ -730,7 +732,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black font-mono text-pitch flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{timeStr}</span>
+                        <span>{ev.isTraining ? 'Treeni alkaa' : ev.sport === 'school' ? 'Koulu' : ev.sport === 'other' ? 'Alkaa' : 'Ottelu alkaa'} klo {timeStr}</span>
                       </span>
                       <span
                         className="text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xs"
@@ -768,7 +770,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
 
                   {/* Conflict warnings */}
                   {(() => {
-                    const related = !isOut ? conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [] : [];
+                    const related = (!isOut && showConflictWarnings) ? conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [] : [];
                     if (related.length === 0) return null;
                     return (
                       <div className="pl-2 flex flex-col gap-1.5">

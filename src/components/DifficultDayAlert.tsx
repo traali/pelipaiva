@@ -36,7 +36,7 @@ export const DifficultDayAlert: React.FC<DifficultDayAlertProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-black uppercase tracking-wider text-text-secondary">
-                AI Tilannevaroitus
+                Aikatauluhuomio
               </span>
               <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[10px] font-bold text-text-primary border border-border-subtle">
                 {first.label}
