@@ -7,6 +7,7 @@ import {
   MessageSquarePlus,
   MoreHorizontal,
   RefreshCw,
+  Settings,
   Share2,
   Trash2,
   Tv,
@@ -29,7 +30,9 @@ interface MissionControlHUDProps {
   onImport: () => void;
   showConflictWarnings?: boolean;
   onToggleConflictWarnings?: () => void;
+  showCopilot?: boolean;
   onOpenHomeLocation?: () => void;
+  onSettings?: () => void;
   onAsk?: () => void;
   onClear: () => void;
 }
@@ -41,6 +44,8 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
   isDemo,
   showConflictWarnings = false,
   onToggleConflictWarnings,
+  showCopilot = false,
+  onSettings,
   onRefresh,
   onShare,
   onAmbient,
@@ -177,12 +182,22 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                     setMenuOpen(false);
                   }}
                 />
-                {onAsk && (
+                {showCopilot && onAsk && (
                   <MenuItem
                     icon={<MessageSquarePlus className="h-4 w-4" />}
                     label="Kysy aikataulusta"
                     onClick={() => {
                       onAsk();
+                      setMenuOpen(false);
+                    }}
+                  />
+                )}
+                {onSettings && (
+                  <MenuItem
+                    icon={<Settings className="h-4 w-4" />}
+                    label="Asetukset & Älytoiminnot"
+                    onClick={() => {
+                      onSettings();
                       setMenuOpen(false);
                     }}
                   />

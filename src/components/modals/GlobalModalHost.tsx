@@ -30,6 +30,9 @@ const FamilyCalendarModal = lazy(() =>
 const MatchStatsModal = lazy(() =>
   import("../MatchStatsModal").then((m) => ({ default: m.MatchStatsModal }))
 );
+const SettingsModal = lazy(() =>
+  import("../SettingsModal").then((m) => ({ default: m.SettingsModal }))
+);
 const SatelliteEmbedDrawer = lazy(() =>
   import("../SatelliteEmbedDrawer").then((m) => ({ default: m.SatelliteEmbedDrawer }))
 );
@@ -47,10 +50,13 @@ export interface GlobalModalHostProps {
   openEditProfile: (profile: PlayerProfile) => void;
   showConflictWarnings: boolean;
   toggleConflictWarnings: () => void;
+  aiSettings?: import("../../lib/settings/useAppSettings").AppAiSettings;
+  onToggleAiSetting?: (key: keyof import("../../lib/settings/useAppSettings").AppAiSettings, value: boolean) => void;
   setIsOnboardingActive: (val: boolean) => void;
   setActiveProfileId: (val: string) => void;
   openHomeLocation: () => void;
   openFamilyShare: () => void;
+  openSmartImport?: () => void;
 }
 
 export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
@@ -66,10 +72,13 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
   openEditProfile,
   showConflictWarnings,
   toggleConflictWarnings,
+  aiSettings,
+  onToggleAiSetting,
   setIsOnboardingActive,
   setActiveProfileId,
   openHomeLocation,
   openFamilyShare,
+  openSmartImport,
 }) => {
   return (
     <Suspense fallback={null}>
@@ -149,6 +158,8 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
           homeLocation={homeLocation}
           showConflictWarnings={showConflictWarnings}
           onToggleConflictWarnings={toggleConflictWarnings}
+          aiSettings={aiSettings}
+          onToggleAiSetting={onToggleAiSetting}
           onOpenHomeLocation={() => {
             onClose();
             openHomeLocation();
@@ -166,6 +177,28 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
             localStorage.removeItem("pelipaiva_onboarding_done");
             setIsOnboardingActive(true);
             onClose();
+          }}
+        />
+      )}
+
+      {/* Settings Modal (Dedicated Granular AI & Experience Sliders) */}
+      {activeModal?.type === "settings" && aiSettings && onToggleAiSetting && (
+        <SettingsModal
+          isOpen={true}
+          onClose={onClose}
+          settings={aiSettings}
+          onToggleSetting={onToggleAiSetting}
+          onOpenHomeLocation={() => {
+            onClose();
+            openHomeLocation();
+          }}
+          onOpenFamilyShare={() => {
+            onClose();
+            openFamilyShare();
+          }}
+          onOpenImport={() => {
+            onClose();
+            openSmartImport?.();
           }}
         />
       )}
@@ -202,6 +235,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
           playerLog={activeModal.event.playerLog}
           score={activeModal.event.score}
           sport={activeModal.event.sport}
+          showTacticalScout={aiSettings?.showTacticalScout}
           onSavePlayerLog={async (log, updatedScore) => {
             const updates: Partial<MatchdayEvent> = {
               playerLog: log,

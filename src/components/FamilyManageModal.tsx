@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2, AlertTriangle, Calendar, MessageSquarePlus, BrainCircuit, Shirt } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { formatHomeTransitSummary } from '../lib/storage/homeLocation';
@@ -9,6 +9,8 @@ import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsPar
 import { fetchRawIcsFeed, isLikelyIcsUrl, ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
 import { TeamColorPicker } from './TeamColorPicker';
 import { OnDeviceLlmSettings } from './OnDeviceLlmSettings';
+import { ToggleSlider } from './ui/ToggleSlider';
+import type { AppAiSettings } from '../lib/settings/useAppSettings';
 
 interface FamilyManageModalProps {
   isOpen: boolean;
@@ -17,6 +19,8 @@ interface FamilyManageModalProps {
   homeLocation?: HomeLocation;
   showConflictWarnings?: boolean;
   onToggleConflictWarnings?: () => void;
+  aiSettings?: AppAiSettings;
+  onToggleAiSetting?: (key: keyof AppAiSettings, value: boolean) => void;
   onOpenHomeLocation?: () => void;
   onOpenImportForPlayer: (playerName: string) => void;
   onEditProfile: (profile: PlayerProfile) => void;
@@ -31,6 +35,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   homeLocation,
   showConflictWarnings = false,
   onToggleConflictWarnings,
+  aiSettings,
+  onToggleAiSetting,
   onOpenHomeLocation,
   onOpenImportForPlayer,
   onEditProfile,
@@ -510,8 +516,59 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
             </div>
           )}
 
-          {/* Settings Section: Conflict & Logistics Warnings Toggle */}
-          {onToggleConflictWarnings && (
+          {/* Settings Section: Granular AI & Smart Assistant Toggles */}
+          {aiSettings && onToggleAiSetting ? (
+            <div className="space-y-2.5 pt-2 border-t border-border-subtle">
+              <h3 className="text-xs font-black uppercase tracking-wider text-text-muted px-1">
+                Älykkäät apurit & ilmoitukset (Valinnaiset)
+              </h3>
+
+              <ToggleSlider
+                id="family-toggle-conflicts"
+                label="Päällekkäisyysvaroitukset"
+                description="Ilmoita jos perheenjäsenten pelit menevät päällekkäin tai siirtymäaika kenttien välillä on liian tiukka."
+                checked={aiSettings.showConflictWarnings}
+                onChange={(val) => onToggleAiSetting('showConflictWarnings', val)}
+                icon={<AlertTriangle className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-advisories"
+                label="Päivän tilannevaroitus"
+                description="Näytä ruuhkaisina pelipäivinä automaattinen tilannekooste ja toimenpidesuositukset."
+                checked={aiSettings.showScheduleAdvisories}
+                onChange={(val) => onToggleAiSetting('showScheduleAdvisories', val)}
+                icon={<Calendar className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-copilot"
+                label="AI Aikatauluapuri (Kysy Pelipäivältä)"
+                description="Avaa tekoälyavusteinen haku ja kalenteriassistentti valikossa."
+                checked={aiSettings.showCopilotAssistant}
+                onChange={(val) => onToggleAiSetting('showCopilotAssistant', val)}
+                icon={<MessageSquarePlus className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-tactical"
+                label="Taktinen otteluennakko"
+                description="Näytä ottelutilastoissa automaattinen vastustajan kuntokatsaus ja pelitapa-analyysi."
+                checked={aiSettings.showTacticalScout}
+                onChange={(val) => onToggleAiSetting('showTacticalScout', val)}
+                icon={<BrainCircuit className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-gear"
+                label="Älykäs varusteopas"
+                description="Näytä sääennusteen ja kenttäalustan mukainen kenkä- ja pukeutumissuositus ottelukortissa."
+                checked={aiSettings.showSmartGearAdvice}
+                onChange={(val) => onToggleAiSetting('showSmartGearAdvice', val)}
+                icon={<Shirt className="w-4 h-4" />}
+              />
+            </div>
+          ) : onToggleConflictWarnings && (
             <div className="p-3.5 rounded-2xl bg-surface-elevated/60 border border-border-subtle flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`p-2 rounded-xl shrink-0 ${showConflictWarnings ? 'bg-whistle/15 text-whistle' : 'bg-surface-base text-text-muted'}`}>

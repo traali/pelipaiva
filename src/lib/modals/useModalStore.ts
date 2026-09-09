@@ -20,6 +20,7 @@ export type ActiveModal =
   | { type: "familyManage" }
   | { type: "familyShare" }
   | { type: "calendar" }
+  | { type: "settings" }
   | { type: "stats"; event: MatchdayEvent }
   | { type: "drawer"; sport: string; matchId: string; title: string }
   | null;
@@ -63,6 +64,10 @@ export function useModalStore() {
     setActiveModal({ type: "drawer", sport, matchId, title });
   }, []);
 
+  const openSettings = useCallback(() => {
+    setActiveModal({ type: "settings" });
+  }, []);
+
   const closeModal = useCallback(() => {
     setActiveModal(null);
   }, []);
@@ -77,6 +82,7 @@ export function useModalStore() {
     openFamilyManage,
     openFamilyShare,
     openCalendar,
+    openSettings,
     openStats,
     openDrawer,
     closeModal,

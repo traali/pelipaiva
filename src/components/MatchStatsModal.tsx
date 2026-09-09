@@ -33,6 +33,7 @@ interface MatchStatsModalProps {
   playerLog?: PlayerMatchLog;
   score?: string;
   sport?: SportType;
+  showTacticalScout?: boolean;
   onSavePlayerLog?: (log: PlayerMatchLog, updatedScore?: string) => void;
 }
 
@@ -64,6 +65,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   playerLog,
   score,
   sport = 'football',
+  showTacticalScout = false,
   onSavePlayerLog
 }) => {
   const stats: FullMatchStats = statsProp ?? {
@@ -400,7 +402,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 { id: 'scorers', label: 'Maalipörssi', icon: Award },
                 { id: 'common', label: 'Yhteiset vastustajat', icon: GitCompare },
                 { id: 'h2h', label: 'Keskinäiset (H2H)', icon: Swords },
-                { id: 'scout', label: 'Taktinen katsaus', icon: BrainCircuit }
+                ...(showTacticalScout ? [{ id: 'scout', label: 'Taktinen katsaus', icon: BrainCircuit }] : [])
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;

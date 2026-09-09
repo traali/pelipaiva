@@ -38,6 +38,7 @@ interface HeroMatchCardProps {
   kit?: SportKitPlan;
   conflicts: FamilyConflict[];
   showConflictWarnings?: boolean;
+  showSmartGearAdvice?: boolean;
   homeLocation?: import('../types/matchday').HomeLocation;
   onNavigate?: () => void;
   onOpenStats?: () => void;
@@ -56,6 +57,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   kit,
   conflicts,
   showConflictWarnings = false,
+  showSmartGearAdvice = false,
   homeLocation,
   onNavigate,
   onOpenStats,
@@ -682,8 +684,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           </div>
         )}
 
-        {/* ALWAYS VISIBLE GEAR GLANCE TWIN-PILL (Jersey + Shoes) */}
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/* GEAR GLANCE PILLS (Jersey always visible; Nappisvahti shoes pill when smart gear advice enabled) */}
+        <div className={`mt-3 grid gap-2 ${showSmartGearAdvice ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
           {/* Jersey Pill */}
           <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
             <span
@@ -696,24 +698,26 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             </div>
           </div>
 
-          {/* Shoes Pill */}
-          <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
-            <ShieldCheck className="w-4 h-4 text-pitch shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Nappisvahti</div>
-              <div className="text-xs font-bold text-text-primary truncate">
-                {(() => {
-                  const fw = event.briefing?.gearAndPackingAdvice.footwear;
-                  if (fw === 'AG_ARTIFICIAL_GRASS') return 'Tekonurmikengät (AG)';
-                  if (fw === 'FG_FIRM_GROUND') return 'Nappikset (FG)';
-                  if (fw === 'SG_SOFT_GROUND') return 'Rautatapit (SG)';
-                  if (fw === 'TF_TURF_SHOES') return 'Turf-kengät (TF)';
-                  if (fw === 'INDOOR_NON_MARKING') return 'Sisäpelikengät';
-                  return event.venue.isIndoor ? 'Sisäpelikengät' : 'Tekonurmikengät (AG)';
-                })()}
+          {/* Shoes Pill (Nappisvahti - conditionally shown when smart gear advice is enabled) */}
+          {showSmartGearAdvice && (
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-elevated border border-border-subtle">
+              <ShieldCheck className="w-4 h-4 text-pitch shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Nappisvahti</div>
+                <div className="text-xs font-bold text-text-primary truncate">
+                  {(() => {
+                    const fw = event.briefing?.gearAndPackingAdvice.footwear;
+                    if (fw === 'AG_ARTIFICIAL_GRASS') return 'Tekonurmikengät (AG)';
+                    if (fw === 'FG_FIRM_GROUND') return 'Nappikset (FG)';
+                    if (fw === 'SG_SOFT_GROUND') return 'Rautatapit (SG)';
+                    if (fw === 'TF_TURF_SHOES') return 'Turf-kengät (TF)';
+                    if (fw === 'INDOOR_NON_MARKING') return 'Sisäpelikengät';
+                    return event.venue.isIndoor ? 'Sisäpelikengät' : 'Tekonurmikengät (AG)';
+                  })()}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Secondary Badges (Parking info - compact when walking/cycling) */}

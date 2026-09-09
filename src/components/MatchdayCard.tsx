@@ -48,6 +48,7 @@ interface MatchdayCardProps {
   compact?: boolean;
   conflicts?: FamilyConflict[];
   showConflictWarnings?: boolean;
+  showSmartGearAdvice?: boolean;
   homeLocation?: HomeLocation;
   onNavigateToVenue?: () => void;
   onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
@@ -67,6 +68,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   compact = false,
   conflicts,
   showConflictWarnings = false,
+  showSmartGearAdvice = false,
   homeLocation,
   onNavigateToVenue,
   onResolveMismatch,
@@ -438,20 +440,20 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 KÄYNNISSÄ
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-text-primary text-xs md:text-sm font-bold font-tabular">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-elevated/80 border border-border-subtle text-text-primary text-xs md:text-sm font-bold font-tabular shadow-xs">
                 <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
                 <span className="text-pitch">
                   {isSchool
-                    ? `Koulu klo ${formattedKickoff}`
+                    ? `🏫 Koulu alkaa klo ${formattedKickoff}`
                     : isOther
-                    ? `Alkaa klo ${formattedKickoff}`
+                    ? `📌 Alkaa klo ${formattedKickoff}`
                     : isTraining
-                    ? `Harjoitus alkaa klo ${formattedKickoff}`
-                    : `Ottelu alkaa klo ${formattedKickoff}`}
+                    ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
+                    : `⚽ Ottelu alkaa klo ${formattedKickoff}`}
                 </span>
                 {formattedWarmup && formattedWarmup !== formattedKickoff && (
-                  <span className="text-[11px] font-medium text-text-secondary">
-                    (Kokoontuminen {formattedWarmup})
+                  <span className="text-[11px] font-medium text-text-secondary pl-1 border-l border-border-subtle">
+                    Kokoontuminen {formattedWarmup}
                   </span>
                 )}
               </div>
@@ -780,9 +782,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         )}
 
-        {/* Bento Sub-Cards: Nappisvahti & Parking (compact parking when walking/cycling) */}
-        <div className={`grid gap-3 mb-5 ${transitPlan?.isSelfTransit ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-          {event.briefing && (
+        {/* Bento Sub-Cards: Nappisvahti & Parking (compact parking when walking/cycling or when gear advice is off) */}
+        <div className={`grid gap-3 mb-5 ${transitPlan?.isSelfTransit || !showSmartGearAdvice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+          {showSmartGearAdvice && event.briefing && (
             <NappisvahtiPill
               footwear={event.briefing.gearAndPackingAdvice.footwear}
               reason={event.briefing.gearAndPackingAdvice.footwearReason}
@@ -797,7 +799,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           )}
         </div>
 
-        {!compact && event.briefing && (
+        {!compact && showSmartGearAdvice && event.briefing && (
           <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
             <div className="font-semibold text-text-primary">
               {isTraining ? '🎒 Treenivarusteet:' : '🎒 Varustesuositus & Katsomo-opas:'}

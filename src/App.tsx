@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteOfficialTeamData, ensureStoragePersistence, clearAllDatabaseData } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
@@ -33,6 +33,7 @@ import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 import { LiveMatchToast } from './components/LiveMatchToast';
 import { useModalStore } from './lib/modals/useModalStore';
 import { GlobalModalHost } from './components/modals';
+import { useAppSettings } from './lib/settings/useAppSettings';
 
 
 
@@ -57,22 +58,11 @@ export const App: React.FC = () => {
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
   const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
-  const [showConflictWarnings, setShowConflictWarnings] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('pelipaiva_show_conflict_warnings') === 'true';
-    }
-    return false;
-  });
-
-  const toggleConflictWarnings = useCallback(() => {
-    setShowConflictWarnings((prev) => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pelipaiva_show_conflict_warnings', String(next));
-      }
-      return next;
-    });
-  }, []);
+  const {
+    settings,
+    updateSetting,
+    toggleConflictWarnings
+  } = useAppSettings();
 
   // Listen to network status changes & background family sync
   useEffect(() => {
@@ -987,8 +977,10 @@ export const App: React.FC = () => {
           handleImportCalendar={handleImportCalendar}
           openAddTeam={openAddTeam}
           openEditProfile={openEditProfile}
-          showConflictWarnings={showConflictWarnings}
+          showConflictWarnings={settings.showConflictWarnings}
           toggleConflictWarnings={toggleConflictWarnings}
+          aiSettings={settings}
+          onToggleAiSetting={updateSetting}
           setIsOnboardingActive={setIsOnboardingActive}
           setActiveProfileId={setActiveProfileId}
           openHomeLocation={modalStore.openHomeLocation}
@@ -1005,8 +997,10 @@ export const App: React.FC = () => {
         isOffline={isOffline}
         isSyncing={isSyncing}
         isDemo={isDemoActive}
-        showConflictWarnings={showConflictWarnings}
+        showConflictWarnings={settings.showConflictWarnings}
         onToggleConflictWarnings={toggleConflictWarnings}
+        showCopilot={settings.showCopilotAssistant}
+        onSettings={modalStore.openSettings}
         onRefresh={handleRefreshAll}
         onShare={modalStore.openFamilyShare}
         onAmbient={() => setIsAmbientMode(true)}
@@ -1204,7 +1198,7 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {showConflictWarnings && unDismissedConflicts.length > 0 && (() => {
+        {settings.showConflictWarnings && unDismissedConflicts.length > 0 && (() => {
           const firstConflict = unDismissedConflicts[0]!;
           const dateLabel = firstConflict.formattedDate || (firstConflict.date ? firstConflict.date.slice(5) : '');
 
@@ -1272,7 +1266,7 @@ export const App: React.FC = () => {
               onEventCreated={() => setActiveProfileId('all')}
             />
 
-            {showConflictWarnings && snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
+            {settings.showScheduleAdvisories && snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
               <DifficultDayAlert
                 warnings={snapshot.difficultDays}
                 onOpenLogistics={modalStore.openLogistics}
@@ -1363,7 +1357,8 @@ export const App: React.FC = () => {
                               profile={snapshot.nextPlayer || profile}
                               kit={snapshot.kitByEventId[event.id]}
                               conflicts={snapshot.conflicts}
-                              showConflictWarnings={showConflictWarnings}
+                              showConflictWarnings={settings.showConflictWarnings}
+                              showSmartGearAdvice={settings.showSmartGearAdvice}
                               homeLocation={homeLocation}
                               onOpenHomeModal={modalStore.openHomeLocation}
                               onNavigate={() => {
@@ -1404,7 +1399,8 @@ export const App: React.FC = () => {
                             profile={profile}
                             compact
                             conflicts={snapshot.conflicts}
-                            showConflictWarnings={showConflictWarnings}
+                            showConflictWarnings={settings.showConflictWarnings}
+                            showSmartGearAdvice={settings.showSmartGearAdvice}
                             homeLocation={homeLocation}
                             onOpenHomeModal={modalStore.openHomeLocation}
                             onResolveMismatch={handleResolveMismatch}
@@ -1478,7 +1474,7 @@ export const App: React.FC = () => {
               profiles={profiles}
               viewMode={viewMode}
               conflicts={snapshot.conflicts}
-              showConflictWarnings={showConflictWarnings}
+              showConflictWarnings={settings.showConflictWarnings}
               onSelectEvent={(ev) => modalStore.openStats(ev)}
               onClearFilter={() => setActiveProfileId('all')}
               onNavigate={(ev) => {
@@ -1528,8 +1524,10 @@ export const App: React.FC = () => {
         handleImportCalendar={handleImportCalendar}
         openAddTeam={openAddTeam}
         openEditProfile={openEditProfile}
-        showConflictWarnings={showConflictWarnings}
+        showConflictWarnings={settings.showConflictWarnings}
         toggleConflictWarnings={toggleConflictWarnings}
+        aiSettings={settings}
+        onToggleAiSetting={updateSetting}
         setIsOnboardingActive={setIsOnboardingActive}
         setActiveProfileId={setActiveProfileId}
         openHomeLocation={modalStore.openHomeLocation}
