@@ -57,8 +57,8 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
     : '🟢 Helppo pysäköidä';
 
   const discTime = calculateParkingDiscTime(new Date());
-  const lat = parking.coordinates.lat;
-  const lng = parking.coordinates.lng;
+  const lat = parking.coordinates?.lat ?? 60.1699;
+  const lng = parking.coordinates?.lng ?? 24.9384;
 
   // OpenStreetMap Bounding Box for embedded interactive map
   const delta = 0.004;
