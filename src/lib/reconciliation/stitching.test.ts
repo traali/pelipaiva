@@ -132,6 +132,7 @@ END:VCALENDAR`;
     expect(icsFeed).toContain('SUMMARY:Tuomas: PPJ/Laru Sininen vs EPS/Valkoinen');
     expect(icsFeed).toContain('DTSTART:20260912T070000Z'); // 10:00 match start for voice assistants
     expect(icsFeed).toContain('Kokoontuminen: klo 09:15'); // Mentioned in description
+    expect(icsFeed).toContain('Pelipaikka: Väinämöinen tn'); // Embedded in description
     expect(icsFeed).toContain('LOCATION:Väinämöinen tn');
     expect(icsFeed).toContain('END:VCALENDAR');
   });

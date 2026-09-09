@@ -53,6 +53,16 @@ export const MULTILINGUAL_COLORS: Record<string, string> = {
 };
 
 /**
+ * Known squad/district synonyms and colloquial abbreviations in Finnish youth sports.
+ * Maps informal district and pitch nicknames to canonical squad tokens.
+ */
+export const SQUAD_SYNONYMS: Record<string, string> = {
+  laru: 'lauttasaari',
+  väke: 'väinämöinen',
+  kantsu: 'kannelmäki',
+};
+
+/**
  * Curated club alias mappings.
  */
 export const CLUB_ALIASES: Record<string, string[]> = {
@@ -168,7 +178,7 @@ export function normalizeTeamName(rawName: string): NormalizedTeamName {
 
   let text = rawName
     .toLowerCase()
-    .replace(/[._\-\/]/g, ' ')
+    .replace(/[._\-/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -203,9 +213,10 @@ export function normalizeTeamName(rawName: string): NormalizedTeamName {
 
   // Extract Squad Level / District: Kilpa, Haaste, Harraste, Akatemia, Edustus, Laru, Töölö, Eira, Väke, Jätkäsaari, United, 1, 2, etc.
   let matchedSquad = '';
-  const squadMatch = text.match(/(?:^|\s)(kilpa|haaste|harraste|akatemia|edustus|green|white|black|blue|red|laru|lauttasaari|töölö|eira|väke|jätkäsaari|kantsu|malmi|united|city|1|2|3)(?:$|\s)/i);
+  const squadMatch = text.match(/(?:^|\s)(kilpa|haaste|harraste|akatemia|edustus|green|white|black|blue|red|laru|lauttasaari|töölö|eira|väke|väinämöinen|jätkäsaari|kantsu|kannelmäki|malmi|united|city|1|2|3)(?:$|\s)/i);
   if (squadMatch && squadMatch[1]) {
-    matchedSquad = squadMatch[1].toLowerCase();
+    const rawSquad = squadMatch[1].toLowerCase();
+    matchedSquad = SQUAD_SYNONYMS[rawSquad] || rawSquad;
     text = text.replace(squadMatch[1], ' ').replace(/\s+/g, ' ').trim();
   }
 
@@ -327,7 +338,9 @@ export function calculateTeamSimilarity(nameA: string, nameB: string): number {
       score -= 0.2; // Different squads (Sininen vs Valkoinen)
     }
   } else if (normA.squad && normB.squad) {
-    if (normA.squad === normB.squad) {
+    const sqA = SQUAD_SYNONYMS[normA.squad] || normA.squad;
+    const sqB = SQUAD_SYNONYMS[normB.squad] || normB.squad;
+    if (sqA === sqB) {
       score += 0.2;
     } else {
       score -= 0.2;

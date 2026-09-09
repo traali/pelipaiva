@@ -298,6 +298,88 @@ export function applyResolutionDecision(
 }
 
 /**
+ * Verifies whether a calendar event and an official bare fixture correspond to the same match.
+ * Enforces two-sided team verification when both teams are known, preventing false merges
+ * from single-team matches.
+ */
+function isCalendarFixtureMatch(cal: MatchdayEvent, fix: MatchdayEvent): boolean {
+  const fixHome = fix.homeTeam?.trim() || '';
+  const fixAway = fix.awayTeam?.trim() || '';
+  if (!fixHome || !fixAway) return false;
+
+  const calHome = cal.homeTeam?.trim() || '';
+  const calAway = cal.awayTeam?.trim() || '';
+  const rawTitle = cal.title?.trim() || '';
+
+  // Check if rawTitle explicitly has two teams (e.g. "PPJ Laru Sininen vs VJS")
+  const cleanTitle = rawTitle.replace(/^(?:peli|ottelu|seriematch|friendly)\s*[:@-]?\s*/i, '').trim();
+  const vsMatch = cleanTitle.match(/^(.+?)\s+(?:vs\.?|v|-)\s+(.+)$/i);
+  if (vsMatch && vsMatch[1] && vsMatch[2]) {
+    const tHome = vsMatch[1].trim();
+    const tAway = vsMatch[2].trim();
+    if (!isGenericOrSquadTag(tHome) && !isGenericOrSquadTag(tAway)) {
+      const dHome = calculateTeamSimilarity(tHome, fixHome);
+      const dAway = calculateTeamSimilarity(tAway, fixAway);
+      if (dHome >= 0.70 && dAway >= 0.70) return true;
+
+      const fHome = calculateTeamSimilarity(tHome, fixAway);
+      const fAway = calculateTeamSimilarity(tAway, fixHome);
+      if (fHome >= 0.70 && fAway >= 0.70) return true;
+    }
+  }
+
+  const isHomeGeneric = !calHome || isGenericOrSquadTag(calHome);
+  const isAwayGeneric = !calAway || isGenericOrSquadTag(calAway);
+
+  // Case 1: Both teams explicitly identified on the calendar event
+  if (!isHomeGeneric && !isAwayGeneric) {
+    // Direct match: cal home matches fix home AND cal away matches fix away
+    const directHome = calculateTeamSimilarity(calHome, fixHome);
+    const directAway = calculateTeamSimilarity(calAway, fixAway);
+    if (directHome >= 0.70 && directAway >= 0.70) {
+      return true;
+    }
+
+    // Flipped match: calendar perspective was inverted (e.g. away match written as "Opponent vs Home")
+    const flippedHome = calculateTeamSimilarity(calHome, fixAway);
+    const flippedAway = calculateTeamSimilarity(calAway, fixHome);
+    if (flippedHome >= 0.70 && flippedAway >= 0.70) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Case 2: One team is generic/squad tag, or only title has text (e.g. "PPJ Laru 2013: PIIRISARJA - SININEN")
+  const candidateCalTeam = !isHomeGeneric ? calHome : (!isAwayGeneric ? calAway : rawTitle);
+  const simOwnHome = calculateTeamSimilarity(candidateCalTeam, fixHome);
+  const simOwnAway = calculateTeamSimilarity(candidateCalTeam, fixAway);
+  const simOwnTitleHome = calculateTeamSimilarity(rawTitle, fixHome);
+  const simOwnTitleAway = calculateTeamSimilarity(rawTitle, fixAway);
+
+  const bestHome = Math.max(simOwnHome, simOwnTitleHome);
+  const bestAway = Math.max(simOwnAway, simOwnTitleAway);
+  const maxSimOwn = Math.max(bestHome, bestAway);
+
+  if (maxSimOwn >= 0.70) {
+    const matchedFixTeam = bestHome >= bestAway ? fixHome : fixAway;
+    const combinedCalText = `${rawTitle} ${calHome} ${calAway}`;
+    const normCal = normalizeTeamName(combinedCalText);
+    const normFix = normalizeTeamName(matchedFixTeam);
+
+    if (normCal.color && normFix.color && normCal.color !== normFix.color) {
+      return false;
+    }
+    if (normCal.squad && normFix.squad && normCal.squad !== normFix.squad) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Stitches club calendar events (e.g. MyClub / Nimenhuuto) with bare official fixtures (e.g. Torneopal / SPL)
  * on the same calendar day matching the team or opponent.
  *
@@ -313,6 +395,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
 
   const enrichedFixtureIds = new Set<string>();
   const bareFixtureIdsToDelete = new Set<string>();
+  const usedFixtureIds = new Set<string>();
 
   for (const e of rawAll) {
     if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
@@ -320,60 +403,91 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     }
   }
 
-  const calendarMatches = rawAll.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
-  const bareFixtures = rawAll.filter((e) => e.id.startsWith('fixture-'));
+  // Process calendar matches chronologically
+  const calendarMatches = rawAll
+    .filter((e) => !e.id.startsWith('fixture-') && !e.isTraining)
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+  const bareFixtures = rawAll
+    .filter((e) => e.id.startsWith('fixture-'))
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   for (const cal of calendarMatches) {
+    // If calendar event already represents a linked official fixture, do not re-match
+    if (cal.officialFixtureId) continue;
+
     const calDate = new Date(cal.startTime);
+    let bestFix: MatchdayEvent | undefined;
+    let bestDiffMins = Infinity;
+
+    // Search for closest matching candidate within 180 min window on the same local date
     for (const fix of bareFixtures) {
-      if (bareFixtureIdsToDelete.has(fix.id)) continue;
+      if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) continue;
+      if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) continue;
+
       const fixDate = new Date(fix.startTime);
       const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-      if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
-        const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
-        const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
-        const sim = Math.max(simHome, simAway);
-        if (sim >= 0.70) {
-          cal.homeTeam = fix.homeTeam;
-          cal.awayTeam = fix.awayTeam;
-          cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
-          cal.officialFixtureId = fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, '');
-          cal.reconciliationStatus = 'auto_matched';
-          cal.score = fix.score || cal.score;
-          cal.tournamentName = fix.tournamentName || cal.tournamentName;
+      if (diffMins > 180 || helsinkiDayKey(calDate) !== helsinkiDayKey(fixDate)) continue;
 
-          // Kickoff & Warmup times:
-          // If Torneopal kickoff is after calendar time (e.g. MyClub 09:15 warmup -> Torneopal 10:00 kickoff)
-          if (fixDate.getTime() > calDate.getTime()) {
-            cal.warmupTime = cal.warmupTime || cal.startTime;
-            cal.startTime = fix.startTime;
-            cal.endTime = fix.endTime || cal.endTime;
-          } else {
-            cal.startTime = fix.startTime;
-          }
-
-          // Venue mismatch: Torneopal wins, but flag for the UI banner
-          const calVenueName = cal.venue?.name || '';
-          const fixVenueName = fix.venue?.name || '';
-          const venuesDiffer = fixVenueName && calVenueName
-            && fixVenueName.toLowerCase() !== calVenueName.toLowerCase()
-            && (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !== (cal.venue?.normalizedName || calVenueName.toLowerCase());
-          if (venuesDiffer) {
-            cal.mismatchFlags = {
-              ...cal.mismatchFlags,
-              venueMismatch: true,
-              calendarVenueName: calVenueName,
-              officialVenueName: fixVenueName
-            };
-            // Adopt Torneopal venue as authoritative
-            cal.venue = fix.venue;
-          }
-
-          if (cal.officialFixtureId) {
-            enrichedFixtureIds.add(cal.officialFixtureId);
-          }
-          bareFixtureIdsToDelete.add(fix.id);
+      if (isCalendarFixtureMatch(cal, fix)) {
+        if (diffMins < bestDiffMins) {
+          bestDiffMins = diffMins;
+          bestFix = fix;
         }
+      }
+    }
+
+    if (bestFix) {
+      const fix = bestFix;
+      const fixDate = new Date(fix.startTime);
+
+      cal.homeTeam = fix.homeTeam;
+      cal.awayTeam = fix.awayTeam;
+      cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
+      cal.officialFixtureId = fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, '');
+      cal.reconciliationStatus = 'auto_matched';
+      cal.score = fix.score || cal.score;
+      cal.tournamentName = fix.tournamentName || cal.tournamentName;
+
+      // Kickoff & Warmup timing
+      if (fixDate.getTime() > calDate.getTime()) {
+        cal.warmupTime = cal.warmupTime || cal.startTime;
+        cal.startTime = fix.startTime;
+        cal.endTime = fix.endTime || cal.endTime;
+      } else {
+        cal.startTime = fix.startTime;
+      }
+
+      // Venue adoption & mismatch diagnostics
+      const calVenueName = cal.venue?.name?.trim() || '';
+      const fixVenueName = fix.venue?.name?.trim() || '';
+
+      if (fix.venue && !calVenueName) {
+        // Empty/undefined calendar venue: adopt authoritative fixture venue cleanly
+        cal.venue = fix.venue;
+      } else if (fixVenueName && calVenueName) {
+        const venuesDiffer =
+          fixVenueName.toLowerCase() !== calVenueName.toLowerCase() &&
+          (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !==
+            (cal.venue?.normalizedName || calVenueName.toLowerCase());
+        if (venuesDiffer) {
+          cal.mismatchFlags = {
+            ...cal.mismatchFlags,
+            venueMismatch: true,
+            calendarVenueName: calVenueName,
+            officialVenueName: fixVenueName
+          };
+          cal.venue = fix.venue;
+        } else if (fix.venue) {
+          cal.venue = fix.venue;
+        }
+      }
+
+      // Claim fixture: prevent greedy overwriting in doubleheaders (<180m apart)
+      usedFixtureIds.add(fix.id);
+      bareFixtureIdsToDelete.add(fix.id);
+      if (cal.officialFixtureId) {
+        enrichedFixtureIds.add(cal.officialFixtureId);
       }
     }
   }

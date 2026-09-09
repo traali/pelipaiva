@@ -223,6 +223,49 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
 }
 
 /**
+ * Constructs a Date object given a base Date and Helsinki wall-clock hour/minute.
+ * Invariant against host local timezone (e.g. UTC in CI/Cloudflare environments).
+ */
+function makeHelsinkiDate(baseDate: Date, hour: number, minute: number): Date {
+  if (isNaN(baseDate.getTime())) {
+    return new Date(NaN);
+  }
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(baseDate);
+  const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
+  const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
+  const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
+
+  // Probe midday UTC on that local date to get exact Europe/Helsinki offset (EET +2 / EEST +3)
+  const noonUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const helsinkiParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Helsinki',
+    hour: 'numeric',
+    hourCycle: 'h23'
+  }).formatToParts(noonUtc);
+  const helsinkiHour = parseInt(helsinkiParts.find((p) => p.type === 'hour')?.value ?? '12', 10);
+  const offsetHours = helsinkiHour - 12; // +2 EET, +3 EEST
+
+  return new Date(Date.UTC(y, m - 1, d, hour - offsetHours, minute, 0));
+}
+
+function resolveCandidateDate(baseDate: Date, hour: number, minute: number, targetRefDate: Date): Date {
+  const localCandidate = new Date(baseDate);
+  localCandidate.setHours(hour, minute, 0, 0);
+
+  const helsinkiCandidate = makeHelsinkiDate(baseDate, hour, minute);
+
+  const diffLocal = isNaN(localCandidate.getTime()) ? Infinity : Math.abs(localCandidate.getTime() - targetRefDate.getTime());
+  const diffHelsinki = isNaN(helsinkiCandidate.getTime()) ? Infinity : Math.abs(helsinkiCandidate.getTime() - targetRefDate.getTime());
+
+  return diffHelsinki < diffLocal ? helsinkiCandidate : localCandidate;
+}
+
+/**
  * Disentangles arrival/warmup DTSTART vs kickoff time from summary and description.
  */
 export function resolveEventTimes(
@@ -256,12 +299,11 @@ export function resolveEventTimes(
     const kHour = parseInt(kickoffMatch[1], 10);
     const kMin = parseInt(kickoffMatch[2], 10);
     
-    // Construct new kickoff date using same day/year as dtStart
-    const explicitKickoff = new Date(dtStart);
-    explicitKickoff.setHours(kHour, kMin, 0, 0);
+    // Choose the candidate (local vs Europe/Helsinki) that best aligns with dtStart (within 3 hours)
+    const explicitKickoff = resolveCandidateDate(dtStart, kHour, kMin, dtStart);
 
     // If dtStart was the gathering time, dtStart is the warmup time!
-    if (Math.abs(explicitKickoff.getTime() - dtStart.getTime()) <= 3 * 3600 * 1000) {
+    if (!isNaN(explicitKickoff.getTime()) && Math.abs(explicitKickoff.getTime() - dtStart.getTime()) <= 3 * 3600 * 1000) {
       if (explicitKickoff.getTime() >= dtStart.getTime()) {
         kickoffTime = explicitKickoff;
         warmupTime = dtStart;
@@ -275,10 +317,9 @@ export function resolveEventTimes(
   if (warmupMatch && warmupMatch[1] && warmupMatch[2]) {
     const wHour = parseInt(warmupMatch[1], 10);
     const wMin = parseInt(warmupMatch[2], 10);
-    const explicitWarmup = new Date(dtStart);
-    explicitWarmup.setHours(wHour, wMin, 0, 0);
+    const explicitWarmup = resolveCandidateDate(dtStart, wHour, wMin, kickoffTime);
 
-    if (Math.abs(explicitWarmup.getTime() - kickoffTime.getTime()) <= 3 * 3600 * 1000) {
+    if (!isNaN(explicitWarmup.getTime()) && Math.abs(explicitWarmup.getTime() - kickoffTime.getTime()) <= 3 * 3600 * 1000) {
       warmupTime = explicitWarmup;
     }
   }
