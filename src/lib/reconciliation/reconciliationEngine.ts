@@ -296,3 +296,101 @@ export function applyResolutionDecision(
     }
   };
 }
+
+/**
+ * Stitches club calendar events (e.g. MyClub / Nimenhuuto) with bare official fixtures (e.g. Torneopal / SPL)
+ * on the same calendar day matching the team or opponent.
+ *
+ * Invariants:
+ * - Matches within ±180 min on the same local date.
+ * - Adopts authoritative official fixture start time as match kickoff.
+ * - Preserves earlier calendar start time as coach warmup/gathering time.
+ * - Reconciles venues: adopts Torneopal venue and flags non-breaking venueMismatch for the UI banner.
+ * - Suppresses bare fixture duplicates, guaranteeing a single enriched event card.
+ */
+export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): MatchdayEvent[] {
+  const rawAll = rawEvents.filter((e) => !e.isHidden).map((e) => ({ ...e }));
+
+  const enrichedFixtureIds = new Set<string>();
+  const bareFixtureIdsToDelete = new Set<string>();
+
+  for (const e of rawAll) {
+    if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
+      enrichedFixtureIds.add(e.officialFixtureId);
+    }
+  }
+
+  const calendarMatches = rawAll.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
+  const bareFixtures = rawAll.filter((e) => e.id.startsWith('fixture-'));
+
+  for (const cal of calendarMatches) {
+    const calDate = new Date(cal.startTime);
+    for (const fix of bareFixtures) {
+      if (bareFixtureIdsToDelete.has(fix.id)) continue;
+      const fixDate = new Date(fix.startTime);
+      const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
+      if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
+        const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+        const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
+        const sim = Math.max(simHome, simAway);
+        if (sim >= 0.70) {
+          cal.homeTeam = fix.homeTeam;
+          cal.awayTeam = fix.awayTeam;
+          cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
+          cal.officialFixtureId = fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, '');
+          cal.reconciliationStatus = 'auto_matched';
+          cal.score = fix.score || cal.score;
+          cal.tournamentName = fix.tournamentName || cal.tournamentName;
+
+          // Kickoff & Warmup times:
+          // If Torneopal kickoff is after calendar time (e.g. MyClub 09:15 warmup -> Torneopal 10:00 kickoff)
+          if (fixDate.getTime() > calDate.getTime()) {
+            cal.warmupTime = cal.warmupTime || cal.startTime;
+            cal.startTime = fix.startTime;
+            cal.endTime = fix.endTime || cal.endTime;
+          } else {
+            cal.startTime = fix.startTime;
+          }
+
+          // Venue mismatch: Torneopal wins, but flag for the UI banner
+          const calVenueName = cal.venue?.name || '';
+          const fixVenueName = fix.venue?.name || '';
+          const venuesDiffer = fixVenueName && calVenueName
+            && fixVenueName.toLowerCase() !== calVenueName.toLowerCase()
+            && (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !== (cal.venue?.normalizedName || calVenueName.toLowerCase());
+          if (venuesDiffer) {
+            cal.mismatchFlags = {
+              ...cal.mismatchFlags,
+              venueMismatch: true,
+              calendarVenueName: calVenueName,
+              officialVenueName: fixVenueName
+            };
+            // Adopt Torneopal venue as authoritative
+            cal.venue = fix.venue;
+          }
+
+          if (cal.officialFixtureId) {
+            enrichedFixtureIds.add(cal.officialFixtureId);
+          }
+          bareFixtureIdsToDelete.add(fix.id);
+        }
+      }
+    }
+  }
+
+  // Suppress bare fixture duplicates if an enriched calendar event already represents it
+  return rawAll
+    .filter((e) => {
+      if (e.id.startsWith('fixture-')) {
+        if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
+          return false;
+        }
+        if (bareFixtureIdsToDelete.has(e.id)) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+

@@ -27,6 +27,7 @@ import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/at
 import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
+import { stitchCalendarEventsWithFixtures } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
@@ -417,81 +418,7 @@ export const App: React.FC = () => {
 
   // Reconcile and stitch calendar events with bare fixtures across all profiles
   const allStitchedEvents = useMemo(() => {
-    const rawAll = rawEvents.filter((e) => !e.isHidden).map((e) => ({ ...e }));
-
-    // Find all linked officialFixtureIds on enriched calendar events
-    const enrichedFixtureIds = new Set<string>();
-    const bareFixtureIdsToDelete = new Set<string>();
-
-    for (const e of rawAll) {
-      if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
-        enrichedFixtureIds.add(e.officialFixtureId);
-      }
-    }
-
-    const calendarMatches = rawAll.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
-    const bareFixtures = rawAll.filter((e) => e.id.startsWith('fixture-'));
-
-    // Dynamic stitch for same-day matches matching squad/club
-    for (const cal of calendarMatches) {
-      const calDate = new Date(cal.startTime);
-      for (const fix of bareFixtures) {
-        if (bareFixtureIdsToDelete.has(fix.id)) continue;
-        const fixDate = new Date(fix.startTime);
-        const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-        if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
-          const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
-          const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
-          const sim = Math.max(simHome, simAway);
-          if (sim >= 0.70) {
-            cal.homeTeam = fix.homeTeam;
-            cal.awayTeam = fix.awayTeam;
-            cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
-            cal.officialFixtureId = fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, '');
-            cal.reconciliationStatus = 'auto_matched';
-            cal.score = fix.score || cal.score;
-            cal.tournamentName = fix.tournamentName || cal.tournamentName;
-
-            // Venue mismatch: Torneopal wins, but flag for the UI banner
-            const calVenueName = cal.venue?.name || '';
-            const fixVenueName = fix.venue?.name || '';
-            const venuesDiffer = fixVenueName && calVenueName
-              && fixVenueName.toLowerCase() !== calVenueName.toLowerCase()
-              && (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !== (cal.venue?.normalizedName || calVenueName.toLowerCase());
-            if (venuesDiffer) {
-              cal.mismatchFlags = {
-                ...cal.mismatchFlags,
-                venueMismatch: true,
-                calendarVenueName: calVenueName,
-                officialVenueName: fixVenueName
-              };
-              // Adopt Torneopal venue as authoritative
-              cal.venue = fix.venue;
-            }
-
-            if (cal.officialFixtureId) {
-              enrichedFixtureIds.add(cal.officialFixtureId);
-            }
-            bareFixtureIdsToDelete.add(fix.id);
-          }
-        }
-      }
-    }
-
-    // Suppress bare fixture duplicates if an enriched calendar event already represents it
-    const deduplicated = rawAll.filter((e) => {
-      if (e.id.startsWith('fixture-')) {
-        if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
-          return false;
-        }
-        if (bareFixtureIdsToDelete.has(e.id)) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    return deduplicated.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    return stitchCalendarEventsWithFixtures(rawEvents);
   }, [rawEvents]);
 
   // Filter stitched events by selected profile or player group
