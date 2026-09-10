@@ -46,6 +46,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [copiedNest, setCopiedNest] = useState(false);
   const [copiedRoutine, setCopiedRoutine] = useState(false);
+  const [copiedDirect, setCopiedDirect] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -78,12 +79,15 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       setStatusMessage('Liitytty perheeseen onnistuneesti!');
       onDataImported();
       setTimeout(() => setStatusMessage(null), 2500);
-    } else if (res.error === 'unknown_family') {
-      setStatusMessage('Koodi ei ole voimassa');
-      setTimeout(() => setStatusMessage(null), 2500);
     } else {
-      setStatusMessage('Perhettä ei löytynyt tai verkkovirhe');
-      setTimeout(() => setStatusMessage(null), 2500);
+      const msg =
+        res.error === 'unknown_family'
+          ? 'Koodia ei löydy. Tarkista koodi.'
+          : res.error === 'rate_limited'
+          ? 'Liian monta yritystä — odota hetki.'
+          : 'Verkkovirhe';
+      setStatusMessage(msg);
+      setTimeout(() => setStatusMessage(null), 3500);
     }
   };
 
@@ -113,13 +117,15 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   };
 
   const directPayload = profiles && profiles.length > 0 ? generateSharePayload(profiles) : '';
+  const directP2PUrl =
+    typeof window !== 'undefined' && directPayload
+      ? `${window.location.origin}/?share=${directPayload}`
+      : '';
   const shareUrl =
     typeof window !== 'undefined'
       ? familyCode
         ? `${window.location.origin}/?perhe=${familyCode}`
-        : directPayload
-          ? `${window.location.origin}/?share=${directPayload}`
-          : ''
+        : directP2PUrl
       : '';
 
   const nestUrl = shareUrl ? `${shareUrl}${shareUrl.includes('?') ? '&' : '?'}ambient=true` : '';
@@ -133,6 +139,17 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       setStatusMessage('Kopiointi estetty — valitse linkki ja kopioi käsin.');
     }
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyDirectLink = async () => {
+    if (!directP2PUrl) return;
+    try {
+      await navigator.clipboard.writeText(directP2PUrl);
+      setCopiedDirect(true);
+    } catch {
+      setStatusMessage('Kopiointi estetty — valitse linkki ja kopioi käsin.');
+    }
+    setTimeout(() => setCopiedDirect(false), 2000);
   };
 
   const handleCopyNestLink = async () => {
@@ -441,10 +458,21 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
               <div className="flex flex-col gap-3 text-center">
                 {shareUrl ? (
                   <>
+                    {!familyCode && (
+                      <div className="flex items-center justify-center gap-2 mb-0.5">
+                        <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-pitch/15 text-pitch border border-pitch/30 flex items-center gap-1">
+                          <Share2 className="w-3 h-3" />
+                          P2P-jakolinkki
+                        </span>
+                        <span className="text-[10px] text-text-muted">
+                          Ei vanhene • Toimii ilman pilveä
+                        </span>
+                      </div>
+                    )}
                     <p className="text-xs text-text-secondary">
                       {familyCode
                         ? 'Avaa tämä linkki toisessa puhelimessa liittyäksesi perheeseen yhdellä napautuksella:'
-                        : 'Jaa perheen joukkueet ja kalenterit toiseen puhelimeen:'}
+                        : 'Tämä suora P2P-linkki pakkaa joukkueet ja profiilit suoraan linkkiin. Se toimii ilman palvelinriippuvuuksia, ei vanhene ja toimii heti myös incognitossa:'}
                     </p>
                     <div className="p-3 rounded-xl bg-surface border border-border-strong font-mono text-xs text-text-primary break-all">
                       {shareUrl}
@@ -467,6 +495,35 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                         <span>Jaa WhatsAppiin</span>
                       </button>
                     </div>
+
+                    {/* Secondary option: P2P direct link if a family cloud code is currently active */}
+                    {familyCode && directP2PUrl && (
+                      <div className="mt-4 p-3.5 rounded-2xl bg-surface/80 border border-border-subtle text-left flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                            <Share2 className="w-3.5 h-3.5 text-pitch" />
+                            Vaihtoehto: P2P-jakolinkki ilman pilveä
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-elevated text-pitch border border-pitch/30">
+                            Ei vanhene
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-text-muted leading-relaxed">
+                          Jos haluat jakaa kalenterit ilman pilvikoodia, tämä P2P-linkki pakkaa joukkueet ja profiilit suoraan URL-osoitteeseen (<code className="text-text-secondary font-mono">?share=...</code>). Se toimii ilman palvelinriippuvuuksia, ei vanhene ja toimii heti myös incognitossa.
+                        </p>
+                        <div className="p-2 rounded-xl bg-surface-elevated border border-border-strong font-mono text-[10px] text-text-secondary truncate select-all">
+                          {directP2PUrl}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCopyDirectLink}
+                          className="self-start py-1.5 px-3 rounded-xl bg-surface-elevated hover:bg-surface border border-border-strong text-text-primary text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          {copiedDirect ? <Check className="w-3.5 h-3.5 text-pitch" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedDirect ? 'P2P-linkki kopioitu!' : 'Kopioi P2P-linkki'}</span>
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="py-6 text-center text-xs text-text-muted">
