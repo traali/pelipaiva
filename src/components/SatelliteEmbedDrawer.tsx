@@ -142,7 +142,6 @@ export const SatelliteEmbedDrawer: React.FC<SatelliteEmbedDrawerProps> = ({
                   setIsLoading(false);
                   setHasError(true);
                 }}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               />
             )}
           </div>

@@ -62,10 +62,12 @@ export function useMatchdayLogistics({
   const consolidatedConflictGroups = useMemo(() => groupActiveConflicts(activeConflicts), [activeConflicts]);
 
   // Transit Plan
-  const transitPlan: TransitPlan = useMemo(
-    () => event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather),
-    [event.transit, homeLocation, event.venue?.coordinates, event.weather]
-  );
+  const transitPlan: TransitPlan = useMemo(() => {
+    if (event.transit && event.transit.distanceKm < 200 && event.transit.travelMinutes < 300) {
+      return event.transit;
+    }
+    return resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather);
+  }, [event.transit, homeLocation, event.venue?.coordinates, event.weather]);
 
   // Time & Status Calculations
   const isLive = new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);

@@ -129,9 +129,22 @@ function ensureModelContextRegistry(): ModelContextRegistry {
     },
   };
 
-  // Bind to document.modelContext
+  // Bind to document.modelContext defensively (some Chrome builds expose getter-only modelContext)
   if (typeof document !== 'undefined') {
-    document.modelContext = registry;
+    try {
+      Object.defineProperty(document, 'modelContext', {
+        value: registry,
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
+    } catch {
+      try {
+        (document as any).modelContext = registry;
+      } catch {
+        // Ignore if document.modelContext is read-only
+      }
+    }
   }
 
   // Bind to navigator.modelContext for standard browser detection

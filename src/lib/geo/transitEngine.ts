@@ -40,13 +40,26 @@ export function resolveTransitPlan(
   overrideMode?: TransitMode,
   defaultDrivingMinutes = 20
 ): TransitPlan {
-  // If no home or venue coordinates available, or coordinates are at (0,0) fallback, fallback to car
+  // Defensive guard against invalid coordinates, Null Island (0,0), or coordinates outside Finland
+  const isCoordValid = (c?: Coordinates | null) =>
+    Boolean(
+      c &&
+      typeof c.lat === 'number' &&
+      typeof c.lng === 'number' &&
+      !isNaN(c.lat) &&
+      !isNaN(c.lng) &&
+      c.lat >= 59.0 &&
+      c.lat <= 71.0 &&
+      c.lng >= 19.0 &&
+      c.lng <= 32.0
+    );
+
   if (
     !home ||
-    !venueCoords ||
     !home.coordinates ||
-    (home.coordinates.lat === 0 && home.coordinates.lng === 0) ||
-    (venueCoords.lat === 0 && venueCoords.lng === 0)
+    !isCoordValid(home.coordinates) ||
+    !venueCoords ||
+    !isCoordValid(venueCoords)
   ) {
     return {
       mode: 'car',

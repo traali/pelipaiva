@@ -33,6 +33,8 @@ interface MatchStatsModalProps {
   playerLog?: PlayerMatchLog;
   score?: string;
   sport?: SportType;
+  stage?: string;
+  division?: string;
   showTacticalScout?: boolean;
   onSavePlayerLog?: (log: PlayerMatchLog, updatedScore?: string) => void;
 }
@@ -65,6 +67,8 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   playerLog,
   score,
   sport = 'football',
+  stage,
+  division,
   showTacticalScout = false,
   onSavePlayerLog
 }) => {
@@ -238,9 +242,9 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 </div>
                 <div>
                   <div className="text-[11px] font-bold text-pitch uppercase tracking-wider">
-                    {stats.leagueName}
+                    {stage || stats.leagueName}
                   </div>
-                  <div className="text-xs text-text-muted">{stats.round || 'Sarjaottelu'}</div>
+                  <div className="text-xs text-text-muted">{division ? `${division} • ${stats.round || 'Sarjaottelu'}` : (stats.round || 'Sarjaottelu')}</div>
                 </div>
               </div>
               <button

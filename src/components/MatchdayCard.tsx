@@ -161,6 +161,17 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     }
   };
 
+  const matchSportIcon =
+    event.sport === 'volleyball'
+      ? '🏐'
+      : event.sport === 'basketball'
+      ? '🏀'
+      : event.sport === 'floorball'
+      ? '🏑'
+      : event.sport === 'icehockey'
+      ? '🏒'
+      : '⚽';
+
   const handleShareWhatsApp = () => {
     if (event.briefing?.postMatchWhatsAppTemplate) {
       const text = encodeURIComponent(event.briefing.postMatchWhatsAppTemplate);
@@ -449,7 +460,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     ? `📌 Alkaa klo ${formattedKickoff}`
                     : isTraining
                     ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
-                    : `⚽ Ottelu alkaa klo ${formattedKickoff}`}
+                    : `${matchSportIcon} Ottelu alkaa klo ${formattedKickoff}`}
                 </span>
                 {formattedWarmup && formattedWarmup !== formattedKickoff && (
                   <span className="text-[11px] font-medium text-text-secondary pl-1 border-l border-border-subtle">
@@ -543,7 +554,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                   ? `🏫 Koulu alkaa klo ${formattedKickoff}`
                   : isOther
                   ? `📌 Alkaa klo ${formattedKickoff}`
-                  : `⚽ Ottelu alkaa klo ${formattedKickoff}`}
+                  : `${matchSportIcon} Ottelu alkaa klo ${formattedKickoff}`}
               </span>
             </div>
             {formattedWarmup && formattedWarmup !== formattedKickoff && (
@@ -931,6 +942,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           playerLog={playerLog}
           score={currentScore}
           sport={event.sport}
+          stage={event.stage}
+          division={event.division}
           onSavePlayerLog={handleSavePlayerLog}
         />
       )}

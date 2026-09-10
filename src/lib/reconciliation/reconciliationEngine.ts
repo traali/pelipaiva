@@ -493,18 +493,71 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
   }
 
   // Suppress bare fixture duplicates if an enriched calendar event already represents it
-  return rawAll
-    .filter((e) => {
-      if (e.id.startsWith('fixture-')) {
-        if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
-          return false;
-        }
-        if (bareFixtureIdsToDelete.has(e.id)) {
-          return false;
-        }
+  const filteredEvents = rawAll.filter((e) => {
+    if (e.id.startsWith('fixture-')) {
+      if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
+        return false;
       }
-      return true;
-    })
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      if (bareFixtureIdsToDelete.has(e.id)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Cross-calendar duplicate deduplication:
+  // If two non-training match events for the same player occur within ±90 minutes
+  // and represent the exact same match (e.g. MyClub "PPJ Laru 2013: Piirisarja - ORANSSI"
+  // and linked/official "IF Gnistan/sininen vs PPJ/Laru oran"), merge into a single card!
+  const finalEvents: MatchdayEvent[] = [];
+  const mergedEventIds = new Set<string>();
+
+  for (let i = 0; i < filteredEvents.length; i++) {
+    const e1 = filteredEvents[i]!;
+    if (mergedEventIds.has(e1.id)) continue;
+
+    for (let j = i + 1; j < filteredEvents.length; j++) {
+      const e2 = filteredEvents[j]!;
+      if (mergedEventIds.has(e2.id)) continue;
+
+      if (e1.profileId && e2.profileId && e1.profileId !== e2.profileId) continue;
+      if (e1.sport !== e2.sport) continue;
+      if (e1.isTraining || e2.isTraining) continue;
+
+      const t1 = new Date(e1.startTime);
+      const t2 = new Date(e2.startTime);
+      if (helsinkiDayKey(t1) !== helsinkiDayKey(t2)) continue;
+      if (Math.abs(t1.getTime() - t2.getTime()) > 90 * 60 * 1000) continue;
+
+      const isMatch = isCalendarFixtureMatch(e1, e2) || isCalendarFixtureMatch(e2, e1);
+      if (isMatch) {
+        const e1HasBoth = Boolean(e1.homeTeam && e1.awayTeam && !isGenericOrSquadTag(e1.awayTeam));
+        const e2HasBoth = Boolean(e2.homeTeam && e2.awayTeam && !isGenericOrSquadTag(e2.awayTeam));
+        const primary = (e2HasBoth && !e1HasBoth) || (!e1.officialFixtureId && e2.officialFixtureId) ? e2 : e1;
+        const secondary = primary === e1 ? e2 : e1;
+
+        if (!primary.warmupTime && secondary.warmupTime) {
+          primary.warmupTime = secondary.warmupTime;
+        }
+        if (secondary.volunteerDuty && !primary.volunteerDuty) {
+          primary.volunteerDuty = secondary.volunteerDuty;
+        }
+        if (secondary.attendanceStatus && !primary.attendanceStatus) {
+          primary.attendanceStatus = secondary.attendanceStatus;
+        }
+
+        mergedEventIds.add(secondary.id);
+        break;
+      }
+    }
+
+    if (!mergedEventIds.has(e1.id)) {
+      finalEvents.push(e1);
+    }
+  }
+
+  return finalEvents.sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
 }
 

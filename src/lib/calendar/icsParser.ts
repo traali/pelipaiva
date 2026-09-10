@@ -143,11 +143,49 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
     }
   }
 
-  // Strip prefixes like "Ottelu:", "Peli:", "Sarjapeli:", "Seriematch:", "Match:"
+  // Strip prefixes like "Ottelu:", "Peli:", "Sarjapeli:", "Seriematch:", "Match:", "Sarjaottelu:"
   text = text.replace(/^(?:peli|ottelu|sarjapeli|sarjaottelu|seriematch|match|sarja):\s*/i, '');
 
   // Strip suffix " peli" or " ottelu", e.g. "HJK-EPS peli" -> "HJK-EPS"
   text = text.replace(/\s+(?:peli|ottelu|match)$/i, '');
+
+  let stage: string | undefined;
+  let division: string | undefined;
+  let calendarOwnerTeam: string | undefined;
+
+  // Check for calendar team prefix with colon:
+  // e.g. "Tytöt 2014-15 joukkue (kausi 2026-27): WU13 1div. LePy vs. ToPoLa"
+  // or "PPJ Laru 2013: Piirisarja - ORANSSI"
+  if (text.includes(':')) {
+    const colonIdx = text.indexOf(':');
+    const prefix = text.slice(0, colonIdx).trim();
+    const rest = text.slice(colonIdx + 1).trim();
+
+    // Check if rest contains match delimiters or match patterns
+    const hasMatchPattern =
+      /\bvs\.?\b/i.test(rest) ||
+      /\s+-\s+/.test(rest) ||
+      /\bv\.?\b/i.test(rest);
+
+    if (hasMatchPattern) {
+      calendarOwnerTeam = prefix;
+      text = rest;
+    }
+  }
+
+  // Check for division / stage prefix in remaining text, e.g.:
+  // "WU13 1div. LePy vs. ToPoLa" -> division = "WU13 1div.", text = "LePy vs. ToPoLa"
+  // "P14 Haastaja: HJK vs Honka"
+  const divMatch = text.match(
+    /^((?:[A-Za-z]{1,4}\d{1,2}(?:\s+\d+\.?\s*(?:div|divisioona)?)?|piirisarja|aluesarja|ykkönen|kakkonen|kolmonen|mestaruussarja|liiga|haastaja|kilpa|harraste)(?:\s+Lohko\s+[A-Z0-9]+)?)\s*[.:\-]\s*(.+)$/i
+  );
+  if (divMatch && divMatch[1] && divMatch[2]) {
+    if (/\bvs\.?\b/i.test(divMatch[2]) || /\s+-\s+/.test(divMatch[2])) {
+      division = divMatch[1].trim();
+      stage = division;
+      text = divMatch[2].trim();
+    }
+  }
 
   let homeTeam = text;
   let awayTeam = '';
@@ -161,8 +199,8 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
         const left = parts[0]?.trim() || '';
         const right = parts[1]?.trim() || '';
 
-        if (right.includes(' vs ')) {
-          const vsParts = right.split(' vs ');
+        if (/\s+vs\.?\s+/i.test(right)) {
+          const vsParts = right.split(/\s+vs\.?\s+/i);
           homeTeam = vsParts[0]?.trim() || '';
           awayTeam = vsParts[1]?.trim() || '';
         } else if (left.length > 0 && !left.toLowerCase().includes('peli')) {
@@ -171,53 +209,73 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
           isHomeMatch = false;
         } else {
           homeTeam = right;
-          awayTeam = defaultTeamName || '';
+          awayTeam = defaultTeamName || calendarOwnerTeam || '';
           isHomeMatch = false;
         }
       }
     } else {
-      // Split on standard delimiters: " vs ", " - ", " v "
-      const delimiters = [' vs ', ' - ', ' v ', '-'];
-      for (const delim of delimiters) {
-        if (text.includes(delim)) {
-          const parts = text.split(delim);
-          if (parts.length >= 2) {
-            const candidateHome = (parts[0] || '').trim();
-            const candidateAway = (parts[1] || '').trim();
-            const isSquadTag = /^(?:musta|mus|oranssi|ora|or|valkoinen|valk|sininen|sin|keltainen|kelt|punainen|pun|vihreä|vihr|raita|kilpa|haastaja|haaste|harraste|edustus|akatemia|black|white|blue|red|yellow|green|orange)$/i.test(
-              candidateAway
-            );
-            if (isSquadTag && delim !== ' vs ') {
-              homeTeam = `${candidateHome} ${candidateAway}`.trim();
-              awayTeam = '';
-            } else {
-              homeTeam = candidateHome;
-              awayTeam = candidateAway;
+      // Split on standard delimiters: " vs. ", " vs ", " - ", " v. ", " v "
+      const vsMatch = text.match(/^(.+?)\s+(?:vs\.?|v\.?)\s+(.+)$/i);
+      if (vsMatch && vsMatch[1] && vsMatch[2]) {
+        homeTeam = vsMatch[1].trim();
+        awayTeam = vsMatch[2].trim();
+      } else {
+        const dashMatch = text.match(/^(.+?)\s+-\s+(.+)$/);
+        if (dashMatch && dashMatch[1] && dashMatch[2]) {
+          const candidateHome = dashMatch[1].trim();
+          const candidateAway = dashMatch[2].trim();
+          const isSquadTag = /^(?:musta|mus|oranssi|ora|or|valkoinen|valk|sininen|sin|keltainen|kelt|punainen|pun|vihreä|vihr|raita|kilpa|haastaja|haaste|harraste|edustus|akatemia|black|white|blue|red|yellow|green|orange)$/i.test(
+            candidateAway
+          );
+          if (isSquadTag) {
+            homeTeam = `${calendarOwnerTeam || candidateHome} ${candidateAway}`.trim();
+            awayTeam = '';
+          } else {
+            homeTeam = candidateHome;
+            awayTeam = candidateAway;
+          }
+        } else {
+          // Bare hyphen between non-digits only, e.g. "HJK-EPS" (never "2014-15" or "2026-27")
+          const wordDashMatch = text.match(
+            /^([a-zA-ZåäöÅÄÖ0-9]+(?:\s+[a-zA-ZåäöÅÄÖ0-9]+)?)-([a-zA-ZåäöÅÄÖ0-9]+(?:\s+[a-zA-ZåäöÅÄÖ0-9]+)?)$/
+          );
+          if (wordDashMatch && wordDashMatch[1] && wordDashMatch[2]) {
+            const isYearOrRange = /^\d+$/.test(wordDashMatch[1]) && /^\d+$/.test(wordDashMatch[2]);
+            if (!isYearOrRange) {
+              homeTeam = wordDashMatch[1].trim();
+              awayTeam = wordDashMatch[2].trim();
             }
-            break;
           }
         }
       }
     }
   }
 
-  // Determine isHomeMatch if defaultTeamName is provided
-  if (defaultTeamName && awayTeam) {
-    const defaultLower = defaultTeamName.toLowerCase();
-    if (awayTeam.toLowerCase().includes(defaultLower)) {
+  // Determine isHomeMatch if defaultTeamName or calendarOwnerTeam is provided
+  const homeRef = (defaultTeamName || calendarOwnerTeam || '').toLowerCase();
+  if (homeRef && awayTeam) {
+    if (
+      awayTeam.toLowerCase().includes(homeRef) ||
+      (homeRef.includes('topola') && awayTeam.toLowerCase().includes('topola'))
+    ) {
       isHomeMatch = false;
-    } else if (homeTeam.toLowerCase().includes(defaultLower)) {
+    } else if (
+      homeTeam.toLowerCase().includes(homeRef) ||
+      (homeRef.includes('topola') && homeTeam.toLowerCase().includes('topola'))
+    ) {
       isHomeMatch = true;
     }
   }
 
   return {
     eventType,
-    homeTeam: homeTeam || defaultTeamName || 'Oma Joukkue',
+    homeTeam: homeTeam || defaultTeamName || calendarOwnerTeam || 'Oma Joukkue',
     awayTeam,
     isHomeMatch,
     embeddedVenueHint,
     roundInfo,
+    stage,
+    division,
     isFriendly: isFriendly || undefined
   };
 }
@@ -803,6 +861,7 @@ export async function parseICSFeed(
               title,
               homeTeam: parsedTitle.homeTeam,
               awayTeam: parsedTitle.awayTeam,
+              stage: parsedTitle.stage || parsedTitle.division,
               isHomeMatch: parsedTitle.isHomeMatch,
               startTime: kickoffTime.toISOString(),
               endTime: endTime.toISOString(),
@@ -842,6 +901,7 @@ export async function parseICSFeed(
           title,
           homeTeam: parsedTitle.homeTeam,
           awayTeam: parsedTitle.awayTeam,
+          stage: parsedTitle.stage || parsedTitle.division,
           isHomeMatch: parsedTitle.isHomeMatch,
           startTime: kickoffTime.toISOString(),
           endTime: endTime.toISOString(),

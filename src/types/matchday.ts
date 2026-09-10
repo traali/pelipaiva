@@ -466,6 +466,8 @@ export interface ParsedTitleResult {
   isHomeMatch: boolean;
   embeddedVenueHint?: string;
   roundInfo?: string;
+  stage?: string;
+  division?: string;
   isFriendly?: boolean;
 }
 
@@ -530,6 +532,7 @@ export interface MatchdayEvent {
   isTournament?: boolean;
   tournamentName?: string;
   stage?: string; // e.g. "P14 Haastaja Lohko B" or "Jatko-ottelut"
+  division?: string; // e.g. "WU13 1div."
   roundInfo?: string;
   matchNumber?: string; // e.g. "227"
   score?: string; // e.g. "2–12", "4–9", "7–3"

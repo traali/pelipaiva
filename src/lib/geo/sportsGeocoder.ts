@@ -166,6 +166,10 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'otaniemi tn': { name: 'Otaniemen Tekonurmi (Otaranta)', lat: 60.1841, lng: 24.8312, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'laaksolahti tn': { name: 'Laaksolahden Tekonurmi', lat: 60.2412, lng: 24.7612, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'karakallio tn': { name: 'Karakallion Tekonurmi', lat: 60.2351, lng: 24.7741, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'karakallion koulu': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'karakallio koulu': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'kotkakuja 5': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'karakallio': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'kivenlahti tn': { name: 'Kivenlahden Tekonurmi', lat: 60.1512, lng: 24.6412, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'grani tn': { name: 'Kauniaisten Keskuskenttä TN (Grani)', lat: 60.2112, lng: 24.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'kauniainen tn': { name: 'Kauniaisten Keskuskenttä TN', lat: 60.2112, lng: 24.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
@@ -181,6 +185,9 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'peakfin areena': { name: 'Peakfin Areena Vantaa', lat: 60.2812, lng: 24.8641, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
   'jokivarsi tn': { name: 'Jokivarren Tekonurmi', lat: 60.3612, lng: 25.1241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'hiekkaharju tn': { name: 'Hiekkaharjun Tekonurmi', lat: 60.3012, lng: 25.0512, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'tuusulan salibandyhalli': { name: 'Tuusulan Salibandyhalli', lat: 60.4042, lng: 25.0275, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'tuusula salibandyhalli': { name: 'Tuusulan Salibandyhalli', lat: 60.4042, lng: 25.0275, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'kilpailukuja 4': { name: 'Tuusulan Salibandyhalli', lat: 60.4042, lng: 25.0275, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
 
   // === TAMPERE & PIRKANMAA ===
   'kauppi tn 1': { name: 'Tampereen Kaupin Urheilupuisto TN 1', lat: 61.5034, lng: 23.8052, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },

@@ -116,6 +116,17 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const jerseyColor = kit?.kitColors?.primary || profile?.colorHex || '#3b82f6';
   const jerseyText = event.isHomeMatch === false ? 'Vieraspaita (+ varapaita)' : 'Kotipeliasu (ykkönen)';
 
+  const heroSportIcon =
+    event.sport === 'volleyball'
+      ? '🏐'
+      : event.sport === 'basketball'
+      ? '🏀'
+      : event.sport === 'floorball'
+      ? '🏑'
+      : event.sport === 'icehockey'
+      ? '🏒'
+      : '⚽';
+
   if (isOut && !isOutExpanded) {
     return (
       <article
@@ -338,7 +349,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
                 ? `🏫 Koulu alkaa klo ${kickoff}`
                 : event.sport === 'other'
                 ? `📌 Alkaa klo ${kickoff}`
-                : `⚽ Ottelu alkaa klo ${kickoff}`}
+                : `${heroSportIcon} Ottelu alkaa klo ${kickoff}`}
             </span>
           </div>
           {warmup && warmup !== kickoff && (
