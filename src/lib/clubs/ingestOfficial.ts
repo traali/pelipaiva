@@ -26,6 +26,7 @@ import {
   mergeOfficialWithCupFallback,
   isUglyTeamName
 } from './exampleTournaments';
+import { notifyFetchError } from '../notifications/notificationStore';
 
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   if (items.length === 0) return [];
@@ -61,7 +62,14 @@ export async function ingestOfficialForProfile(opts: {
     officialData = await extractOfficialTeamData(parsedAssoc, {
       customTeamName: cup?.teamName || opts.teamName,
       fallbackToSynthetic: false
-    }).catch(() => null);
+    }).catch(() => {
+      notifyFetchError({
+        title: 'Sarjatietojen haku epäonnistui',
+        message: `Yhteys tulospalveluun katkesi (${opts.teamName}). Käytetään tallennettua välimuistia.`,
+        source: 'Torneopal'
+      });
+      return null;
+    });
   }
 
   officialData = mergeOfficialWithCupFallback(cup, officialData);
@@ -185,7 +193,14 @@ export async function fetchRawIcsFeed(url: string): Promise<string | null> {
   const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
   try {
     const res = await fetch(target, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      notifyFetchError({
+        title: 'Kalenterin haku epäonnistui',
+        message: `Palvelin palautti virheen (${res.status}). Käytetään tallennettua välimuistia.`,
+        source: 'Kalenteri-iCal'
+      });
+      return null;
+    }
     const text = await res.text();
     if (!text || text.length < 20) return null;
     const trimmed = text.trim();
@@ -194,6 +209,11 @@ export async function fetchRawIcsFeed(url: string): Promise<string | null> {
     }
     return text;
   } catch {
+    notifyFetchError({
+      title: 'Kalenterin haku aikakatkaistiin',
+      message: 'Yhteys kalenteripalvelimeen katkesi tai aikakatkaistiin. Käytetään tallennettua välimuistia.',
+      source: 'Kalenteri-iCal'
+    });
     return null;
   }
 }

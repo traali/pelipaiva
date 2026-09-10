@@ -72,7 +72,7 @@ Pick **one** issued code per family. WhatsApp the join template (app copies it a
 Pelipäivä-perhe {CODE}
 Avaa: https://pelipaiva.pages.dev/?perhe={CODE}
 
-Etunimi ja joukkue-URL Cloudflareen 7 pv.
+Etunimi ja joukkue-URL Cloudflareen 30 pv.
 Ottelut tulospalvelusta. Ei sukunimeä, ei vammoja.
 ```
 
@@ -137,7 +137,7 @@ After a dashboard edit, wait a few seconds and re-run the curl checks.
 
 Existing KV row + missing/stale `If-Match` → **409**. First PUT of an empty allowlisted slot has no `If-Match`.
 
-Roster TTL: **7 days** sliding on PUT. Idle family vanishes; same issued code can be used again (404 then first PUT).
+Roster TTL: **30 days** sliding on PUT. Idle family vanishes; same issued code can be used again (404 then first PUT).
 
 ---
 

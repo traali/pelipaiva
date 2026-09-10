@@ -524,7 +524,7 @@ export default {
         };
 
         await env.MATCHDAY_KV.put(kvKey, JSON.stringify(toStore), {
-          expirationTtl: 604800 // 7 days sliding TTL
+          expirationTtl: 2592000 // 30 days sliding TTL (30 * 24 * 3600)
         });
 
         return new Response(

@@ -32,6 +32,12 @@ import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 import { LiveMatchToast } from './components/LiveMatchToast';
+import { NotificationToastContainer } from './components/ui/NotificationToastContainer';
+import {
+  notifyFetchError,
+  notifyWarning,
+  notifySuccess
+} from './lib/notifications/notificationStore';
 import { useModalStore } from './lib/modals/useModalStore';
 import { GlobalModalHost } from './components/modals';
 import { useAppSettings } from './lib/settings/useAppSettings';
@@ -67,8 +73,18 @@ export const App: React.FC = () => {
 
   // Listen to network status changes & background family sync
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => {
+      setIsOffline(false);
+      notifySuccess('Verkkoyhteys palautui', 'Tiedot ja synkronointi ovat taas ajan tasalla.');
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      notifyWarning(
+        'Ei verkkoyhteyttä',
+        'Verkkoyhteys katkesi — käytetään tallennettua välimuistia.',
+        'Verkkotila'
+      );
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -135,12 +151,13 @@ export const App: React.FC = () => {
       // Handle ?perhe=PERHE-2 deep link join
       const perheCode = params.get('perhe');
       if (perheCode) {
-        (async () => {
+        const attemptJoin = async () => {
           const res = await syncFamilyRosterCycle(perheCode, db);
           if (res.success) {
             await syncManualEvents(perheCode, db);
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);
+            notifySuccess('Liitytty perheeseen!', `Perheen ${perheCode} joukkueet ja ottelut synkronoitu.`);
             if (isAmbientRequest) {
               setIsAmbientMode(true);
             } else {
@@ -155,9 +172,16 @@ export const App: React.FC = () => {
                 : res.error === 'rate_limited'
                 ? 'Liian monta yritystä — odota hetki ja yritä uudelleen.'
                 : 'Verkkovirhe — tarkista yhteys ja yritä uudelleen.';
-            window.alert(`Perheeseen liittyminen epäonnistui: ${msg}`);
+            notifyFetchError({
+              title: 'Perheeseen liittyminen epäonnistui',
+              message: msg,
+              source: 'Perhejako',
+              retryAction: attemptJoin,
+              retryLabel: 'Yritä liittyä uudelleen'
+            });
           }
-        })();
+        };
+        attemptJoin();
       }
 
       // Handle family share link payload
@@ -1473,6 +1497,9 @@ export const App: React.FC = () => {
           modalStore.openDrawer(repoMap[sport] || 'floorball-stats', matchId, title);
         }}
       />
+
+      {/* Unified In-App Fetch & Status Notifications */}
+      <NotificationToastContainer />
     </div>
   );
 };
