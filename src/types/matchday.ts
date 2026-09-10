@@ -88,6 +88,11 @@ export interface WeatherCondition {
   turfCondition: 'dry' | 'slick' | 'frozen' | 'snowy';
   uvIndex?: number;
   isForecastLongRange?: boolean;
+  turfConditionLabelFi?: string;
+  windAdvisoryBadge?: string;
+  rainOnsetLabel?: string;
+  isCacheFallback?: boolean;
+  lightningSafety?: LightningSafetyAlert;
 }
 
 export interface LightningSafetyAlert {

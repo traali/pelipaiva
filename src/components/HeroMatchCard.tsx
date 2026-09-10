@@ -30,6 +30,7 @@ import { EventMergeModal } from './EventMergeModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
 import { MoreHorizontal, FileText } from 'lucide-react';
 import { useMatchdayLogistics } from '../hooks/useMatchdayLogistics';
+import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -112,8 +113,16 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
     onEventUpdated,
   });
 
-  const temp = event.weather?.isForecastLongRange ? undefined : event.weather?.temperatureC;
-  const isWetOrCold = event.weather && (event.weather.precipitationMmh > 0.2 || (temp !== undefined && temp <= 3));
+  const effectiveWeather = useMemo(() => {
+    if (event.weather) return event.weather;
+    if (!event.venue.isIndoor && event.venue.coordinates?.lat && event.venue.coordinates?.lng) {
+      return getDeterministicWeatherFallback(event.venue.coordinates, event.startTime);
+    }
+    return undefined;
+  }, [event.weather, event.venue.isIndoor, event.venue.coordinates, event.startTime]);
+
+  const temp = effectiveWeather?.isForecastLongRange ? undefined : effectiveWeather?.temperatureC;
+  const isWetOrCold = effectiveWeather && (effectiveWeather.precipitationMmh > 0.2 || (temp !== undefined && temp <= 3));
 
   const jerseyColor = kit?.kitColors?.primary || profile?.colorHex || '#3b82f6';
   const jerseyText = event.isHomeMatch === false ? 'Vieraspaita (+ varapaita)' : 'Kotipeliasu (ykkönen)';
@@ -459,8 +468,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
                 <span className="text-text-muted">(Sisähalli)</span>
               ) : (
                 <span className="text-text-muted">
-                  {event.weather?.precipitationMmh && event.weather.precipitationMmh > 0
-                    ? `• Sade ${event.weather.precipitationMmh.toFixed(1)} mm/h`
+                  {effectiveWeather?.precipitationMmh && effectiveWeather.precipitationMmh > 0
+                    ? `• Sade ${effectiveWeather.precipitationMmh.toFixed(1)} mm/h`
                     : '• Pouta'}
                 </span>
               )}

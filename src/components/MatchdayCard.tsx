@@ -21,7 +21,9 @@ import { MatchdayEvent, FullMatchStats, PlayerMatchLog, PlayerProfile } from '..
 import { springTactile } from '../lib/motion/springs';
 import { NappisvahtiPill } from './NappisvahtiPill';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
-import { RainRadarCurve } from './RainRadarCurve';
+import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
+import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
+import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventChatModal } from './EventChatModal';
@@ -86,6 +88,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [stats, setStats] = useState<FullMatchStats | undefined>(event.stats);
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
   const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
+  const [isWeatherDrawerOpen, setIsWeatherDrawerOpen] = useState(false);
+
+  const effectiveWeather = React.useMemo(() => {
+    if (event.weather) return event.weather;
+    if (!event.venue.isIndoor && event.venue.coordinates?.lat && event.venue.coordinates?.lng) {
+      return getDeterministicWeatherFallback(event.venue.coordinates, event.startTime);
+    }
+    return undefined;
+  }, [event.weather, event.venue.isIndoor, event.venue.coordinates, event.startTime]);
 
   const {
     transitPlan,
@@ -794,13 +805,11 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </motion.button>
         )}
 
-        {!compact && event.weather && (
+        {!compact && effectiveWeather && (
           <div className="mb-4">
-            <RainRadarCurve
-              weather={event.weather}
-              isOutdoor={!event.venue.isIndoor}
-              coordinates={event.venue.coordinates}
-              venueName={event.venue.name}
+            <MatchdayCardWeatherBadge
+              weather={effectiveWeather}
+              onOpenRadar={() => setIsWeatherDrawerOpen(true)}
             />
           </div>
         )}
@@ -1001,6 +1010,17 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         eventId={event.id}
         onSaved={(updated) => setLocalVenue(updated)}
       />
+
+      {/* Interactive Weather, Radar & Lightning Safety Drawer */}
+      {effectiveWeather && event.venue.coordinates && (
+        <WeatherSatelliteDrawer
+          isOpen={isWeatherDrawerOpen}
+          onClose={() => setIsWeatherDrawerOpen(false)}
+          venueCoords={event.venue.coordinates}
+          venueName={event.venue.name}
+          weather={effectiveWeather}
+        />
+      )}
     </>
   );
 };
