@@ -177,7 +177,7 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
   // "WU13 1div. LePy vs. ToPoLa" -> division = "WU13 1div.", text = "LePy vs. ToPoLa"
   // "P14 Haastaja: HJK vs Honka"
   const divMatch = text.match(
-    /^((?:[A-Za-z]{1,4}\d{1,2}(?:\s+\d+\.?\s*(?:div|divisioona)?)?|piirisarja|aluesarja|ykkönen|kakkonen|kolmonen|mestaruussarja|liiga|haastaja|kilpa|harraste)(?:\s+Lohko\s+[A-Z0-9]+)?)\s*[.:\-]\s*(.+)$/i
+    /^((?:[A-Za-z]{1,4}\d{1,2}(?:\s+\d+\.?\s*(?:div|divisioona)?)?|piirisarja|aluesarja|ykkönen|kakkonen|kolmonen|mestaruussarja|liiga|haastaja|kilpa|harraste)(?:\s+Lohko\s+[A-Z0-9]+)?)\s*[.:-]\s*(.+)$/i
   );
   if (divMatch && divMatch[1] && divMatch[2]) {
     if (/\bvs\.?\b/i.test(divMatch[2]) || /\s+-\s+/.test(divMatch[2])) {

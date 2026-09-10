@@ -319,7 +319,7 @@ export async function resolveSportsVenue(
 ): Promise<VenueInfo> {
   const normalized = (rawVenueString || '')
     .toLowerCase()
-    .replace(/[\.,\-\/\(\)]/g, ' ')
+    .replace(/[.,\-/()]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
