@@ -91,6 +91,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
     formattedKickoff: kickoff,
     formattedWarmup: warmup,
     dateLabel,
+    isTournament,
+    isTraining,
     mapsUrl,
     transitEmoji,
     isOut,
@@ -343,8 +345,10 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           <div className="flex items-center gap-1.5 font-black text-sm sm:text-base">
             <Clock className="w-4 h-4 text-pitch shrink-0" />
             <span className="text-pitch">
-              {event.isTraining
+              {isTraining
                 ? `🏃 Harjoitus alkaa klo ${kickoff}`
+                : isTournament
+                ? `🏆 Turnaus alkaa klo ${kickoff}`
                 : event.sport === 'school'
                 ? `🏫 Koulu alkaa klo ${kickoff}`
                 : event.sport === 'other'

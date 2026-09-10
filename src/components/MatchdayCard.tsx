@@ -93,6 +93,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     isPast,
     formattedKickoff,
     formattedWarmup,
+    isTournament,
     isTraining,
     isSchool,
     isOther,
@@ -350,6 +351,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
                 isTraining
                   ? 'bg-radar/15 text-radar border-radar/25'
+                  : isTournament
+                  ? 'bg-gold/20 text-gold border border-gold/35 shadow-xs'
                   : 'bg-pitch/15 text-pitch border border-pitch/25'
               }`}
             >
@@ -357,6 +360,11 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 <>
                   <Dumbbell className="w-3.5 h-3.5" />
                   <span>Harjoitus • {getSportBadge()}</span>
+                </>
+              ) : isTournament ? (
+                <>
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Turnaus • {getSportBadge()}</span>
                 </>
               ) : (
                 getSportBadge()
@@ -367,7 +375,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <TalkooDutyTag duty={event.volunteerDuty} />
             )}
 
-            {(event.isTournament || event.tournamentName || /turnaus|tournament|cup\b|memorial/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)) && (
+            {!isTournament && (event.tournamentName || /turnaus|tournament|cup\b|memorial/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)) && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gold/20 text-gold border border-gold/35 shadow-xs">
                 <Trophy className="w-3.5 h-3.5" />
                 <span>Turnaus</span>
@@ -460,6 +468,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     ? `📌 Alkaa klo ${formattedKickoff}`
                     : isTraining
                     ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
+                    : isTournament
+                    ? `🏆 Turnaus alkaa klo ${formattedKickoff}`
                     : `${matchSportIcon} Ottelu alkaa klo ${formattedKickoff}`}
                 </span>
                 {formattedWarmup && formattedWarmup !== formattedKickoff && (
@@ -550,6 +560,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <span className="text-pitch">
                 {isTraining
                   ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
+                  : isTournament
+                  ? `🏆 Turnaus alkaa klo ${formattedKickoff}`
                   : isSchool
                   ? `🏫 Koulu alkaa klo ${formattedKickoff}`
                   : isOther
@@ -849,7 +861,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             <span>
               {isTraining
                 ? 'Treenivarusteet & Juomapullo'
-                : event.briefing?.gearAndPackingAdvice.kitRecommendation || 'Ykköspeliasu'}
+                : event.briefing?.gearAndPackingAdvice.kitRecommendation ||
+                  (isTournament ? 'Peliasu (ykkönen) + varapaita' : 'Kotipeliasu (ykkönen)')}
             </span>
           </div>
 

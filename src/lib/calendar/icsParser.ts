@@ -35,6 +35,11 @@ export function isTrainingEvent(title: string, description: string = ''): boolea
     'träning'
   ];
 
+  // Tournaments and cups are competition matches/events, never training sessions
+  if (/turnaus|tournament|pelitapahtuma|lopputurnaus|kutsuturnaus|cup-turnaus|vastuuturnaus/i.test(text)) {
+    return false;
+  }
+
   // If explicit "vs" or " v " with another team, it's a match unless specified as internal drill
   if ((text.includes(' vs ') || text.includes(' v ')) && !text.includes('sisäinen')) {
     return false;
@@ -804,11 +809,16 @@ export async function parseICSFeed(
         }
       }
 
-      const isTraining =
-        category.toLowerCase().includes('treenit') ||
-        category.toLowerCase().includes('harjoitus') ||
-        isTrainingEvent(title, description);
       const parsedTitle = parseMatchTitle(title, defaultTeamName);
+      const isTournament =
+        parsedTitle.eventType === 'tournament' ||
+        /turnaus|tournament|cup\b|memorial|pelitapahtuma/i.test(`${title} ${description} ${category}`);
+
+      const isTraining =
+        !isTournament &&
+        (category.toLowerCase().includes('treenit') ||
+          category.toLowerCase().includes('harjoitus') ||
+          isTrainingEvent(title, description));
       const eventSport = detectSportFromText(`${title} ${category} ${description}`) || resolvedSport;
 
       // Volunteer duty detection (Talkoovahti)
@@ -857,6 +867,7 @@ export async function parseICSFeed(
               profileId,
               sport: eventSport,
               eventType: parsedTitle.eventType,
+              isTournament,
               isTraining,
               title,
               homeTeam: parsedTitle.homeTeam,
@@ -897,6 +908,7 @@ export async function parseICSFeed(
           profileId,
           sport: eventSport,
           eventType: parsedTitle.eventType,
+          isTournament,
           isTraining,
           title,
           homeTeam: parsedTitle.homeTeam,

@@ -94,7 +94,12 @@ export function useMatchdayLogistics({
     timeZone: "Europe/Helsinki",
   });
 
-  const isTraining = Boolean(event.isTraining || event.eventType === "training");
+  const isTournament = Boolean(
+    event.isTournament ||
+    event.eventType === "tournament" ||
+    /turnaus|tournament|cup\b|memorial|pelitapahtuma|vastuuturnaus/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)
+  );
+  const isTraining = !isTournament && Boolean(event.isTraining || event.eventType === "training");
   const isSchool = Boolean(event.sport === "school" || event.eventType === "school");
   const isOther = Boolean(event.sport === "other" || event.eventType === "other" || event.eventType === "meeting");
 
@@ -150,6 +155,7 @@ export function useMatchdayLogistics({
     formattedKickoff,
     formattedWarmup,
     dateLabel,
+    isTournament,
     isTraining,
     isSchool,
     isOther,
