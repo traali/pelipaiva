@@ -240,7 +240,7 @@ async function collectRosterIcsEvents(
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Origin-scoped CORS (M-12): echo only known first-party origins. The
@@ -624,6 +624,24 @@ export default {
       let existingEventsStr = await env.MATCHDAY_KV.get(eventsKey);
       if (!existingEventsStr) {
         existingEventsStr = await env.MATCHDAY_KV.get(`fam_events_${familyCode}`);
+      }
+
+      // Sliding TTL refresh: Calendar subscribers (Google Calendar, Apple Calendar)
+      // poll every 8-24 hours. Refreshing KV expirationTtl keeps active family feeds
+      // alive indefinitely in Cloudflare KV without requiring manual webapp visits.
+      if (existingStr && ctx?.waitUntil) {
+        ctx.waitUntil(
+          env.MATCHDAY_KV.put(kvKey, existingStr, {
+            expirationTtl: 2592000 // 30 days sliding TTL
+          })
+        );
+      }
+      if (existingEventsStr && ctx?.waitUntil) {
+        ctx.waitUntil(
+          env.MATCHDAY_KV.put(eventsKey, existingEventsStr, {
+            expirationTtl: 2592000 // 30 days sliding TTL
+          })
+        );
       }
 
       let customEvents: FamilyManualEvent[] = [];
