@@ -33,7 +33,6 @@ import type { FamilyConflict } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { db } from '../lib/storage/db';
-import { resolveTransitPlan } from '../lib/geo/transitEngine';
 import type { HomeLocation } from '../types/matchday';
 import { useMatchdayLogistics, surfaceLabel } from '../hooks/useMatchdayLogistics';
 import { TalkooDutyTag } from './matchday';
@@ -394,25 +393,31 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             )}
 
             {/* Transit Mode Badge */}
-            {(() => {
-              const transitPlan = event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather);
-              if (!transitPlan) return null;
-              return (
-                <button
-                  type="button"
-                  onClick={onOpenHomeModal}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
-                    transitPlan.isSelfTransit
-                      ? 'bg-pitch/15 text-pitch border-pitch/30'
-                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
-                  }`}
-                  title={`${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`}
-                  aria-label={`Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`}
-                >
-                  <span>{transitPlan.transitLabel}</span>
-                </button>
-              );
-            })()}
+            {transitPlan && (
+              <button
+                type="button"
+                onClick={transitPlan.isUnknownLocation ? () => setIsVenueModalOpen(true) : onOpenHomeModal}
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
+                  transitPlan.isUnknownLocation
+                    ? 'bg-whistle/15 text-whistle border-whistle/35 hover:bg-whistle/25'
+                    : transitPlan.isSelfTransit
+                    ? 'bg-pitch/15 text-pitch border-pitch/30'
+                    : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                }`}
+                title={
+                  transitPlan.isUnknownLocation
+                    ? 'Kentän sijainti tuntematon • Klikkaa asettaaksesi kenttä tai korjataksesi osoite'
+                    : `${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`
+                }
+                aria-label={
+                  transitPlan.isUnknownLocation
+                    ? 'Sijainti tuntematon. Klikkaa asettaaksesi kentän sijainti.'
+                    : `Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`
+                }
+              >
+                <span>{transitPlan.transitLabel}</span>
+              </button>
+            )}
 
             {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
             {(() => {

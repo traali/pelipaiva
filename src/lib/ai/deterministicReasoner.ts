@@ -95,15 +95,20 @@ export function calculateDepartureCountdown(
         }
       : undefined;
 
+  const isApprox = Boolean(event.venue?.isApproximateLocation);
+  const coords = event.venue?.coordinates;
+  const hasValidCoords = Boolean(coords && coords.lat >= 59.0 && coords.lat <= 71.0 && coords.lng >= 19.0 && coords.lng <= 32.0);
+
   const transitPlan =
-    event.transit ||
-    resolveTransitPlan(
-      normalizedHome,
-      event.venue?.coordinates,
-      event.weather,
-      undefined,
-      arrivalRules?.defaultDrivingEstimateMinutes ?? 20
-    );
+    (!isApprox && hasValidCoords && event.transit && !event.transit.isUnknownLocation && event.transit.distanceKm < 300)
+      ? event.transit
+      : resolveTransitPlan(
+          normalizedHome,
+          event.venue?.coordinates,
+          event.weather,
+          undefined,
+          arrivalRules?.defaultDrivingEstimateMinutes ?? 20
+        );
 
   const isNearbyActiveTransit = transitPlan.mode === 'walk' || transitPlan.mode === 'bicycle';
 

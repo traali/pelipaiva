@@ -47,6 +47,7 @@ export interface TransitPlan {
   travelMinutes: number;
   transitLabel: string;
   isSelfTransit: boolean; // true for walk/bicycle (independent transit, no parent driver needed)
+  isUnknownLocation?: boolean; // true when venue coordinates are missing, approximate, or (0,0)
   weatherWarning?: string;
 }
 

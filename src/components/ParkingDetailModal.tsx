@@ -65,16 +65,23 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
   const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
 
+  const hasValidCoords = Boolean(lat !== 0 && lng !== 0 && lat >= 59.0 && lat <= 71.0 && lng >= 19.0 && lng <= 32.0);
+
   const openGoogleMaps = () => {
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank', 'noopener,noreferrer');
+    const dest = hasValidCoords ? `${lat},${lng}` : encodeURIComponent(venueName || 'Kenttä');
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank', 'noopener,noreferrer');
   };
 
   const openAppleMaps = () => {
-    window.open(`https://maps.apple.com/?daddr=${lat},${lng}`, '_blank', 'noopener,noreferrer');
+    const dest = hasValidCoords ? `${lat},${lng}` : encodeURIComponent(venueName || 'Kenttä');
+    window.open(`https://maps.apple.com/?daddr=${dest}`, '_blank', 'noopener,noreferrer');
   };
 
   const openWaze = () => {
-    window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank', 'noopener,noreferrer');
+    const url = hasValidCoords
+      ? `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`
+      : `https://waze.com/ul?q=${encodeURIComponent(venueName || 'Kenttä')}&navigate=yes`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {

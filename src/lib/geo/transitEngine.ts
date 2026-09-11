@@ -61,12 +61,14 @@ export function resolveTransitPlan(
     !venueCoords ||
     !isCoordValid(venueCoords)
   ) {
+    const isVenueMissing = !venueCoords || !isCoordValid(venueCoords);
     return {
       mode: 'car',
       distanceKm: 0,
-      travelMinutes: defaultDrivingMinutes,
-      transitLabel: `🚗 Auto ~${defaultDrivingMinutes} min`,
-      isSelfTransit: false
+      travelMinutes: isVenueMissing ? 0 : defaultDrivingMinutes,
+      transitLabel: isVenueMissing ? '📍 Sijainti tuntematon' : `🚗 Auto ~${defaultDrivingMinutes} min`,
+      isSelfTransit: false,
+      isUnknownLocation: isVenueMissing
     };
   }
 

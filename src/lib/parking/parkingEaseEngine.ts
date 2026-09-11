@@ -346,10 +346,15 @@ export function calculateParkingEase(
     ]
   };
 
+  const hasCoords = Boolean(coords && (coords.lat !== 0 || coords.lng !== 0));
+  const mapsNavigationUrl = hasCoords
+    ? `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueName || 'Kenttä')}`;
+
   return {
     easeScore: 'moderate',
     easeScoreValue: 60,
-    lotName: 'Lähin urheilupuiston pysäköintialue',
+    lotName: hasCoords ? 'Lähin urheilupuiston pysäköintialue' : 'Kentän pysäköintialue (tarkista opasteet)',
     coordinates: coords,
     feeZone: 'Pysäköintikiekko 2h-4h',
     parkingDiscRequired: true,
@@ -357,7 +362,7 @@ export function calculateParkingEase(
     walkingTimeMinutes: 3,
     walkingDistanceMeters: 200,
     warnings: ['Aseta pysäköintikiekko saapuessa'],
-    mapsNavigationUrl: `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
+    mapsNavigationUrl,
     spots: defaultSpots,
     trafficSigns: defaultSigns,
     fineRisk: defaultFineRisk

@@ -186,6 +186,24 @@ describe('transitEngine', () => {
     expect(plan.mode).toBe('car');
     expect(plan.isSelfTransit).toBe(false);
   });
+
+  it('safely handles unknown venue location (0,0 or missing) without computing absurd distance', () => {
+    const nullIsland = { lat: 0, lng: 0 };
+    const plan = resolveTransitPlan(mockHome, nullIsland);
+    expect(plan.isUnknownLocation).toBe(true);
+    expect(plan.distanceKm).toBe(0);
+    expect(plan.travelMinutes).toBe(0);
+    expect(plan.transitLabel).toBe('📍 Sijainti tuntematon');
+    expect(plan.transitLabel).not.toMatch(/8779|14052|km/);
+  });
+
+  it('safely handles missing venue coordinates without computing absurd distance', () => {
+    const plan = resolveTransitPlan(mockHome, null);
+    expect(plan.isUnknownLocation).toBe(true);
+    expect(plan.distanceKm).toBe(0);
+    expect(plan.travelMinutes).toBe(0);
+    expect(plan.transitLabel).toBe('📍 Sijainti tuntematon');
+  });
 });
 
 describe('departure countdown with HomeLocation', () => {

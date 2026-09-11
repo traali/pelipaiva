@@ -63,11 +63,31 @@ export function useMatchdayLogistics({
 
   // Transit Plan
   const transitPlan: TransitPlan = useMemo(() => {
-    if (event.transit && event.transit.distanceKm < 200 && event.transit.travelMinutes < 300) {
+    const isApprox = Boolean(event.venue?.isApproximateLocation);
+    const coords = event.venue?.coordinates;
+    const hasValidCoords = Boolean(coords && coords.lat >= 59.0 && coords.lat <= 71.0 && coords.lng >= 19.0 && coords.lng <= 32.0);
+
+    if (isApprox || !hasValidCoords) {
+      return {
+        mode: 'car',
+        distanceKm: 0,
+        travelMinutes: 0,
+        transitLabel: '📍 Sijainti tuntematon',
+        isSelfTransit: false,
+        isUnknownLocation: true
+      };
+    }
+
+    if (
+      event.transit &&
+      !event.transit.isUnknownLocation &&
+      event.transit.distanceKm < 300 &&
+      event.transit.travelMinutes < 300
+    ) {
       return event.transit;
     }
-    return resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather);
-  }, [event.transit, homeLocation, event.venue?.coordinates, event.weather]);
+    return resolveTransitPlan(homeLocation, coords, event.weather);
+  }, [event.transit, event.venue?.isApproximateLocation, event.venue?.coordinates, homeLocation, event.weather]);
 
   // Time & Status Calculations
   const isLive = new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
@@ -122,7 +142,9 @@ export function useMatchdayLogistics({
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}${travelModeParam}`;
 
   const transitEmoji =
-    transitPlan?.mode === "walk"
+    transitPlan?.isUnknownLocation
+      ? "📍 Sijainti"
+      : transitPlan?.mode === "walk"
       ? "🚶 Kävely"
       : transitPlan?.mode === "bicycle"
       ? "🚴 Pyörä"

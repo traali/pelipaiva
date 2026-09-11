@@ -27,10 +27,12 @@ import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { EventChatModal } from './EventChatModal';
 import { EventMergeModal } from './EventMergeModal';
+import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
-import { MoreHorizontal, FileText } from 'lucide-react';
+import { MoreHorizontal, FileText, Edit3 } from 'lucide-react';
 import { useMatchdayLogistics } from '../hooks/useMatchdayLogistics';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
+import { db } from '../lib/storage/db';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -72,6 +74,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const [showKit, setShowKit] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
 
   const stats: FullMatchStats | null = useMemo(() => {
     if (event.isTraining) return null;
@@ -259,14 +262,24 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             {transitPlan && (
               <button
                 type="button"
-                onClick={onOpenHomeModal}
+                onClick={transitPlan.isUnknownLocation ? () => setIsVenueModalOpen(true) : onOpenHomeModal}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
-                  transitPlan.isSelfTransit
+                  transitPlan.isUnknownLocation
+                    ? 'bg-whistle/15 text-whistle border-whistle/35 hover:bg-whistle/25'
+                    : transitPlan.isSelfTransit
                     ? 'bg-pitch/15 text-pitch border-pitch/30'
                     : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
                 }`}
-                title={`${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`}
-                aria-label={`Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`}
+                title={
+                  transitPlan.isUnknownLocation
+                    ? 'Kentän sijainti tuntematon • Klikkaa asettaaksesi kenttä tai korjataksesi osoite'
+                    : `${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`
+                }
+                aria-label={
+                  transitPlan.isUnknownLocation
+                    ? 'Sijainti tuntematon. Klikkaa asettaaksesi kentän sijainti.'
+                    : `Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`
+                }
               >
                 <span>{transitPlan.transitLabel}</span>
               </button>
@@ -373,12 +386,25 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         </div>
         
         {/* Venue Info */}
-        <div className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">
+        <div className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary flex-wrap">
           <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
-          <span className="truncate font-medium">{event.venue.name}</span>
+          <span className="truncate font-medium">
+            {event.venue.name}
+            {event.venue.isApproximateLocation && (
+              <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti tuntematon)</span>
+            )}
+          </span>
           <span className="text-xs text-text-muted">
             • {event.venue.isIndoor ? 'Sisätila' : 'Ulkokenttä'}
           </span>
+          <button
+            type="button"
+            onClick={() => setIsVenueModalOpen(true)}
+            aria-label={`Korjaa kentän tietoja: ${event.venue.name}`}
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-2 -mr-2 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Schedule / Venue Mismatch Warning Banner */}
@@ -839,6 +865,23 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           profile={profile}
           onEventUpdated={(updated) => {
             onEventUpdated?.(updated);
+          }}
+        />
+
+        {/* Venue Correction Modal */}
+        <VenueCorrectionModal
+          isOpen={isVenueModalOpen}
+          onClose={() => setIsVenueModalOpen(false)}
+          currentVenue={event.venue}
+          eventId={event.id}
+          onSaved={async (updatedVenue: import('../types/matchday').VenueInfo) => {
+            const updated: MatchdayEvent = {
+              ...event,
+              venue: updatedVenue,
+            };
+            await db.events.update(event.id, { venue: updatedVenue });
+            onEventUpdated?.(updated);
+            setIsVenueModalOpen(false);
           }}
         />
 

@@ -247,6 +247,20 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'rovaniemi keskuskenttä': { name: 'Rovaniemen Keskuskenttä', lat: 66.4981, lng: 25.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'ounashalli': { name: 'Ounashalli Rovaniemi', lat: 66.5141, lng: 25.7612, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
 
+  // === KOUVOLA & KYMENLAAKSO ===
+  'utti-halli': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'utti halli': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'lennostontie 2': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'utti': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'kouvola utti': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'jatke areena': { name: 'Lumon Areena / Jatke Areena Kouvola', lat: 60.8695, lng: 26.7112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'lumon areena': { name: 'Lumon Areena Kouvola', lat: 60.8695, lng: 26.7112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'kouvolan keskusurheilukenttä': { name: 'Kouvolan Keskuskenttä', lat: 60.8712, lng: 26.7052, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'kuusankosken urheilupuisto': { name: 'Kuusankosken Urheilupuisto', lat: 60.9082, lng: 26.6212, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lehtomäki tn': { name: 'Lehtomäen Tekonurmi Kouvola', lat: 60.8841, lng: 26.7321, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'sarkola tn': { name: 'Sarkolan Tekonurmi Kouvola', lat: 60.8612, lng: 26.6912, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'koria monitoimitalo': { name: 'Korian Monitoimitalo', lat: 60.8541, lng: 26.6112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+
   // === NATIONAL SPORTS INSTITUTES ===
   'eerikkilä': { name: 'Eerikkilän Urheiluopisto', lat: 60.7785, lng: 23.7541, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'eerikkilä tn 1': { name: 'Eerikkilän Urheiluopisto TN 1', lat: 60.7785, lng: 23.7541, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
