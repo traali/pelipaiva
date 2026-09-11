@@ -29,6 +29,8 @@ interface MatchStatsModalProps {
   stats?: FullMatchStats | null;
   homeTeam: string;
   awayTeam: string;
+  officialFixtureId?: string;
+  matchId?: string;
   playerName?: string;
   playerLog?: PlayerMatchLog;
   score?: string;
@@ -63,6 +65,8 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   stats: statsProp,
   homeTeam: rawHomeTeam,
   awayTeam: rawAwayTeam,
+  officialFixtureId,
+  matchId,
   playerName,
   playerLog,
   score,
@@ -93,7 +97,13 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
   const [isSatelliteDrawerOpen, setIsSatelliteDrawerOpen] = useState(false);
-  const footballMatchParam = `${homeTeam.replace(/\//g, ' ')} - ${awayTeam.replace(/\//g, ' ')}`;
+  
+  // Clean, authoritative match ID: e.g. "palloliitto_60341_4321789" -> "4321789"
+  const rawId = matchId || officialFixtureId || '';
+  const resolvedNumericId = rawId.includes('_') ? rawId.split('_').pop() || rawId : rawId;
+  const footballMatchParam = /^\d+$/.test(resolvedNumericId)
+    ? resolvedNumericId
+    : `${homeTeam.replace(/\//g, ' ')} - ${awayTeam.replace(/\//g, ' ')}`;
 
   // Local state for recording player stats
   const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
@@ -264,7 +274,11 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     {homeTeam}
                   </div>
                   <div className="text-xs text-text-muted">
-                    Sarjasijoitus: {stats.homeStanding.rank}. ({stats.homeStanding.points}p)
+                    {stats.homeStanding && stats.homeStanding.rank > 0 && stats.homeStanding.played > 0 ? (
+                      `Sarjasijoitus: ${stats.homeStanding.rank}. (${stats.homeStanding.points}p)`
+                    ) : (
+                      'Sarjataulukko ei saatavilla'
+                    )}
                   </div>
                 </div>
 
@@ -301,7 +315,11 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     {awayTeam}
                   </div>
                   <div className="text-xs text-text-muted">
-                    Sarjasijoitus: {stats.awayStanding.rank}. ({stats.awayStanding.points}p)
+                    {stats.awayStanding && stats.awayStanding.rank > 0 && stats.awayStanding.played > 0 ? (
+                      `Sarjasijoitus: ${stats.awayStanding.rank}. (${stats.awayStanding.points}p)`
+                    ) : (
+                      'Sarjataulukko ei saatavilla'
+                    )}
                   </div>
                 </div>
               </div>
@@ -810,26 +828,28 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             {/* TAB 3: League Standings Table */}
             {activeTab === 'standings' && (
               <div className="flex flex-col gap-2">
-                <div className="text-[11px] text-text-muted px-1">
-                  💡 Klikkaa mitä tahansa joukkuetta nähdäksesi heidän pelaajakokoonpanonsa ja maalitilastonsa.
-                </div>
-                <div className="rounded-2xl border border-border-subtle overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-surface-elevated text-text-muted text-[11px] font-semibold border-b border-border-subtle">
-                        <tr>
-                          <th className="py-2.5 px-3">#</th>
-                          <th className="py-2.5 px-3">Joukkue</th>
-                          <th className="py-2.5 px-2 text-center">O</th>
-                          <th className="py-2.5 px-2 text-center">V</th>
-                          <th className="py-2.5 px-2 text-center">T</th>
-                          <th className="py-2.5 px-2 text-center">H</th>
-                          <th className="py-2.5 px-2 text-center">ME</th>
-                          <th className="py-2.5 px-3 text-right">Pisteet</th>
-                          <th className="py-2.5 px-3 text-center">Kunto</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-subtle/50">
+                {stats.standingsTable && stats.standingsTable.length > 0 ? (
+                  <>
+                    <div className="text-[11px] text-text-muted px-1">
+                      💡 Klikkaa mitä tahansa joukkuetta nähdäksesi heidän pelaajakokoonpanonsa ja maalitilastonsa.
+                    </div>
+                    <div className="rounded-2xl border border-border-subtle overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-surface-elevated text-text-muted text-[11px] font-semibold border-b border-border-subtle">
+                            <tr>
+                              <th className="py-2.5 px-3">#</th>
+                              <th className="py-2.5 px-3">Joukkue</th>
+                              <th className="py-2.5 px-2 text-center">O</th>
+                              <th className="py-2.5 px-2 text-center">V</th>
+                              <th className="py-2.5 px-2 text-center">T</th>
+                              <th className="py-2.5 px-2 text-center">H</th>
+                              <th className="py-2.5 px-2 text-center">ME</th>
+                              <th className="py-2.5 px-3 text-right">Pisteet</th>
+                              <th className="py-2.5 px-3 text-center">Kunto</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-subtle/50">
                         {stats.standingsTable.map((row) => {
                           const isHome = row.teamName === homeTeam;
                           const isAway = row.teamName === awayTeam;
@@ -887,8 +907,22 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     </table>
                   </div>
                 </div>
+              </>
+            ) : (
+              <div className="p-5 rounded-2xl bg-surface-elevated/60 border border-border-subtle text-center flex flex-col items-center gap-2 text-xs">
+                <div className="w-10 h-10 rounded-full bg-surface border border-border-strong flex items-center justify-center text-text-muted text-base">
+                  📊
+                </div>
+                <div className="font-bold text-text-primary text-sm">
+                  Sarjataulukko ei saatavilla
+                </div>
+                <p className="text-text-secondary max-w-sm leading-relaxed">
+                  Tälle sarjalle tai harjoitusottelulle ei ole vielä virallisia sarjataulukkotietoja liiton tulospalvelussa.
+                </p>
               </div>
             )}
+          </div>
+        )}
 
             {/* TAB 4: Top Scorers (Maalipörssi) */}
             {activeTab === 'scorers' && (

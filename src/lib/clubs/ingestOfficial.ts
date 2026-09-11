@@ -295,6 +295,22 @@ export async function ingestIcsForProfile(opts: {
             }
           }
 
+          // Authoritative kickoff time strictly comes from Torneopal/official fixture.
+          // Coach gathering / arrival time strictly preserved from MyClub/Nimenhuuto.
+          if (result.officialFixture.startTime) {
+            const offStart = new Date(result.officialFixture.startTime);
+            const calStart = new Date(ev.startTime);
+            if (offStart.getTime() > calStart.getTime()) {
+              ev.warmupTime = ev.warmupTime || ev.startTime;
+              ev.startTime = result.officialFixture.startTime;
+              if (result.officialFixture.endTime) {
+                ev.endTime = result.officialFixture.endTime;
+              }
+            } else {
+              ev.startTime = result.officialFixture.startTime;
+            }
+          }
+
           const diag = computeMismatchDiagnostics(ev, result.officialFixture);
           if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
             ev.mismatchFlags = {
