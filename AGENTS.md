@@ -165,3 +165,7 @@ Volatile and transient facts must NOT be stored in `AGENTS.md`. Consult their si
 | What changed recently? | `CHANGELOG.md` and Git commit history |
 | What are the active tasks or sprint goals? | Task list / issue tracker / `.agent/handoffs/` |
 | What is the Cloudflare edge route configuration? | `wrangler.toml` and `functions/` |
+
+## Neighbor check
+`npm run visit` includes `scripts/check-neighbors.mjs`: peer AGENTS.md + canonical contract fields + 5-point plans. Do not drop a required contract field without a major version.
+

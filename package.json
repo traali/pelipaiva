@@ -17,7 +17,8 @@
     "pwa:audit": "node scripts/pwa-audit.mjs",
     "db:inspect": "npx tsx scripts/db-inspector.ts",
     "visit": "node scripts/monastery-visitor.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:neighbors": "node scripts/check-neighbors.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

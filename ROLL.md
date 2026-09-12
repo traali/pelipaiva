@@ -24,3 +24,8 @@ Read the last ~15 lines at session start (Chapter). Never rewrite history; only 
 
 
 
+
+## 2026-09-12 — Chapter of Neighbors
+- **Office / Author:** Legate
+- **Verdict:** PASS
+- **Summary:** Vendored check-neighbors.mjs into visit. Graph: federation.neighbors.json. 5-point HOUSE_TEST_SPEC.md. SupportedSport includes weather. Future contract/rule breaks fail closed.
