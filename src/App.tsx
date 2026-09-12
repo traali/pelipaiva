@@ -849,9 +849,15 @@ export const App: React.FC = () => {
       if (!officialIso && !officialVenue) {
         return handleResolveMismatch(eventId, 'keep_calendar');
       }
+      const newStartTime = officialIso || ev.startTime;
+      let newWarmupTime = ev.warmupTime;
+      if (officialIso && new Date(officialIso).getTime() > new Date(ev.startTime).getTime()) {
+        newWarmupTime = newWarmupTime || ev.startTime;
+      }
       const updated: MatchdayEvent = {
         ...ev,
-        startTime: officialIso || ev.startTime,
+        startTime: newStartTime,
+        warmupTime: newWarmupTime,
         venue: officialVenue
           ? { ...ev.venue, name: officialVenue }
           : ev.venue,

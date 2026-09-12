@@ -450,12 +450,26 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       cal.tournamentName = fix.tournamentName || cal.tournamentName;
 
       // Kickoff & Warmup timing
+      const originalCalStart = cal.startTime;
       if (fixDate.getTime() > calDate.getTime()) {
-        cal.warmupTime = cal.warmupTime || cal.startTime;
+        cal.warmupTime = cal.warmupTime || originalCalStart;
         cal.startTime = fix.startTime;
         cal.endTime = fix.endTime || cal.endTime;
       } else {
         cal.startTime = fix.startTime;
+      }
+
+      // If official kickoff differs from original calendar time, attach mismatch flags
+      const timeDiffMins = Math.round(Math.abs(fixDate.getTime() - calDate.getTime()) / 60000);
+      if (timeDiffMins >= 5) {
+        cal.mismatchFlags = {
+          ...cal.mismatchFlags,
+          timeMismatch: true,
+          timeDiffMinutes: timeDiffMins,
+          calendarStartTime: calDate.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' }),
+          officialStartTime: fixDate.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' }),
+          officialStartTimeIso: fix.startTime,
+        };
       }
 
       // Venue adoption & mismatch diagnostics

@@ -295,13 +295,14 @@ export async function ingestIcsForProfile(opts: {
             }
           }
 
+          const originalCalStart = ev.startTime;
           // Authoritative kickoff time strictly comes from Torneopal/official fixture.
           // Coach gathering / arrival time strictly preserved from MyClub/Nimenhuuto.
           if (result.officialFixture.startTime) {
             const offStart = new Date(result.officialFixture.startTime);
-            const calStart = new Date(ev.startTime);
+            const calStart = new Date(originalCalStart);
             if (offStart.getTime() > calStart.getTime()) {
-              ev.warmupTime = ev.warmupTime || ev.startTime;
+              ev.warmupTime = ev.warmupTime || originalCalStart;
               ev.startTime = result.officialFixture.startTime;
               if (result.officialFixture.endTime) {
                 ev.endTime = result.officialFixture.endTime;
@@ -311,7 +312,7 @@ export async function ingestIcsForProfile(opts: {
             }
           }
 
-          const diag = computeMismatchDiagnostics(ev, result.officialFixture);
+          const diag = result.mismatches || computeMismatchDiagnostics({ ...ev, startTime: originalCalStart }, result.officialFixture);
           if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
             ev.mismatchFlags = {
               timeMismatch: diag.hasKickoffMismatch,
@@ -327,6 +328,10 @@ export async function ingestIcsForProfile(opts: {
               officialOpponent: diag.officialOpponent
             };
           }
+
+          // Recalculate briefing so departure timing, WhatsApp brief and spectator advice
+          // reflect the enriched official kickoff and preserved coach gathering time.
+          ev.briefing = generateMatchdayBriefing(ev, withMeta);
 
           // Mark corresponding bare fixture event for deletion to avoid duplicates
           duplicateFixtureIdsToDelete.push(`fixture-${opts.profileId}-${result.officialFixture.id}`);
