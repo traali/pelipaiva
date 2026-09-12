@@ -288,11 +288,14 @@ export const NATIONAL_FIELD_ALIASES: Record<
 };
 
 function matchesAliasWord(text: string, alias: string): boolean {
+  if (!text || !alias) return false;
   if (text === alias) return true;
-  // Whole phrase/word match with boundary spaces or string start/end
   const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
-  return regex.test(text);
+  if (regex.test(text)) return true;
+  // Long hall names survive extra address tokens ("Tuusulan Salibandyhalli, Kilpailukuja 4")
+  if (alias.length >= 10 && text.includes(alias)) return true;
+  return false;
 }
 
 export interface VenueResolveHint {

@@ -367,7 +367,9 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   repo: 'floorball-stats',
                   name: '🏑 Floorball Stats (SSBL)',
                   subtitle: '3 erää, YV/AV radar & torjunnat',
-                  url: `https://floorball-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  url: /^\d+$/.test(resolvedNumericId)
+                    ? `https://floorball-stats.pages.dev/#/match/${resolvedNumericId}`
+                    : `https://floorball-stats.pages.dev/#/search?q=${encodeURIComponent(`${homeTeam} ${awayTeam}`.trim())}`,
                   btnColor: 'bg-[#5BC0BE]/15 border-[#5BC0BE]/30 text-[#6FFFE9] hover:bg-[#5BC0BE]/25'
                 },
                 basketball: {
@@ -1100,7 +1102,9 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
 
         const url =
           sport === 'floorball'
-            ? `https://floorball-stats.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
+            ? (/^\d+$/.test(resolvedNumericId)
+                ? `https://floorball-stats.pages.dev/#/match/${resolvedNumericId}?embed=true`
+                : `https://floorball-stats.pages.dev/#/search?q=${encodeURIComponent(`${homeTeam} ${awayTeam}`.trim())}&embed=true`)
             : sport === 'basketball'
             ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
             : sport === 'volleyball'

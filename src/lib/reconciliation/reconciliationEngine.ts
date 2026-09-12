@@ -31,6 +31,39 @@ function isGenericOrSquadTag(tag: string): boolean {
   return GENERIC_MATCH_TERMS.some((term) => t === term || t.startsWith(term) || t.endsWith(term));
 }
 
+function isTournamentish(event: MatchdayEvent): boolean {
+  return event.eventType === 'tournament' || /turnaus/i.test(`${event.title} ${event.tournamentName || ''}`)
+}
+
+/**
+ * TASO/Torneopal owns kickoff. MyClub/Nimenhuuto owns arrival (kokoontuminen).
+ * Calendar DTSTART is often the gathering time, 30–60 min before official kickoff.
+ */
+export function applyOfficialKickoffKeepCalendarArrival<
+  T extends { startTime: string; warmupTime?: string; endTime?: string }
+>(
+  event: T,
+  official: { startTime: string; endTime?: string },
+  defaultWarmupMins = 45
+): T {
+  const calendarStart = event.startTime
+  const calendarWarmup = event.warmupTime
+  const offMs = new Date(official.startTime).getTime()
+  if (!Number.isFinite(offMs)) return event
+
+  event.startTime = official.startTime
+  if (official.endTime) event.endTime = official.endTime
+
+  const arrivals = [calendarWarmup, calendarStart]
+    .filter((t): t is string => Boolean(t))
+    .map((t) => new Date(t).getTime())
+    .filter((ms) => Number.isFinite(ms) && ms < offMs)
+
+  const arrivalMs = arrivals.length ? Math.max(...arrivals) : offMs - defaultWarmupMins * 60_000
+  event.warmupTime = new Date(arrivalMs).toISOString()
+  return event
+}
+
 /** Helsinki-local calendar-day key — UTC keys mis-bucketed 00:00–02:59 FI events
  *  against the ±180 min tolerance window (M-19/V6, SPEC §5.1 "same day" is local). */
 function helsinkiDayKey(d: Date): string {
@@ -186,6 +219,29 @@ export function reconcileCalendarWithOfficial(
 
       if (confidenceScore >= 0.50) {
         candidates.push({ fixture, score: confidenceScore });
+      }
+    }
+
+    if (candidates.length === 0 && isTournamentish(event)) {
+      const sameDay = officialFixtures.filter((fixture) => helsinkiDayKey(new Date(fixture.startTime)) === eventDayKey)
+      const calVenue = (event.venue?.name || '').toLowerCase().replace(/[\s\-_]/g, '')
+      const venueHits = calVenue
+        ? sameDay.filter((f) => {
+            const off = (f.venueName || '').toLowerCase().replace(/[\s\-_]/g, '')
+            return off && (calVenue.includes(off) || off.includes(calVenue) || calVenue.includes('salibandy') && off.includes('salibandy'))
+          })
+        : []
+      const pool = (venueHits.length ? venueHits : sameDay).slice().sort((a, b) => a.startTime.localeCompare(b.startTime))
+      const first = pool[0]
+      if (first) {
+        const simOwn = Math.max(
+          calculateTeamSimilarity(event.homeTeam, first.isHome ? first.homeTeam : first.awayTeam),
+          calculateTeamSimilarity(event.title, first.homeTeam),
+          calculateTeamSimilarity(event.title, first.awayTeam),
+        )
+        if (simOwn >= 0.45 || venueHits.length > 0) {
+          candidates.push({ fixture: first, score: venueHits.length ? 0.88 : 0.86 })
+        }
       }
     }
 

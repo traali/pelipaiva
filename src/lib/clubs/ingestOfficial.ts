@@ -18,7 +18,8 @@ import { parseICSFeed } from '../calendar/icsParser';
 import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
 import {
   reconcileCalendarWithOfficial,
-  computeMismatchDiagnostics
+  computeMismatchDiagnostics,
+  applyOfficialKickoffKeepCalendarArrival
 } from '../reconciliation/reconciliationEngine';
 import {
   exampleTournamentFromUrl,
@@ -296,20 +297,8 @@ export async function ingestIcsForProfile(opts: {
           }
 
           const originalCalStart = ev.startTime;
-          // Authoritative kickoff time strictly comes from Torneopal/official fixture.
-          // Coach gathering / arrival time strictly preserved from MyClub/Nimenhuuto.
           if (result.officialFixture.startTime) {
-            const offStart = new Date(result.officialFixture.startTime);
-            const calStart = new Date(originalCalStart);
-            if (offStart.getTime() > calStart.getTime()) {
-              ev.warmupTime = ev.warmupTime || originalCalStart;
-              ev.startTime = result.officialFixture.startTime;
-              if (result.officialFixture.endTime) {
-                ev.endTime = result.officialFixture.endTime;
-              }
-            } else {
-              ev.startTime = result.officialFixture.startTime;
-            }
+            applyOfficialKickoffKeepCalendarArrival(ev, result.officialFixture);
           }
 
           const diag = result.mismatches || computeMismatchDiagnostics({ ...ev, startTime: originalCalStart }, result.officialFixture);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reconcileCalendarWithOfficial } from '../../../src/lib/reconciliation/reconciliationEngine';
+import { reconcileCalendarWithOfficial, applyOfficialKickoffKeepCalendarArrival } from '../../../src/lib/reconciliation/reconciliationEngine';
 import { MatchdayEvent, OfficialLeagueFixture } from '../../../src/types/matchday';
 
 describe('Feature 14: Conservative Fuzzy Match & Reconciliation', () => {
@@ -291,6 +291,66 @@ describe('Feature 14: Conservative Fuzzy Match & Reconciliation', () => {
     expect(res?.mismatches?.hasVenueMismatch).toBe(true);
     expect(res?.mismatches?.calendarVenueName).toContain('Pyrkkä');
     expect(res?.mismatches?.officialVenueName).toBe('Töölö PK 6 tn (Bubu)');
+  });
+
+  it('uses Torneopal kickoff and keeps MyClub DTSTART as kokoontuminen', () => {
+    const merged = applyOfficialKickoffKeepCalendarArrival(
+      {
+        startTime: '2026-09-13T09:30:00.000Z', // MyClub 12:30 EEST
+        warmupTime: '2026-09-13T08:45:00.000Z',
+        endTime: '2026-09-13T11:00:00.000Z'
+      },
+      { startTime: '2026-09-13T10:00:00.000Z' } // TASO 13:00 EEST
+    );
+    expect(merged.startTime).toBe('2026-09-13T10:00:00.000Z');
+    expect(merged.warmupTime).toBe('2026-09-13T09:30:00.000Z');
+  });
+
+  it('auto-matches a floorball tournament block to the first same-day TASO game at the hall', () => {
+    const official: OfficialLeagueFixture[] = [
+      {
+        id: 'ssbl_25301_949661',
+        teamId: '25301',
+        association: 'salibandy',
+        sport: 'floorball',
+        leagueName: 'U14 Pojat VALK B ES',
+        homeTeam: 'SB Vantaa Orange',
+        awayTeam: 'Westend Indians Yellow',
+        isHome: false,
+        startTime: '2026-09-13T13:00:00.000Z',
+        venueName: 'Tuusulan Salibandyhalli kenttä 2',
+        status: 'upcoming',
+        fetchedAt: new Date().toISOString(),
+        matchId: '949661'
+      }
+    ];
+    const calendar: MatchdayEvent[] = [
+      {
+        id: 'nh-turnaus',
+        profileId: 'p-s',
+        sport: 'floorball',
+        eventType: 'tournament',
+        isTraining: false,
+        title: 'Westend Indians P14: Turnaus Yellow',
+        homeTeam: 'Westend Indians Yellow',
+        awayTeam: '',
+        isHomeMatch: false,
+        startTime: '2026-09-13T12:00:00.000Z',
+        endTime: '2026-09-13T16:00:00.000Z',
+        warmupTime: '2026-09-13T11:15:00.000Z',
+        venue: {
+          name: 'Tuusulan Salibandyhalli, Kilpailukuja 4, Tuusula',
+          normalizedName: 'tuusulan salibandyhalli',
+          coordinates: { lat: 60.4042, lng: 25.0275 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      }
+    ];
+    const res = reconcileCalendarWithOfficial(calendar, official).get('nh-turnaus');
+    expect(res?.status).toBe('auto_matched');
+    expect(res?.officialFixture?.matchId).toBe('949661');
   });
 });
 
