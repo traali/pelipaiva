@@ -63,3 +63,4 @@ scratch/
 # Cloudflare Wrangler
 .wrangler/
 .agent/visitations/neighbors-*.json
+.ua/intermediate/

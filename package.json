@@ -18,7 +18,8 @@
     "db:inspect": "npx tsx scripts/db-inspector.ts",
     "visit": "node scripts/monastery-visitor.mjs",
     "preview": "vite preview",
-    "check:neighbors": "node scripts/check-neighbors.mjs"
+    "check:neighbors": "node scripts/check-neighbors.mjs",
+    "understand": "node scripts/understand.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

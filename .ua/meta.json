@@ -1,0 +1,9 @@
+{
+  "tool": "federation-understand",
+  "compatibleWith": "Egonex-AI/Understand-Anything 1.0.0",
+  "generatedAt": "2026-09-12T10:44:08.366Z",
+  "repo": "pelipaiva",
+  "commit": "d80a04c7cc4b095a1031b9ef85eb141dc11b3b6b",
+  "nodeCount": 858,
+  "edgeCount": 1088
+}
