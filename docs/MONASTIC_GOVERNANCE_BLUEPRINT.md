@@ -1,390 +1,220 @@
-# The Monastic Governance Model for AI Coding Agents
-**The Definitive, All-in-One Specification & Implementation Blueprint**
-*Zero-Regression, Clean-Room Audited Agentic Software Development*
+# 🏛️ The Monastic Governance Model for AI Coding Agents
+
+[![Template Repository](https://img.shields.io/badge/GitHub-Template_Repository-blue?logo=github)](https://github.com/traali/monastic-governance/generate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js CI](https://img.shields.io/badge/Node.js-20%2B-brightgreen?logo=node.js)](https://nodejs.org/)
+[![Model Tier Routing](https://img.shields.io/badge/Model_Routing-Flash_%7C_Pro-purple)](https://github.com/traali/monastic-governance)
+[![Audited by Visitor](https://img.shields.io/badge/Audit-Clean--Room_Visitor-success)](https://github.com/traali/monastic-governance)
+
+> **A battle-tested, zero-regression governance framework for software engineered by autonomous AI coding assistants (Claude Code, Antigravity, Cursor, GitHub Copilot, Codex).**
 
 ---
 
-## Table of Contents
-1. [Why Agent Swarms Fail & The Monastic Solution](#1-why-agent-swarms-fail--the-monastic-solution)
-2. [The 4 Core Principles](#2-the-4-core-principles)
-3. [The Complete Monastic Architecture](#3-the-complete-monastic-architecture)
-4. [The 6 Accountable Offices & Model Specialization Matrix](#4-the-6-accountable-offices--model-specialization-matrix)
-5. [File 1: `AGENTS.md` (The Supreme Rule Template)](#5-file-1-agentsmd-the-supreme-rule-template)
-6. [File 2: `ROLL.md` (The Append-Only Chronicle Template)](#6-file-2-rollmd-the-append-only-chronicle-template)
-7. [File 3: `.agent/workflows/chapter.md` (Session Start & Delegation)](#7-file-3-agentworkllowschaptermd-session-start--delegation)
-8. [File 4: `.agent/workflows/visitation.md` (Clean-Room Audit Protocol)](#8-file-4-agentworkflowsvisitationmd-clean-room-audit-protocol)
-9. [File 5: `.agent/workflows/rebuttal.md` (Right of Appeal Protocol)](#9-file-5-agentworkflowsrebuttalmd-right-of-appeal-protocol)
-10. [File 6: `scripts/monastery-visitor.mjs` (Automated Gate Script)](#10-file-6-scriptsmonastery-visitormjs-automated-gate-script)
-11. [File 7: `lefthook.yml` (Git Pre-Commit & Pre-Push Hook)](#11-file-7-lefthookyml-git-pre-commit--pre-push-hook)
-12. [5-Minute Quickstart: How to Initialize Any Repository](#12-5-minute-quickstart-how-to-initialize-any-repository)
-13. [How to Prompt Your AI Agent to Follow This Model](#13-how-to-prompt-your-ai-agent-to-follow-this-model)
+## ⚡ Quick Start: Adopt in 60 Seconds
+
+Click the **["Use this template"](https://github.com/traali/monastic-governance/generate)** button above, or clone this repository into your project:
+
+```bash
+# 1. Copy the core monastic structure to your codebase
+cp AGENTS.template.md /path/to/your-repo/AGENTS.md
+cp ROLL.template.md /path/to/your-repo/ROLL.md
+cp -r .agent /path/to/your-repo/
+cp -r scripts /path/to/your-repo/
+cp lefthook.yml /path/to/your-repo/
+
+# 2. Add the automated visit script to your package.json
+# "scripts": { "visit": "node scripts/monastery-visitor.mjs" }
+
+# 3. Verify the pre-visitation gate
+npm run visit
+```
+
+Then prompt your AI assistant:
+> *"This repository follows the Monastic Governance Model. Before writing any code, read `AGENTS.md` and `.agent/workflows/chapter.md`. Divide work across the accountable offices, run `npm run visit` before completion, and spawn an isolated Clean-Room Visitor subagent to audit your diff against `AGENTS.md`."*
 
 ---
 
-## 1. Why Agent Swarms Fail & The Monastic Solution
+## 📖 Table of Contents
+- [1. Why Agent Swarms Fail (and How the Monastery Solves It)](#1-why-agent-swarms-fail-and-how-the-monastery-solves-it)
+- [2. The 5 Pillars of Monastic Governance](#2-the-5-pillars-of-monastic-governance)
+- [3. What's New: Recent Additions to the Model](#3-whats-new-recent-additions-to-the-model)
+- [4. The 6 Accountable Offices & Model Matrix](#4-the-6-accountable-offices--model-matrix)
+- [5. Separation of Duties: The Clean-Room Visitor Protocol](#5-separation-of-duties-the-clean-room-visitor-protocol)
+- [6. The Multi-Repo Federation ("The General Chapter")](#6-the-multi-repo-federation-the-general-chapter)
+- [7. Complete File Reference & Templates](#7-complete-file-reference--templates)
+- [8. Real-World Case Study](#8-real-world-case-study)
 
-When AI coding assistants (Claude, Cursor, Antigravity, Copilot, Codex) work on long-lived software projects, they inevitably degrade through three failure modes:
+---
 
-| Failure Mode | Why It Happens | How the Monastery Solves It |
+## 1. Why Agent Swarms Fail (and How the Monastery Solves It)
+
+When modern AI coding agents work on long-lived projects, they inevitably suffer from three fundamental decay loops:
+
+```
+❌ The Traditional Agent Failure Loop:
+Sprawling 50KB Prompts ──> Context / Prompt Rot ──> Hallucinations & Diff Drift
+          ▲                                                   │
+          └────────── Self-Confirmation Bias ─────────────────┘
+                      (Author audits own code, excuses bugs)
+```
+
+| Failure Mode | Why It Happens | How Monastic Governance Solves It |
 |---|---|---|
-| **Context / Prompt Rot** | Prompts grow uncontrollably. Agents ignore rules buried in 50KB files. | **The Rule is hard-capped (< 1,500 words)**. All volatile facts (versions, routes) live in single-source files. |
-| **Self-Confirmation Bias** | The agent that wrote the code verifies its own code, inventing excuses for bugs. | **Separation of Duties (§11)**: The author agent NEVER audits its own code. An isolated Visitor subagent audits the diff with zero author bias. |
-| **Swarm Noise & Diff Drift** | Autonomous agents without strict domain boundaries touch unrelated files. | **6 Accountable Offices**: Every file and test is owned by a dedicated Office running on a matched model tier. |
+| **Context & Prompt Rot** | Prompts grow uncontrollably. LLMs skip rules buried in 50KB documentation. | **Hard-Capped Supreme Rule (`AGENTS.md` < 1,500 words)**. Volatile facts (versions, routes) are strictly banned and offloaded to single sources of truth. |
+| **Self-Confirmation Bias** | The agent that wrote the implementation verifies its own pull request, inventing excuses for broken edges. | **Separation of Duties (§11)**: The author agent NEVER audits its own code. An isolated **Visitor subagent** audits the diff with zero prior reasoning or author context. |
+| **Swarm Noise & Diff Drift** | Free-roaming multi-agent swarms touch unrelated files, duplicate code, and pass blame. | **6 Accountable Offices**: Every file and test is owned by a dedicated Office with a matched AI model tier. |
 
 ---
 
-## 2. The 4 Core Principles
-
-1. **Precedence:** `AGENTS.md` is the supreme project law. Native IDE tool rules (`.cursorrules`, `CLAUDE.md`) are thin one-line pointers to `AGENTS.md`.
-2. **Separation of Duties:** Writing code and auditing code are strictly decoupled across different agent contexts.
-3. **Deterministic Verification:** 100% green unit tests, 0 lint errors, and zero dynamic/fabricated date mocks are required before any merge.
-4. **Adversarial Auditing:** Zero findings is a valid outcome. The Auditor never compliments the author, never summarizes what went well, and cites exact `rule:line` for every finding.
-
----
-
-## 3. The Complete Monastic Architecture
+## 2. The 5 Pillars of Monastic Governance
 
 ```
-├── AGENTS.md                  # 1. The Supreme Rule (< 1500 words)
-├── ROLL.md                    # 2. Append-only history of decisions & dispensations
-├── package.json               # 3. Standard scripts: lint, test, build, visit
-├── lefthook.yml               # 4. Pre-commit/pre-push enforcement hooks
-├── scripts/
-│   └── monastery-visitor.mjs  # 5. Pre-visitation automated gate runner
-└── .agent/
-    ├── workflows/
-    │   ├── chapter.md         # 6. Session start & office delegation
-    │   ├── visitation.md      # 7. Clean-room audit specification
-    │   └── rebuttal.md        # 8. Ground-based appeal procedure
-    └── visitations/           # 9. Permanent audit records (<branch>-<date>.md)
+                    ┌─────────────────────────┐
+                    │        AGENTS.md        │
+                    │   The Supreme Rule      │
+                    │    (< 1,500 words)      │
+                    └────────────┬────────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         ▼                       ▼                       ▼
+┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
+│Accountable Offices│   │Pre-Visitation Gate│   │Clean-Room Visitor │
+│  Domain Ownership │   │npm run visit (CI) │   │ Adversarial Audit │
+│ Model Tier Routing│   │0 Lint, 100% Green │   │PASS / WITH / BLOCK│
+└───────────────────┘   └───────────────────┘   └───────────────────┘
 ```
 
----
-
-## 4. The 6 Accountable Offices & Model Specialization Matrix
-
-Divide all development tasks across these 6 specialized offices, allocating model tiers based on complexity:
-
-| Office | Accountable Domain & Files | Recommended AI Model Tier | Core Responsibility |
-|---|---|---|---|
-| **Cellarer** | Edge routes, Workers, serverless, KV sync, package configs, CI | `pro` (crypto/auth) or `flash` (configs) | Zero hardcoded secrets, 64KB payload limits, optimistic locking (`If-Match`), CORS |
-| **Scriptorium** | Parsers (ICS, JSON, XML, OCR), NLP message extractors, external APIs | `pro` (complex parsers) or `flash` (regex) | Deterministic parsing, zero date/venue fabrication, fail closed on broken inputs |
-| **Prior** | Core domain state, IndexedDB/Postgres, conflict reasoning, transit math | `pro` / `inherit` | Concurrency safety, table indexing, eliminating false alarms/overlaps |
-| **Master of Works** | UI components, design tokens, styling, responsiveness, accessibility | `inherit` / `pro` (layout) or `flash` (CSS) | 44px touch targets (`touch-target`), 60fps scrolling, fluid typography, no text clipping |
-| **Sacrist** | Unit test suites, mock fixtures, E2E browser tests | `flash` (fast runs) or `pro` (adversarial suites) | 100% test green gate, deterministic mock fixtures, test speed (< 5s) |
-| **Visitor** | Clean-room adversarial audit against `AGENTS.md` (never writes code) | `pro` / `inherit` (strict reasoning) | Independent audit report, zero compliments, exact rule & line citations |
+1. **Constitutional Precedence:** `AGENTS.md` is the supreme law. Tool configs (`.cursorrules`, `CLAUDE.md`, IDE instructions) are thin pointers to `AGENTS.md`.
+2. **Separation of Duties:** The author who wrote a change never audits it. Verification is performed by a fresh, clean-room Visitor subagent.
+3. **Accountable Offices:** Tasks are cleanly divided across dedicated domains (Edge, Parsers, State, UI, Tests, Audit).
+4. **Deterministic Pre-Conditions:** The Visitor only inspects a clean tree (`npm run visit` passing: 0 lint errors, 100% green tests, strict typecheck).
+5. **Continuous Chronicle:** All decisions, dispensations, and audit verdicts are permanently recorded in an append-only `ROLL.md`.
 
 ---
 
-## 5. File 1: `AGENTS.md` (The Supreme Rule Template)
+## 3. What's New: Recent Additions to the Model
 
-Save this file as `AGENTS.md` in your repository root. Keep the word count **under 1,500 words**.
+The Monastic Model has evolved with state-of-the-art agentic engineering:
 
-```markdown
-# AGENTS.md — The Rule of [Your Project Name]
+### 🌟 1. Multi-Repo Federation ("The General Chapter")
+When a system expands beyond a single repository, the architecture scales into a **Federation of Monasteries**:
+- **Sovereign Monasteries:** Individual repos with their own internal Rule (`AGENTS.md`), local offices, and tests.
+- **The General Chapter Repository:** A central governance repo containing:
+  - **The Canons (`contracts/index.ts`):** Shared domain types and contract boundaries.
+  - **The Global Roll (`GLOBAL_ROLL.md`):** Cross-monastery architectural decisions.
+  - **Supreme Golden Test Suite:** Outside-in, black-box integration tests verifying user journeys across repositories without blowing up local LLM context limits (< 1,500 words per repo).
 
-The canonical, tool-agnostic rule for all AI agents and contributors working in this repository.
+### 🌟 2. CI-Enforced Visitation Gate (`.github/workflows/monastic-visit.yml`)
+Automated enforcement runs in cloud CI on every Pull Request:
+- **Word Count Enforcement:** Automatically fails CI if `AGENTS.md` exceeds 1,500 words.
+- **Static Linter & Typecheck Gate:** Zero errors required.
+- **Deterministic Test Suite:** 100% green tests required before human or Visitor review.
 
----
+### 🌟 3. Model Tier Routing Matrix
+Different offices require different reasoning capabilities. Matching model tiers prevents budget waste while maintaining elite reasoning quality:
+- **`flash` / `flash_lite`:** Fast regex checks, mock fixtures, formatting, test runs.
+- **`pro` / `inherit`:** Architectural state machines, concurrency handling, and clean-room adversarial audits.
 
-## §0 Precedence
-1. `AGENTS.md` (this file) is the supreme project rule.
-2. Native tool configs (`CLAUDE.md`, `.cursorrules`, etc.) are thin pointers to this file and must contain no independent rules.
-3. In conflicts between code comments and `AGENTS.md`, `AGENTS.md` wins.
+### 🌟 4. Formalized Fault Attribution (`house` vs `RULE`)
+Every audit finding is classified into one of two faults:
+- `house`: Code violated the Rule. The author fixes the code.
+- `RULE`: Code is valid, but the Rule is obsolete, contradictory, or impractical. The author files a **Ground-4 Rebuttal**, amends `AGENTS.md`, and logs a dispensation in `ROLL.md`.
 
----
-
-## §1 Identity & Architecture
-- [Briefly state what your app does].
-- **Core Architecture:** [e.g. Offline-first IndexedDB, Client-Side Compute, Edge API Proxy, Zero-Auth Sync].
-
----
-
-## §2 Stack & Invariants
-| Use | Never |
-|---|---|
-| Strict TypeScript (no `any` types) | Ad-hoc `any` casting, untyped dynamic objects |
-| Accessible UI primitives + Design Tokens | Unstyled raw primitives, ad-hoc inline styles |
-| Indexed database persistence for domain data | Direct un-indexed localStorage for core state |
-| Vitest / Jest for automated tests | Untested parser regex or date manipulation |
-| Zero-Secret Commitment | Hardcoded API keys, tokens, or environment secrets |
+### 🌟 5. Dynamic Office Chartering
+When a new technical domain arises (e.g. Weather Radar, Local on-device LLMs, WhatsApp bots), the Archon dynamically charters a specialized Office via `define_subagent` rather than bloating existing agents.
 
 ---
 
-## §3 Testing & Quality Gates
-- **Unit & Integration:** All parsers, date calculations, and business logic must have deterministic test fixtures.
-- **Pre-visitation Gate:** Run `npm run visit` before any commit.
-- **Definition of Done:**
-  1. `npm run lint` reports 0 errors.
-  2. `npm run test` passes with 100% green tests.
-  3. `npm run build` compiles production bundle without warnings.
+## 4. The 6 Accountable Offices & Model Matrix
+
+| Office | Subagent Name | Accountable Domain | Recommended Model Tier | Key Responsibilities |
+|---|---|---|---|---|
+| **Cellarer** | `cellarer_office` | Edge proxy, Cloudflare Workers, serverless, KV sync, package configs | `pro` (crypto/auth) or `flash` (configs) | Zero hardcoded secrets, 64KB payload limits, optimistic locking (`If-Match`), CORS headers |
+| **Scriptorium** | `scriptorium_office` | Parsers (ICS, JSON, XML, OCR), NLP message extractors, external APIs | `pro` (complex parsers) or `flash` (regex) | Deterministic parsing, zero date/venue fabrication, fail closed on broken inputs |
+| **Prior** | `prior_office` | Core domain state, IndexedDB/Postgres, conflict reasoning, transit math | `pro` / `inherit` | Concurrency safety, table indexing, eliminating false alarms/overlaps |
+| **Master of Works** | `works_office` | UI components, design tokens, styling, responsiveness, accessibility | `inherit` / `pro` (layout) or `flash` (CSS) | 44px touch targets (`touch-target`), 60fps scrolling, fluid typography, no text clipping |
+| **Sacrist** | `sacrist_office` | Unit test suites, mock fixtures, E2E browser tests | `flash` (fast runs) or `pro` (adversarial suites) | 100% test green gate, deterministic mock fixtures, test speed (< 5s) |
+| **Visitor** | `visitor_office` | Clean-room adversarial audit against `AGENTS.md` (never writes code) | `pro` / `inherit` (strict reasoning) | Independent audit report, zero compliments, exact rule & line citations |
 
 ---
 
-## §4 Security & Hardening
-- **Zero Secrets:** Never commit credentials, private keys, or API tokens.
-- **Input Sanitization:** All external feeds, freeform user inputs, and uploaded files must be sanitized defensively.
-- **Payload Limits:** Strict size bounds on all incoming network requests.
+## 5. Separation of Duties: The Clean-Room Visitor Protocol
+
+When an author agent finishes implementing code, it **MUST NOT** approve its own work. Instead, it spawns an isolated Visitor subagent with:
+1. `AGENTS.md` (The Rule)
+2. The `git diff` against base branch
+3. The test results
+4. **Zero conversation history or author reasoning.**
+
+### The Adversarial Audit Directive:
+> *"Be adversarial. Zero findings is a valid and expected outcome. Do NOT invent findings to appear thorough. Do NOT summarize what went well. Do NOT compliment the author. Cite exact rule section (§N) and file:line for every finding."*
+
+### Verdicts:
+- **`PASS`**: 0 blocking findings, 0 advisory findings. Merge ready.
+- **`PASS WITH FINDINGS`**: 0 blocking findings, advisory findings logged in `DEBT.md` with owner and deadline.
+- **`BLOCK`**: 1+ blocking findings (security vulnerability, data loss, contract breach). Cannot merge.
 
 ---
 
-## §5 Design & Usability
-- **Mobile-First:** Target 360px–430px viewports first; adapt cleanly to desktop.
-- **Touch Targets:** All interactive buttons and triggers must have minimum 44px height (`min-h-[44px]` / `touch-target`).
-- **Fluid Typography:** Responsive text scaling without manual breakpoint jumps.
+## 6. The Multi-Repo Federation ("The General Chapter")
 
----
+For large-scale architectures spanning multiple microservices, applications, or edge workers:
 
-## §6 Visitation (Separation of Duties)
-- The agent or author who wrote a change does NOT perform its final audit.
-- An independent **Visitor subagent** receives only: `AGENTS.md`, the git diff, and the test results (no conversation history).
-- **Verdicts:** `PASS` · `PASS WITH FINDINGS` · `BLOCK`
-- **Finding Classes:**
-  - `blocking`: Security vulnerability, data loss, contract breach. Must fix before merge.
-  - `advisory`: Rule violation without data loss. Must fix or log in `DEBT.md`.
-- **Fault Attribution:**
-  - `house`: Code violates the Rule. Fix code.
-  - `RULE`: The Rule is impractical or obsolete. Propose an amendment in `ROLL.md`.
-
----
-
-## §7 Volatile Facts (Not in this file)
-Do NOT put volatile facts in `AGENTS.md`. Single sources of truth:
-- Library versions: `package.json`
-- Recent history: `CHANGELOG.md` and git log
-- Architecture decisions: `docs/` and `ROLL.md`
+```
+                      ┌─────────────────────────────────┐
+                      │    CENTRAL GOVERNANCE REPO      │
+                      │  traali/sports-federation       │
+                      │                                 │
+                      │  • The Canons (contracts/index) │
+                      │  • The Global Roll (GLOBAL_ROLL)│
+                      │  • Supreme Golden Test Suite    │
+                      └────────────────┬────────────────┘
+                                       │ Enforces Contract Invariants
+         ┌─────────────────────────────┼─────────────────────────────┐
+         ▼                             ▼                             ▼
+┌──────────────────┐          ┌──────────────────┐          ┌──────────────────┐
+│   MONASTERY 1    │          │   MONASTERY 2    │          │   MONASTERY 3    │
+│    pelipaiva     │          │  football-stats  │          │     Parkkis      │
+│                  │          │                  │          │                  │
+│ • Local AGENTS.md│          │ • Local AGENTS.md│          │ • Local AGENTS.md│
+│ • Local Offices  │          │ • Local Offices  │          │ • Local Offices  │
+│ • Context <1.5k  │          │ • Context <1.5k  │          │ • Context <1.5k  │
+└──────────────────┘          └──────────────────┘          └──────────────────┘
 ```
 
----
-
-## 6. File 2: `ROLL.md` (The Append-Only Chronicle Template)
-
-Save this file as `ROLL.md` in the repository root:
-
-```markdown
-# ROLL.md — The Chronicle of the Monastery
-
-Append-only record of architectural decisions, dispensations, rule amendments, and visitation verdicts.
+Each sovereign monastery keeps its LLM context tight and focused (< 1,500 words), while the central Federation repository guarantees system-wide contract integrity.
 
 ---
 
-## 2026-09-02 — Initial Monastic Foundation
-- **Actor:** Archon
-- **Action:** Established AGENTS.md, .agent/workflows, and automated pre-visitation gate.
-- **Rationale:** Eliminate prompt rot and enforce clean-room adversarial auditing.
+## 7. Complete File Reference & Templates
+
+All ready-to-use templates are included in this repository:
+
+| File | Purpose | Location |
+|---|---|---|
+| **The Rule Template** | Canonical project rule (< 1,500 words) | [`templates/AGENTS.template.md`](templates/AGENTS.template.md) |
+| **Chronicle Template** | Append-only decision log | [`templates/ROLL.template.md`](templates/ROLL.template.md) |
+| **Chapter Rite** | Session start & delegation workflow | [`.agent/workflows/chapter.md`](.agent/workflows/chapter.md) |
+| **Visitation Workflow** | Clean-room adversarial audit instructions | [`.agent/workflows/visitation.md`](.agent/workflows/visitation.md) |
+| **Rebuttal Workflow** | Right of appeal & 4 grounds | [`.agent/workflows/rebuttal.md`](.agent/workflows/rebuttal.md) |
+| **Pre-Visitation Gate** | Automated Node.js verification script | [`scripts/monastery-visitor.mjs`](scripts/monastery-visitor.mjs) |
+| **CI Gate Workflow** | GitHub Actions cloud workflow | [`.github/workflows/monastic-visit.yml`](.github/workflows/monastic-visit.yml) |
+| **Git Hook Config** | Lefthook pre-commit/pre-push hooks | [`lefthook.yml`](lefthook.yml) |
 
 ---
 
-## Format for New Entries:
-```markdown
-## YYYY-MM-DD — <Title of Change>
-- **Office / Author:** <Office Name>
-- **Base / Commit:** <sha>
-- **Verdict:** PASS | PASS WITH FINDINGS | BLOCK
-- **Summary:** <1-2 sentences on what was decided or changed>
-```
-```
+## 8. Real-World Case Study
+
+The Monastic Governance Model was developed and battle-tested in **[Pelipäivä](https://github.com/traali/pelipaiva)**, a production offline-first junior sports PWA serving Finnish families:
+- **57 test files, 509/509 deterministic tests passing (100% green)**
+- **Zero ESLint errors & 0 TS errors**
+- **Clean-room visitation audits** caught subtle issues (untested CSV parsers, DST timezone edge cases, missing touch targets) before code reached production.
+- Scaled smoothly across a **6-monastery multi-repo federation** (`pelipaiva`, `football-stats`, `Parkkis`, `volleyball-stats`, `basketball-stats`, `weather-stats`) governed by `sports-federation`.
 
 ---
 
-## 7. File 3: `.agent/workflows/chapter.md` (Session Start & Delegation)
+## 🤝 Contributing & License
 
-Save this file as `.agent/workflows/chapter.md`:
-
-```markdown
-# Workflow: Chapter (Session Opening Rite)
-
-The opening rite for any agent session. Takes ~10 seconds.
-
-## Steps
-1. **Read `AGENTS.md`**: Verify non-negotiables, stack rules, and testing requirements.
-2. **Read the tail of `ROLL.md`**: Review the last ~10 entries to understand recent decisions and dead ends.
-3. **Read the Task**: Understand the user request or feature spec.
-4. **Select Accountable Office & Model Tier**:
-   - `cellarer_office`: Edge routes, KV sync, package configs (`pro`/`flash`)
-   - `scriptorium_office`: Parsers, external feeds, NLP extractors (`pro`/`flash`)
-   - `prior_office`: Core domain state, databases, conflict engine (`pro`)
-   - `works_office`: UI components, styling, responsiveness (`inherit`/`flash`)
-   - `sacrist_office`: Test suites, mock fixtures (`flash`)
-   - `visitor_office`: Clean-room adversarial audit (`pro`/`inherit`)
-5. **Plan Before Execution**: Formulate a concise plan. For major changes, write an implementation plan.
-```
-
----
-
-## 8. File 4: `.agent/workflows/visitation.md` (Clean-Room Audit Protocol)
-
-Save this file as `.agent/workflows/visitation.md`:
-
-```markdown
-# Workflow: Visitation (Independent Clean-Room Audit)
-
-The outside inspection mechanism. Executed in an isolated subagent context with NO conversation history from the author.
-
-## Preconditions
-- [ ] Working tree committed or ready for audit.
-- [ ] `npm run visit` passes: 0 lint errors, 100% green tests.
-
-## Prompt to the Visitor Subagent
-```
-You are the outside Visitor conducting an independent audit of branch <branch> against AGENTS.md.
-You did not write this code.
-
-Your context is: AGENTS.md, the git diff against base <base-sha>, and the test results.
-Nothing else — no author reasoning, no conversation history.
-
-Instructions:
-1. Read AGENTS.md in full before inspecting the diff.
-2. For every finding, cite the exact rule section (§N) and file:line that violates it.
-3. Classify each finding as `blocking` or `advisory`.
-4. Assign fault: `house` (code issue) or `RULE` (rule is wrong).
-5. Zero findings is a valid and expected outcome. Do not invent findings.
-   Do not summarize what went well. Do not compliment the author.
-6. Write your report to .agent/visitations/<branch>-<date>.md and report verdict: PASS | PASS WITH FINDINGS | BLOCK.
-```
-
-## Report Template (`.agent/visitations/<branch>-<date>.md`)
-```markdown
-# Visitation: <feature> — <date>
-Visitor: Outside-Visitor · Implementer: Unknown · Base: <base-sha>
-
-## Verdict
-PASS | PASS WITH FINDINGS | BLOCK
-
-## Findings
-| # | Class | Fault | Rule § | Location | Claim |
-|---|---|---|---|---|---|
-| F1 | blocking | house | §2 | src/api.ts:42 | Missing input sanitization on freeform input |
-
-*(If no findings, write "No findings.")*
-
-## Areas Checked
-- List of criteria and files inspected.
-```
-```
-
----
-
-## 9. File 5: `.agent/workflows/rebuttal.md` (Right of Appeal Protocol)
-
-Save this file as `.agent/workflows/rebuttal.md`:
-
-```markdown
-# Workflow: Rebuttal (Right of Appeal)
-
-The author may rebut any finding from a Visitation. This prevents false positives and improves rules over time.
-
-## 4 Valid Grounds for Rebuttal:
-1. **Ground 1 (Misread):** Visitor's factual claim about the code is incorrect. (Visitor re-reads cited lines).
-2. **Ground 2 (Out of Scope):** Pre-existing bug, not introduced by this diff. (Add to `DEBT.md` and proceed).
-3. **Ground 4 (Rule Wrong):** Code is valid, but the rule in `AGENTS.md` is outdated or contradictory. (Author amends `AGENTS.md`, logs in `ROLL.md`, finding falls).
-4. **Ground 5 (Deferred):** Valid advisory finding, deferred to `DEBT.md` with owner and deadline.
-```
-
----
-
-## 10. File 6: `scripts/monastery-visitor.mjs` (Automated Gate Script)
-
-Save this script as `scripts/monastery-visitor.mjs`:
-
-```javascript
-import { execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-
-console.log('🏛️  [MONASTERY] Initiating Pre-Visitation Protocol...\n');
-
-// 1. Check Rule Word Count Cap (< 1500 words)
-if (existsSync('AGENTS.md')) {
-  const content = readFileSync('AGENTS.md', 'utf8');
-  const wordCount = content.trim().split(/\s+/).length;
-  console.log(`📜 The Rule: AGENTS.md (${wordCount} words / 1500 cap)`);
-  if (wordCount > 1500) {
-    console.error(`❌ AGENTS.md exceeds 1500 words (${wordCount} words)! Prune volatile facts.`);
-    process.exit(1);
-  }
-} else {
-  console.error('❌ AGENTS.md not found in root!');
-  process.exit(1);
-}
-
-// 2. Static Lint Check
-console.log('🔍 Running static lint check (eslint)...');
-try {
-  execSync('npm run lint', { stdio: 'inherit' });
-  console.log('✅ Lint check passed (0 errors).\n');
-} catch (e) {
-  console.error('❌ Lint check failed.');
-  process.exit(1);
-}
-
-// 3. Automated Test Suite Check
-console.log('🧪 Running Vitest unit & integration test suite...');
-try {
-  execSync('npm run test', { stdio: 'inherit' });
-  console.log('✅ Test suite passed (100% green).\n');
-} catch (e) {
-  console.error('❌ Test suite failed.');
-  process.exit(1);
-}
-
-console.log('================================================================');
-console.log('✨ [MONASTERY] Pre-conditions met! Ready for Clean-Room Visitor.');
-console.log('================================================================\n');
-```
-
-Add this script to your `package.json`:
-```json
-{
-  "scripts": {
-    "visit": "node scripts/monastery-visitor.mjs"
-  }
-}
-```
-
----
-
-## 11. File 7: `lefthook.yml` (Git Pre-Commit & Pre-Push Hook)
-
-Save this file as `lefthook.yml` in your project root to enforce rules at the Git level:
-
-```yaml
-pre-commit:
-  parallel: false
-  commands:
-    eslint:
-      glob: "*.{js,ts,jsx,tsx}"
-      run: npx eslint {staged_files}
-    oxlint:
-      glob: "*.{js,ts,jsx,tsx}"
-      run: npx oxlint {staged_files}
-
-pre-push:
-  parallel: false
-  commands:
-    monastery-visit:
-      run: npm run visit
-```
-
----
-
-## 12. 5-Minute Quickstart: How to Initialize Any Repository
-
-1. **Copy `AGENTS.md`** to your repository root and update §1 (Identity) and §2 (Stack).
-2. **Create the directories**:
-   ```bash
-   mkdir -p .agent/workflows .agent/visitations scripts
-   ```
-3. **Copy the workflow files** (`chapter.md`, `visitation.md`, `rebuttal.md`) into `.agent/workflows/`.
-4. **Copy `monastery-visitor.mjs`** into `scripts/` and add `"visit": "node scripts/monastery-visitor.mjs"` to `package.json`.
-5. **Install Lefthook** (or Husky) to run `npm run visit` on `pre-push`:
-   ```bash
-   npx lefthook install
-   ```
-
----
-
-## 13. How to Prompt Your AI Agent to Follow This Model
-
-When starting a conversation with any AI agent (Claude, Cursor, Antigravity, Copilot), paste this instruction prompt:
-
-> **"This repository follows the Monastic Governance Model. Before writing any code, open and read `AGENTS.md` and `.agent/workflows/chapter.md`. Divide your work across the 6 accountable offices, run `npm run visit` before finishing, and spawn an isolated Clean-Room Visitor subagent to audit your diff against `AGENTS.md` before declaring completion."**
+Contributions, amendments, and case studies are welcome!
+- License: [MIT](LICENSE)
+- Creator: **[Arto Oinonen](https://github.com/traali)**
