@@ -172,17 +172,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     }
   };
 
-  const matchSportIcon =
-    event.sport === 'volleyball'
-      ? '🏐'
-      : event.sport === 'basketball'
-      ? '🏀'
-      : event.sport === 'floorball'
-      ? '🏑'
-      : event.sport === 'icehockey'
-      ? '🏒'
-      : '⚽';
-
   const handleShareWhatsApp = () => {
     if (event.briefing?.postMatchWhatsAppTemplate) {
       const text = encodeURIComponent(event.briefing.postMatchWhatsAppTemplate);
