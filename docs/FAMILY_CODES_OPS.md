@@ -14,10 +14,10 @@ Secret name: `FAMILY_CODES`
 | Fact | Detail |
 | --- | --- |
 | Codes are optional for users | Pelipäivä works fully on one phone with no code (Dexie only). |
-| Codes are not optional for the Worker | Empty or unknown code → **403** `unknown_family`. Fail closed. |
-| Ten slots | Comma-separated Crockford-32 values in one secret. Max storage = 10 KV keys. |
-| Possession = membership | Anyone with a live code can GET/PUT that family’s roster. |
-| Client cannot mint | There is no “Luo perhe-koodi”. Join or `?perhe=`. |
+| Codes are not optional for the Worker | **Empty `FAMILY_CODES`:** first parent PUT of a valid Crockford code claims a slot (max 10). GET of an unclaimed code is 404 so the phone can upload. **Secret set:** unknown code → 403 `unknown_family`. Already-claimed KV rows stay reachable. |
+| Ten slots | Claimed `family:` keys, or comma-separated values in `FAMILY_CODES`. Max 10. |
+| Possession = membership | Anyone with a live (claimed or issued) code can GET/PUT that family’s roster. |
+| Client cannot mint a new alphabet | Join or `?perhe=`. First phone **sends the code back** (PUT roster) and that activates the slot when the secret is empty. |
 | GitHub cannot mint | Alphabet and regex are public. The **issued list is not**. |
 
 Format: `XXXXX-X`  
@@ -28,7 +28,11 @@ Regex (client + Worker): `^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$`
 
 ## 1. First-time setup (unlock family sync)
 
-Until this secret exists, every `/api/family/:code` call is 403. Local PWA still works.
+**Empty secret (default):** open [https://pelipaiva.pages.dev/?perhe=YOUR-CODE](https://pelipaiva.pages.dev/?perhe=YOUR-CODE) on the phone that already has the kids/teams. GET returns 404, the PWA PUTs the roster, the slot is claimed. Other phones can then join.
+
+**Lock to a list:** set `FAMILY_CODES` (dashboard or `wrangler secret put`). Unknown codes 403 again.
+
+Until a slot is claimed, `GET /api/family/:code` is 404 (`not_found`) when the secret is empty, or 403 (`unknown_family`) when the secret is set and the code is missing.
 
 ### Dashboard (preferred)
 

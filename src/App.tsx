@@ -169,6 +169,8 @@ export const App: React.FC = () => {
             const msg =
               res.error === 'unknown_family'
                 ? 'Koodi ei ole voimassa. Tarkista koodi perheeltä.'
+                : res.error === 'family_slots_full'
+                ? 'Perhepaikat täynnä (max 10). Pyydä operaattoria vapauttamaan paikka.'
                 : res.error === 'rate_limited'
                 ? 'Liian monta yritystä — odota hetki ja yritä uudelleen.'
                 : 'Verkkovirhe — tarkista yhteys ja yritä uudelleen.';

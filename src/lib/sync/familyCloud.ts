@@ -113,7 +113,12 @@ export async function pushFamilyRoster(
     }
 
     if (res.status === 403) {
-      return { success: false, error: 'unknown_family' };
+      const errJson = await res.json().catch(() => ({}));
+      const codeErr = (errJson as { error?: string }).error;
+      return {
+        success: false,
+        error: codeErr === 'family_slots_full' ? 'family_slots_full' : 'unknown_family'
+      };
     }
 
     if (!res.ok) {

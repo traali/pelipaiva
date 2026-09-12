@@ -116,11 +116,11 @@ pendingUpload: boolean   // offline queue flag (keep 2.6)
 
 Display: `XXXXX-X` (Crockford-32, no I/L/O/U).
 
-**Issued slots:** 10 codes live only in the Cloudflare Worker secret `FAMILY_CODES`. They are not in this repo, not in the PWA bundle, and the app cannot mint new ones.
+**Issued slots:** optional Worker secret `FAMILY_CODES`. Empty secret = first parent PUT claims a slot (max 10). Codes are not in this repo or the PWA bundle.
 
-- Worker: code not in the secret → 403 `unknown_family` (fail closed if the secret is empty)
-- Client: join-only. No “Luo perhe-koodi”.
-- Deep link: `https://pelipaiva.pages.dev/?perhe={issued-code}`
+- Worker: empty secret → GET unclaimed 404, PUT claims (cap 10). Secret set + unknown → 403 `unknown_family`.
+- Client: join-only. No “Luo perhe-koodi”. First phone sends the existing code back via PUT.
+- Deep link: `https://pelipaiva.pages.dev/?perhe={code}`
 
 Possession of an issued code = membership. Do not commit values.
 

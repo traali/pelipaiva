@@ -1,6 +1,6 @@
 export interface Env {
   MATCHDAY_KV: KVNamespace;
-  /** Comma-separated issued Crockford codes. Empty = no family slots. Never commit values. */
+  /** Comma-separated issued Crockford codes. Empty = first-PUT claim (max FAMILY_SLOT_CAP). Never commit values. */
   FAMILY_CODES?: string;
 }
 
@@ -65,6 +65,53 @@ async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
     if (codeRegex.test(code)) set.add(code);
   }
   return set;
+}
+
+const FAMILY_CODE_REGEX = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
+/** Max claimed `family:` KV slots when FAMILY_CODES is empty (first-PUT claim). */
+const FAMILY_SLOT_CAP = 10;
+
+async function countClaimedFamilies(kv: KVNamespace): Promise<number> {
+  const listed = await kv.list({ prefix: 'family:' });
+  return listed.keys.filter((k) => FAMILY_CODE_REGEX.test(k.name.slice('family:'.length))).length;
+}
+
+/**
+ * Empty FAMILY_CODES → first parent PUT claims the slot (cap 10).
+ * Set FAMILY_CODES → only those codes (fail closed).
+ * Already-claimed KV rows stay reachable so a phone can keep syncing.
+ * Returns a Response to send, or null if the request may proceed.
+ */
+async function denyUnknownFamily(
+  env: Env,
+  code: string,
+  method: string,
+  corsHeaders: Record<string, string>
+): Promise<Response | null> {
+  const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
+  if (issued.has(code)) return null;
+
+  const existing = await env.MATCHDAY_KV.get(`family:${code}`);
+  if (existing) return null;
+
+  if (issued.size > 0) {
+    return new Response(JSON.stringify({ error: 'unknown_family' }), {
+      status: 403,
+      headers: corsHeaders
+    });
+  }
+
+  if (method === 'PUT') {
+    const n = await countClaimedFamilies(env.MATCHDAY_KV);
+    if (n >= FAMILY_SLOT_CAP) {
+      return new Response(JSON.stringify({ error: 'family_slots_full' }), {
+        status: 403,
+        headers: corsHeaders
+      });
+    }
+  }
+
+  return null;
 }
 
 const FAMILY_RATE_WINDOW_SEC = 900;
@@ -285,8 +332,7 @@ export default {
         : rawCode;
 
       // Keep in sync with src/lib/sync/familyCode.ts FAMILY_CODE_REGEX (Crockford-32, no I/L/O/U)
-      const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
-      if (!codeRegex.test(code)) {
+      if (!FAMILY_CODE_REGEX.test(code)) {
         return new Response(JSON.stringify({ error: 'invalid_code_format' }), {
           status: 400,
           headers: corsHeaders
@@ -296,13 +342,8 @@ export default {
       const limited = await rateLimitFamily(request, request.method, corsHeaders);
       if (limited) return limited;
 
-      const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
-      if (issued.size === 0 || !issued.has(code)) {
-        return new Response(JSON.stringify({ error: 'unknown_family' }), {
-          status: 403,
-          headers: corsHeaders
-        });
-      }
+      const denied = await denyUnknownFamily(env, code, request.method, corsHeaders);
+      if (denied) return denied;
 
       // ---------------------------------------------------------------
       // /api/family/:code/events — Manual freeform family event sync
@@ -591,16 +632,16 @@ export default {
         ? `${cleanCode.slice(0, 5)}-${cleanCode.slice(5)}`
         : cleanCode;
 
-      const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
-      if (!codeRegex.test(familyCode)) {
+      if (!FAMILY_CODE_REGEX.test(familyCode)) {
         return new Response(JSON.stringify({ error: 'invalid_family_code' }), {
           status: 400,
           headers: corsHeaders
         });
       }
 
-      const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
-      if (issued.size > 0 && !issued.has(familyCode)) {
+      const issuedCal = await parseIssuedFamilyCodes(env.FAMILY_CODES);
+      const claimedCal = await env.MATCHDAY_KV.get(`family:${familyCode}`);
+      if (issuedCal.size > 0 && !issuedCal.has(familyCode) && !claimedCal) {
         return new Response(JSON.stringify({ error: 'unknown_family' }), {
           status: 403,
           headers: corsHeaders
@@ -609,7 +650,7 @@ export default {
 
       // Read family roster from KV
       const kvKey = `family:${familyCode}`;
-      const existingStr = await env.MATCHDAY_KV.get(kvKey);
+      const existingStr = claimedCal;
       let roster: FamilyRosterV1 | null = null;
       if (existingStr) {
         try {

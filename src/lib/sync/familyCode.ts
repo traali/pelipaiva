@@ -1,7 +1,7 @@
 /** Crockford-32 without I, L, O, U. Must match cloudflare-worker/worker.ts. */
 export const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-/** Display form XXXXX-C. Issued slots live in the Worker secret FAMILY_CODES, not in this repo. */
+/** Display form XXXXX-C. Optional Worker secret FAMILY_CODES locks the list; empty secret = first-PUT claim. */
 export const FAMILY_CODE_REGEX = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
 
 export function normalizeFamilyCode(code: string): string {

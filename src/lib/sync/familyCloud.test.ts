@@ -42,6 +42,10 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).toContain('PUT: 5');
     expect(workerSrc).toContain('FAMILY_CODES');
     expect(workerSrc).toContain('unknown_family');
+    expect(workerSrc).toContain('FAMILY_SLOT_CAP');
+    expect(workerSrc).toContain('family_slots_full');
+    expect(workerSrc).toContain('denyUnknownFamily');
+    expect(workerSrc).not.toMatch(/if \(issued\.size === 0 \|\| !issued\.has\(code\)\)/);
     expect(workerSrc).toContain('isAllowedProxyTarget');
     expect(workerSrc).toContain('api.lipas.fi');
     expect(workerSrc).toContain('collectRosterIcsEvents');
@@ -52,7 +56,7 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).not.toMatch(/FAMILY_CODES\s*=\s*['\"][0-9A-HJKMNP-TV-Z]{5}-/);
   });
 
-  it('allowlist is fail-closed and does not live in the client', () => {
+  it('allowlist is fail-closed when set and does not live in the client', () => {
     expect(parseFamilyAllowlist(undefined).size).toBe(0);
     expect(parseFamilyAllowlist('').size).toBe(0);
     const issued = parseFamilyAllowlist('AAAAA-1, BBBBB-2\nCCCCC-3');
