@@ -14,7 +14,7 @@
  */
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -53,6 +53,29 @@ async function getText(url, headers = {}, timeout = TIMEOUT_MS) {
   } finally {
     clearTimeout(t)
   }
+}
+
+async function getGithubFile(repoName, branch, filePath) {
+  // Prefer GitHub API (not CDN-cached). CI has GITHUB_TOKEN; local has `gh`.
+  const api = `https://api.github.com/repos/traali/${repoName}/contents/${filePath}?ref=${branch}`
+  const headers = { Accept: 'application/vnd.github.raw+json' }
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+  if (token) headers.Authorization = `Bearer ${token}`
+  const apiRes = await getText(api, headers)
+  if (apiRes.ok && apiRes.body.includes('interface')) return apiRes
+
+  try {
+    const b64 = execSync(
+      `gh api "repos/traali/${repoName}/contents/${filePath}?ref=${branch}" --jq .content`,
+      { encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    if (b64 && b64 !== 'null') {
+      const body = Buffer.from(b64.replace(/\s/g, ''), 'base64').toString('utf8')
+      if (body) return { ok: true, status: 200, body }
+    }
+  } catch { /* fall through to raw CDN */ }
+
+  return getText(`${RAW}/${repoName}/${branch}/${filePath}`)
 }
 
 function extractInterfaces(src) {
@@ -180,7 +203,7 @@ const localCanon = existsSync(join(ROOT, 'contracts/index.ts'))
 if (localCanon) canonicalSrc = readFileSync(localCanon, 'utf8')
 
 if (!canonicalSrc) {
-  const remote = await getText(graph.canonicalContracts)
+  const remote = await getGithubFile('sports-federation', 'main', 'contracts/index.ts')
   if (!remote.ok) block(`Cannot load canonical contracts (${remote.status} ${remote.error || ''})`)
   else canonicalSrc = remote.body
 }
@@ -249,7 +272,7 @@ for (const name of targets) {
     continue
   }
   const branch = n.branch || 'main'
-  const agents = await getText(`${RAW}/${name}/${branch}/AGENTS.md`)
+  const agents = await getGithubFile(name, branch, 'AGENTS.md')
   if (!agents.ok) {
     block(`Neighbor ${name} AGENTS.md unreachable (${agents.status}). House is not in line.`)
   } else {
@@ -268,7 +291,7 @@ for (const name of targets) {
         : ['src/types/contracts.ts', 'src/contracts.ts']
     let found = ''
     for (const p of paths) {
-      const r = await getText(`${RAW}/${name}/${branch}/${p}`)
+      const r = await getGithubFile(name, branch, p)
       if (r.ok) { found = r.body; break }
     }
     if (!found) {
