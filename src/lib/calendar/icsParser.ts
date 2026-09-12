@@ -340,12 +340,16 @@ export function resolveEventTimes(
   defaultWarmupOffsetMins?: number
 ): { kickoffTime: Date; warmupTime: Date; endTime: Date } {
   const text = `${title} ${description}`;
+  const isTournamentEvent = /turnaus|tournament|cup\b|memorial|pelitapahtuma|vastuuturnaus/i.test(text);
   const defaultOffset = defaultWarmupOffsetMins !== undefined
     ? defaultWarmupOffsetMins
     : (isTraining ? 15 : 45);
 
   let kickoffTime = new Date(dtStart.getTime());
-  let warmupTime = new Date(dtStart.getTime() - defaultOffset * 60 * 1000);
+  // Nimenhuuto/MyClub DTSTART for a turnaus is kokoontuminen, not first-game kickoff.
+  let warmupTime = isTournamentEvent
+    ? new Date(dtStart.getTime())
+    : new Date(dtStart.getTime() - defaultOffset * 60 * 1000);
   let endTime = new Date(dtEnd.getTime());
 
   // Look for explicit kickoff / match start times in description:
@@ -387,8 +391,9 @@ export function resolveEventTimes(
     }
   }
 
-  // Ensure warmup is strictly before kickoff
-  if (warmupTime.getTime() >= kickoffTime.getTime()) {
+  // League matches: warmup must be before kickoff. Tournaments: DTSTART is meetup;
+  // do not invent a 45 min earlier kokoontuminen.
+  if (!isTournamentEvent && warmupTime.getTime() >= kickoffTime.getTime()) {
     warmupTime = new Date(kickoffTime.getTime() - defaultOffset * 60 * 1000);
   }
 

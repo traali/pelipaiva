@@ -27,7 +27,7 @@ import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/at
 import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
-import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival } from './lib/reconciliation/reconciliationEngine';
+import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
@@ -345,6 +345,38 @@ export const App: React.FC = () => {
           if (needsUpdate) {
             await db.events.update(ev.id, updates);
           }
+        }
+
+        const healPass = await db.events.toArray();
+        for (const ev of healPass) {
+          const patch: Partial<MatchdayEvent> = {};
+          const lat = ev.venue?.coordinates?.lat || 0;
+          const lng = ev.venue?.coordinates?.lng || 0;
+          if (ev.venue && (ev.venue.isApproximateLocation || (lat === 0 && lng === 0)) && ev.venue.name) {
+            try {
+              const geo = await resolveSportsVenue(ev.venue.name);
+              if (geo.coordinates && (geo.coordinates.lat !== 0 || geo.coordinates.lng !== 0) && !geo.isApproximateLocation) {
+                patch.venue = { ...ev.venue, ...geo, isApproximateLocation: false };
+              }
+            } catch {
+              /* keep stored venue */
+            }
+          }
+          if (isTournamentish(ev) && !ev.officialFixtureId) {
+            const normalized = normalizeTournamentArrival({ startTime: ev.startTime, warmupTime: ev.warmupTime });
+            if (normalized.warmupTime !== ev.warmupTime) patch.warmupTime = normalized.warmupTime;
+          }
+          const officialIso = ev.mismatchFlags?.officialStartTimeIso;
+          if (officialIso && officialIso !== ev.startTime) {
+            const timed = applyOfficialKickoffKeepCalendarArrival(
+              { startTime: ev.startTime, warmupTime: ev.warmupTime, endTime: ev.endTime },
+              { startTime: officialIso }
+            );
+            patch.startTime = timed.startTime;
+            patch.warmupTime = timed.warmupTime;
+            patch.endTime = timed.endTime;
+          }
+          if (Object.keys(patch).length) await db.events.update(ev.id, patch);
         }
 
         // Reconcile and merge any unlinked calendar matches with bare official fixtures on the same day

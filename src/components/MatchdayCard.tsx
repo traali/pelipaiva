@@ -475,21 +475,23 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 KÄYNNISSÄ
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-elevated/80 border border-border-subtle text-text-primary text-xs md:text-sm font-bold font-tabular shadow-xs">
-                <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
-                <span className="text-pitch">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-pitch/15 border border-pitch/40 text-pitch shadow-xs">
+                <Clock className="w-5 h-5 shrink-0" strokeWidth={2.5} />
+                <span className="text-base md:text-lg font-black font-tabular tracking-tight">
                   {isSchool
-                    ? `🏫 Koulu alkaa klo ${formattedKickoff}`
+                    ? `Koulu ${formattedKickoff}`
                     : isOther
-                    ? `📌 Alkaa klo ${formattedKickoff}`
+                    ? `Alkaa ${formattedKickoff}`
                     : isTraining
-                    ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
+                    ? `Treeni ${formattedKickoff}`
+                    : isTournament && formattedWarmup === formattedKickoff
+                    ? `Kokoontuminen ${formattedKickoff}`
                     : isTournament
-                    ? `🏆 Turnaus alkaa klo ${formattedKickoff}`
-                    : `${matchSportIcon} Ottelu alkaa klo ${formattedKickoff}`}
+                    ? `1. peli ${formattedKickoff}`
+                    : `Ottelu ${formattedKickoff}`}
                 </span>
                 {formattedWarmup && formattedWarmup !== formattedKickoff && (
-                  <span className="text-[11px] font-medium text-text-secondary pl-1 border-l border-border-subtle">
+                  <span className="text-xs font-bold text-text-primary pl-2 border-l border-pitch/30">
                     Kokoontuminen {formattedWarmup}
                   </span>
                 )}
@@ -570,27 +572,50 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           )}
 
           {/* Clearly Stated Kickoff / Exercise Start Time */}
-          <div className="mt-2 mb-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-elevated/90 border border-border-strong text-text-primary shadow-xs flex-wrap">
-            <div className="flex items-center gap-1.5 font-black text-sm">
-              <Clock className="w-4 h-4 text-pitch shrink-0" />
-              <span className="text-pitch">
+          <div className="mt-2 mb-1 inline-flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-pitch/15 border border-pitch/40 text-pitch shadow-xs flex-wrap">
+            <div className="flex items-center gap-2 font-black text-lg md:text-xl font-tabular tracking-tight">
+              <Clock className="w-5 h-5 shrink-0" strokeWidth={2.5} />
+              <span>
                 {isTraining
-                  ? `🏃 Harjoitus alkaa klo ${formattedKickoff}`
+                  ? `Treeni klo ${formattedKickoff}`
+                  : isTournament && formattedWarmup === formattedKickoff
+                  ? `Kokoontuminen klo ${formattedKickoff}`
                   : isTournament
-                  ? `🏆 Turnaus alkaa klo ${formattedKickoff}`
+                  ? `1. peli klo ${formattedKickoff}`
                   : isSchool
-                  ? `🏫 Koulu alkaa klo ${formattedKickoff}`
+                  ? `Koulu klo ${formattedKickoff}`
                   : isOther
-                  ? `📌 Alkaa klo ${formattedKickoff}`
-                  : `${matchSportIcon} Ottelu alkaa klo ${formattedKickoff}`}
+                  ? `Alkaa klo ${formattedKickoff}`
+                  : `Ottelu alkaa klo ${formattedKickoff}`}
               </span>
             </div>
             {formattedWarmup && formattedWarmup !== formattedKickoff && (
-              <span className="text-xs font-semibold text-text-secondary pl-1.5 border-l border-border-subtle">
+              <span className="text-sm font-bold text-text-primary pl-2 border-l border-pitch/30">
                 Kokoontuminen klo {formattedWarmup}
               </span>
             )}
           </div>
+          {isTournament && (event.officialGameTimes?.length || 0) > 0 && (
+            <ul className="mt-1.5 mb-1 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1">
+              {event.officialGameTimes!.map((g) => (
+                <li key={`${g.startTime}-${g.title}`} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="font-semibold text-text-primary truncate">{g.title}</span>
+                  <span className="font-black font-tabular text-pitch shrink-0">
+                    {new Date(g.startTime).toLocaleTimeString('fi-FI', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Europe/Helsinki'
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {isTournament && !(event.officialGameTimes?.length) && !event.officialFixtureId && (
+            <p className="mt-1 mb-1 text-xs font-semibold text-text-muted">
+              Otteluajat tulospalvelusta (Torneopal) kun joukkue on yhdistetty.
+            </p>
+          )}
 
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />

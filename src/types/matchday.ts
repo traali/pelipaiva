@@ -567,6 +567,8 @@ export interface MatchdayEvent {
 
   // Milestone 1 & 3 additions:
   officialFixtureId?: string;
+  /** TASO/Torneopal games under a Nimenhuuto/MyClub tournament card (ISO kickoffs). */
+  officialGameTimes?: Array<{ startTime: string; title: string; officialFixtureId?: string }>;
   reconciliationStatus?: ReconciliationStatus;
   confidenceScore?: number;
   mismatchFlags?: MismatchFlags;

@@ -223,4 +223,56 @@ END:VCALENDAR`;
     expect(card.warmupTime).toBe('2026-09-12T06:30:00.000Z'); // 09:30 gathering
     expect(card.attendanceStatus).toBe('in');
   });
+
+  it('keeps Nimenhuuto tournament title and lists Torneopal game times; meetup stays calendar DTSTART', () => {
+    const nimenhuuto = mockEvent({
+      id: 'nh-turnaus',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'Westend Indians P14: Turnaus Yellow',
+      homeTeam: 'Westend Indians P14',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z', // 15:00 FI meetup
+      warmupTime: '2026-09-13T11:15:00.000Z', // invented 45 min
+      venue: {
+        name: 'Tuusulan Salibandyhalli, Kilpailukuja 4, Tuusula',
+        normalizedName: 'tuusulan salibandyhalli',
+        coordinates: { lat: 60.4042, lng: 25.0275 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-1',
+      officialFixtureId: 'ssbl_1',
+      sport: 'floorball',
+      title: 'Westend Indians vs SB Vantaa',
+      homeTeam: 'Westend Indians',
+      awayTeam: 'SB Vantaa',
+      startTime: '2026-09-13T12:30:00.000Z',
+      venue: nimenhuuto.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-2',
+      officialFixtureId: 'ssbl_2',
+      sport: 'floorball',
+      title: 'Westend Indians vs Oilers',
+      homeTeam: 'Westend Indians',
+      awayTeam: 'Oilers',
+      startTime: '2026-09-13T13:30:00.000Z',
+      venue: nimenhuuto.venue
+    });
+    const stitched = stitchCalendarEventsWithFixtures([nimenhuuto, g1, g2]);
+    expect(stitched).toHaveLength(1);
+    const card = stitched[0]!;
+    expect(card.title).toBe('Westend Indians P14: Turnaus Yellow');
+    expect(card.warmupTime).toBe('2026-09-13T12:00:00.000Z');
+    expect(card.startTime).toBe('2026-09-13T12:30:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.title)).toEqual([
+      'Westend Indians vs SB Vantaa',
+      'Westend Indians vs Oilers'
+    ]);
+  });
 });
