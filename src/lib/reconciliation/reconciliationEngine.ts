@@ -493,6 +493,26 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       }
     }
 
+    if (!bestFix && isTournamentish(cal)) {
+      const sameDay = bareFixtures.filter((fix) => {
+        if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false
+        return helsinkiDayKey(calDate) === helsinkiDayKey(new Date(fix.startTime))
+      })
+      const calVenue = (cal.venue?.name || '').toLowerCase().replace(/[\s\-_]/g, '')
+      const venueHits = calVenue
+        ? sameDay.filter((f) => {
+            const off = (f.venue?.name || '').toLowerCase().replace(/[\s\-_]/g, '')
+            return off && (calVenue.includes(off) || off.includes(calVenue))
+          })
+        : []
+      const pool = (venueHits.length ? venueHits : sameDay)
+        .slice()
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      if (pool[0] && (venueHits.length || calculateTeamSimilarity(cal.title, pool[0].homeTeam) >= 0.45 || calculateTeamSimilarity(cal.title, pool[0].awayTeam) >= 0.45 || calculateTeamSimilarity(cal.homeTeam, pool[0].homeTeam) >= 0.45)) {
+        bestFix = pool[0]
+      }
+    }
+
     if (bestFix) {
       const fix = bestFix;
       const fixDate = new Date(fix.startTime);
@@ -505,15 +525,8 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       cal.score = fix.score || cal.score;
       cal.tournamentName = fix.tournamentName || cal.tournamentName;
 
-      // Kickoff & Warmup timing
-      const originalCalStart = cal.startTime;
-      if (fixDate.getTime() > calDate.getTime()) {
-        cal.warmupTime = cal.warmupTime || originalCalStart;
-        cal.startTime = fix.startTime;
-        cal.endTime = fix.endTime || cal.endTime;
-      } else {
-        cal.startTime = fix.startTime;
-      }
+      // Kickoff & Warmup timing — TASO owns kickoff, calendar owns kokoontuminen
+      applyOfficialKickoffKeepCalendarArrival(cal, fix);
 
       // If official kickoff differs from original calendar time, attach mismatch flags
       const timeDiffMins = Math.round(Math.abs(fixDate.getTime() - calDate.getTime()) / 60000);

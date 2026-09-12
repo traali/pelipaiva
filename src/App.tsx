@@ -27,7 +27,7 @@ import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/at
 import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
 import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
-import { stitchCalendarEventsWithFixtures } from './lib/reconciliation/reconciliationEngine';
+import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
@@ -368,8 +368,11 @@ export const App: React.FC = () => {
                   officialFixtureId: fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, ''),
                   reconciliationStatus: 'auto_matched',
                   score: fix.score || cal.score,
-                  tournamentName: fix.tournamentName || cal.tournamentName
+                  tournamentName: fix.tournamentName || cal.tournamentName,
+                  venue: fix.venue || cal.venue,
+                  stats: fix.stats || cal.stats,
                 };
+                applyOfficialKickoffKeepCalendarArrival(enriched, fix);
                 await db.events.put(enriched);
                 await db.events.delete(fix.id);
               }
@@ -797,10 +800,20 @@ export const App: React.FC = () => {
           return f.profileId === cal.profileId && fDate === calDate;
         });
         if (match) {
-          await db.events.update(cal.id, {
-            officialFixtureId: match.id,
-            reconciliationStatus: 'auto_matched'
-          });
+          const patch: Partial<MatchdayEvent> = {
+            officialFixtureId: match.officialFixtureId || match.id.replace(/^fixture-[^-]+-/, ''),
+            reconciliationStatus: 'auto_matched',
+            homeTeam: match.homeTeam || cal.homeTeam,
+            awayTeam: match.awayTeam || cal.awayTeam,
+            title: match.homeTeam && match.awayTeam ? `${match.homeTeam} vs ${match.awayTeam}` : cal.title,
+            venue: match.venue || cal.venue,
+            stats: match.stats || cal.stats,
+          };
+          const timed = applyOfficialKickoffKeepCalendarArrival(
+            { startTime: cal.startTime, warmupTime: cal.warmupTime, endTime: cal.endTime },
+            match,
+          );
+          await db.events.update(cal.id, { ...patch, ...timed });
           await db.events.delete(match.id);
         }
       }
