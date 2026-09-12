@@ -5,7 +5,7 @@ import { ingestSourceForProfile } from '../clubs/ingestOfficial';
 import { swatchForHex } from '../sport/teamColors';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 
-export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
+export { isValidFamilyCode, normalizeFamilyCode, mintFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
 
 export interface FamilyRosterRow {

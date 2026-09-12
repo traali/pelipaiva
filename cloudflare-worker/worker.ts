@@ -68,7 +68,7 @@ async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
 }
 
 const FAMILY_CODE_REGEX = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
-/** Max claimed `family:` KV slots when FAMILY_CODES is empty (first-PUT claim). */
+/** Max claimed `family:` KV slots. Any valid Crockford code may claim one. */
 const FAMILY_SLOT_CAP = 10;
 
 async function countClaimedFamilies(kv: KVNamespace): Promise<number> {
@@ -77,9 +77,8 @@ async function countClaimedFamilies(kv: KVNamespace): Promise<number> {
 }
 
 /**
- * Empty FAMILY_CODES → first parent PUT claims the slot (cap 10).
- * Set FAMILY_CODES → only those codes (fail closed).
- * Already-claimed KV rows stay reachable so a phone can keep syncing.
+ * Any valid Crockford code may claim a slot (max FAMILY_SLOT_CAP).
+ * Already-claimed KV rows always stay reachable. FAMILY_CODES is unused as a deny list.
  * Returns a Response to send, or null if the request may proceed.
  */
 async function denyUnknownFamily(
@@ -88,18 +87,8 @@ async function denyUnknownFamily(
   method: string,
   corsHeaders: Record<string, string>
 ): Promise<Response | null> {
-  const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
-  if (issued.has(code)) return null;
-
   const existing = await env.MATCHDAY_KV.get(`family:${code}`);
   if (existing) return null;
-
-  if (issued.size > 0) {
-    return new Response(JSON.stringify({ error: 'unknown_family' }), {
-      status: 403,
-      headers: corsHeaders
-    });
-  }
 
   if (method === 'PUT') {
     const n = await countClaimedFamilies(env.MATCHDAY_KV);
@@ -639,14 +628,7 @@ export default {
         });
       }
 
-      const issuedCal = await parseIssuedFamilyCodes(env.FAMILY_CODES);
       const claimedCal = await env.MATCHDAY_KV.get(`family:${familyCode}`);
-      if (issuedCal.size > 0 && !issuedCal.has(familyCode) && !claimedCal) {
-        return new Response(JSON.stringify({ error: 'unknown_family' }), {
-          status: 403,
-          headers: corsHeaders
-        });
-      }
 
       // Read family roster from KV
       const kvKey = `family:${familyCode}`;

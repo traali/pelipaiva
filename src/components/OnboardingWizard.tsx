@@ -19,7 +19,7 @@ import { springTactile } from '../lib/motion/springs';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import type { SportType } from '../types/matchday';
 import { db } from '../lib/storage/db';
-import { syncFamilyRosterCycle, hydrateRosterProfiles, normalizeFamilyCode } from '../lib/sync/familyCloud';
+import { syncFamilyRosterCycle, hydrateRosterProfiles, normalizeFamilyCode, isValidFamilyCode, mintFamilyCode } from '../lib/sync/familyCloud';
 
 interface AddedSource {
   id: string;
@@ -253,8 +253,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleJoinFamilySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = normalizeFamilyCode(familyCodeInput);
-    if (!cleanCode) {
-      setErrorMessage('Syötä perhekoodi (esim. PERHE-1 tai PERHE-2)');
+    if (!isValidFamilyCode(cleanCode)) {
+      setErrorMessage('Koodin muoto on XXXXX-X (ei kirjaimia I, L, O, U)');
       return;
     }
 
@@ -285,23 +285,52 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  // Create Family Key Flow
+  // Create / activate any valid Crockford code (new mint or old phone code)
   const handleCreateFamilySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = normalizeFamilyCode(familyCodeInput);
-    if (!cleanCode) {
-      setErrorMessage('Syötä myönnetty perheavain (esim. PERHE-1 tai PERHE-2)');
+    if (!isValidFamilyCode(cleanCode)) {
+      setErrorMessage('Koodin muoto on XXXXX-X (ei kirjaimia I, L, O, U)');
       return;
     }
 
-    await db.syncState.put({
-      key: 'family',
-      syncKey: cleanCode,
-      lastSyncedAt: new Date().toISOString()
-    });
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await db.syncState.put({
+        key: 'family',
+        syncKey: cleanCode,
+        lastSyncedAt: new Date().toISOString()
+      });
+      const syncRes = await syncFamilyRosterCycle(cleanCode, db);
+      if (!syncRes.success && syncRes.error === 'family_slots_full') {
+        setErrorMessage('Perhepaikat täynnä (max 10).');
+        return;
+      }
+      setOnboardingMode('local');
+      setIsNamingStep(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    setOnboardingMode('local');
-    setIsNamingStep(true);
+  const handleMintNewFamily = async () => {
+    const minted = mintFamilyCode();
+    setFamilyCodeInput(minted);
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await db.syncState.put({
+        key: 'family',
+        syncKey: minted,
+        lastSyncedAt: new Date().toISOString()
+      });
+      await syncFamilyRosterCycle(minted, db);
+      setOnboardingMode('local');
+      setIsNamingStep(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const totalSourcesCount = addedSources.length || existingProfilesCount;
@@ -379,13 +408,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-text-primary">Luo perhe (Pilvisynkronointi)</span>
+                    <span className="font-bold text-sm text-text-primary">Luo tai aktivoi perhe</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pitch text-text-inverse">
                       Suositus ⭐
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                    Synkronoi pelit, kuskiringit ja Wilman perheen puhelimiin ja elävään Apple/Google-kalenteriin. Vaatii perheavaimen.
+                    Synkronoi pelit perheen puhelimiin. Luo uusi koodi tai aktivoi vanha (mikä tahansa XXXXX-X).
                   </p>
                 </div>
               </button>
@@ -435,11 +464,28 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
             <div>
               <h2 className="text-base font-bold text-text-primary mb-1">
-                Määritä perheavain
+                Luo uusi tai aktivoi vanha
               </h2>
               <p className="text-xs text-text-muted">
-                Syötä myönnetty perheavain (esim. <code className="font-mono font-bold text-pitch">PERHE-1</code> tai <code className="font-mono font-bold text-pitch">PERHE-2</code>):
+                Mikä tahansa muotoa <code className="font-mono font-bold text-pitch">XXXXX-X</code> oleva koodi käy.
+                Luo uusi, tai kirjoita vanha koodi tältä puhelimelta (esim. se joka on jo Dexiessä).
               </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleMintNewFamily}
+              disabled={isLoading}
+              className="w-full py-3 rounded-2xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-sm shadow-pitch/20 transition-all disabled:opacity-50"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span>Luo uusi perhekoodi</span>
+            </button>
+
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              <span className="flex-1 h-px bg-border-subtle" />
+              <span>tai aktivoi vanha</span>
+              <span className="flex-1 h-px bg-border-subtle" />
             </div>
 
             <form onSubmit={handleCreateFamilySubmit} className="space-y-4">
@@ -449,7 +495,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   autoFocus
                   value={familyCodeInput}
                   onChange={(e) => setFamilyCodeInput(e.target.value.toUpperCase())}
-                  placeholder="esim. PERHE-1"
+                  placeholder="esim. ABCDE-2"
                   className="w-full px-4 py-3 rounded-2xl bg-surface-base border border-border-strong text-sm font-mono font-bold text-text-primary tracking-wider uppercase focus-visible:ring-2 focus-visible:ring-pitch"
                 />
               </div>
@@ -462,9 +508,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-sm shadow-pitch/20 transition-all"
+                disabled={isLoading}
+                className="w-full py-3 rounded-2xl bg-surface-elevated border border-pitch/40 text-text-primary text-xs font-bold flex items-center justify-center gap-2 hover:border-pitch cursor-pointer transition-all disabled:opacity-50"
               >
-                <span>Tallenna ja jatka joukkueisiin</span>
+                <span>Aktivoi tämä koodi ja jatka</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

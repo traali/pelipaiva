@@ -11,7 +11,7 @@ import {
   mergeFamilyEvents,
   mergeAttendanceOverrides
 } from './familyCloud';
-import { FAMILY_CODE_REGEX, existingRosterPutConflicts, parseFamilyAllowlist } from './familyCode';
+import { FAMILY_CODE_REGEX, existingRosterPutConflicts, parseFamilyAllowlist, mintFamilyCode } from './familyCode';
 import { PlayerProfile } from '../../types/matchday';
 
 describe('familyCloud Sync & Merge Engine', () => {
@@ -33,6 +33,14 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(normalizeFamilyCode('SAKKA4')).toBe('SAKKA-4');
   });
 
+  it('mints a valid Crockford family code', () => {
+    const a = mintFamilyCode();
+    const b = mintFamilyCode();
+    expect(isValidFamilyCode(a)).toBe(true);
+    expect(isValidFamilyCode(b)).toBe(true);
+    expect(a).not.toBe(b);
+  });
+
   it('worker source shares the client Crockford regex and requires If-Match on existing keys', () => {
     const workerSrc = readFileSync(resolve(__dirname, '../../../cloudflare-worker/worker.ts'), 'utf8');
     expect(workerSrc).toContain(FAMILY_CODE_REGEX.source);
@@ -41,11 +49,11 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).toContain('GET: 20');
     expect(workerSrc).toContain('PUT: 5');
     expect(workerSrc).toContain('FAMILY_CODES');
-    expect(workerSrc).toContain('unknown_family');
     expect(workerSrc).toContain('FAMILY_SLOT_CAP');
     expect(workerSrc).toContain('family_slots_full');
     expect(workerSrc).toContain('denyUnknownFamily');
     expect(workerSrc).not.toMatch(/if \(issued\.size === 0 \|\| !issued\.has\(code\)\)/);
+    expect(workerSrc).not.toMatch(/issued\.size > 0 && !issued/);
     expect(workerSrc).toContain('isAllowedProxyTarget');
     expect(workerSrc).toContain('api.lipas.fi');
     expect(workerSrc).toContain('collectRosterIcsEvents');
@@ -56,7 +64,7 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).not.toMatch(/FAMILY_CODES\s*=\s*['\"][0-9A-HJKMNP-TV-Z]{5}-/);
   });
 
-  it('allowlist is fail-closed when set and does not live in the client', () => {
+  it('allowlist parser still works and does not live in the client bundle as issued values', () => {
     expect(parseFamilyAllowlist(undefined).size).toBe(0);
     expect(parseFamilyAllowlist('').size).toBe(0);
     const issued = parseFamilyAllowlist('AAAAA-1, BBBBB-2\nCCCCC-3');

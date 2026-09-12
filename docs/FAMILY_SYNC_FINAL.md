@@ -116,10 +116,10 @@ pendingUpload: boolean   // offline queue flag (keep 2.6)
 
 Display: `XXXXX-X` (Crockford-32, no I/L/O/U).
 
-**Issued slots:** optional Worker secret `FAMILY_CODES`. Empty secret = first parent PUT claims a slot (max 10). Codes are not in this repo or the PWA bundle.
+**Slots:** any valid Crockford `XXXXX-X`. First parent PUT claims (max 10). Client can mint a new code or activate an old one.
 
-- Worker: empty secret → GET unclaimed 404, PUT claims (cap 10). Secret set + unknown → 403 `unknown_family`.
-- Client: join-only. No “Luo perhe-koodi”. First phone sends the existing code back via PUT.
+- Worker: GET unclaimed → 404. PUT claims. Cap → 403 `family_slots_full`.
+- Client: Luo uusi / Aktivoi vanha. Deep link `?perhe=` also PUTs.
 - Deep link: `https://pelipaiva.pages.dev/?perhe={code}`
 
 Possession of an issued code = membership. Do not commit values.

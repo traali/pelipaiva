@@ -22,7 +22,8 @@ import { ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
 import {
   syncFamilyRosterCycle,
   isValidFamilyCode,
-  normalizeFamilyCode
+  normalizeFamilyCode,
+  mintFamilyCode
 } from '../lib/sync/familyCloud';
 import { generateJoinWhatsApp } from '../lib/sync/familyWhatsApp';
 
@@ -76,12 +77,14 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     if (res.success) {
       setFamilyCode(clean);
       setLastSynced(new Date().toISOString());
-      setStatusMessage('Liitytty perheeseen onnistuneesti!');
+      setStatusMessage('Perhe aktivoitu pilveen.');
       onDataImported();
       setTimeout(() => setStatusMessage(null), 2500);
     } else {
       const msg =
-        res.error === 'unknown_family'
+        res.error === 'family_slots_full'
+          ? 'Perhepaikat täynnä (max 10).'
+          : res.error === 'unknown_family'
           ? 'Koodia ei löydy. Tarkista koodi.'
           : res.error === 'rate_limited'
           ? 'Liian monta yritystä — odota hetki.'
@@ -89,6 +92,23 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
       setStatusMessage(msg);
       setTimeout(() => setStatusMessage(null), 3500);
     }
+  };
+
+  const handleMintNewFamily = async () => {
+    const minted = mintFamilyCode();
+    setInputCode(minted);
+    setIsSyncing(true);
+    const res = await syncFamilyRosterCycle(minted, db);
+    setIsSyncing(false);
+    if (res.success) {
+      setFamilyCode(minted);
+      setLastSynced(new Date().toISOString());
+      setStatusMessage(`Uusi perhe ${minted} aktivoitu.`);
+      onDataImported();
+    } else {
+      setStatusMessage(res.error === 'family_slots_full' ? 'Perhepaikat täynnä (max 10).' : 'Verkkovirhe');
+    }
+    setTimeout(() => setStatusMessage(null), 3500);
   };
 
   const handleSyncNow = async () => {
@@ -423,10 +443,18 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={handleMintNewFamily}
+                      disabled={isSyncing}
+                      className="w-full py-3 rounded-2xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer disabled:opacity-50"
+                    >
+                      Luo uusi perhekoodi
+                    </button>
                     <div className="p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5">
-                      <div className="text-xs font-bold text-text-primary">Liity perhe-koodilla</div>
+                      <div className="text-xs font-bold text-text-primary">Aktivoi vanha tai liity</div>
                       <p className="text-xs text-text-muted">
-                        Syötä perheeltä tai ylläpidolta saamasi koodi:
+                        Mikä tahansa muotoa XXXXX-X oleva koodi käy. Vanha koodi tältä puhelimelta aktivoituu ensimmäisellä synkellä.
                       </p>
                       <div className="flex items-center gap-2">
                         <input
@@ -444,7 +472,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                           disabled={isSyncing || !inputCode.trim()}
                           className="py-2 px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer disabled:opacity-50"
                         >
-                          Liity
+                          Aktivoi
                         </button>
                       </div>
                     </div>
