@@ -17,7 +17,6 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
   onSelectProfile,
   onAddProfile
 }) => {
-  // Group profiles by playerName (normalized casing)
   const playerGroups = React.useMemo(() => {
     const map = new Map<string, PlayerProfile[]>();
     for (const p of profiles) {
@@ -47,7 +46,7 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
             : 'border-border-subtle bg-surface-elevated text-text-secondary hover:text-text-primary'
         }`}
       >
-        Kaikki profiilit
+        Kaikki
       </motion.button>
 
       {playerGroups.map(([playerName, playerProfiles]) => {
