@@ -4,7 +4,6 @@ import {
   Clock,
   MapPin,
   Navigation,
-  Shirt,
   AlertTriangle,
   Share2,
   BarChart3,
@@ -51,6 +50,7 @@ interface MatchdayCardProps {
   colorHex?: string;
   profile?: PlayerProfile;
   compact?: boolean;
+  initialShowExtras?: boolean;
   conflicts?: FamilyConflict[];
   showConflictWarnings?: boolean;
   showSmartGearAdvice?: boolean;
@@ -71,6 +71,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   colorHex,
   profile,
   compact = false,
+  initialShowExtras = false,
   conflicts,
   showConflictWarnings = false,
   showSmartGearAdvice = false,
@@ -94,6 +95,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [isWeatherDrawerOpen, setIsWeatherDrawerOpen] = useState(false);
   const [dismissedConflictWarning, setDismissedConflictWarning] = useState(false);
   const [mismatchBusy, setMismatchBusy] = useState(false);
+  const [showExtras, setShowExtras] = useState(initialShowExtras);
+  const extrasId = React.useId();
 
   const indoor = isIndoorEvent(event);
   const {
@@ -150,6 +153,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     return undefined;
   }, [event.weather, indoor, radarCoords, event.startTime]);
   const lightningAlert = event.lightning || effectiveWeather?.lightningSafety;
+  const sourceInfo = React.useMemo(() => resolveEventSourceInfo(event, profile), [event, profile]);
 
   const handleOpenStats = () => {
     let resolved = stats;
@@ -202,6 +206,24 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
       window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
     }
   };
+
+  const typeBadge = isTraining
+    ? {
+        label: 'Harjoitus',
+        icon: Dumbbell,
+        className: 'bg-radar/15 text-radar border-radar/25',
+      }
+    : isTournament
+      ? {
+          label: 'Turnaus',
+          icon: Trophy,
+          className: 'bg-gold/20 text-gold border-gold/35 shadow-xs',
+        }
+      : {
+          label: getSportBadge(),
+          icon: null,
+          className: 'bg-pitch/15 text-pitch border-pitch/25',
+        };
 
   if (isOut && !isOutExpanded) {
     return (
@@ -362,86 +384,17 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             )}
 
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                isTraining
-                  ? 'bg-radar/15 text-radar border-radar/25'
-                  : isTournament
-                  ? 'bg-gold/20 text-gold border border-gold/35 shadow-xs'
-                  : 'bg-pitch/15 text-pitch border border-pitch/25'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${typeBadge.className}`}
             >
-              {isTraining ? (
+              {typeBadge.icon ? (
                 <>
-                  <Dumbbell className="w-3.5 h-3.5" />
-                  <span>Harjoitus • {getSportBadge()}</span>
-                </>
-              ) : isTournament ? (
-                <>
-                  <Trophy className="w-3.5 h-3.5" />
-                  <span>Turnaus • {getSportBadge()}</span>
+                  <typeBadge.icon className="w-3.5 h-3.5" />
+                  <span>{typeBadge.label}</span>
                 </>
               ) : (
-                getSportBadge()
+                <span>{typeBadge.label}</span>
               )}
             </span>
-
-            {event.volunteerDuty && (
-              <TalkooDutyTag duty={event.volunteerDuty} />
-            )}
-
-            {!isTournament && (event.tournamentName || /turnaus|tournament|cup\b|memorial/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)) && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gold/20 text-gold border border-gold/35 shadow-xs">
-                <Trophy className="w-3.5 h-3.5" />
-                <span>Turnaus</span>
-              </span>
-            )}
-
-            {/* Transit Mode Badge */}
-            {transitPlan && (
-              <button
-                type="button"
-                onClick={transitPlan.isUnknownLocation ? () => setIsVenueModalOpen(true) : onOpenHomeModal}
-                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
-                  transitPlan.isUnknownLocation
-                    ? 'bg-whistle/15 text-whistle border-whistle/35 hover:bg-whistle/25'
-                    : transitPlan.isSelfTransit
-                    ? 'bg-pitch/15 text-pitch border-pitch/30'
-                    : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
-                }`}
-                title={
-                  transitPlan.isUnknownLocation
-                    ? 'Kentän sijainti tuntematon • Klikkaa asettaaksesi kenttä tai korjataksesi osoite'
-                    : `${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`
-                }
-                aria-label={
-                  transitPlan.isUnknownLocation
-                    ? 'Sijainti tuntematon. Klikkaa asettaaksesi kentän sijainti.'
-                    : `Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`
-                }
-              >
-                <span>{transitPlan.transitLabel}</span>
-              </button>
-            )}
-
-            {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
-            {(() => {
-              const sourceInfo = resolveEventSourceInfo(event, profile);
-              return (
-                <button
-                  type="button"
-                  onClick={() => setIsMergeOpen(true)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
-                    sourceInfo.isCombined
-                      ? 'bg-pitch/15 text-pitch border-pitch/30 hover:bg-pitch/25'
-                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
-                  }`}
-                  title={`${sourceInfo.tooltipDetails || ''} • Klikkaa hallitaksesi lähteitä tai yhdistääksesi`}
-                  aria-label={`Tietolähde: ${sourceInfo.badgeText}. Klikkaa hallitaksesi yhdistämistä.`}
-                >
-                  <span>{sourceInfo.badgeText}</span>
-                </button>
-              );
-            })()}
 
             {/* 1-Tap Attendance In/Out Button */}
             {!isOut ? (
@@ -453,7 +406,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 aria-label={`Pelaaja osallistuu. Klikkaa ilmoittaaksesi poisjäänti.`}
               >
                 <span className="h-2 w-2 rounded-full bg-pitch group-hover:bg-stoppage shrink-0" />
-                <span className="group-hover:hidden">🟢 {playerName || 'Pelaaja'} osallistuu</span>
+                <span className="group-hover:hidden">🟢 Osallistuu{playerName ? ` · ${playerName}` : ''}</span>
                 <span className="hidden group-hover:inline">⛔ Ilmoita poisjäänti</span>
               </button>
             ) : (
@@ -465,7 +418,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 aria-label={`Poisjäänti merkitty. Klikkaa merkitäksesi osallistuvaksi.`}
               >
                 <span className="h-2 w-2 rounded-full bg-stoppage group-hover:bg-pitch shrink-0" />
-                <span className="group-hover:hidden">⛔ Poisjäänti (OUT)</span>
+                <span className="group-hover:hidden">⛔ Poisjäänti{playerName ? ` · ${playerName}` : ''}</span>
                 <span className="hidden group-hover:inline">↩️ Osallistuu silti</span>
               </button>
             )}
@@ -493,7 +446,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
         {/* Event Header (Matchup vs Training / School / Other Title) */}
         <div className="mb-4">
-          {(event.tournamentName || event.stage || event.matchNumber) && (
+          {showExtras && (event.tournamentName || event.stage || event.matchNumber) && (
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               {event.tournamentName && (
                 <span className="text-[11px] font-bold text-pitch flex items-center gap-1">
@@ -536,7 +489,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </h2>
 
               {/* Personal Player Match Log Badge (if logged) */}
-              {playerLog && (
+              {showExtras && playerLog && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-whistle/15 text-whistle border border-whistle/30">
                     <Star className="w-3.5 h-3.5 fill-whistle text-whistle" />
@@ -570,7 +523,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </span>
             )}
           </div>
-          {(event.officialGameTimes?.length || 0) > 1 && (
+          {showExtras && (event.officialGameTimes?.length || 0) > 1 && (
             <ul className="mt-1.5 mb-1 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1">
               {event.officialGameTimes!.map((g, i) => (
                 <li key={`${g.startTime}-${g.title}`} className="flex items-center justify-between gap-2 text-sm">
@@ -592,7 +545,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               ))}
             </ul>
           )}
-          {isTournament && !(event.officialGameTimes?.length) && !event.officialFixtureId && (
+          {showExtras && isTournament && !(event.officialGameTimes?.length) && !event.officialFixtureId && (
             <p className="mt-1 mb-1 text-xs font-semibold text-text-muted">
               Otteluajat tulospalvelusta (Torneopal) kun joukkue on yhdistetty.
             </p>
@@ -606,17 +559,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti tuntematon)</span>
               )}
             </span>
-            <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
-              {indoor ? 'Sisähalli' : surfaceLabel(venue.surface, venue.isIndoor)}
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsVenueModalOpen(true)}
-              aria-label={`Korjaa kentän tietoja: ${venue.name}`}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-2 -mr-2 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
 
@@ -697,195 +639,275 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         )}
 
-        {/* View Dismissed / Acknowledged Conflicts */}
-        {dismissedConflicts.length > 0 && (
-          <div className="mb-4 flex flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowDismissedConflicts(!showDismissedConflicts)}
-              className="touch-target min-h-[44px] text-xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer transition-colors py-1 self-start"
-            >
-              <span>👁️</span>
-              <span>{showDismissedConflicts ? 'Piilota kuitatut huomiot' : `Näytä kuitatut huomiot (${dismissedConflicts.length})`}</span>
-            </button>
-            {showDismissedConflicts && (
-              <div className="flex flex-col gap-2 pl-2.5 border-l-2 border-border-subtle">
-                {dismissedConflicts.map((dc) => (
-                  <div
-                    key={dc.id}
-                    className="p-2.5 rounded-xl bg-surface/60 border border-border-subtle text-xs text-text-muted flex items-center justify-between gap-3 flex-wrap"
+        <div
+          id={extrasId}
+          hidden={!showExtras}
+          className={showExtras ? 'mb-5 flex flex-col gap-4' : undefined}
+        >
+          {showExtras && (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                {event.volunteerDuty && (
+                  <TalkooDutyTag duty={event.volunteerDuty} />
+                )}
+
+                {transitPlan && (
+                  <button
+                    type="button"
+                    onClick={transitPlan.isUnknownLocation ? () => setIsVenueModalOpen(true) : onOpenHomeModal}
+                    className={`touch-target min-h-[44px] inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
+                      transitPlan.isUnknownLocation
+                        ? 'bg-whistle/15 text-whistle border-whistle/35 hover:bg-whistle/25'
+                        : transitPlan.isSelfTransit
+                          ? 'bg-pitch/15 text-pitch border-pitch/30'
+                          : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                    }`}
+                    title={
+                      transitPlan.isUnknownLocation
+                        ? 'Kentän sijainti tuntematon • Klikkaa asettaaksesi kenttä tai korjataksesi osoite'
+                        : `${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`
+                    }
+                    aria-label={
+                      transitPlan.isUnknownLocation
+                        ? 'Sijainti tuntematon. Klikkaa asettaaksesi kentän sijainti.'
+                        : `Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`
+                    }
                   >
-                    <span className="line-through truncate flex-1 min-w-[200px]">{dc.message}</span>
-                    <button
-                      type="button"
-                      onClick={() => restoreConflict(dc)}
-                      className="touch-target min-h-[44px] px-3 py-1.5 rounded-xl bg-surface-elevated text-xs font-bold text-pitch hover:border-pitch/40 border border-border-subtle inline-flex items-center gap-1 shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
-                    >
-                      <span>↩️</span>
-                      <span>Palauta huomio</span>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                    <span>{transitPlan.transitLabel}</span>
+                  </button>
+                )}
 
-        {/* Modern Sports Stats & Match Report Strip (Interactive for all Matches & Past Games) */}
-        {!isTraining && (
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.98 }}
-            whileHover={{ scale: 1.01 }}
-            transition={springTactile.snappy}
-            onClick={handleOpenStats}
-            className={`w-full mb-4 p-3 rounded-2xl border cursor-pointer flex items-center justify-between gap-3 text-left transition-all group ${
-              isPast
-                ? 'bg-surface-elevated/90 border-pitch/30 hover:border-pitch hover:bg-surface-elevated'
-                : 'bg-surface-elevated/70 border-border-subtle hover:border-pitch/40'
-            }`}
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className={`p-2 rounded-xl shrink-0 ${isPast ? 'bg-pitch/20 text-pitch' : 'bg-pitch/15 text-pitch'}`}>
-                {isPast ? <BarChart3 className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
-              </div>
-              <div className="min-w-0">
-                {(() => {
-                  const hasValidStanding = Boolean(
-                    stats &&
-                    !stats.isSynthetic &&
-                    stats.homeStanding &&
-                    stats.homeStanding.rank > 0 &&
-                    stats.homeStanding.played > 0
-                  );
+                <button
+                  type="button"
+                  onClick={() => setIsMergeOpen(true)}
+                  className={`touch-target min-h-[44px] inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
+                    sourceInfo.isCombined
+                      ? 'bg-pitch/15 text-pitch border-pitch/30 hover:bg-pitch/25'
+                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                  }`}
+                  title={`${sourceInfo.tooltipDetails || ''} • Klikkaa hallitaksesi lähteitä tai yhdistääksesi`}
+                  aria-label={`Tietolähde: ${sourceInfo.badgeText}. Klikkaa hallitaksesi yhdistämistä.`}
+                >
+                  <span>{sourceInfo.badgeText}</span>
+                </button>
 
-                  return (
-                    <>
-                      <div className="text-xs font-bold text-text-primary flex items-center gap-2">
-                        {hasValidStanding && stats ? (
+                <button
+                  type="button"
+                  onClick={() => setIsVenueModalOpen(true)}
+                  aria-label={`Korjaa kentän tietoja: ${venue.name}`}
+                  className="touch-target min-h-[44px] inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border border-border-subtle bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{indoor ? 'Sisähalli' : surfaceLabel(venue.surface, venue.isIndoor)}</span>
+                </button>
+              </div>
+
+              {/* View Dismissed / Acknowledged Conflicts */}
+              {dismissedConflicts.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowDismissedConflicts(!showDismissedConflicts)}
+                    className="touch-target min-h-[44px] text-xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer transition-colors py-1 self-start"
+                  >
+                    <span>👁️</span>
+                    <span>{showDismissedConflicts ? 'Piilota kuitatut huomiot' : `Näytä kuitatut huomiot (${dismissedConflicts.length})`}</span>
+                  </button>
+                  {showDismissedConflicts && (
+                    <div className="flex flex-col gap-2 pl-2.5 border-l-2 border-border-subtle">
+                      {dismissedConflicts.map((dc) => (
+                        <div
+                          key={dc.id}
+                          className="p-2.5 rounded-xl bg-surface/60 border border-border-subtle text-xs text-text-muted flex items-center justify-between gap-3 flex-wrap"
+                        >
+                          <span className="line-through truncate flex-1 min-w-[200px]">{dc.message}</span>
+                          <button
+                            type="button"
+                            onClick={() => restoreConflict(dc)}
+                            className="touch-target min-h-[44px] px-3 py-1.5 rounded-xl bg-surface-elevated text-xs font-bold text-pitch hover:border-pitch/40 border border-border-subtle inline-flex items-center gap-1 shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                          >
+                            <span>↩️</span>
+                            <span>Palauta huomio</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Modern Sports Stats & Match Report Strip (Interactive for all Matches & Past Games) */}
+              {!isTraining && (
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.98 }}
+                  whileHover={{ scale: 1.01 }}
+                  transition={springTactile.snappy}
+                  onClick={handleOpenStats}
+                  className={`w-full p-3 rounded-2xl border cursor-pointer flex items-center justify-between gap-3 text-left transition-all group ${
+                    isPast
+                      ? 'bg-surface-elevated/90 border-pitch/30 hover:border-pitch hover:bg-surface-elevated'
+                      : 'bg-surface-elevated/70 border-border-subtle hover:border-pitch/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-2 rounded-xl shrink-0 ${isPast ? 'bg-pitch/20 text-pitch' : 'bg-pitch/15 text-pitch'}`}>
+                      {isPast ? <BarChart3 className="w-4 h-4" /> : <Trophy className="w-4 h-4" />}
+                    </div>
+                    <div className="min-w-0">
+                      {(() => {
+                        const hasValidStanding = Boolean(
+                          stats &&
+                          !stats.isSynthetic &&
+                          stats.homeStanding &&
+                          stats.homeStanding.rank > 0 &&
+                          stats.homeStanding.played > 0
+                        );
+
+                        return (
                           <>
-                            <span>
-                              {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
-                            </span>
-                            {event.awayTeam && (
-                              <>
-                                <span className="text-text-muted font-normal">vs</span>
-                                <span>
-                                  {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                            <div className="text-xs font-bold text-text-primary flex items-center gap-2">
+                              {hasValidStanding && stats ? (
+                                <>
+                                  <span>
+                                    {stats.homeStanding.rank}. {event.homeTeam} ({stats.homeStanding.points}p)
+                                  </span>
+                                  {event.awayTeam && (
+                                    <>
+                                      <span className="text-text-muted font-normal">vs</span>
+                                      <span>
+                                        {stats.awayStanding.rank}. {event.awayTeam} ({stats.awayStanding.points}p)
+                                      </span>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <span>{isPast ? 'Ottelutilastot & Kirjaa suoritus' : 'Otteluennakko & Sarjatilastot'}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5 flex-wrap">
+                              {hasValidStanding && stats ? (
+                                <>
+                                  <span>
+                                    {stats.homeStanding.won}V–{stats.homeStanding.drawn}T–{stats.homeStanding.lost}H (Maalit {stats.homeStanding.goalsFor}–{stats.homeStanding.goalsAgainst})
+                                  </span>
+                                  {stats.homeStanding.form && stats.homeStanding.form.length > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] text-text-muted">Kunto:</span>
+                                      <div className="flex items-center gap-0.5">
+                                        {stats.homeStanding.form.slice(-3).map((f, idx) => (
+                                          <span
+                                            key={idx}
+                                            className={`h-1.5 w-1.5 rounded-full ${
+                                              f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
+                                            }`}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="flex items-center gap-1 text-pitch font-medium">
+                                  <Sparkles className="w-3 h-3" />
+                                  {isPast ? 'Päättynyt ottelu • Klikkaa tilastoihin' : 'Sarjataulukko, H2H & kokoonpanot'}
                                 </span>
-                              </>
-                            )}
+                              )}
+                              <span>•</span>
+                              <span className="truncate text-pitch font-medium">
+                                {isPast ? 'Kirjaa omat tilastot & raportti' : 'Avaa tilastokeskus'}
+                              </span>
+                            </div>
                           </>
-                        ) : (
-                          <span>{isPast ? 'Ottelutilastot & Kirjaa suoritus' : 'Otteluennakko & Sarjatilastot'}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11px] text-text-secondary mt-0.5 flex-wrap">
-                        {hasValidStanding && stats ? (
-                          <>
-                            <span>
-                              {stats.homeStanding.won}V–{stats.homeStanding.drawn}T–{stats.homeStanding.lost}H (Maalit {stats.homeStanding.goalsFor}–{stats.homeStanding.goalsAgainst})
-                            </span>
-                            {stats.homeStanding.form && stats.homeStanding.form.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-[10px] text-text-muted">Kunto:</span>
-                                <div className="flex items-center gap-0.5">
-                                  {stats.homeStanding.form.slice(-3).map((f, idx) => (
-                                    <span
-                                      key={idx}
-                                      className={`h-1.5 w-1.5 rounded-full ${
-                                        f === 'W' ? 'bg-pitch' : f === 'D' ? 'bg-whistle' : 'bg-stoppage'
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <span className="flex items-center gap-1 text-pitch font-medium">
-                            <Sparkles className="w-3 h-3" />
-                            {isPast ? 'Päättynyt ottelu • Klikkaa tilastoihin' : 'Sarjataulukko, H2H & kokoonpanot'}
-                          </span>
-                        )}
-                        <span>•</span>
-                        <span className="truncate text-pitch font-medium">
-                          {isPast ? 'Kirjaa omat tilastot & raportti' : 'Avaa tilastokeskus'}
-                        </span>
-                      </div>
-                    </>
-                  );
-                })()}
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 text-xs font-semibold text-pitch group-hover:translate-x-0.5 transition-transform">
+                    <BarChart3 className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </motion.button>
+              )}
+
+              {/* Bento Sub-Cards: Nappisvahti & Parking (compact parking when walking/cycling or when gear advice is off) */}
+              <div className={`grid gap-3 ${transitPlan?.isSelfTransit || !showSmartGearAdvice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                {showSmartGearAdvice && event.briefing && (
+                  <NappisvahtiPill
+                    footwear={event.briefing.gearAndPackingAdvice.footwear}
+                    reason={event.briefing.gearAndPackingAdvice.footwearReason}
+                  />
+                )}
+                {event.parking && (
+                  <ParkingEaseBadge
+                    parking={event.parking}
+                    venueName={event.venue.name}
+                    compact={transitPlan?.isSelfTransit}
+                  />
+                )}
               </div>
-            </div>
 
-            <div className="flex items-center gap-1 shrink-0 text-xs font-semibold text-pitch group-hover:translate-x-0.5 transition-transform">
-              <BarChart3 className="w-4 h-4" />
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </motion.button>
-        )}
+              {!compact && showSmartGearAdvice && event.briefing && (
+                <div className="p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
+                  <div className="font-semibold text-text-primary">
+                    {isTraining ? '🎒 Treenivarusteet:' : '🎒 Varustesuositus & Katsomo-opas:'}
+                  </div>
+                  <div>
+                    {event.briefing.gearAndPackingAdvice.clothing}{' '}
+                    {event.briefing.gearAndPackingAdvice.spectatorGear}
+                  </div>
+                </div>
+              )}
 
-        {/* Bento Sub-Cards: Nappisvahti & Parking (compact parking when walking/cycling or when gear advice is off) */}
-        <div className={`grid gap-3 mb-5 ${transitPlan?.isSelfTransit || !showSmartGearAdvice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-          {showSmartGearAdvice && event.briefing && (
-            <NappisvahtiPill
-              footwear={event.briefing.gearAndPackingAdvice.footwear}
-              reason={event.briefing.gearAndPackingAdvice.footwearReason}
-            />
-          )}
-          {event.parking && (
-            <ParkingEaseBadge
-              parking={event.parking}
-              venueName={event.venue.name}
-              compact={transitPlan?.isSelfTransit}
-            />
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                transition={springTactile.snappy}
+                onClick={() => setIsChatOpen(true)}
+                aria-label="Päivitä tietoja chatin lailla"
+                title="Päivitä chatin lailla"
+                className="touch-target min-h-[44px] inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border-strong bg-surface-elevated px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-pitch cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
+              >
+                <MessageSquare className="w-4 h-4 text-pitch" />
+                <span>Päivitä tapahtumaa viestillä</span>
+              </motion.button>
+
+              {/* Applied Notes / Carpool / Volunteer / School Details */}
+              {event.notes && (
+                <div className="p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-primary flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5 font-bold text-pitch text-[11px] uppercase tracking-wider">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Tapahtuman lisätiedot & huomiot</span>
+                  </div>
+                  <div className="whitespace-pre-line text-xs font-medium text-text-secondary leading-relaxed">
+                    {event.notes}
+                  </div>
+                </div>
+              )}
+
+              {/* Inline Fast Drop-In & Update Zone */}
+              <EventInlineDropIn
+                event={event}
+                onEventUpdated={onEventUpdated}
+                compact={compact}
+              />
+            </>
           )}
         </div>
 
-        {!compact && showSmartGearAdvice && event.briefing && (
-          <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
-            <div className="font-semibold text-text-primary">
-              {isTraining ? '🎒 Treenivarusteet:' : '🎒 Varustesuositus & Katsomo-opas:'}
-            </div>
-            <div>
-              {event.briefing.gearAndPackingAdvice.clothing}{' '}
-              {event.briefing.gearAndPackingAdvice.spectatorGear}
-            </div>
-          </div>
-        )}
-
-        {/* Applied Notes / Carpool / Volunteer / School Details */}
-        {event.notes && (
-          <div className="mb-4 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-primary flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 font-bold text-pitch text-[11px] uppercase tracking-wider">
-              <FileText className="w-3.5 h-3.5" />
-              <span>Tapahtuman lisätiedot & huomiot</span>
-            </div>
-            <div className="whitespace-pre-line text-xs font-medium text-text-secondary leading-relaxed">
-              {event.notes}
-            </div>
-          </div>
-        )}
-
-        {/* Inline Fast Drop-In & Update Zone */}
-        <EventInlineDropIn
-          event={event}
-          onEventUpdated={onEventUpdated}
-          compact={compact}
-        />
-
         {/* Footer Action Bar */}
         <div className="pt-3 border-t border-border-subtle flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
-            <Shirt className="w-4 h-4 text-pitch" />
-            <span>
-              {isTraining
-                ? 'Treenivarusteet & Juomapullo'
-                : event.briefing?.gearAndPackingAdvice.kitRecommendation ||
-                  (isTournament ? 'Peliasu (ykkönen) + varapaita' : 'Kotipeliasu (ykkönen)')}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowExtras((prev) => !prev)}
+            aria-expanded={showExtras}
+            aria-controls={extrasId}
+            className="touch-target min-h-[44px] inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-elevated border border-border-strong text-xs font-bold text-text-secondary hover:text-text-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
+          >
+            {showExtras ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            <span>{showExtras ? 'Vähemmän' : 'Lisätiedot'}</span>
+          </button>
 
           <div className="flex items-center gap-2">
             <motion.button
@@ -898,18 +920,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
             >
               <Share2 className="w-4 h-4" />
-            </motion.button>
-
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.95 }}
-              transition={springTactile.snappy}
-              onClick={() => setIsChatOpen(true)}
-              aria-label="Päivitä tietoja chatin lailla"
-              title="Päivitä chatin lailla"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-pitch cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
-            >
-              <MessageSquare className="w-4 h-4 text-pitch" />
             </motion.button>
 
             {isPast ? (
