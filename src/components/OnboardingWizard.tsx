@@ -342,11 +342,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-2xl bg-pitch text-text-inverse flex items-center justify-center font-black text-sm shadow-sm shadow-pitch/20">
-              FD
+              PP
             </div>
             <div>
               <h1 className="text-base font-black tracking-tight text-text-primary">
-                FamDay
+                Pelipäivä
               </h1>
               <p className="text-[11px] text-text-muted">
                 Perheen arjen ja pelipäivien hermokeskus
@@ -367,7 +367,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           >
             <div>
               <h2 className="text-base font-bold text-text-primary mb-1">
-                Miten haluat käyttää FamDayta?
+                Miten haluat käyttää Pelipäivää?
               </h2>
               <p className="text-xs text-text-muted">
                 Valitse perheellesi sopiva käyttötapa. Voit muuttaa asetusta myöhemmin milloin vain.
@@ -409,8 +409,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-text-primary">Luo tai aktivoi perhe</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pitch text-text-inverse">
-                      Suositus ⭐
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base text-text-secondary border border-border-subtle">
+                      Useampi puhelin
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mt-1 leading-relaxed">
@@ -844,7 +844,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             onClick={onFinishOnboarding}
             className="w-full py-3.5 rounded-2xl bg-pitch text-text-inverse font-black text-sm flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-lg shadow-pitch/25 transition-all"
           >
-            <span>Siirry FamDay-ottelukeskukseen</span>
+            <span>Siirry ottelukeskukseen</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

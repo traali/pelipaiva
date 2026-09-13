@@ -32,11 +32,11 @@ async function resetClient(page: Page) {
 }
 
 async function enterLocalHud(page: Page) {
-  await expect(page.getByRole('heading', { name: /Miten haluat käyttää FamDayta/i })).toBeVisible({
+  await expect(page.getByRole('heading', { name: /Miten haluat käyttää Pelipäivää/i })).toBeVisible({
     timeout: 20_000
   });
   await page.getByRole('button', { name: /Vain tämä laite/i }).click();
-  await page.getByRole('button', { name: /Siirry FamDay-ottelukeskukseen/i }).click();
+  await page.getByRole('button', { name: /Siirry ottelukeskukseen/i }).click();
   await expect(page.getByRole('tab', { name: /Kaikki/i }).first()).toBeVisible({ timeout: 20_000 });
 }
 

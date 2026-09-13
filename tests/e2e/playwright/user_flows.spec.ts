@@ -14,9 +14,9 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
   });
 
   async function enterLocalHud(page: import('@playwright/test').Page) {
-    await expect(page.getByRole('heading', { name: /Miten haluat käyttää FamDayta/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Miten haluat käyttää Pelipäivää/i })).toBeVisible();
     await page.getByRole('button', { name: /Vain tämä laite/i }).click();
-    await page.getByRole('button', { name: /Siirry FamDay-ottelukeskukseen/i }).click();
+    await page.getByRole('button', { name: /Siirry ottelukeskukseen/i }).click();
     await expect(page.getByRole('tab', { name: /Kaikki/i })).toBeVisible();
   }
 
@@ -25,6 +25,12 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     await enterLocalHud(page);
     await expect(page.locator('header')).toBeVisible();
     await expect(page.locator('main')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Kaikki ottelut$/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ei otteluita vielä' })).toBeVisible();
+    await expect(
+      page.getByText('Liitä Nimenhuuto-, MyClub- tai liiton linkki, tai liitä WhatsApp-viesti.')
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Tuo joukkue' })).toBeVisible();
   });
 
   test('Flow 2: Mission Control All-profiles tab', async ({ page }) => {
@@ -46,12 +52,17 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     const modal = page.locator('div[role="dialog"]');
     await expect(modal).toBeVisible();
 
-    await expect(modal.getByRole('tab', { name: /Liitto/i })).toBeVisible();
-    await expect(modal.getByRole('tab', { name: /WhatsApp/i })).toBeVisible();
+    const classicTab = modal.getByRole('tab', { name: /Liitto/i });
+    await expect(classicTab).toBeVisible();
+    await expect(modal.getByRole('tab', { name: /Viesti/i })).toBeVisible();
     await expect(modal.getByRole('tab', { name: /Excel/i })).toBeVisible();
-    await expect(modal.getByRole('tab', { name: /Kuvakaappaus/i })).toBeVisible();
+    await expect(modal.getByRole('tab', { name: /Kuva/i })).toBeVisible();
+    await classicTab.click();
+    await expect(modal.getByRole('button', { name: 'Anna pelaajan nimi' })).toBeDisabled();
 
-    const whatsappTab = modal.getByRole('tab', { name: /WhatsApp/i });
+    const whatsappTab = modal.getByRole('tab', { name: /Viesti/i });
+    await modal.getByPlaceholder('+ Uusi nimi').fill('Simo');
+    await expect(modal.getByRole('button', { name: 'Tuo joukkue · Simo' })).toBeVisible();
     await whatsappTab.click();
     await expect(whatsappTab).toHaveAttribute('aria-selected', 'true');
     await expect(modal.getByText(/Liitä valmentajan WhatsApp-viesti/i)).toBeVisible();

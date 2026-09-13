@@ -1045,7 +1045,7 @@ export const App: React.FC = () => {
         onClear={handleClearData}
       />
 
-      <main className="mx-auto max-w-5xl px-4 pt-2">
+      <main className="mx-auto max-w-6xl px-4 pt-2">
         {isDemoActive && (
           <DemoBanner
             onOpenImport={modalStore.openSmartImport}
@@ -1132,7 +1132,7 @@ export const App: React.FC = () => {
                   : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
               }`}
             >
-              Kaikki
+              Kaikki ottelut
             </button>
             <button
               type="button"
@@ -1477,11 +1477,18 @@ export const App: React.FC = () => {
                   <CalendarIcon className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm font-black text-text-primary">Ei tulevia otteluita kalenterissa</h3>
+                  <h3 className="text-sm font-black text-text-primary">Ei otteluita vielä</h3>
                   <p className="text-xs text-text-muted max-w-sm">
-                    Tulevia otteluita ei ole vielä julkaistu sarjajärjestelmässä tai kausi on päättynyt.
+                    Liitä Nimenhuuto-, MyClub- tai liiton linkki, tai liitä WhatsApp-viesti.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => openAddTeam(activePlayerName)}
+                  className="inline-flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-2xl bg-pitch text-text-inverse text-xs font-black hover:brightness-110 transition-all cursor-pointer shadow-lg shadow-pitch/25"
+                >
+                  <span>Tuo joukkue</span>
+                </button>
 
                 {pastEvents.length > 0 && (
                   <button

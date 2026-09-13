@@ -237,7 +237,7 @@ export const ClassicUrlImportTab: React.FC<ClassicUrlImportTabProps> = ({
 
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={isSaving || !selectedPlayer.trim()}
           className="mt-2 py-3 px-4 rounded-xl bg-pitch text-text-inverse font-black text-xs flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-md shadow-pitch/25 disabled:opacity-50 transition-all"
         >
           {isSaving ? (
@@ -254,7 +254,9 @@ export const ClassicUrlImportTab: React.FC<ClassicUrlImportTabProps> = ({
                 : "Haetaan otteluita…"
               : isEditing
               ? `Tallenna muutokset · ${selectedPlayer}`
-              : `Tuo joukkue · ${selectedPlayer}`}
+              : !selectedPlayer.trim()
+                ? "Anna pelaajan nimi"
+                : `Tuo joukkue · ${selectedPlayer}`}
           </span>
         </button>
       </form>
