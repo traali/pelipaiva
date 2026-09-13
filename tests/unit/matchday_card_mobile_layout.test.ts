@@ -237,7 +237,7 @@ describe('MatchdayCard mobile default view', () => {
         event,
         playerName: 'Arto',
         colorHex: '#0f766e',
-        defaultShowExtras: true,
+        initialShowExtras: true,
         showConflictWarnings: true,
         showSmartGearAdvice: true,
       })

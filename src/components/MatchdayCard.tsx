@@ -50,7 +50,7 @@ interface MatchdayCardProps {
   colorHex?: string;
   profile?: PlayerProfile;
   compact?: boolean;
-  defaultShowExtras?: boolean;
+  initialShowExtras?: boolean;
   conflicts?: FamilyConflict[];
   showConflictWarnings?: boolean;
   showSmartGearAdvice?: boolean;
@@ -71,7 +71,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   colorHex,
   profile,
   compact = false,
-  defaultShowExtras = false,
+  initialShowExtras = false,
   conflicts,
   showConflictWarnings = false,
   showSmartGearAdvice = false,
@@ -95,12 +95,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [isWeatherDrawerOpen, setIsWeatherDrawerOpen] = useState(false);
   const [dismissedConflictWarning, setDismissedConflictWarning] = useState(false);
   const [mismatchBusy, setMismatchBusy] = useState(false);
-  const [showExtras, setShowExtras] = useState(defaultShowExtras);
+  const [showExtras, setShowExtras] = useState(initialShowExtras);
   const extrasId = React.useId();
 
   const indoor = isIndoorEvent(event);
   const {
     transitPlan,
+    isLive,
     isPast,
     formattedKickoff,
     formattedWarmup,
@@ -425,6 +426,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
           {/* Live or Kickoff Info & More Actions */}
           <div className="flex items-center gap-2">
+            {isLive ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stoppage/15 text-stoppage border border-stoppage/30 text-xs font-bold animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-stoppage" />
+                KÄYNNISSÄ
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setIsMergeOpen(true)}
