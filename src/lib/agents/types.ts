@@ -96,6 +96,7 @@ export interface TournamentBlock {
   date: string;
   venueName: string;
   childName: string;
+  teamName?: string;
   profileId: string;
   colorHex: string;
   matchCount: number;

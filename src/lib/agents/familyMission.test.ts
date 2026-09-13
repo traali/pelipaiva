@@ -330,6 +330,90 @@ describe('tournamentAgent', () => {
     expect(blocks[0]?.matchCount).toBe(2);
     expect(blocks[0]?.colorHex).toBe('#ef4444');
   });
+
+  it('does not stash Sunday and next-week games into Saturday’s day card', () => {
+    const events = [
+      ev({
+        id: 'sat',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: '2026-09-12T12:00:00+03:00',
+        title: 'Westend Indians P14 vs A',
+        homeTeam: 'Westend Indians P14',
+        awayTeam: 'A',
+        venue: {
+          name: 'Utti-halli Kouvola',
+          normalizedName: 'utti-halli',
+          coordinates: { lat: 60.89, lng: 26.91 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      }),
+      ev({
+        id: 'sun',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: '2026-09-13T16:00:00+03:00',
+        title: 'Westend Indians P14 vs B',
+        homeTeam: 'Westend Indians P14',
+        awayTeam: 'B',
+        venue: {
+          name: 'Utti-halli Kouvola',
+          normalizedName: 'utti-halli',
+          coordinates: { lat: 60.89, lng: 26.91 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      }),
+      ev({
+        id: 'later',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: '2026-09-26T10:00:00+03:00',
+        title: 'Westend Indians P14 vs C',
+        homeTeam: 'Westend Indians P14',
+        awayTeam: 'C',
+        venue: {
+          name: 'Utti-halli Kouvola',
+          normalizedName: 'utti-halli',
+          coordinates: { lat: 60.89, lng: 26.91 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      })
+    ];
+    const blocks = tournamentAgent(events, profiles);
+    expect(blocks.map((b) => b.date)).toEqual(['2026-09-12', '2026-09-13', '2026-09-26']);
+    expect(blocks.every((b) => b.matchCount === 1)).toBe(true);
+  });
+
+  it('keeps two kids as two cards even at the same hall', () => {
+    const events = [
+      ev({
+        id: 's1',
+        profileId: 'p-simo',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: isoOn(0, 12, 0),
+      }),
+      ev({
+        id: 'a1',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: isoOn(0, 12, 30)
+      })
+    ];
+    const blocks = tournamentAgent(events, profiles);
+    expect(blocks).toHaveLength(2);
+    expect(new Set(blocks.map((b) => b.profileId)).size).toBe(2);
+  });
 });
 
 describe('runMissionControlGraph', () => {

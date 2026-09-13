@@ -80,6 +80,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                       }}
                     >
                       {b.childName}
+                      {b.teamName ? ` · ${b.teamName}` : ''}
                     </span>
                     <span className="text-[11px] font-semibold text-text-muted capitalize">
                       {dayLabel}
@@ -126,7 +127,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
               {isExpanded && matches.length > 0 && (
                 <div className="pl-1.5 pt-2 border-t border-border-subtle flex flex-col gap-2">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
-                    <span>Turnauksen kaikki ottelut:</span>
+                    <span>Tämän päivän ottelut{b.teamName ? ` · ${b.teamName}` : ''}:</span>
                     <span>{matches.length} kpl</span>
                   </div>
 
@@ -189,8 +190,10 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                           </div>
 
                           <div className="flex items-center justify-between gap-2 pt-0.5">
-                            <span className="font-bold text-text-primary text-[13px] truncate">
-                              {m.title}
+                            <span className="font-bold text-text-primary text-[13px] leading-snug">
+                              {m.homeTeam && m.awayTeam
+                                ? `${m.homeTeam} – ${m.awayTeam}`
+                                : m.title}
                             </span>
 
                             {isPast || m.score ? (
