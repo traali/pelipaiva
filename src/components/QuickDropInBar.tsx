@@ -312,7 +312,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
             value={text}
             onFocus={() => setIsExpanded(true)}
             onChange={(e) => setText(e.target.value)}
-            placeholder="💬 Liitä teksti WhatsAppista, MyClubista tai kirjoita oma merkintä..."
+            placeholder="Liitä viesti tai .ics-linkki"
             className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted focus:outline-none font-medium"
           />
 

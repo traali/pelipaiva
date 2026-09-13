@@ -1055,7 +1055,7 @@ export const App: React.FC = () => {
         {/* Sticky Profile Filter & View Mode Switcher Header */}
         <div
           ref={stickyFilterRef}
-          className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2 shadow-xs"
+          className="sticky top-0 z-20 -mx-4 px-4 py-1.5 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-2 flex flex-col gap-1.5 shadow-xs"
         >
           {/* Row 1: View Mode Switcher */}
           <div
