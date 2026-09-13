@@ -496,70 +496,69 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     const calDate = new Date(cal.startTime);
     let bestFix: MatchdayEvent | undefined;
     let bestDiffMins = Infinity;
+    let sameDayPool: MatchdayEvent[] = [];
 
-    // Search for closest matching candidate within 180 min window on the same local date
-    // Tournaments wait for the same-day pool so we do not bind a single vs-card.
-    if (!isTournamentish(cal)) {
-    for (const fix of bareFixtures) {
-      if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) continue;
-      if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) continue;
+    // Always fold every same-day TASO game for this team onto one card
+    // (turnaus, two league games, cup — title does not matter).
+    const sameDayTeam = bareFixtures.filter((fix) => {
+      if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
+      if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
+      if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+      if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
+      return (
+        isCalendarFixtureMatch(cal, fix) ||
+        calculateTeamSimilarity(cal.title, fix.homeTeam) >= 0.45 ||
+        calculateTeamSimilarity(cal.title, fix.awayTeam) >= 0.45 ||
+        calculateTeamSimilarity(cal.homeTeam, fix.homeTeam) >= 0.45 ||
+        calculateTeamSimilarity(cal.homeTeam, fix.awayTeam) >= 0.45
+      );
+    }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-      const fixDate = new Date(fix.startTime);
-      const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-      if (diffMins > 180 || helsinkiDayKey(calDate) !== helsinkiDayKey(fixDate)) continue;
+    if (sameDayTeam.length >= 2) {
+      sameDayPool = sameDayTeam;
+      bestFix = sameDayTeam.reduce((best, f) => {
+        const d = Math.abs(new Date(f.startTime).getTime() - calDate.getTime());
+        const bd = Math.abs(new Date(best.startTime).getTime() - calDate.getTime());
+        return d < bd ? f : best;
+      }, sameDayTeam[0]!);
+    } else if (sameDayTeam.length === 1) {
+      bestFix = sameDayTeam[0];
+    } else if (!isTournamentish(cal)) {
+      for (const fix of bareFixtures) {
+        if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) continue;
+        if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) continue;
 
-      if (isCalendarFixtureMatch(cal, fix)) {
-        if (diffMins < bestDiffMins) {
-          bestDiffMins = diffMins;
-          bestFix = fix;
+        const fixDate = new Date(fix.startTime);
+        const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
+        if (diffMins > 180 || helsinkiDayKey(calDate) !== helsinkiDayKey(fixDate)) continue;
+
+        if (isCalendarFixtureMatch(cal, fix)) {
+          if (diffMins < bestDiffMins) {
+            bestDiffMins = diffMins;
+            bestFix = fix;
+          }
         }
       }
     }
-    }
 
-    if (!bestFix && isTournamentish(cal)) {
-      const sameDay = bareFixtures.filter((fix) => {
-        if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
-        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
-        return helsinkiDayKey(calDate) === helsinkiDayKey(new Date(fix.startTime));
-      });
-      const calVenue = (cal.venue?.name || '').toLowerCase().replace(/[\s\-_]/g, '');
-      const venueHits = calVenue
-        ? sameDay.filter((f) => {
-            const off = (f.venue?.name || '').toLowerCase().replace(/[\s\-_]/g, '');
-            return off && (calVenue.includes(off) || off.includes(calVenue));
-          })
-        : [];
-      const pool = (venueHits.length ? venueHits : sameDay)
-        .slice()
-        .sort((a, b) => a.startTime.localeCompare(b.startTime));
-      const teamish = pool.filter(
-        (f) =>
-          calculateTeamSimilarity(cal.title, f.homeTeam) >= 0.45 ||
-          calculateTeamSimilarity(cal.title, f.awayTeam) >= 0.45 ||
-          calculateTeamSimilarity(cal.homeTeam, f.homeTeam) >= 0.45
-      );
-      const chosen = venueHits.length ? pool : teamish;
-      if (chosen[0]) {
-        bestFix = chosen[0];
-        cal.officialGameTimes = chosen.map((f) => ({
-          startTime: f.startTime,
-          title: f.homeTeam && f.awayTeam ? `${f.homeTeam} vs ${f.awayTeam}` : f.title,
-          officialFixtureId: f.officialFixtureId || f.id.replace(/^fixture-[^-]+-/, '')
-        }));
-        for (const f of chosen) {
-          usedFixtureIds.add(f.id);
-          bareFixtureIdsToDelete.add(f.id);
-        }
+    if (sameDayPool.length >= 2) {
+      cal.officialGameTimes = sameDayPool.map((f) => ({
+        startTime: f.startTime,
+        title: f.homeTeam && f.awayTeam ? `${f.homeTeam} vs ${f.awayTeam}` : f.title,
+        officialFixtureId: f.officialFixtureId || f.id.replace(/^fixture-[^-]+-/, ''),
+      }));
+      for (const f of sameDayPool) {
+        usedFixtureIds.add(f.id);
+        bareFixtureIdsToDelete.add(f.id);
       }
     }
 
     if (bestFix) {
       const fix = bestFix;
       const fixDate = new Date(fix.startTime);
-      const keepTournamentTitle = isTournamentish(cal);
+      const keepMultiGameTitle = isTournamentish(cal) || sameDayPool.length >= 2;
 
-      if (!keepTournamentTitle) {
+      if (!keepMultiGameTitle) {
         cal.homeTeam = fix.homeTeam;
         cal.awayTeam = fix.awayTeam;
         cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
@@ -570,7 +569,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       cal.tournamentName = cal.tournamentName || fix.tournamentName;
 
       applyOfficialKickoffKeepCalendarArrival(cal, fix);
-      if (keepTournamentTitle) {
+      if (keepMultiGameTitle) {
         cal.warmupTime = new Date(calDate).toISOString();
       }
 

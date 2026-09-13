@@ -126,6 +126,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   });
 
   const venue = isVenueModalOpen ? localVenue : event.venue;
+  const multiGame = (event.officialGameTimes?.length || 0) > 1;
 
   const handleOpenStats = () => {
     let resolved = stats;
@@ -473,9 +474,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     ? `Alkaa ${formattedKickoff}`
                     : isTraining
                     ? `Treeni ${formattedKickoff}`
-                    : isTournament && formattedWarmup === formattedKickoff
+                    : (isTournament || multiGame) && formattedWarmup === formattedKickoff
                     ? `Kokoontuminen ${formattedKickoff}`
-                    : isTournament
+                    : isTournament || multiGame
                     ? `1. peli ${formattedKickoff}`
                     : `Ottelu ${formattedKickoff}`}
                 </span>
@@ -567,6 +568,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <span>
                 {isTraining
                   ? `Treeni klo ${formattedKickoff}`
+                  : multiGame && formattedWarmup === formattedKickoff
+                  ? `Kokoontuminen klo ${formattedKickoff}`
+                  : multiGame
+                  ? `1. peli klo ${formattedKickoff}`
                   : isTournament && formattedWarmup === formattedKickoff
                   ? `Kokoontuminen klo ${formattedKickoff}`
                   : isTournament
@@ -584,7 +589,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </span>
             )}
           </div>
-          {isTournament && (event.officialGameTimes?.length || 0) > 0 && (
+          {(event.officialGameTimes?.length || 0) > 1 && (
             <ul className="mt-1.5 mb-1 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1">
               {event.officialGameTimes!.map((g) => (
                 <li key={`${g.startTime}-${g.title}`} className="flex items-center justify-between gap-2 text-sm">

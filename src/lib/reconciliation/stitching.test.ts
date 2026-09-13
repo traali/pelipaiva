@@ -275,4 +275,47 @@ END:VCALENDAR`;
       'Westend Indians vs Oilers'
     ]);
   });
+
+  it('always lists same-day TASO games on one card even without the word turnaus', () => {
+    const cal = mockEvent({
+      id: 'nh-yellow',
+      sport: 'floorball',
+      title: 'Westend Indians P14 Yellow',
+      homeTeam: 'Westend Indians P14 Yellow',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z',
+      venue: {
+        name: 'Tuusulan Salibandyhalli',
+        normalizedName: 'tuusulan salibandyhalli',
+        coordinates: { lat: 60.4042, lng: 25.0275 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-1',
+      officialFixtureId: 'ssbl_1',
+      sport: 'floorball',
+      title: 'SB Vantaa Orange vs Westend Indians Yellow',
+      homeTeam: 'SB Vantaa Orange',
+      awayTeam: 'Westend Indians Yellow',
+      startTime: '2026-09-13T13:00:00.000Z',
+      venue: cal.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-2',
+      officialFixtureId: 'ssbl_2',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Oilers',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Oilers',
+      startTime: '2026-09-13T14:45:00.000Z',
+      venue: cal.venue
+    });
+    const stitched = stitchCalendarEventsWithFixtures([cal, g1, g2]);
+    expect(stitched).toHaveLength(1);
+    expect(stitched[0]!.officialGameTimes).toHaveLength(2);
+    expect(stitched[0]!.title).toBe('Westend Indians P14 Yellow');
+  });
 });
