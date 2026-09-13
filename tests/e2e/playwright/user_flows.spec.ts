@@ -64,6 +64,12 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     await modal.getByRole('button', { name: 'Jäsennä ottelutiedot tekoälyllä' }).click();
     await expect(modal.getByRole('alert')).toContainText('Anna pelaajan nimi ennen tuontia.');
 
+    const excelTab = modal.getByRole('tab', { name: /Excel/i });
+    await excelTab.click();
+    await modal.locator('textarea').first().fill('15.9.\t10:00\tHJK vs EPS\tTali');
+    await modal.getByRole('button', { name: 'Jäsennä taulukon ottelut' }).click();
+    await expect(modal.getByRole('alert')).toContainText('Anna pelaajan nimi ennen tuontia.');
+
     await classicTab.click();
     await expect(modal.getByRole('button', { name: 'Anna pelaajan nimi' })).toBeDisabled();
 
@@ -73,7 +79,6 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     await expect(messageTab).toHaveAttribute('aria-selected', 'true');
     await expect(modal.getByText(/Liitä valmentajan WhatsApp-viesti/i)).toBeVisible();
 
-    const excelTab = modal.getByRole('tab', { name: /Excel/i });
     await excelTab.click();
     await expect(modal.getByText(/Kopioi taulukko Sheetsistä/i)).toBeVisible();
     await expect(excelTab).toHaveAttribute('aria-selected', 'true');
