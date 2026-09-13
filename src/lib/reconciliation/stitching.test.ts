@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { stitchCalendarEventsWithFixtures, fixtureInvolvesOwnTeam, isKickoffAfterKokoontuminen } from './reconciliationEngine';
+import { stitchCalendarEventsWithFixtures, fixtureInvolvesOwnTeam, isKickoffAfterKokoontuminen, applyResolutionDecision } from './reconciliationEngine';
 import { parseICSFeed } from '../calendar/icsParser';
 import { generateIcsCalendarFeed } from '../calendar/calendarFeedGenerator';
-import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import { MatchdayEvent, OfficialLeagueFixture, PlayerProfile } from '../../types/matchday';
 
 const defaultVenue = {
   name: 'Väinämöinen tn',
@@ -435,5 +435,73 @@ END:VCALENDAR`;
     const card = stitched.find((e) => e.id === 'nh-yellow')!;
     expect(card.officialFixtureId).toBe('ssbl_own');
     expect(card.officialGameTimes?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
+  it('clears mismatch flags for all applyResolutionDecision outcomes', () => {
+    const event = mockEvent({
+      id: 'resolve-base',
+      officialFixtureId: 'spl_old',
+      mismatchFlags: {
+        timeMismatch: true,
+        timeDiffMinutes: 45,
+        calendarStartTime: '09.15',
+        officialStartTime: '10.00'
+      }
+    });
+    const fixture: OfficialLeagueFixture = {
+      id: 'spl_445566',
+      teamId: 'team-1',
+      association: 'palloliitto',
+      sport: 'football',
+      leagueName: 'P13 Kakkonen',
+      homeTeam: 'PPJ',
+      awayTeam: 'EPS',
+      isHome: true,
+      startTime: '2026-09-12T07:00:00.000Z',
+      venueName: 'Väinämöinen tn',
+      status: 'upcoming',
+      fetchedAt: '2026-09-01T08:00:00.000Z'
+    };
+
+    expect(applyResolutionDecision(event, fixture, 'use_official').mismatchFlags).toBeUndefined();
+    expect(applyResolutionDecision(event, fixture, 'keep_calendar').mismatchFlags).toBeUndefined();
+    expect(applyResolutionDecision(event, fixture, 'unlink').mismatchFlags).toBeUndefined();
+  });
+
+  it('suppresses mismatch flags for stitched events with user overrides', () => {
+    const cal = mockEvent({
+      id: 'myclub-override',
+      title: 'PPJ Laru Sininen vs EPS Valkoinen',
+      homeTeam: 'PPJ Laru Sininen',
+      awayTeam: 'EPS Valkoinen',
+      startTime: '2026-09-12T06:15:00.000Z',
+      venue: {
+        ...defaultVenue,
+        name: 'Väinämöisen kenttä tn, Helsinki'
+      },
+      mismatchFlags: {
+        venueMismatch: true,
+        calendarVenueName: 'Väinämöisen kenttä tn, Helsinki',
+        officialVenueName: 'Väinämöinen tn'
+      },
+      userOverride: {
+        action: 'keep_calendar',
+        appliedAt: '2026-09-12T06:20:00.000Z',
+        notes: 'User chose calendar details'
+      }
+    });
+    const fix = mockEvent({
+      id: 'fixture-spl-override',
+      title: 'PPJ/Laru Sininen vs EPS/Valkoinen',
+      homeTeam: 'PPJ/Laru Sininen',
+      awayTeam: 'EPS/Valkoinen',
+      officialFixtureId: 'spl_override',
+      startTime: '2026-09-12T07:00:00.000Z',
+      venue: defaultVenue
+    });
+
+    const stitched = stitchCalendarEventsWithFixtures([cal, fix]);
+    const card = stitched.find((e) => e.id === 'myclub-override');
+    expect(card?.mismatchFlags).toBeUndefined();
   });
 });

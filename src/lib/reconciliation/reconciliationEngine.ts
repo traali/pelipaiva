@@ -392,6 +392,7 @@ export function applyResolutionDecision(
       isHomeMatch: officialFixture.isHome,
       officialFixtureId: officialFixture.id,
       reconciliationStatus: 'manual_matched',
+      mismatchFlags: undefined,
       userOverride: {
         action: 'adopt_official',
         appliedAt: now,
@@ -405,6 +406,7 @@ export function applyResolutionDecision(
       ...event,
       officialFixtureId: officialFixture.id,
       reconciliationStatus: 'manual_matched',
+      mismatchFlags: undefined,
       userOverride: {
         action: 'keep_calendar',
         appliedAt: now,
@@ -418,6 +420,7 @@ export function applyResolutionDecision(
     ...event,
     officialFixtureId: undefined,
     reconciliationStatus: 'unlinked',
+    mismatchFlags: undefined,
     userOverride: {
       action: 'unlink',
       appliedAt: now,
@@ -651,6 +654,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       const fix = bestFix;
       const fixDate = new Date(fix.startTime);
       const keepMultiGameTitle = isTournamentish(cal) || sameDayPool.length >= 2;
+      const suppressMismatchFlags = Boolean(cal.userOverride);
 
       if (!keepMultiGameTitle) {
         cal.homeTeam = fix.homeTeam;
@@ -669,7 +673,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
 
       // If official kickoff differs from original calendar time, attach mismatch flags
       const timeDiffMins = Math.round(Math.abs(fixDate.getTime() - calDate.getTime()) / 60000);
-      if (timeDiffMins >= 5) {
+      if (!suppressMismatchFlags && timeDiffMins >= 5) {
         cal.mismatchFlags = {
           ...cal.mismatchFlags,
           timeMismatch: true,
@@ -692,7 +696,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
           fixVenueName.toLowerCase() !== calVenueName.toLowerCase() &&
           (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !==
             (cal.venue?.normalizedName || calVenueName.toLowerCase());
-        if (venuesDiffer) {
+        if (!suppressMismatchFlags && venuesDiffer) {
           cal.mismatchFlags = {
             ...cal.mismatchFlags,
             venueMismatch: true,
@@ -703,6 +707,9 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         } else if (fix.venue) {
           cal.venue = fix.venue;
         }
+      }
+      if (suppressMismatchFlags) {
+        cal.mismatchFlags = undefined;
       }
 
       // Claim fixture: prevent greedy overwriting in doubleheaders (<180m apart)
@@ -783,4 +790,3 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
 }
-

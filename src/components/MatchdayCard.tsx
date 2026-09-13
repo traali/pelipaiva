@@ -39,6 +39,7 @@ import { db } from '../lib/storage/db';
 import type { HomeLocation } from '../types/matchday';
 import { useMatchdayLogistics, surfaceLabel } from '../hooks/useMatchdayLogistics';
 import { TalkooDutyTag } from './matchday';
+import { MismatchResolveBanner, type MismatchDecision } from './MismatchResolveBanner';
 
 import { EventMergeModal } from './EventMergeModal';
 import { MoreHorizontal } from 'lucide-react';
@@ -55,7 +56,7 @@ interface MatchdayCardProps {
   showSmartGearAdvice?: boolean;
   homeLocation?: HomeLocation;
   onNavigateToVenue?: () => void;
-  onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
+  onResolveMismatch?: (eventId: string, decision: MismatchDecision) => void;
   onOpenHomeModal?: () => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
   onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
@@ -91,6 +92,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [playerLog, setPlayerLog] = useState<PlayerMatchLog | undefined>(event.playerLog);
   const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
   const [isWeatherDrawerOpen, setIsWeatherDrawerOpen] = useState(false);
+  const [dismissedConflictWarning, setDismissedConflictWarning] = useState(false);
+  const [mismatchBusy, setMismatchBusy] = useState(false);
 
   const indoor = isIndoorEvent(event);
   const {
@@ -307,40 +310,26 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
         )}
 
-        {/* Conflict Warning Banner (only if no detailed conflict cards exist) */}
-        {!isOut && event.briefing?.conflictWarning && consolidatedConflictGroups.length === 0 && (
-          <div className="mb-4 flex items-center gap-2 p-2.5 rounded-xl bg-whistle/15 border border-whistle/30 text-whistle text-xs font-semibold">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>{event.briefing.conflictWarning}</span>
-          </div>
-        )}
-
-        {/* Schedule / Venue Mismatch Warning & 1-Tap Resolution Banner */}
-        {!isOut && event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
-          <div className="mb-3 px-3 py-1.5 rounded-xl bg-whistle/10 border border-whistle/25 flex items-center gap-2 flex-wrap">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-whistle" />
-            <span className="text-whistle text-[11px] font-semibold flex-1 min-w-0 truncate">
-              {event.mismatchFlags.timeMismatch
-                ? `Aikataulumuutos: ${event.mismatchFlags.calendarStartTime || ''} ➔ ${event.mismatchFlags.officialStartTime || ''}`
-                : `Kenttämuutos: ${event.mismatchFlags.calendarVenueName || ''} ➔ ${event.mismatchFlags.officialVenueName || ''}`}
-            </span>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => onResolveMismatch?.(event.id, 'use_official')}
-                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[10px] font-bold hover:brightness-110 cursor-pointer"
-              >
-                Päivitä liiton tietoon
-              </button>
-              <button
-                type="button"
-                onClick={() => onResolveMismatch?.(event.id, 'keep_calendar')}
-                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[10px] font-medium border border-border-subtle cursor-pointer"
-              >
-                Säilytä oma
-              </button>
-            </div>
-          </div>
+        {!isOut && (
+          <MismatchResolveBanner
+            event={event}
+            conflictWarning={
+              dismissedConflictWarning || consolidatedConflictGroups.length > 0
+                ? undefined
+                : event.briefing?.conflictWarning
+            }
+            resolving={mismatchBusy}
+            onDismissConflict={() => setDismissedConflictWarning(true)}
+            onResolve={async (eventId, decision) => {
+              if (!onResolveMismatch) return;
+              setMismatchBusy(true);
+              try {
+                await Promise.resolve(onResolveMismatch(eventId, decision));
+              } finally {
+                setMismatchBusy(false);
+              }
+            }}
+          />
         )}
 
         {/* Lightning Danger Alert Banner */}
