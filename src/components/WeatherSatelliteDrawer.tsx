@@ -28,7 +28,7 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
   venueName = 'Pelipaikka',
   weather,
 }) => {
-  const [activeLayer, setActiveLayer] = useState<LayerId>('fmi_rain_radar');
+  const [activeLayer] = useState<LayerId>('fmi_rain_radar');
   const [frameIndex, setFrameIndex] = useState<number>(5);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
 
@@ -156,20 +156,13 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
               )}
 
               {weather && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   <div className="p-3 rounded-xl bg-surface-elevated/70 border border-border-subtle flex flex-col">
                     <span className="text-[11px] font-semibold text-text-muted">Lämpötila</span>
                     <span className="text-base font-extrabold text-text-primary font-tabular mt-0.5">
                       {weather.temperatureC.toFixed(1)}°C
                     </span>
                     <span className="text-[10px] text-text-muted">(tuntuu {weather.feelsLikeC.toFixed(1)}°)</span>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-surface-elevated/70 border border-border-subtle flex flex-col">
-                    <span className="text-[11px] font-semibold text-text-muted">Kentän pito</span>
-                    <span className="text-xs font-bold text-text-primary mt-1">
-                      {weather.turfConditionLabelFi || 'Kuiva tekonurmi'}
-                    </span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-surface-elevated/70 border border-border-subtle flex flex-col">
@@ -184,7 +177,7 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
                   </div>
 
                   <div className="p-3 rounded-xl bg-surface-elevated/70 border border-border-subtle flex flex-col">
-                    <span className="text-[11px] font-semibold text-text-muted">Sadesumma</span>
+                    <span className="text-[11px] font-semibold text-text-muted">Sade</span>
                     <span className="text-base font-extrabold text-sky-400 font-tabular mt-0.5 flex items-center gap-1">
                       <CloudRain className="w-3.5 h-3.5" />
                       {weather.precipitationMmh.toFixed(1)} <span className="text-xs font-normal">mm/h</span>
@@ -193,41 +186,9 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
                 </div>
               )}
 
-              <div className="flex items-center gap-2 p-1 rounded-xl bg-surface-elevated/50 border border-border-subtle">
-                <button
-                  type="button"
-                  onClick={() => setActiveLayer('fmi_rain_radar')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeLayer === 'fmi_rain_radar'
-                      ? 'bg-pitch text-white shadow-xs'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  🌧️ Sadetutka
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveLayer('eumetsat_natural')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeLayer === 'eumetsat_natural'
-                      ? 'bg-pitch text-white shadow-xs'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  🛰️ Satelliitti
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveLayer('fmi_lightning')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    activeLayer === 'fmi_lightning'
-                      ? 'bg-pitch text-white shadow-xs'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  ⚡ Salamaniskut
-                </button>
-              </div>
+              <p className="text-[11px] text-text-muted">
+                Sadetutka (FMI). Salama ei ole karttakerros — hälytys tulee, jos isku on alle 10–20 km.
+              </p>
 
               <div className="relative rounded-2xl overflow-hidden border border-border-subtle aspect-[4/3] bg-slate-950 shadow-inner">
                 {coordsOk ? (

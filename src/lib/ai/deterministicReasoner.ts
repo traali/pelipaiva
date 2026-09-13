@@ -9,6 +9,7 @@ import {
   TransitPlan
 } from '../../types/matchday';
 import { resolveTransitPlan } from '../geo/transitEngine';
+import { isIndoorEvent } from '../sport/isIndoorEvent';
 
 export function determineFootwear(
   surface: PitchSurface,
@@ -171,7 +172,7 @@ export function generateMatchdayBriefing(
   arrivalRules?: ArrivalRules
 ): MatchdayBriefing {
   const { weather, venue, volunteerDuty } = event;
-  const isOutdoor = !venue.isIndoor;
+  const isOutdoor = !isIndoorEvent(event);
   const temp = weather?.temperatureC ?? 15;
   const rain = weather?.precipitationMmh ?? 0;
   const isSchool = event.sport === 'school' || event.eventType === 'school';

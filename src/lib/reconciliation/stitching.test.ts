@@ -319,7 +319,7 @@ END:VCALENDAR`;
     expect(stitched[0]!.title).toBe('Westend Indians P14 Yellow');
   });
 
-  it('does not attach TASO games that kick off before Nimenhuuto kokoontuminen', () => {
+  it('lists both own-team TASO games on a Nimenhuuto day; clock stays the game after meetup', () => {
     const cal = mockEvent({
       id: 'nh-15',
       sport: 'floorball',
@@ -328,7 +328,7 @@ END:VCALENDAR`;
       title: 'Westend Indians P14: Turnaus Yellow',
       homeTeam: 'Westend Indians P14 Yellow',
       awayTeam: '',
-      startTime: '2026-09-13T12:00:00.000Z', // 15.00 FI meetup
+      startTime: '2026-09-13T12:00:00.000Z',
       warmupTime: '2026-09-13T12:00:00.000Z'
     });
     const morning = mockEvent({
@@ -338,7 +338,8 @@ END:VCALENDAR`;
       title: 'Westend Indians Yellow vs SB Vantaa',
       homeTeam: 'Westend Indians Yellow',
       awayTeam: 'SB Vantaa',
-      startTime: '2026-09-13T09:00:00.000Z' // 12.00 FI — before meetup
+      score: '3-2',
+      startTime: '2026-09-13T09:00:00.000Z'
     });
     const after = mockEvent({
       id: 'fixture-ssbl-after',
@@ -347,12 +348,45 @@ END:VCALENDAR`;
       title: 'Westend Indians Yellow vs Oilers',
       homeTeam: 'Westend Indians Yellow',
       awayTeam: 'Oilers',
-      startTime: '2026-09-13T13:00:00.000Z' // 16.00 FI
+      score: '7-1',
+      startTime: '2026-09-13T13:00:00.000Z'
     });
     const stitched = stitchCalendarEventsWithFixtures([cal, morning, after]);
     const card = stitched.find((e) => e.id === 'nh-15')!;
-    expect(card.officialGameTimes?.map((g) => g.officialFixtureId) || [card.officialFixtureId]).toEqual(['ssbl_after']);
-    expect(stitched.some((e) => e.officialFixtureId === 'ssbl_morning' || e.id.includes('morning'))).toBe(true);
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_morning', 'ssbl_after']);
+    expect(card.startTime).toBe('2026-09-13T13:00:00.000Z');
+    expect(card.warmupTime).toBe('2026-09-13T12:00:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.score)).toEqual(['3-2', '7-1']);
+  });
+
+  it('already-linked Nimenhuuto card still lists a leftover same-day own-team game', () => {
+    const cal = mockEvent({
+      id: 'nh-linked',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'SB Vantaa Orange vs Westend Indians Yellow',
+      homeTeam: 'SB Vantaa Orange',
+      awayTeam: 'Westend Indians Yellow',
+      officialFixtureId: 'ssbl_after',
+      score: '7-1',
+      startTime: '2026-09-13T13:00:00.000Z',
+      warmupTime: '2026-09-13T12:00:00.000Z'
+    });
+    const earlier = mockEvent({
+      id: 'fixture-ssbl-early',
+      officialFixtureId: 'ssbl_early',
+      sport: 'floorball',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Oilers',
+      title: 'Westend Indians Yellow vs Oilers',
+      score: '4-4',
+      startTime: '2026-09-13T09:30:00.000Z'
+    });
+    const stitched = stitchCalendarEventsWithFixtures([cal, earlier]);
+    const card = stitched.find((e) => e.id === 'nh-linked')!;
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_early', 'ssbl_after']);
+    expect(stitched).toHaveLength(1);
   });
 
   it('does not attach another squad or a pool game the child is not in', () => {

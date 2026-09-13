@@ -24,6 +24,7 @@ import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
+import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
 import { lookupKnownField } from '../lib/geo/sportsGeocoder';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
@@ -90,13 +91,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [currentScore, setCurrentScore] = useState<string | undefined>(event.score);
   const [isWeatherDrawerOpen, setIsWeatherDrawerOpen] = useState(false);
 
+  const indoor = isIndoorEvent(event);
   const effectiveWeather = React.useMemo(() => {
     if (event.weather) return event.weather;
-    if (!event.venue.isIndoor && event.venue.coordinates?.lat && event.venue.coordinates?.lng) {
+    if (!indoor && event.venue.coordinates?.lat && event.venue.coordinates?.lng) {
       return getDeterministicWeatherFallback(event.venue.coordinates, event.startTime);
     }
-    return undefined;
-  }, [event.weather, event.venue.isIndoor, event.venue.coordinates, event.startTime]);
+    return event.weather;
+  }, [event.weather, indoor, event.venue.coordinates, event.startTime]);
+  const lightningAlert = event.lightning || effectiveWeather?.lightningSafety;
 
   const {
     transitPlan,
@@ -329,10 +332,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         )}
 
         {/* Lightning Danger Alert Banner */}
-        {!isOut && event.lightning && event.lightning.status === 'danger' && (
-          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold animate-pulse">
+        {!isOut && lightningAlert && (lightningAlert.status === 'danger' || lightningAlert.status === 'watch') && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>{event.lightning.alertMessage}</span>
+            <span>
+              {lightningAlert.alertMessage ||
+                (lightningAlert.status === 'danger'
+                  ? `Salama ${lightningAlert.nearestStrikeKm ?? '?'} km — 30/30 sääntö`
+                  : `Salamoita ${lightningAlert.nearestStrikeKm ?? '?'} km päässä`)}
+            </span>
           </div>
         )}
 
@@ -596,15 +604,21 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           </div>
           {(event.officialGameTimes?.length || 0) > 1 && (
             <ul className="mt-1.5 mb-1 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1">
-              {event.officialGameTimes!.map((g) => (
+              {event.officialGameTimes!.map((g, i) => (
                 <li key={`${g.startTime}-${g.title}`} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="font-semibold text-text-primary truncate">{g.title}</span>
-                  <span className="font-black font-tabular text-pitch shrink-0">
+                  <span className="font-semibold text-text-primary leading-snug">
+                    <span className="text-[10px] font-bold text-text-muted mr-1.5">{i + 1}.</span>
+                    {g.title}
+                  </span>
+                  <span className="font-black font-tabular text-pitch shrink-0 flex items-center gap-2">
                     {new Date(g.startTime).toLocaleTimeString('fi-FI', {
                       hour: '2-digit',
                       minute: '2-digit',
                       timeZone: 'Europe/Helsinki'
                     })}
+                    {g.score ? (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-pitch/15 border border-pitch/25">{g.score}</span>
+                    ) : null}
                   </span>
                 </li>
               ))}
@@ -625,7 +639,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               )}
             </span>
             <span className="text-[10px] md:text-xs px-2 py-0.5 rounded-md bg-surface-elevated text-text-muted border border-border-subtle shrink-0">
-              {surfaceLabel(venue.surface, venue.isIndoor)}
+              {indoor ? 'Sisähalli' : surfaceLabel(venue.surface, venue.isIndoor)}
             </span>
             <button
               type="button"
@@ -838,7 +852,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           <div className="mb-4">
             <MatchdayCardWeatherBadge
               weather={effectiveWeather}
-              onOpenRadar={() => setIsWeatherDrawerOpen(true)}
+              indoor={indoor}
+              onOpenRadar={indoor ? undefined : () => setIsWeatherDrawerOpen(true)}
             />
           </div>
         )}
@@ -1043,7 +1058,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
       />
 
       {/* Interactive Weather, Radar & Lightning Safety Drawer */}
-      {isWeatherDrawerOpen && effectiveWeather && radarCoords && (
+      {!indoor && isWeatherDrawerOpen && effectiveWeather && radarCoords && (
         <WeatherSatelliteDrawer
           isOpen={isWeatherDrawerOpen}
           onClose={() => setIsWeatherDrawerOpen(false)}

@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { Coordinates, WeatherCondition } from '../../types/matchday';
+import { compute30_30Rule, type LightningStrike } from './lightningSafety';
 
 /**
  * FMI Open Data WFS Stored Queries and Constants
@@ -42,6 +43,62 @@ export function calculateFeelsLike(tempC: number, windSpeedMs: number, humidityP
     return Math.round(tempC + 0.33 * (humidityPercent / 100 * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC))) - 4.0);
   }
   return Math.round(tempC);
+}
+
+/** FMI lightning MultiPointCoverage positions: lat lon unixTime (repeat). */
+export function parseLightningWfs(xml: string): LightningStrike[] {
+  if (!xml || xml.includes('numberReturned="0"')) return [];
+  const block = xml.match(/<gmlcov:positions>([\s\S]*?)<\/gmlcov:positions>/i)?.[1]
+    || xml.match(/<gml:posList>([\s\S]*?)<\/gml:posList>/i)?.[1];
+  if (!block) return [];
+  const nums = block.trim().split(/\s+/).map(Number).filter((n) => Number.isFinite(n));
+  const strikes: LightningStrike[] = [];
+  for (let i = 0; i + 2 < nums.length; i += 3) {
+    const lat = nums[i]!;
+    const lng = nums[i + 1]!;
+    const t = nums[i + 2]!;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
+    const ms = t > 1e12 ? t : t > 1e9 ? t * 1000 : Date.now();
+    strikes.push({ lat, lng, timeIso: new Date(ms).toISOString() });
+  }
+  return strikes;
+}
+
+async function fetchLightningSafety(coords: Coordinates, startTimeIso: string): Promise<WeatherCondition['lightningSafety']> {
+  const clear = {
+    status: 'clear' as const,
+    strikesWithin30kmCount: 0,
+    suspendMatchRecommended: false,
+    downpourWarning: false
+  };
+  try {
+    const ref = new Date(startTimeIso).getTime();
+    const now = Date.now();
+    const live = Number.isFinite(ref) && Math.abs(now - ref) < 6 * 3600_000;
+    const endMs = live ? now : (Number.isFinite(ref) ? ref + 60 * 60_000 : now);
+    const startMs = endMs - 30 * 60_000;
+    const dLat = 30 / 111.32;
+    const dLng = 30 / (111.32 * Math.max(0.2, Math.cos((coords.lat * Math.PI) / 180)));
+    const bbox = [
+      (coords.lng - dLng).toFixed(3),
+      (coords.lat - dLat).toFixed(3),
+      (coords.lng + dLng).toFixed(3),
+      (coords.lat + dLat).toFixed(3)
+    ].join(',');
+    const url =
+      `${FMI_CONFIG.wfsBaseUrl}?service=WFS&version=2.0.0&request=GetFeature` +
+      `&storedquery_id=${encodeURIComponent(FMI_CONFIG.queryLightning)}` +
+      `&starttime=${encodeURIComponent(new Date(startMs).toISOString())}` +
+      `&endtime=${encodeURIComponent(new Date(endMs).toISOString())}` +
+      `&bbox=${bbox}`;
+    const res = await fetch(url);
+    if (!res.ok) return clear;
+    const xml = await res.text();
+    const strikes = parseLightningWfs(xml);
+    return compute30_30Rule(coords, strikes, live ? now : endMs);
+  } catch {
+    return clear;
+  }
 }
 
 // Deterministic snapshot cache for Finnish sports hubs (Zero-Mock Fallback)
@@ -275,7 +332,9 @@ async function fetchFmiMatchWeatherUncached(
     }
 
     if (!Number.isFinite(temperature) || !Number.isFinite(windSpeed)) {
-      return getDeterministicWeatherFallback(coords, startTimeIso);
+      const fb = getDeterministicWeatherFallback(coords, startTimeIso);
+      fb.lightningSafety = await fetchLightningSafety(coords, startTimeIso);
+      return fb;
     }
 
     const feelsLike = calculateFeelsLike(temperature, windSpeed, humidity);
@@ -307,16 +366,17 @@ async function fetchFmiMatchWeatherUncached(
       windAdvisoryBadge: windGust >= 12 ? `Puuskatuuli ${Math.round(windGust)} m/s` : undefined,
       rainOnsetLabel: rainMmh > 0.1 ? '🌧️ Sade pelin aikana' : undefined,
       isCacheFallback: false,
-      lightningSafety: {
-        status: 'clear',
-        strikesWithin30kmCount: 0,
-        suspendMatchRecommended: false,
-        downpourWarning: false,
-      },
+      lightningSafety: await fetchLightningSafety(coords, startTimeIso)
     };
   } catch (error) {
     console.warn('[PELIPAIVA:WEATHER] FMI weather fetch failed or CORS blocked, using verified cache fallback:', error);
-    return getDeterministicWeatherFallback(coords, startTimeIso);
+    const fb = getDeterministicWeatherFallback(coords, startTimeIso);
+    try {
+      fb.lightningSafety = await fetchLightningSafety(coords, startTimeIso);
+    } catch {
+      /* keep clear */
+    }
+    return fb;
   }
 }
 

@@ -547,10 +547,54 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   for (const cal of calendarMatches) {
-    // If calendar event already represents a linked official fixture, do not re-match
-    if (cal.officialFixtureId) continue;
-
     const calDate = new Date(cal.startTime);
+
+    const collectSameDay = (includeLinked: boolean) =>
+      bareFixtures.filter((fix) => {
+        if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
+        if (!includeLinked && fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
+        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+        if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
+        if (includeLinked && (fix.officialFixtureId === cal.officialFixtureId || fix.id.endsWith(cal.officialFixtureId || '—'))) {
+          return false;
+        }
+        return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
+      }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    // Already linked: still fold leftover same-day own-team TASO games onto this card.
+    if (cal.officialFixtureId) {
+      const extras = collectSameDay(true);
+      if (extras.length) {
+        const selfTitle =
+          cal.homeTeam && cal.awayTeam ? `${cal.homeTeam} vs ${cal.awayTeam}` : cal.title;
+        const merged = [
+          {
+            startTime: cal.startTime,
+            title: selfTitle,
+            officialFixtureId: cal.officialFixtureId,
+            score: cal.score
+          },
+          ...extras.map((f) => ({
+            startTime: f.startTime,
+            title: f.homeTeam && f.awayTeam ? `${f.homeTeam} vs ${f.awayTeam}` : f.title,
+            officialFixtureId: f.officialFixtureId || f.id.replace(/^fixture-[^-]+-/, ''),
+            score: f.score
+          }))
+        ].sort((a, b) => a.startTime.localeCompare(b.startTime));
+        const seen = new Set<string>();
+        cal.officialGameTimes = merged.filter((g) => {
+          const k = g.officialFixtureId || g.startTime;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+        for (const f of extras) {
+          usedFixtureIds.add(f.id);
+          bareFixtureIdsToDelete.add(f.id);
+        }
+      }
+      continue;
+    }
     let bestFix: MatchdayEvent | undefined;
     let bestDiffMins = Infinity;
     let sameDayPool: MatchdayEvent[] = [];
@@ -562,19 +606,15 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
       if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
       if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
-      if (!isKickoffAfterKokoontuminen(cal, fix.startTime)) return false;
       return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
     }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-    if (sameDayTeam.length >= 2) {
-      sameDayPool = sameDayTeam;
-      bestFix = sameDayTeam.reduce((best, f) => {
-        const d = Math.abs(new Date(f.startTime).getTime() - calDate.getTime());
-        const bd = Math.abs(new Date(best.startTime).getTime() - calDate.getTime());
-        return d < bd ? f : best;
-      }, sameDayTeam[0]!);
-    } else if (sameDayTeam.length === 1) {
-      bestFix = sameDayTeam[0];
+    if (sameDayTeam.length >= 1) {
+      const afterMeetup = sameDayTeam.filter((f) => isKickoffAfterKokoontuminen(cal, f.startTime));
+      bestFix = afterMeetup[0] || sameDayTeam[0];
+      if (sameDayTeam.length >= 2) {
+        sameDayPool = sameDayTeam;
+      }
     } else if (!isTournamentish(cal)) {
       for (const fix of bareFixtures) {
         if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) continue;
@@ -599,6 +639,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         startTime: f.startTime,
         title: f.homeTeam && f.awayTeam ? `${f.homeTeam} vs ${f.awayTeam}` : f.title,
         officialFixtureId: f.officialFixtureId || f.id.replace(/^fixture-[^-]+-/, ''),
+        score: f.score
       }));
       for (const f of sameDayPool) {
         usedFixtureIds.add(f.id);

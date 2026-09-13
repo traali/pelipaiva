@@ -191,7 +191,7 @@ describe('FAMILY LOGIC GAUNTLET', () => {
   });
 
   describe('C. stitch family weekend', () => {
-    it('Nimenhuuto 15.00 + morning pool + Black + own 16.00 → only own 16.00 on the card', () => {
+    it('Nimenhuuto 15.00 + own morning + own 16.00 lists both; Black/pool stay off', () => {
       const cal = ev({
         id: 'nh-15',
         eventType: 'tournament',
@@ -205,9 +205,8 @@ describe('FAMILY LOGIC GAUNTLET', () => {
       const own = taso('o', 'SB Vantaa', 'Westend Indians Yellow', '2026-09-13T13:00:00.000Z');
       const stitched = stitchCalendarEventsWithFixtures([cal, morning, black, pool, own]);
       const card = stitched.find((e) => e.id === 'nh-15')!;
-      expect(card.officialFixtureId).toBe('o');
-      expect(card.officialGameTimes?.length ?? 1).toBe(1);
-      expect(stitched.some((e) => e.id === 'fixture-ssbl-m')).toBe(true);
+      expect(card.startTime).toBe('2026-09-13T13:00:00.000Z');
+      expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['m', 'o']);
       expect(stitched.some((e) => e.id === 'fixture-ssbl-b')).toBe(true);
     });
 
