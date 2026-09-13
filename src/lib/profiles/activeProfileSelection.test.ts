@@ -144,6 +144,7 @@ describe('activeProfileSelection', () => {
   it('decodes grouped player selections for display', () => {
     expect(groupedPlayerNameFromActiveProfileId('player:%20Simo%20')).toBe('Simo');
     expect(activePlayerNameForSelection('player:Simo%20Jr', profiles)).toBe('Simo Jr');
+    expect(groupedPlayerNameFromActiveProfileId('player:%20%20')).toBe('');
   });
 
   it('includes every matching profile for grouped player selections', () => {
@@ -161,5 +162,48 @@ describe('activeProfileSelection', () => {
     const filtered = filterEventsByActiveProfileId(events, profiles, 'player:custom-id');
     expect(filtered.map((event) => event.id)).toEqual(['e4']);
     expect(activePlayerNameForSelection('player:custom-id', profiles)).toBe('Iiro');
+  });
+
+  it('keeps empty grouped selections on the grouped-selection path', () => {
+    const emptyProfiles: PlayerProfile[] = [
+      {
+        id: 'blank',
+        playerName: '   ',
+        teamName: 'Blank',
+        sport: 'football',
+        primaryColor: 'white',
+        calendarUrl: 'https://example.com/blank.ics',
+        colorHex: '#ffffff'
+      }
+    ];
+    const emptyEvents: MatchdayEvent[] = [
+      {
+        id: 'blank-event',
+        profileId: 'blank',
+        sport: 'football',
+        eventType: 'match',
+        isTraining: false,
+        title: 'Blank match',
+        homeTeam: 'Blank',
+        awayTeam: 'Opposition',
+        isHomeMatch: true,
+        startTime: '2026-09-14T18:00:00.000Z',
+        endTime: '2026-09-14T19:00:00.000Z',
+        warmupTime: '2026-09-14T17:15:00.000Z',
+        venue: {
+          name: 'Arena',
+          normalizedName: 'arena',
+          coordinates: { lat: 60.1, lng: 24.9 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        },
+        attendanceStatus: 'in'
+      }
+    ];
+
+    expect(filterEventsByActiveProfileId(emptyEvents, emptyProfiles, 'player:%20%20').map((event) => event.id)).toEqual([
+      'blank-event'
+    ]);
   });
 });

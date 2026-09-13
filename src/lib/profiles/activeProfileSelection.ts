@@ -16,8 +16,7 @@ function normalizePlayerName(value?: string): string {
 
 export function groupedPlayerNameFromActiveProfileId(activeProfileId: string): string | undefined {
   if (!activeProfileId.startsWith(PLAYER_SELECTION_PREFIX)) return undefined;
-  const playerName = safeDecodeURIComponent(activeProfileId.slice(PLAYER_SELECTION_PREFIX.length)).trim();
-  return playerName || undefined;
+  return safeDecodeURIComponent(activeProfileId.slice(PLAYER_SELECTION_PREFIX.length)).trim();
 }
 
 export function activePlayerNameForSelection(
@@ -42,7 +41,7 @@ export function filterEventsByActiveProfileId(
   }
 
   const groupedPlayerName = groupedPlayerNameFromActiveProfileId(activeProfileId);
-  if (!groupedPlayerName) return events.filter((event) => event.profileId === activeProfileId);
+  if (groupedPlayerName === undefined) return events.filter((event) => event.profileId === activeProfileId);
 
   const matchingProfileIds = new Set(
     profiles
