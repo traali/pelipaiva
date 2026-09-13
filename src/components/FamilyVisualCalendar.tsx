@@ -82,8 +82,8 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
     return upcoming ? helsinkiDateISO(new Date(upcoming.startTime)) : todayISO;
   }, [events, todayISO]);
 
-  const [selectedDateISO, setSelectedDateISO] = useState<string>(defaultDateISO);
-  const [granularity, setGranularity] = useState<CalendarGranularity>('month');
+  const [selectedDateISO, setSelectedDateISO] = useState<string>(todayISO);
+  const [granularity, setGranularity] = useState<CalendarGranularity>('day');
 
   // Month navigation state: First day of current view month
   const [viewDate, setViewDate] = useState<Date>(() => {

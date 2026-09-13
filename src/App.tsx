@@ -57,7 +57,7 @@ export const App: React.FC = () => {
     return true;
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('timeline');
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'in' | 'out'>('all');
   const [eventTypeFilter, setEventTypeFilter] = useState<
     'all' | 'tournaments' | 'matches' | 'trainings' | 'other'
