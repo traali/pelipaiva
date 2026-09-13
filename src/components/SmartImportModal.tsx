@@ -223,10 +223,18 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     scanIcsCategories(val);
   };
 
+  const requireSelectedPlayer = () => {
+    if (selectedPlayer.trim()) {
+      return true;
+    }
+    setErrorMessage('Anna pelaajan nimi ennen tuontia.');
+    return false;
+  };
+
   // Parse multi-match freeform text
   const handleParseMessage = () => {
     const trimmed = pastedMessage.trim();
-    if (!trimmed) return;
+    if (!trimmed || !requireSelectedPlayer()) return;
     setErrorMessage('');
     const results = parseMultipleSportsMessages(trimmed, selectedPlayer);
     setExtractedMessageEvents(results);
@@ -242,7 +250,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Parse table
   const handleParseTable = () => {
-    if (!pastedTableText.trim()) return;
+    if (!pastedTableText.trim() || !requireSelectedPlayer()) return;
     setErrorMessage('');
     const res = parsePastedSpreadsheetText(pastedTableText, selectedSport, selectedPlayer);
     setExtractedTableEvents(res.events);
@@ -256,7 +264,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   // Excel / Image file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !requireSelectedPlayer()) return;
     setErrorMessage('');
 
     if (
@@ -277,6 +285,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Image OCR
   const handleImageOcr = async (file: File | Blob) => {
+    if (!requireSelectedPlayer()) return;
     setIsOcrProcessing(true);
     setOcrStatus('Käynnistetään paikallinen tekoäly-OCR...');
     setOcrProgress(0.1);
@@ -304,6 +313,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Save extracted events to IndexedDB
   const handleSaveEvents = async (eventsToSave: ExtractedSportsEvent[]) => {
+    if (!requireSelectedPlayer()) return;
     const usable = eventsToSave.filter((e) => e.confidenceScore >= 0.5 && e.dateStr && e.kickoffTime);
     if (usable.length === 0) return;
     setIsSaving(true);

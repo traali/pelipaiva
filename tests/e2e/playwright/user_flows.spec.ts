@@ -54,17 +54,23 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
 
     const classicTab = modal.getByRole('tab', { name: /Liitto/i });
     await expect(classicTab).toBeVisible();
-    await expect(modal.getByRole('tab', { name: /Viesti/i })).toBeVisible();
+    const messageTab = modal.getByRole('tab', { name: /Viesti/i });
+    await expect(messageTab).toBeVisible();
     await expect(modal.getByRole('tab', { name: /Excel/i })).toBeVisible();
     await expect(modal.getByRole('tab', { name: /Kuva/i })).toBeVisible();
+
+    await messageTab.click();
+    await modal.locator('textarea').first().fill('Su 15.9 klo 10:00 HJK vs EPS');
+    await modal.getByRole('button', { name: 'Jäsennä ottelutiedot tekoälyllä' }).click();
+    await expect(modal.getByRole('alert')).toContainText('Anna pelaajan nimi ennen tuontia.');
+
     await classicTab.click();
     await expect(modal.getByRole('button', { name: 'Anna pelaajan nimi' })).toBeDisabled();
 
-    const whatsappTab = modal.getByRole('tab', { name: /Viesti/i });
     await modal.getByPlaceholder('+ Uusi nimi').fill('Simo');
     await expect(modal.getByRole('button', { name: 'Tuo joukkue · Simo' })).toBeVisible();
-    await whatsappTab.click();
-    await expect(whatsappTab).toHaveAttribute('aria-selected', 'true');
+    await messageTab.click();
+    await expect(messageTab).toHaveAttribute('aria-selected', 'true');
     await expect(modal.getByText(/Liitä valmentajan WhatsApp-viesti/i)).toBeVisible();
 
     const excelTab = modal.getByRole('tab', { name: /Excel/i });
