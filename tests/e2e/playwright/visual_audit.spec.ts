@@ -26,11 +26,11 @@ test.describe('📸 Visual Quality & Layout Audit Captures', () => {
     });
     await page.reload();
 
-    await expect(page.getByRole('heading', { name: /Miten haluat käyttää FamDayta/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Miten haluat käyttää Pelipäivää/i })).toBeVisible();
     await page.screenshot({ path: path.join(screenshotsDir, `${prefix}-01-onboarding.png`), fullPage: true });
 
     await page.getByRole('button', { name: /Vain tämä laite/i }).click();
-    await page.getByRole('button', { name: /Siirry FamDay-ottelukeskukseen/i }).click();
+    await page.getByRole('button', { name: /Siirry ottelukeskukseen/i }).click();
     await expect(page.getByRole('tab', { name: /Kaikki/i })).toBeVisible();
     await page.waitForTimeout(500); // Allow spring animations to settle
     await page.screenshot({ path: path.join(screenshotsDir, `${prefix}-02-dashboard-cards.png`), fullPage: true });
@@ -55,7 +55,7 @@ test.describe('📸 Visual Quality & Layout Audit Captures', () => {
     const modal = page.locator('div[role="dialog"]');
     await expect(modal).toBeVisible();
 
-    const whatsappTab = page.getByRole('tab', { name: /WhatsApp/i });
+    const whatsappTab = page.getByRole('tab', { name: /Viesti/i });
     await whatsappTab.click({ force: true });
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(screenshotsDir, `${prefix}-05-smart-import-whatsapp.png`) });
