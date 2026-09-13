@@ -35,7 +35,7 @@ vi.mock('motion/react', async () => {
 
 vi.mock('../../src/hooks/useMatchdayLogistics', () => ({
   surfaceLabel: () => 'Tekonurmi 3G',
-  useMatchdayLogistics: () => ({
+  useMatchdayLogistics: ({ event }: { event: MatchdayEvent }) => ({
     transitPlan: {
       mode: 'walk',
       distanceKm: 0.8,
@@ -44,10 +44,10 @@ vi.mock('../../src/hooks/useMatchdayLogistics', () => ({
       isSelfTransit: true,
     },
     isPast: false,
-    formattedKickoff: '18.00',
-    formattedWarmup: '17.15',
-    isTournament: false,
-    isTraining: false,
+    formattedKickoff: event.eventType === 'tournament' ? '10.00' : event.eventType === 'training' ? '18.30' : '18.00',
+    formattedWarmup: event.eventType === 'tournament' ? '09.15' : event.eventType === 'training' ? '18.15' : '17.15',
+    isTournament: event.eventType === 'tournament',
+    isTraining: Boolean(event.isTraining || event.eventType === 'training'),
     isSchool: false,
     isOther: false,
     isOut: false,
@@ -254,6 +254,65 @@ describe('MatchdayCard mobile default view', () => {
 });
 
 describe('Requested supporting copy and spacing tweaks', () => {
+  it('includes the sport badge in training and tournament labels', () => {
+    const trainingMarkup = renderToStaticMarkup(
+      React.createElement(MatchdayCard, {
+        event: {
+          ...event,
+          id: 'evt-training',
+          eventType: 'training',
+          isTraining: true,
+          title: 'PPJ harjoitus',
+        },
+        playerName: 'Arto',
+        colorHex: '#0f766e',
+      })
+    );
+
+    const tournamentMarkup = renderToStaticMarkup(
+      React.createElement(MatchdayCard, {
+        event: {
+          ...event,
+          id: 'evt-tournament',
+          eventType: 'tournament',
+          title: 'Mini Cup',
+          officialGameTimes: [
+            { startTime: '2026-09-14T10:00:00.000Z', title: 'PPJ vs HJK' },
+            { startTime: '2026-09-14T12:00:00.000Z', title: 'PPJ vs Honka', score: '2-1' },
+          ],
+        },
+        playerName: 'Arto',
+        colorHex: '#0f766e',
+      })
+    );
+
+    expect(trainingMarkup).toContain('Harjoitus · ⚽ Jalkapallo');
+    expect(tournamentMarkup).toContain('Turnaus · ⚽ Jalkapallo');
+  });
+
+  it('shows official game times even before extras are opened', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(MatchdayCard, {
+        event: {
+          ...event,
+          id: 'evt-tournament-list',
+          eventType: 'tournament',
+          title: 'Mini Cup',
+          officialGameTimes: [
+            { startTime: '2026-09-14T10:00:00.000Z', title: 'PPJ vs HJK' },
+            { startTime: '2026-09-14T12:00:00.000Z', title: 'PPJ vs Honka', score: '2-1' },
+          ],
+        },
+        playerName: 'Arto',
+        colorHex: '#0f766e',
+      })
+    );
+
+    expect(markup).toContain('PPJ vs HJK');
+    expect(markup).toContain('PPJ vs Honka');
+    expect(markup).toContain('2-1');
+  });
+
   it('renders the shorter quick drop-in placeholder', () => {
     const markup = renderToStaticMarkup(
       React.createElement(QuickDropInBar, {
