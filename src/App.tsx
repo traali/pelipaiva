@@ -1125,6 +1125,7 @@ export const App: React.FC = () => {
             {/* Attendance Filter Chips */}
             <button
               type="button"
+              aria-label="Kaikki"
               onClick={() => setAttendanceFilter('all')}
               className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
                 attendanceFilter === 'all'

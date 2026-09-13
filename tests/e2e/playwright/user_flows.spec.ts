@@ -46,6 +46,16 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     const modal = page.locator('div[role="dialog"]');
     await expect(modal).toBeVisible();
 
+    const customPlayerInput = modal.getByPlaceholder('+ Uusi nimi');
+    await expect(customPlayerInput).toBeVisible();
+
+    const classicTab = modal.getByRole('tab', { name: /Liitto/i });
+    await classicTab.click();
+    await expect(modal.getByRole('button', { name: /Anna pelaajan nimi/i })).toBeDisabled();
+
+    await customPlayerInput.fill('Simo');
+    await expect(modal.getByRole('button', { name: /Tuo joukkue · Simo/i })).toBeEnabled();
+
     await expect(modal.getByRole('tab', { name: /Liitto/i })).toBeVisible();
     await expect(modal.getByRole('tab', { name: /Viesti/i })).toBeVisible();
     await expect(modal.getByRole('tab', { name: /Excel/i })).toBeVisible();
