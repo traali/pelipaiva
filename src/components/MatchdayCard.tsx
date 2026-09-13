@@ -25,6 +25,7 @@ import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
+import { clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
 import { lookupKnownField } from '../lib/geo/sportsGeocoder';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
@@ -92,15 +93,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const [isWeatherDrawerOpen, setIsWeatherDrawerOpen] = useState(false);
 
   const indoor = isIndoorEvent(event);
-  const effectiveWeather = React.useMemo(() => {
-    if (event.weather) return event.weather;
-    if (!indoor && event.venue.coordinates?.lat && event.venue.coordinates?.lng) {
-      return getDeterministicWeatherFallback(event.venue.coordinates, event.startTime);
-    }
-    return event.weather;
-  }, [event.weather, indoor, event.venue.coordinates, event.startTime]);
-  const lightningAlert = event.lightning || effectiveWeather?.lightningSafety;
-
   const {
     transitPlan,
     isLive,
@@ -135,6 +127,26 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     ? { lat: knownField.lat, lng: knownField.lng }
     : localVenue.coordinates || event.venue.coordinates;
   const multiGame = (event.officialGameTimes?.length || 0) > 1;
+  const showMeetup = shouldShowKokoontuminen(event);
+  const clockKind = isTraining
+    ? 'training'
+    : isSchool
+      ? 'school'
+      : isOther
+        ? 'other'
+        : isTournament || multiGame
+          ? 'tournament'
+          : 'match';
+  const effectiveWeather = React.useMemo(() => {
+    if (event.weather) return event.weather;
+    if (indoor) return undefined;
+    const c = radarCoords;
+    if (c && Number.isFinite(c.lat) && Number.isFinite(c.lng) && !(c.lat === 0 && c.lng === 0)) {
+      return getDeterministicWeatherFallback(c, event.startTime);
+    }
+    return undefined;
+  }, [event.weather, indoor, radarCoords, event.startTime]);
+  const lightningAlert = event.lightning || effectiveWeather?.lightningSafety;
 
   const handleOpenStats = () => {
     let resolved = stats;
@@ -477,29 +489,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 <span className="h-2 w-2 rounded-full bg-stoppage" />
                 KÄYNNISSÄ
               </div>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-pitch/15 border border-pitch/40 text-pitch shadow-xs">
-                <Clock className="w-5 h-5 shrink-0" strokeWidth={2.5} />
-                <span className="text-base md:text-lg font-black font-tabular tracking-tight">
-                  {isSchool
-                    ? `Koulu ${formattedKickoff}`
-                    : isOther
-                    ? `Alkaa ${formattedKickoff}`
-                    : isTraining
-                    ? `Treeni ${formattedKickoff}`
-                    : (isTournament || multiGame) && formattedWarmup === formattedKickoff
-                    ? `Kokoontuminen ${formattedKickoff}`
-                    : isTournament || multiGame
-                    ? `1. peli ${formattedKickoff}`
-                    : `Ottelu ${formattedKickoff}`}
-                </span>
-                {formattedWarmup && formattedWarmup !== formattedKickoff && (
-                  <span className="text-xs font-bold text-text-primary pl-2 border-l border-pitch/30">
-                    Kokoontuminen {formattedWarmup}
-                  </span>
-                )}
-              </div>
-            )}
+            ) : null}
             <button
               type="button"
               onClick={() => setIsMergeOpen(true)}
@@ -574,29 +564,18 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </div>
           )}
 
-          {/* Clearly Stated Kickoff / Exercise Start Time */}
+          {/* One clock: games = kickoff + real kokoontuminen; treeni = start only */}
           <div className="mt-2 mb-1 inline-flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-pitch/15 border border-pitch/40 text-pitch shadow-xs flex-wrap">
             <div className="flex items-center gap-2 font-black text-lg md:text-xl font-tabular tracking-tight">
               <Clock className="w-5 h-5 shrink-0" strokeWidth={2.5} />
               <span>
-                {isTraining
-                  ? `Treeni klo ${formattedKickoff}`
-                  : multiGame && formattedWarmup === formattedKickoff
-                  ? `Kokoontuminen klo ${formattedKickoff}`
-                  : multiGame
-                  ? `1. peli klo ${formattedKickoff}`
-                  : isTournament && formattedWarmup === formattedKickoff
-                  ? `Kokoontuminen klo ${formattedKickoff}`
-                  : isTournament
-                  ? `1. peli klo ${formattedKickoff}`
-                  : isSchool
-                  ? `Koulu klo ${formattedKickoff}`
-                  : isOther
-                  ? `Alkaa klo ${formattedKickoff}`
-                  : `Ottelu alkaa klo ${formattedKickoff}`}
+                {clockHeadline(clockKind, formattedKickoff, {
+                  multiGame,
+                  warmupEqualsKickoff: formattedWarmup === formattedKickoff
+                })}
               </span>
             </div>
-            {formattedWarmup && formattedWarmup !== formattedKickoff && (
+            {showMeetup && formattedWarmup !== formattedKickoff && (
               <span className="text-sm font-bold text-text-primary pl-2 border-l border-pitch/30">
                 Kokoontuminen klo {formattedWarmup}
               </span>
@@ -651,6 +630,16 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </button>
           </div>
         </div>
+
+        {!compact && effectiveWeather && (
+          <div className="mb-4">
+            <MatchdayCardWeatherBadge
+              weather={effectiveWeather}
+              indoor={indoor}
+              onOpenRadar={indoor ? undefined : () => setIsWeatherDrawerOpen(true)}
+            />
+          </div>
+        )}
 
         {/* Overlap & Driving Buffer Conflict Warning Banner (Consolidated) */}
         {!isOut && showConflictWarnings && consolidatedConflictGroups.length > 0 && (
@@ -846,16 +835,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <ChevronRight className="w-4 h-4" />
             </div>
           </motion.button>
-        )}
-
-        {!compact && effectiveWeather && (
-          <div className="mb-4">
-            <MatchdayCardWeatherBadge
-              weather={effectiveWeather}
-              indoor={indoor}
-              onOpenRadar={indoor ? undefined : () => setIsWeatherDrawerOpen(true)}
-            />
-          </div>
         )}
 
         {/* Bento Sub-Cards: Nappisvahti & Parking (compact parking when walking/cycling or when gear advice is off) */}
