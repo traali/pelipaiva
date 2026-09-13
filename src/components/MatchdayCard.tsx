@@ -24,6 +24,7 @@ import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
+import { lookupKnownField } from '../lib/geo/sportsGeocoder';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventChatModal } from './EventChatModal';
@@ -126,6 +127,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   });
 
   const venue = isVenueModalOpen ? localVenue : event.venue;
+  const knownField = lookupKnownField(localVenue.name || event.venue.name);
+  const radarCoords = knownField
+    ? { lat: knownField.lat, lng: knownField.lng }
+    : localVenue.coordinates || event.venue.coordinates;
   const multiGame = (event.officialGameTimes?.length || 0) > 1;
 
   const handleOpenStats = () => {
@@ -1038,12 +1043,12 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
       />
 
       {/* Interactive Weather, Radar & Lightning Safety Drawer */}
-      {effectiveWeather && event.venue.coordinates && (
+      {isWeatherDrawerOpen && effectiveWeather && radarCoords && (
         <WeatherSatelliteDrawer
           isOpen={isWeatherDrawerOpen}
           onClose={() => setIsWeatherDrawerOpen(false)}
-          venueCoords={event.venue.coordinates}
-          venueName={event.venue.name}
+          venueCoords={radarCoords}
+          venueName={localVenue.name || event.venue.name}
           weather={effectiveWeather}
         />
       )}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -14,7 +15,11 @@ import {
   RadarSatelliteLayer,
   WEATHER_IMAGERY_LAYERS,
   buildImageryUrl,
-  getImageryLoopTimestamps
+  buildBasemapUrl,
+  calculateRadarBbox,
+  getImageryLoopTimestamps,
+  isValidRadarCoords,
+  RADAR_VIEW_KM,
 } from '../lib/weather/radarSatelliteEngine';
 import { springTactile } from '../lib/motion/springs';
 
@@ -70,23 +75,19 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
-  const hasValidCoords = coordinates && (coordinates.lat !== 0 || coordinates.lng !== 0);
-  const targetCoords = hasValidCoords ? coordinates : { lat: 60.1872, lng: 24.9248 };
+  const hasValidCoords = isValidRadarCoords(coordinates);
+  const targetCoords = hasValidCoords ? coordinates : { lat: 60.16357, lng: 24.8675 };
   const currentFrame = frames[currentFrameIndex] || frames[frames.length - 1] || { label: 'Nyt', date: new Date() };
   const layerInfo = WEATHER_IMAGERY_LAYERS[selectedLayer];
   const imageUrl = hasValidCoords ? buildImageryUrl(selectedLayer, targetCoords, currentFrame.date) : '';
+  const bbox = calculateRadarBbox(targetCoords, RADAR_VIEW_KM);
+  const basemapUrl = buildBasemapUrl(bbox);
 
-  // OSM base map for backdrop
-  const delta = 0.45;
-  const minLat = targetCoords.lat - delta;
-  const maxLat = targetCoords.lat + delta;
-  const minLng = targetCoords.lng - (delta * 1.8);
-  const maxLng = targetCoords.lng + (delta * 1.8);
-  const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${minLng},${minLat},${maxLng},${maxLat}&layer=mapnik`;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4">
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 md:p-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -165,30 +166,14 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
           </div>
 
           {/* Main Visual Display Canvas */}
-          <div className="relative h-64 md:h-80 w-full rounded-2xl overflow-hidden border border-border-subtle bg-surface-elevated mb-4">
-            {/* OpenStreetMap Base Map */}
-            <iframe
-              title="Tutkakartta"
-              width="100%"
-              height="100%"
-              frameBorder="0"
-              scrolling="no"
-              marginHeight={0}
-              marginWidth={0}
-              src={osmEmbedUrl}
-              className="w-full h-full filter contrast-[0.95] dark:invert dark:hue-rotate-180 opacity-60 pointer-events-none"
-            />
-
-            {/* Live Weather Overlay Image */}
+          <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden border border-border-subtle bg-slate-950 mb-4">
+            <img src={basemapUrl} alt="" className="absolute inset-0 w-full h-full object-fill pointer-events-none" />
             {hasValidCoords && imageUrl && (
               <img
                 src={imageUrl}
                 alt={layerInfo.title}
                 key={`${selectedLayer}-${currentFrameIndex}`}
-                className="absolute inset-0 w-full h-full object-cover mix-blend-multiply dark:mix-blend-screen transition-opacity duration-200"
-                onError={(e) => {
-                  e.currentTarget.style.opacity = '0.7';
-                }}
+                className="absolute inset-0 w-full h-full object-fill mix-blend-screen opacity-90 pointer-events-none"
               />
             )}
 
@@ -286,6 +271,7 @@ export const LiveWeatherRadarModal: React.FC<LiveWeatherRadarModalProps> = ({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };

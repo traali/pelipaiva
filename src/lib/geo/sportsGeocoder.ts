@@ -298,6 +298,18 @@ function matchesAliasWord(text: string, alias: string): boolean {
   return false;
 }
 
+export function lookupKnownField(rawVenueString: string) {
+  const normalized = (rawVenueString || '')
+    .toLowerCase()
+    .replace(/[.,\-/()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const aliasHit = Object.entries(NATIONAL_FIELD_ALIASES)
+    .sort((a, b) => b[0].length - a[0].length)
+    .find(([alias]) => matchesAliasWord(normalized, alias));
+  return aliasHit?.[1] ?? null;
+}
+
 export interface VenueResolveHint {
   lat?: number;
   lng?: number;
