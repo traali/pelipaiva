@@ -64,7 +64,7 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     const whatsappTab = modal.getByRole('tab', { name: /Viesti/i });
     await whatsappTab.click();
     await expect(whatsappTab).toHaveAttribute('aria-selected', 'true');
-    await expect(modal.getByText(/Liitä valmentajan WhatsApp-viesti/i)).toBeVisible();
+    await expect(modal.getByRole('button', { name: /Jäsennä ottelutiedot tekoälyllä/i })).toBeVisible();
 
     const excelTab = modal.getByRole('tab', { name: /Excel/i });
     await excelTab.click();
