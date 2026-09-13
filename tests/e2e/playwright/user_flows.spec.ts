@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5P4n8AAAAASUVORK5CYII=',
+  'base64'
+);
+
 test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -68,6 +73,15 @@ test.describe('🏆 Pelipäivä End-to-End User Flows', () => {
     await excelTab.click();
     await modal.locator('textarea').first().fill('15.9.\t10:00\tHJK vs EPS\tTali');
     await modal.getByRole('button', { name: 'Jäsennä taulukon ottelut' }).click();
+    await expect(modal.getByRole('alert')).toContainText('Anna pelaajan nimi ennen tuontia.');
+
+    const imageTab = modal.getByRole('tab', { name: /Kuva/i });
+    await imageTab.click();
+    await modal.locator('input[type="file"][accept="image/*"]').setInputFiles({
+      name: 'schedule.png',
+      mimeType: 'image/png',
+      buffer: onePixelPng
+    });
     await expect(modal.getByRole('alert')).toContainText('Anna pelaajan nimi ennen tuontia.');
 
     await classicTab.click();

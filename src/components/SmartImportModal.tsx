@@ -234,8 +234,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   // Parse multi-match freeform text
   const handleParseMessage = () => {
     const trimmed = pastedMessage.trim();
-    if (!trimmed || !requireSelectedPlayer()) return;
     setErrorMessage('');
+    if (!trimmed || !requireSelectedPlayer()) return;
     const results = parseMultipleSportsMessages(trimmed, selectedPlayer);
     setExtractedMessageEvents(results);
     setParseNotice(
@@ -250,8 +250,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Parse table
   const handleParseTable = () => {
-    if (!pastedTableText.trim() || !requireSelectedPlayer()) return;
     setErrorMessage('');
+    if (!pastedTableText.trim() || !requireSelectedPlayer()) return;
     const res = parsePastedSpreadsheetText(pastedTableText, selectedSport, selectedPlayer);
     setExtractedTableEvents(res.events);
     setParseNotice(
@@ -264,8 +264,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   // Excel / Image file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !requireSelectedPlayer()) return;
     setErrorMessage('');
+    if (!file || !requireSelectedPlayer()) return;
 
     if (
       file.name.endsWith('.csv') ||
@@ -285,11 +285,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Image OCR
   const handleImageOcr = async (file: File | Blob) => {
+    setErrorMessage('');
     if (!requireSelectedPlayer()) return;
     setIsOcrProcessing(true);
     setOcrStatus('Käynnistetään paikallinen tekoäly-OCR...');
     setOcrProgress(0.1);
-    setErrorMessage('');
 
     try {
       const res = await parseScheduleImage(file, selectedSport, selectedPlayer, (p) => {
@@ -313,11 +313,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 
   // Save extracted events to IndexedDB
   const handleSaveEvents = async (eventsToSave: ExtractedSportsEvent[]) => {
+    setErrorMessage('');
     if (!requireSelectedPlayer()) return;
     const usable = eventsToSave.filter((e) => e.confidenceScore >= 0.5 && e.dateStr && e.kickoffTime);
     if (usable.length === 0) return;
     setIsSaving(true);
-    setErrorMessage('');
 
     try {
       const existingProfiles = await db.profiles.toArray();
