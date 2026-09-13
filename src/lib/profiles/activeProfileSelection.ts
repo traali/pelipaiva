@@ -24,8 +24,10 @@ export function activePlayerNameForSelection(
   activeProfileId: string,
   profiles: PlayerProfile[]
 ): string | undefined {
-  return groupedPlayerNameFromActiveProfileId(activeProfileId)
-    ?? profiles.find((profile) => profile.id === activeProfileId)?.playerName;
+  const exactProfile = profiles.find((profile) => profile.id === activeProfileId);
+  if (exactProfile) return exactProfile.playerName;
+
+  return groupedPlayerNameFromActiveProfileId(activeProfileId);
 }
 
 export function filterEventsByActiveProfileId(
@@ -35,10 +37,12 @@ export function filterEventsByActiveProfileId(
 ): MatchdayEvent[] {
   if (activeProfileId === 'all') return events;
 
-  const groupedPlayerName = groupedPlayerNameFromActiveProfileId(activeProfileId);
-  if (!groupedPlayerName) {
+  if (profiles.some((profile) => profile.id === activeProfileId)) {
     return events.filter((event) => event.profileId === activeProfileId);
   }
+
+  const groupedPlayerName = groupedPlayerNameFromActiveProfileId(activeProfileId);
+  if (!groupedPlayerName) return events.filter((event) => event.profileId === activeProfileId);
 
   const matchingProfileIds = new Set(
     profiles

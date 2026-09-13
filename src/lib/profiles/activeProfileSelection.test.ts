@@ -34,6 +34,15 @@ describe('activeProfileSelection', () => {
       primaryColor: 'green',
       calendarUrl: 'https://example.com/green.ics',
       colorHex: '#00ff00'
+    },
+    {
+      id: 'player:custom-id',
+      playerName: 'Iiro',
+      teamName: 'Black',
+      sport: 'football',
+      primaryColor: 'black',
+      calendarUrl: 'https://example.com/black.ics',
+      colorHex: '#111111'
     }
   ];
 
@@ -106,6 +115,29 @@ describe('activeProfileSelection', () => {
         hasFloodlights: true
       },
       attendanceStatus: 'in'
+    },
+    {
+      id: 'e4',
+      profileId: 'player:custom-id',
+      sport: 'football',
+      eventType: 'match',
+      isTraining: false,
+      title: 'Black match',
+      homeTeam: 'Black',
+      awayTeam: 'Opposition',
+      isHomeMatch: false,
+      startTime: '2026-09-14T16:00:00.000Z',
+      endTime: '2026-09-14T17:00:00.000Z',
+      warmupTime: '2026-09-14T15:15:00.000Z',
+      venue: {
+        name: 'Arena',
+        normalizedName: 'arena',
+        coordinates: { lat: 60.1, lng: 24.9 },
+        isIndoor: false,
+        surface: 'artificial_turf_3g',
+        hasFloodlights: true
+      },
+      attendanceStatus: 'in'
     }
   ];
 
@@ -123,5 +155,11 @@ describe('activeProfileSelection', () => {
     const filtered = filterEventsByActiveProfileId(events, profiles, 'p1');
     expect(filtered.map((event) => event.id)).toEqual(['e1']);
     expect(activePlayerNameForSelection('p2', profiles)).toBe(' simo ');
+  });
+
+  it('prefers exact profile ids even when they start with player:', () => {
+    const filtered = filterEventsByActiveProfileId(events, profiles, 'player:custom-id');
+    expect(filtered.map((event) => event.id)).toEqual(['e4']);
+    expect(activePlayerNameForSelection('player:custom-id', profiles)).toBe('Iiro');
   });
 });
