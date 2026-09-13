@@ -19,7 +19,7 @@ import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { helsinkiDateISO } from './lib/agents/time';
+import { helsinkiDateISO, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
@@ -892,41 +892,12 @@ export const App: React.FC = () => {
     }
 
     const nowIso = new Date().toISOString();
-    const parseOfficialTimeOnEventDate = (timeText?: string): string | undefined => {
-      if (!timeText) return undefined;
-      const match = timeText.trim().match(/^(\d{1,2})[:.](\d{2})$/);
-      if (!match) return undefined;
-      const hour = Number(match[1]);
-      const minute = Number(match[2]);
-      if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-        return undefined;
-      }
-      const baseDate = new Date(ev.startTime);
-      if (Number.isNaN(baseDate.getTime())) return undefined;
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Europe/Helsinki',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).formatToParts(baseDate);
-      const year = Number(parts.find((p) => p.type === 'year')?.value || '1970');
-      const month = Number(parts.find((p) => p.type === 'month')?.value || '01');
-      const day = Number(parts.find((p) => p.type === 'day')?.value || '01');
-      const noonUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-      const helsinkiHour = Number(
-        new Intl.DateTimeFormat('en-US', {
-          timeZone: 'Europe/Helsinki',
-          hour: 'numeric',
-          hourCycle: 'h23'
-        }).formatToParts(noonUtc).find((p) => p.type === 'hour')?.value || '12'
-      );
-      const offsetHours = helsinkiHour - 12;
-      return new Date(Date.UTC(year, month - 1, day, hour - offsetHours, minute, 0)).toISOString();
-    };
 
     let updated: MatchdayEvent = ev;
     if (decision === 'use_official') {
-      const officialIso = ev.mismatchFlags?.officialStartTimeIso || parseOfficialTimeOnEventDate(ev.mismatchFlags?.officialStartTime);
+      const officialIso =
+        ev.mismatchFlags?.officialStartTimeIso ||
+        parseHelsinkiClockOnEventDate(ev.startTime, ev.mismatchFlags?.officialStartTime);
       const officialVenue = ev.mismatchFlags?.officialVenueName;
       const timed = officialIso
         ? applyOfficialKickoffKeepCalendarArrival(
@@ -970,6 +941,7 @@ export const App: React.FC = () => {
         }
       };
     } else {
+      const dismissNote = 'Piilotettu aikatauluristiriita';
       updated = {
         ...ev,
         mismatchFlags: undefined,
@@ -977,12 +949,14 @@ export const App: React.FC = () => {
           ? {
             ...ev.userOverride,
             appliedAt: nowIso,
-            notes: 'Piilotettu aikatauluristiriita'
+            notes: ev.userOverride.notes
+              ? `${ev.userOverride.notes} • ${dismissNote}`
+              : dismissNote
           }
           : {
             action: 'custom',
             appliedAt: nowIso,
-            notes: 'Piilotettu aikatauluristiriita'
+            notes: dismissNote
           }
       };
     }

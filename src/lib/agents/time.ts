@@ -29,6 +29,30 @@ export function helsinkiOffsetForDateISO(dateISO: string): string {
   return getFinnishTimezoneOffset(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)));
 }
 
+/**
+ * Parses a Helsinki wall-clock string ("HH:MM" or "HH.MM") on the same
+ * local date as a base event ISO timestamp and returns a UTC ISO timestamp.
+ */
+export function parseHelsinkiClockOnEventDate(baseEventIso: string, clockText?: string): string | undefined {
+  if (!clockText) return undefined;
+  const baseDate = new Date(baseEventIso);
+  if (Number.isNaN(baseDate.getTime())) return undefined;
+  const match = clockText.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!match) return undefined;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return undefined;
+  }
+  const dateISO = helsinkiDateISO(baseDate);
+  const offset = helsinkiOffsetForDateISO(dateISO);
+  const hh = String(hour).padStart(2, '0');
+  const mm = String(minute).padStart(2, '0');
+  const parsed = new Date(`${dateISO}T${hh}:${mm}:00${offset}`);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}
+
 function helsinkiWall(isoDate: string, time = '12:00:00'): Date {
   const offset = getFinnishTimezoneOffset(new Date(`${isoDate}T12:00:00Z`));
   const hhmm = time.length === 5 ? `${time}:00` : time;
