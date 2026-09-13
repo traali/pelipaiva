@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -27,6 +27,36 @@ interface TimelineCalendarViewProps {
   onNavigate?: (event: MatchdayEvent) => void;
   onSelectEvent?: (event: MatchdayEvent) => void;
   onClearFilter?: () => void;
+}
+
+type TimelineDayGroup = { date: Date; dateStr: string; label: string; events: MatchdayEvent[] };
+
+export function nextTimelineEventDayKeys(dayKeys: string[], todayKey: string, limit = 6): string[] {
+  return dayKeys.filter((key) => key > todayKey).slice(0, limit);
+}
+
+export function formatTimelineDayChipLabel(date: Date): string {
+  const parts = new Intl.DateTimeFormat('fi-FI', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
+  }).formatToParts(date);
+  const weekday = (parts.find((part) => part.type === 'weekday')?.value || 'pv').replace('.', '');
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${day}.${month}`;
+}
+
+export function filterVisibleTimelineDays<T extends { dateStr: string }>(
+  groupedByDay: T[],
+  selectedTimelineDay: string,
+  todayKey: string
+): T[] {
+  if (selectedTimelineDay === 'all') return groupedByDay;
+  if (selectedTimelineDay === 'upcoming') return groupedByDay.filter((group) => group.dateStr > todayKey);
+  const selectedDay = selectedTimelineDay === 'today' ? todayKey : selectedTimelineDay;
+  return groupedByDay.filter((group) => group.dateStr === selectedDay);
 }
 
 function surfaceLabel(surface?: string, indoor?: boolean): string | null {
@@ -72,9 +102,30 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return map;
   }, [profiles]);
 
+  const [todayKey, setTodayKey] = useState<string>(() => helsinkiDateISO(new Date()));
+  const [selectedTimelineDay, setSelectedTimelineDay] = useState<string>('today');
+  const previousTodayKeyRef = useRef(todayKey);
+
+  useEffect(() => {
+    const tick = () => {
+      const nextToday = helsinkiDateISO(new Date());
+      setTodayKey((prev) => (prev === nextToday ? prev : nextToday));
+    };
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const previousTodayKey = previousTodayKeyRef.current;
+    if (previousTodayKey !== todayKey) {
+      setSelectedTimelineDay((prev) => (prev === previousTodayKey ? 'today' : prev));
+      previousTodayKeyRef.current = todayKey;
+    }
+  }, [todayKey]);
+
   // Group events by YYYY-MM-DD
   const groupedByDay = useMemo(() => {
-    const map = new Map<string, { date: Date; dateStr: string; label: string; events: MatchdayEvent[] }>();
+    const map = new Map<string, TimelineDayGroup>();
     const sorted = [...events].sort(
       (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
@@ -102,6 +153,24 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return Array.from(map.values());
   }, [events]);
 
+  const groupedByDayMap = useMemo(
+    () => new Map(groupedByDay.map((group) => [group.dateStr, group])),
+    [groupedByDay]
+  );
+
+  const futureDayKeys = useMemo(
+    () => nextTimelineEventDayKeys(groupedByDay.map((group) => group.dateStr), todayKey),
+    [groupedByDay, todayKey]
+  );
+
+  const visibleDayGroups = useMemo(
+    () => filterVisibleTimelineDays(groupedByDay, selectedTimelineDay, todayKey),
+    [groupedByDay, selectedTimelineDay, todayKey]
+  );
+
+  const todayGroup = groupedByDayMap.get(todayKey);
+  const hasTodayEvents = Boolean(todayGroup && todayGroup.events.length > 0);
+
   if (events.length === 0) {
     return (
       <div className="p-8 text-center text-text-muted text-xs bg-surface-elevated/50 rounded-2xl border border-border-subtle flex flex-col items-center gap-3 my-4">
@@ -123,7 +192,70 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   if (viewMode === 'timeline') {
     return (
       <div className="flex flex-col gap-5 pb-8">
-        {groupedByDay.map((dayGroup) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedTimelineDay('today')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              selectedTimelineDay === 'today'
+                ? 'bg-pitch text-text-inverse border-pitch'
+                : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+            }`}
+          >
+            Tänään
+          </button>
+          {futureDayKeys.map((dayKey) => {
+            const dayGroup = groupedByDayMap.get(dayKey);
+            if (!dayGroup) return null;
+            return (
+              <button
+                key={dayGroup.dateStr}
+                type="button"
+                onClick={() => setSelectedTimelineDay(dayGroup.dateStr)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  selectedTimelineDay === dayGroup.dateStr
+                    ? 'bg-pitch text-text-inverse border-pitch'
+                    : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                }`}
+              >
+                {formatTimelineDayChipLabel(dayGroup.date)}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setSelectedTimelineDay('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              selectedTimelineDay === 'all'
+                ? 'bg-pitch text-text-inverse border-pitch'
+                : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+            }`}
+          >
+            Kaikki päivät
+          </button>
+        </div>
+
+        {selectedTimelineDay === 'today' && !hasTodayEvents && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="p-4 rounded-2xl border border-border-subtle bg-surface-elevated/50 text-text-secondary text-xs flex flex-wrap items-center gap-2"
+          >
+            <span>Ei otteluita tänään</span>
+            <button
+              type="button"
+              disabled={futureDayKeys.length === 0}
+              onClick={() => {
+                setSelectedTimelineDay(futureDayKeys.length > 0 ? 'upcoming' : 'all');
+              }}
+              className="px-3 py-1.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Näytä seuraavat päivät
+            </button>
+          </div>
+        )}
+
+        {visibleDayGroups.map((dayGroup) => (
           <div key={dayGroup.dateStr} className="flex flex-col gap-2">
             {/* Sticky Day Section Header */}
             <div className="sticky top-12 z-10 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">

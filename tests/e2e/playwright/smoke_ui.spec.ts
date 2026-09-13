@@ -233,7 +233,7 @@ test.describe('Smoke: seed events and click through UI', () => {
       await page.waitForTimeout(200);
       await expect(page.getByText(/KäPa|Poisjäänti|Osallistuu silti/i).first()).toBeAttached();
       await shot(page, '07-filter-out.png');
-      await page.getByRole('button', { name: /^Kaikki/ }).first().click();
+      await page.getByRole('button', { name: /^Kaikki ottelut$/ }).click();
     }
     await cardsTab.click();
     const banner = page.getByText(/AIKATAULURUUHKI|Aikataulu eroaa|Aikataulumuutos/i).first();

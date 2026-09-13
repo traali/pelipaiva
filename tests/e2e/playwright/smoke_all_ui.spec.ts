@@ -114,7 +114,7 @@ test.describe('Smoke all UI + mocked MyClub / Nimenhuuto / Torneopal', () => {
       await outBtn.click();
       await shot(page, '15-filter-out');
     }
-    await page.getByRole('button', { name: /^Kaikki/ }).first().click();
+    await page.getByRole('button', { name: /^Kaikki ottelut$/ }).click();
 
     const more = page.getByLabel('Hallitse tapahtumaa').first();
     if (await more.isVisible()) {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronLeft,
@@ -31,6 +31,17 @@ export interface FamilyVisualCalendarProps {
 }
 
 export type CalendarGranularity = 'month' | 'week' | 'day';
+export const DEFAULT_CALENDAR_GRANULARITY: CalendarGranularity = 'day';
+
+export function getDefaultCalendarLanding(todayISO: string): {
+  selectedDateISO: string;
+  granularity: CalendarGranularity;
+} {
+  return {
+    selectedDateISO: todayISO,
+    granularity: DEFAULT_CALENDAR_GRANULARITY
+  };
+}
 
 export const WEEKDAYS_FI = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su'];
 export const MONTH_NAMES_FI = [
@@ -71,25 +82,45 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
     return map;
   }, [profiles]);
 
-  const todayISO = useMemo(() => helsinkiDateISO(new Date()), []);
+  const [todayISO, setTodayISO] = useState<string>(() => helsinkiDateISO(new Date()));
+  const previousTodayISORef = useRef(todayISO);
 
-  // Find default active date (first upcoming event date or today)
-  const defaultDateISO = useMemo(() => {
-    const sorted = [...events].sort(
-      (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-    );
-    const upcoming = sorted.find((ev) => helsinkiDateISO(new Date(ev.startTime)) >= todayISO);
-    return upcoming ? helsinkiDateISO(new Date(upcoming.startTime)) : todayISO;
-  }, [events, todayISO]);
+  // Find default active date (today)
+  const defaultDateISO = useMemo(() => todayISO, [todayISO]);
+  const defaultLanding = useMemo(() => getDefaultCalendarLanding(defaultDateISO), [defaultDateISO]);
 
-  const [selectedDateISO, setSelectedDateISO] = useState<string>(defaultDateISO);
-  const [granularity, setGranularity] = useState<CalendarGranularity>('month');
+  const [selectedDateISO, setSelectedDateISO] = useState<string>(defaultLanding.selectedDateISO);
+  const [granularity, setGranularity] = useState<CalendarGranularity>(defaultLanding.granularity);
 
   // Month navigation state: First day of current view month
   const [viewDate, setViewDate] = useState<Date>(() => {
     const [y, m] = defaultDateISO.split('-').map(Number);
     return new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
   });
+
+  useEffect(() => {
+    const tick = () => {
+      const nextToday = helsinkiDateISO(new Date());
+      setTodayISO((prev) => (prev === nextToday ? prev : nextToday));
+    };
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const previousTodayISO = previousTodayISORef.current;
+    if (previousTodayISO !== todayISO) {
+      setSelectedDateISO((current) => (current === previousTodayISO ? todayISO : current));
+      setViewDate((current) => {
+        const currentMonthISO = formatDateKey(new Date(current.getFullYear(), current.getMonth(), 1));
+        const previousMonthISO = `${previousTodayISO.slice(0, 7)}-01`;
+        if (currentMonthISO !== previousMonthISO) return current;
+        const [y, m] = todayISO.split('-').map(Number);
+        return new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
+      });
+      previousTodayISORef.current = todayISO;
+    }
+  }, [todayISO]);
 
   // Map events by date ISO string (YYYY-MM-DD)
   const eventsByDate = useMemo(() => {
