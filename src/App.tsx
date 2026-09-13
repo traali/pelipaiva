@@ -45,6 +45,8 @@ import { activePlayerNameForSelection, filterEventsByActiveProfileId } from './l
 
 
 
+export const DEFAULT_VIEW_MODE: 'cards' | 'timeline' | 'calendar' = 'timeline';
+
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
   const modalStore = useModalStore();
@@ -57,7 +59,7 @@ export const App: React.FC = () => {
     return true;
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('timeline');
+  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>(DEFAULT_VIEW_MODE);
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'in' | 'out'>('all');
   const [eventTypeFilter, setEventTypeFilter] = useState<
     'all' | 'tournaments' | 'matches' | 'trainings' | 'other'

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -48,6 +48,17 @@ export function formatTimelineDayChipLabel(date: Date): string {
   return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${day}.${month}`;
 }
 
+export function filterVisibleTimelineDays<T extends { dateStr: string }>(
+  groupedByDay: T[],
+  selectedTimelineDay: string,
+  todayKey: string
+): T[] {
+  if (selectedTimelineDay === 'all') return groupedByDay;
+  if (selectedTimelineDay === 'upcoming') return groupedByDay.filter((group) => group.dateStr > todayKey);
+  const selectedDay = selectedTimelineDay === 'today' ? todayKey : selectedTimelineDay;
+  return groupedByDay.filter((group) => group.dateStr === selectedDay);
+}
+
 function surfaceLabel(surface?: string, indoor?: boolean): string | null {
   if (!surface) return null;
   if (indoor) {
@@ -91,8 +102,26 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return map;
   }, [profiles]);
 
-  const todayKey = helsinkiDateISO(new Date());
+  const [todayKey, setTodayKey] = useState<string>(() => helsinkiDateISO(new Date()));
   const [selectedTimelineDay, setSelectedTimelineDay] = useState<string>('today');
+  const previousTodayKeyRef = useRef(todayKey);
+
+  useEffect(() => {
+    const tick = () => {
+      const nextToday = helsinkiDateISO(new Date());
+      setTodayKey((prev) => (prev === nextToday ? prev : nextToday));
+    };
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const previousTodayKey = previousTodayKeyRef.current;
+    if (previousTodayKey !== todayKey) {
+      setSelectedTimelineDay((prev) => (prev === previousTodayKey ? 'today' : prev));
+      previousTodayKeyRef.current = todayKey;
+    }
+  }, [todayKey]);
 
   // Group events by YYYY-MM-DD
   const groupedByDay = useMemo(() => {
@@ -134,12 +163,10 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     [groupedByDay, todayKey]
   );
 
-  const visibleDayGroups = useMemo(() => {
-    if (selectedTimelineDay === 'all') return groupedByDay;
-    const selectedDay = selectedTimelineDay === 'today' ? todayKey : selectedTimelineDay;
-    const dayGroup = groupedByDayMap.get(selectedDay);
-    return dayGroup ? [dayGroup] : [];
-  }, [selectedTimelineDay, groupedByDay, groupedByDayMap, todayKey]);
+  const visibleDayGroups = useMemo(
+    () => filterVisibleTimelineDays(groupedByDay, selectedTimelineDay, todayKey),
+    [groupedByDay, selectedTimelineDay, todayKey]
+  );
 
   const todayGroup = groupedByDayMap.get(todayKey);
   const hasTodayEvents = Boolean(todayGroup && todayGroup.events.length > 0);
@@ -209,15 +236,19 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
         </div>
 
         {selectedTimelineDay === 'today' && !hasTodayEvents && (
-          <div className="p-4 rounded-2xl border border-border-subtle bg-surface-elevated/50 text-text-secondary text-xs flex flex-wrap items-center gap-2">
+          <div
+            role="status"
+            aria-live="polite"
+            className="p-4 rounded-2xl border border-border-subtle bg-surface-elevated/50 text-text-secondary text-xs flex flex-wrap items-center gap-2"
+          >
             <span>Ei otteluita tänään</span>
             <button
               type="button"
+              disabled={futureDayKeys.length === 0}
               onClick={() => {
-                const nextDay = futureDayKeys[0];
-                setSelectedTimelineDay(nextDay || 'all');
+                setSelectedTimelineDay(futureDayKeys.length > 0 ? 'upcoming' : 'all');
               }}
-              className="px-3 py-1.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Näytä seuraavat päivät
             </button>
