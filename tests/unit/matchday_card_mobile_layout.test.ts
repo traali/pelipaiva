@@ -220,6 +220,7 @@ describe('MatchdayCard mobile default view', () => {
     expect(markup).toContain('Salamavaara lähellä kenttää');
     expect(markup).toContain('Kentät vaihtuvat nopeasti saman illan aikana.');
     expect(markup).toContain('Lisätiedot');
+    expect(markup).toMatch(/aria-controls="[^"]+"/);
     expect(markup).toContain('Kävele paikalle (12 min)');
 
     expect(markup).not.toContain('Kahviovuoro');
@@ -228,6 +229,27 @@ describe('MatchdayCard mobile default view', () => {
     expect(markup).not.toContain('Kotipeliasu');
     expect(markup).not.toContain('Muista juomapullo ja vaihtosukat.');
     expect(markup).not.toContain('EventInlineDropIn stub');
+  });
+
+  it('reveals the moved secondary sections when extras are opened', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(MatchdayCard, {
+        event,
+        playerName: 'Arto',
+        colorHex: '#0f766e',
+        defaultShowExtras: true,
+        showConflictWarnings: true,
+        showSmartGearAdvice: true,
+      })
+    );
+
+    expect(markup).toContain('Vähemmän');
+    expect(markup).toContain('Kahviovuoro');
+    expect(markup).toContain('🚶 Kävely 12 min');
+    expect(markup).toContain('Avaa tilastokeskus');
+    expect(markup).toContain('Takki mukaan. Huoltajalle sadetakki.');
+    expect(markup).toContain('Muista juomapullo ja vaihtosukat.');
+    expect(markup).toContain('EventInlineDropIn stub');
   });
 });
 
