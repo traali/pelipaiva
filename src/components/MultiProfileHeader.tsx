@@ -46,7 +46,7 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
             : 'border-border-subtle bg-surface-elevated text-text-secondary hover:text-text-primary'
         }`}
       >
-        Kaikki
+        Kaikki lapset
       </motion.button>
 
       {playerGroups.map(([playerName, playerProfiles]) => {
@@ -110,7 +110,7 @@ export const MultiProfileHeader: React.FC<MultiProfileHeaderProps> = ({
         className="touch-target min-h-[44px] inline-flex shrink-0 items-center gap-1 rounded-xl border border-border-strong bg-surface-elevated px-3 text-xs font-bold text-text-muted hover:text-pitch hover:border-pitch transition-all focus-visible:ring-2 focus-visible:ring-pitch cursor-pointer"
       >
         <Plus className="w-4 h-4" />
-        <span>+ Joukkue</span>
+        <span>Joukkue</span>
       </motion.button>
     </nav>
   );
