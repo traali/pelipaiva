@@ -81,7 +81,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
 }) => {
   const isEditing = Boolean(initialTeamUrl || initialTeamName || editingProfileId);
   const [activeTab, setActiveTab] = useState<ImportTab>(initialTab);
-  const [selectedPlayer, setSelectedPlayer] = useState(initialPlayerName || existingPlayers[0] || 'Maija');
+  const [selectedPlayer, setSelectedPlayer] = useState(initialPlayerName || existingPlayers[0] || '');
   const [selectedSport, setSelectedSport] = useState<SportType>(initialSport || 'football');
   const [playerActiveSports, setPlayerActiveSports] = useState<SportType[]>([]);
   const [customPlayerDraft, setCustomPlayerDraft] = useState('');
@@ -193,7 +193,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [parseNotice, setParseNotice] = useState('');
   useEffect(() => {
     if (isOpen && !prevIsOpen.current) {
-      setSelectedPlayer(initialPlayerName || existingPlayers[0] || 'Maija');
+      setSelectedPlayer(initialPlayerName || existingPlayers[0] || '');
       setSelectedSport(initialSport || 'football');
       setClassicUrl(initialTeamUrl || '');
       setClassicTeamName(initialTeamName || '');
@@ -589,7 +589,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Liitto / .ics</span>
+                <span>Liitto</span>
               </button>
 
               <button
@@ -604,7 +604,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                 }`}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                <span>WhatsApp</span>
+                <span>Viesti</span>
               </button>
 
               <button
@@ -619,7 +619,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                 }`}
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Excel / Sheets</span>
+                <span>Excel</span>
               </button>
 
               <button
@@ -634,7 +634,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                 }`}
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>Kuvakaappaus</span>
+                <span>Kuva</span>
               </button>
             </div>
 

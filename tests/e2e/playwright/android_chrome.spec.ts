@@ -10,9 +10,9 @@ async function enterLocalHud(page: import('@playwright/test').Page) {
     }
   });
   await page.reload();
-  await expect(page.getByRole('heading', { name: /Miten haluat käyttää FamDayta/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Miten haluat käyttää Pelipäivää/i })).toBeVisible();
   await page.getByRole('button', { name: /Vain tämä laite/i }).click();
-  await page.getByRole('button', { name: /Siirry FamDay-ottelukeskukseen/i }).click();
+  await page.getByRole('button', { name: /Siirry ottelukeskukseen/i }).click();
   await expect(page.getByRole('tab', { name: /Kaikki/i })).toBeVisible();
 }
 
@@ -61,6 +61,6 @@ test.describe('Android Chrome + desktop Chrome — family AI + HUD', () => {
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible();
     await expect(modal.getByRole('tab', { name: /Liitto/i })).toBeVisible();
-    await expect(modal.getByRole('tab', { name: /WhatsApp/i })).toBeVisible();
+    await expect(modal.getByRole('tab', { name: /Viesti/i })).toBeVisible();
   });
 });

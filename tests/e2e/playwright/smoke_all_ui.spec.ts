@@ -23,9 +23,9 @@ async function resetClient(page: Page) {
 }
 
 async function enterLocalHud(page: Page) {
-  await expect(page.getByRole('heading', { name: /Miten haluat käyttää FamDayta/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: /Miten haluat käyttää Pelipäivää/i })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: /Vain tämä laite/i }).click();
-  await page.getByRole('button', { name: /Siirry FamDay-ottelukeskukseen/i }).click();
+  await page.getByRole('button', { name: /Siirry ottelukeskukseen/i }).click();
   await expect(page.getByRole('tab', { name: /Kaikki/i }).first()).toBeVisible({ timeout: 20_000 });
 }
 
@@ -88,11 +88,11 @@ test.describe('Smoke all UI + mocked MyClub / Nimenhuuto / Torneopal', () => {
     await dialog.getByRole('tab', { name: /Liitto/i }).click();
     await dialog.getByPlaceholder(/tulospalvelu.palloliitto|.ics-linkki/i).fill('https://tulospalvelu.palloliitto.fi/team/12345/fixture');
     await shot(page, '07-import-palloliitto-url');
-    await dialog.getByRole('tab', { name: /WhatsApp/i }).click();
+    await dialog.getByRole('tab', { name: /Viesti/i }).click();
     await shot(page, '08-import-whatsapp');
     await dialog.getByRole('tab', { name: /Excel/i }).click();
     await shot(page, '09-import-excel');
-    await dialog.getByRole('tab', { name: /Kuvakaappaus/i }).click();
+    await dialog.getByRole('tab', { name: /Kuva/i }).click();
     await shot(page, '10-import-ocr');
     await closeDialog(page);
 
