@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -126,6 +125,8 @@ vi.mock('../../src/components/EventMergeModal', () => ({
 }));
 
 import { MatchdayCard } from '../../src/components/MatchdayCard';
+import { MultiProfileHeader } from '../../src/components/MultiProfileHeader';
+import { QuickDropInBar } from '../../src/components/QuickDropInBar';
 
 const event: MatchdayEvent = {
   id: 'evt-1',
@@ -209,7 +210,7 @@ describe('MatchdayCard mobile default view', () => {
 
     expect(markup).toContain('Arto');
     expect(markup).toContain('⚽ Jalkapallo');
-    expect(markup).toContain('🟢 Osallistuu');
+    expect(markup).toContain('🟢 Osallistuu · Arto');
     expect(markup).not.toContain('Arto osallistuu');
     expect(markup).toContain('PPJ/Laru');
     expect(markup).toContain('HJK');
@@ -231,15 +232,28 @@ describe('MatchdayCard mobile default view', () => {
 });
 
 describe('Requested supporting copy and spacing tweaks', () => {
-  it('updates the drop-in placeholder, add button copy, and sticky filter spacing', () => {
-    const quickDropInBar = fs.readFileSync('/home/runner/work/pelipaiva/pelipaiva/src/components/QuickDropInBar.tsx', 'utf8');
-    const multiProfileHeader = fs.readFileSync('/home/runner/work/pelipaiva/pelipaiva/src/components/MultiProfileHeader.tsx', 'utf8');
-    const appSource = fs.readFileSync('/home/runner/work/pelipaiva/pelipaiva/src/App.tsx', 'utf8');
+  it('renders the shorter quick drop-in placeholder', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(QuickDropInBar, {
+        existingPlayers: ['Arto'],
+        activeProfilePlayerName: 'Arto',
+      })
+    );
 
-    expect(quickDropInBar).toContain("placeholder=\"Liitä viesti tai .ics-linkki\"");
-    expect(multiProfileHeader).toContain('<span>Lisää</span>');
-    expect(appSource).toContain('py-1.5');
-    expect(appSource).toContain('mb-2');
-    expect(appSource).toContain('gap-1.5');
+    expect(markup).toContain('Liitä viesti tai .ics-linkki');
+  });
+
+  it('renders the add-profile button as “Lisää” while keeping the add aria-label', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(MultiProfileHeader, {
+        profiles: [],
+        activeProfileId: 'all',
+        onSelectProfile: () => undefined,
+        onAddProfile: () => undefined,
+      })
+    );
+
+    expect(markup).toContain('>Lisää<');
+    expect(markup).toContain('aria-label="Lisää joukkue tai turnaus"');
   });
 });

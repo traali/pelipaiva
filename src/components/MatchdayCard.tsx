@@ -402,7 +402,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 aria-label={`Pelaaja osallistuu. Klikkaa ilmoittaaksesi poisjäänti.`}
               >
                 <span className="h-2 w-2 rounded-full bg-pitch group-hover:bg-stoppage shrink-0" />
-                <span className="group-hover:hidden">🟢 Osallistuu</span>
+                <span className="group-hover:hidden">🟢 Osallistuu{playerName ? ` · ${playerName}` : ''}</span>
                 <span className="hidden group-hover:inline">⛔ Ilmoita poisjäänti</span>
               </button>
             ) : (
@@ -414,7 +414,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 aria-label={`Poisjäänti merkitty. Klikkaa merkitäksesi osallistuvaksi.`}
               >
                 <span className="h-2 w-2 rounded-full bg-stoppage group-hover:bg-pitch shrink-0" />
-                <span className="group-hover:hidden">⛔ Poisjäänti</span>
+                <span className="group-hover:hidden">⛔ Poisjäänti{playerName ? ` · ${playerName}` : ''}</span>
                 <span className="hidden group-hover:inline">↩️ Osallistuu silti</span>
               </button>
             )}
