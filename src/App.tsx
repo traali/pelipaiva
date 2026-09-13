@@ -41,6 +41,7 @@ import {
 import { useModalStore } from './lib/modals/useModalStore';
 import { GlobalModalHost } from './components/modals';
 import { useAppSettings } from './lib/settings/useAppSettings';
+import { activePlayerNameForSelection, filterEventsByActiveProfileId } from './lib/profiles/activeProfileSelection';
 
 
 
@@ -484,15 +485,7 @@ export const App: React.FC = () => {
 
   // Filter stitched events by selected profile or player group
   const filteredEvents = useMemo(() => {
-    return allStitchedEvents.filter((e) => {
-      if (activeProfileId === 'all') return true;
-      if (activeProfileId.startsWith('player:')) {
-        const pName = activeProfileId.replace('player:', '').toLowerCase();
-        const profile = profiles.find((p) => p.id === e.profileId);
-        return (profile?.playerName || '').toLowerCase() === pName;
-      }
-      return e.profileId === activeProfileId;
-    });
+    return filterEventsByActiveProfileId(allStitchedEvents, profiles, activeProfileId);
   }, [allStitchedEvents, activeProfileId, profiles]);
 
   const [clockTick, setClockTick] = useState(0);
@@ -749,9 +742,7 @@ export const App: React.FC = () => {
     });
   };
 
-  const activePlayerName = activeProfileId.startsWith('player:')
-    ? activeProfileId.replace('player:', '')
-    : profiles.find((p) => p.id === activeProfileId)?.playerName;
+  const activePlayerName = activePlayerNameForSelection(activeProfileId, profiles);
 
   const handleRefreshAll = async () => {
     setIsSyncing(true);
@@ -1289,11 +1280,7 @@ export const App: React.FC = () => {
             {/* Quick Drop-In Bar & Photo OCR at Top */}
             <QuickDropInBar
               existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
-              activeProfilePlayerName={
-                activeProfileId.startsWith('player:')
-                  ? activeProfileId.replace('player:', '')
-                  : profiles.find((p) => p.id === activeProfileId)?.playerName
-              }
+              activeProfilePlayerName={activePlayerName}
               onEventCreated={() => setActiveProfileId('all')}
             />
 

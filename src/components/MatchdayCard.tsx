@@ -209,13 +209,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
   const typeBadge = isTraining
     ? {
-        label: 'Harjoitus',
+        label: `Harjoitus · ${getSportBadge()}`,
         icon: Dumbbell,
         className: 'bg-radar/15 text-radar border-radar/25',
       }
     : isTournament
       ? {
-          label: 'Turnaus',
+          label: `Turnaus · ${getSportBadge()}`,
           icon: Trophy,
           className: 'bg-gold/20 text-gold border-gold/35 shadow-xs',
         }
@@ -523,7 +523,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </span>
             )}
           </div>
-          {showExtras && (event.officialGameTimes?.length || 0) > 1 && (
+          {(event.officialGameTimes?.length || 0) > 1 && (
             <ul className="mt-1.5 mb-1 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1">
               {event.officialGameTimes!.map((g, i) => (
                 <li key={`${g.startTime}-${g.title}`} className="flex items-center justify-between gap-2 text-sm">
