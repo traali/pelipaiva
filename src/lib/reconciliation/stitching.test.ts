@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stitchCalendarEventsWithFixtures } from './reconciliationEngine';
+import { stitchCalendarEventsWithFixtures, fixtureInvolvesOwnTeam, isKickoffAfterKokoontuminen } from './reconciliationEngine';
 import { parseICSFeed } from '../calendar/icsParser';
 import { generateIcsCalendarFeed } from '../calendar/calendarFeedGenerator';
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
@@ -317,5 +317,89 @@ END:VCALENDAR`;
     expect(stitched).toHaveLength(1);
     expect(stitched[0]!.officialGameTimes).toHaveLength(2);
     expect(stitched[0]!.title).toBe('Westend Indians P14 Yellow');
+  });
+
+  it('does not attach TASO games that kick off before Nimenhuuto kokoontuminen', () => {
+    const cal = mockEvent({
+      id: 'nh-15',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'Westend Indians P14: Turnaus Yellow',
+      homeTeam: 'Westend Indians P14 Yellow',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z', // 15.00 FI meetup
+      warmupTime: '2026-09-13T12:00:00.000Z'
+    });
+    const morning = mockEvent({
+      id: 'fixture-ssbl-morning',
+      officialFixtureId: 'ssbl_morning',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs SB Vantaa',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'SB Vantaa',
+      startTime: '2026-09-13T09:00:00.000Z' // 12.00 FI — before meetup
+    });
+    const after = mockEvent({
+      id: 'fixture-ssbl-after',
+      officialFixtureId: 'ssbl_after',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Oilers',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Oilers',
+      startTime: '2026-09-13T13:00:00.000Z' // 16.00 FI
+    });
+    const stitched = stitchCalendarEventsWithFixtures([cal, morning, after]);
+    const card = stitched.find((e) => e.id === 'nh-15')!;
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId) || [card.officialFixtureId]).toEqual(['ssbl_after']);
+    expect(stitched.some((e) => e.officialFixtureId === 'ssbl_morning' || e.id.includes('morning'))).toBe(true);
+  });
+
+  it('does not attach another squad or a pool game the child is not in', () => {
+    const cal = mockEvent({
+      id: 'nh-yellow',
+      sport: 'floorball',
+      eventType: 'tournament',
+      title: 'Westend Indians P14 Yellow',
+      homeTeam: 'Westend Indians P14 Yellow',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z'
+    });
+    const black = mockEvent({
+      id: 'fixture-ssbl-black',
+      officialFixtureId: 'ssbl_black',
+      sport: 'floorball',
+      homeTeam: 'Westend Indians Black',
+      awayTeam: 'Oilers',
+      title: 'Westend Indians Black vs Oilers',
+      startTime: '2026-09-13T13:00:00.000Z'
+    });
+    const pool = mockEvent({
+      id: 'fixture-ssbl-pool',
+      officialFixtureId: 'ssbl_pool',
+      sport: 'floorball',
+      homeTeam: 'SB Vantaa Orange',
+      awayTeam: 'Oilers White',
+      title: 'SB Vantaa Orange vs Oilers White',
+      startTime: '2026-09-13T13:15:00.000Z'
+    });
+    const own = mockEvent({
+      id: 'fixture-ssbl-own',
+      officialFixtureId: 'ssbl_own',
+      sport: 'floorball',
+      homeTeam: 'SB Vantaa',
+      awayTeam: 'Westend Indians Yellow',
+      title: 'SB Vantaa vs Westend Indians Yellow',
+      startTime: '2026-09-13T13:30:00.000Z'
+    });
+    expect(fixtureInvolvesOwnTeam(cal, black)).toBe(false);
+    expect(fixtureInvolvesOwnTeam(cal, pool)).toBe(false);
+    expect(fixtureInvolvesOwnTeam(cal, own)).toBe(true);
+    expect(isKickoffAfterKokoontuminen(cal, own.startTime)).toBe(true);
+
+    const stitched = stitchCalendarEventsWithFixtures([cal, black, pool, own]);
+    const card = stitched.find((e) => e.id === 'nh-yellow')!;
+    expect(card.officialFixtureId).toBe('ssbl_own');
+    expect(card.officialGameTimes?.length ?? 0).toBeLessThanOrEqual(1);
   });
 });

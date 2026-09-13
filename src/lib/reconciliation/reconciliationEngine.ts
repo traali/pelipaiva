@@ -85,6 +85,67 @@ export function applyOfficialKickoffKeepCalendarArrival<
   return event
 }
 
+const KICKOFF_BEFORE_ARRIVAL_SLACK_MS = 5 * 60_000;
+
+type TeamSides = { homeTeam?: string; awayTeam?: string; title?: string };
+
+export function ownTeamFromCalendar(cal: TeamSides): string {
+  const home = cal.homeTeam?.trim() || '';
+  const away = cal.awayTeam?.trim() || '';
+  const title = cal.title?.trim() || '';
+  if (home && !isGenericOrSquadTag(home)) return home;
+  if (away && !isGenericOrSquadTag(away)) return away;
+  return title;
+}
+
+function identityConflicts(calendarText: string, fixtureTeam: string): boolean {
+  const a = normalizeTeamName(calendarText);
+  const b = normalizeTeamName(fixtureTeam);
+  if (a.color && b.color && a.color !== b.color) return true;
+  if (a.squad && b.squad && a.squad !== b.squad) return true;
+  if (a.ageGroup && b.ageGroup && a.ageGroup !== b.ageGroup) return true;
+  return false;
+}
+
+/** TASO row is this child’s team as home or away — not another Indians/PPJ squad. */
+export function fixtureInvolvesOwnTeam(cal: TeamSides, fix: TeamSides): boolean {
+  const fixHome = fix.homeTeam?.trim() || '';
+  const fixAway = fix.awayTeam?.trim() || '';
+  if (!fixHome || !fixAway) return false;
+
+  const own = ownTeamFromCalendar(cal);
+  const blob = `${own} ${cal.title || ''}`.trim();
+  if (!blob) return false;
+
+  const scored = [
+    { team: fixHome, sim: Math.max(calculateTeamSimilarity(own, fixHome), calculateTeamSimilarity(cal.title || '', fixHome)) },
+    { team: fixAway, sim: Math.max(calculateTeamSimilarity(own, fixAway), calculateTeamSimilarity(cal.title || '', fixAway)) }
+  ];
+  return scored.some((s) => s.sim >= 0.70 && !identityConflicts(blob, s.team));
+}
+
+/**
+ * Nimenhuuto/MyClub DTSTART is kokoontuminen. Torneopal kickoff must not be earlier
+ * (morning pool games do not belong on a 15.00 meetup card). Equal times = calendar is kickoff.
+ */
+export function isKickoffAfterKokoontuminen(
+  cal: { startTime: string; warmupTime?: string; eventType?: string; isTournament?: boolean; title?: string; tournamentName?: string; notes?: string },
+  officialStartIso: string
+): boolean {
+  const kick = new Date(officialStartIso).getTime();
+  if (!Number.isFinite(kick)) return false;
+  const tournament = isTournamentish(cal as MatchdayEvent);
+  let arrivalIso = cal.startTime;
+  if (!tournament && cal.warmupTime) {
+    const warm = new Date(cal.warmupTime).getTime();
+    const start = new Date(cal.startTime).getTime();
+    if (Number.isFinite(warm) && warm < start) arrivalIso = cal.warmupTime;
+  }
+  const arrival = new Date(arrivalIso).getTime();
+  if (!Number.isFinite(arrival)) return false;
+  return kick + KICKOFF_BEFORE_ARRIVAL_SLACK_MS >= arrival;
+}
+
 /** Helsinki-local calendar-day key — UTC keys mis-bucketed 00:00–02:59 FI events
  *  against the ±180 min tolerance window (M-19/V6, SPEC §5.1 "same day" is local). */
 function helsinkiDayKey(d: Date): string {
@@ -181,6 +242,7 @@ export function reconcileCalendarWithOfficial(
       // Time proximity check: ±3h (180 minutes)
       const timeDiffMins = Math.abs(fixDate.getTime() - eventDate.getTime()) / 60000;
       if (timeDiffMins > 180) continue;
+      if (!isKickoffAfterKokoontuminen(event, fixture.startTime)) continue;
 
       // Opponent comparison
       const offOpponent = fixture.isHome ? fixture.awayTeam : fixture.homeTeam;
@@ -244,25 +306,15 @@ export function reconcileCalendarWithOfficial(
     }
 
     if (candidates.length === 0 && isTournamentish(event)) {
-      const sameDay = officialFixtures.filter((fixture) => helsinkiDayKey(new Date(fixture.startTime)) === eventDayKey)
-      const calVenue = (event.venue?.name || '').toLowerCase().replace(/[\s\-_]/g, '')
-      const venueHits = calVenue
-        ? sameDay.filter((f) => {
-            const off = (f.venueName || '').toLowerCase().replace(/[\s\-_]/g, '')
-            return off && (calVenue.includes(off) || off.includes(calVenue) || calVenue.includes('salibandy') && off.includes('salibandy'))
-          })
-        : []
-      const pool = (venueHits.length ? venueHits : sameDay).slice().sort((a, b) => a.startTime.localeCompare(b.startTime))
-      const first = pool[0]
+      const sameDay = officialFixtures.filter((fixture) => {
+        if (helsinkiDayKey(new Date(fixture.startTime)) !== eventDayKey) return false;
+        if (!isKickoffAfterKokoontuminen(event, fixture.startTime)) return false;
+        return fixtureInvolvesOwnTeam(event, fixture);
+      });
+      const pool = sameDay.slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const first = pool[0];
       if (first) {
-        const simOwn = Math.max(
-          calculateTeamSimilarity(event.homeTeam, first.isHome ? first.homeTeam : first.awayTeam),
-          calculateTeamSimilarity(event.title, first.homeTeam),
-          calculateTeamSimilarity(event.title, first.awayTeam),
-        )
-        if (simOwn >= 0.45 || venueHits.length > 0) {
-          candidates.push({ fixture: first, score: venueHits.length ? 0.88 : 0.86 })
-        }
+        candidates.push({ fixture: first, score: 0.86 });
       }
     }
 
@@ -450,6 +502,9 @@ function isCalendarFixtureMatch(cal: MatchdayEvent, fix: MatchdayEvent): boolean
     if (normCal.squad && normFix.squad && normCal.squad !== normFix.squad) {
       return false;
     }
+    if (normCal.ageGroup && normFix.ageGroup && normCal.ageGroup !== normFix.ageGroup) {
+      return false;
+    }
     return true;
   }
 
@@ -461,7 +516,9 @@ function isCalendarFixtureMatch(cal: MatchdayEvent, fix: MatchdayEvent): boolean
  * on the same calendar day matching the team or opponent.
  *
  * Invariants:
- * - Matches within ±180 min on the same local date.
+ * - Own team must be TASO home or away (colour / age / squad may not conflict).
+ * - Official kickoff must be at or after calendar kokoontuminen (5 min slack).
+ * - Matches on the same local date.
  * - Adopts authoritative official fixture start time as match kickoff.
  * - Preserves earlier calendar start time as coach warmup/gathering time.
  * - Reconciles venues: adopts Torneopal venue and flags non-breaking venueMismatch for the UI banner.
@@ -505,13 +562,8 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
       if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
       if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
-      return (
-        isCalendarFixtureMatch(cal, fix) ||
-        calculateTeamSimilarity(cal.title, fix.homeTeam) >= 0.45 ||
-        calculateTeamSimilarity(cal.title, fix.awayTeam) >= 0.45 ||
-        calculateTeamSimilarity(cal.homeTeam, fix.homeTeam) >= 0.45 ||
-        calculateTeamSimilarity(cal.homeTeam, fix.awayTeam) >= 0.45
-      );
+      if (!isKickoffAfterKokoontuminen(cal, fix.startTime)) return false;
+      return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
     }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     if (sameDayTeam.length >= 2) {
@@ -531,6 +583,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         const fixDate = new Date(fix.startTime);
         const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
         if (diffMins > 180 || helsinkiDayKey(calDate) !== helsinkiDayKey(fixDate)) continue;
+        if (!isKickoffAfterKokoontuminen(cal, fix.startTime)) continue;
 
         if (isCalendarFixtureMatch(cal, fix)) {
           if (diffMins < bestDiffMins) {

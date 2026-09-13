@@ -1,5 +1,6 @@
 import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
+import { calculateTeamSimilarity, normalizeTeamName } from '../reconciliation/teamNameMatcher';
 import type { TournamentBlock } from './types';
 import { helsinkiDateISO } from './time';
 
@@ -13,14 +14,23 @@ function tournamentKey(ev: MatchdayEvent): string {
 
 function involvesTeam(ev: MatchdayEvent, teamName?: string): boolean {
   if (!teamName) return true;
-  const blob = `${ev.title} ${ev.homeTeam || ''} ${ev.awayTeam || ''}`.toLowerCase();
-  const tokens = teamName
-    .toLowerCase()
-    .split(/[\s/]+/)
-    .map((t) => t.trim())
-    .filter((t) => t.length >= 3);
-  if (!tokens.length) return blob.includes(teamName.toLowerCase());
-  return tokens.some((t) => blob.includes(t));
+  const simHome = calculateTeamSimilarity(teamName, ev.homeTeam || '');
+  const simAway = calculateTeamSimilarity(teamName, ev.awayTeam || '');
+  const simTitle = calculateTeamSimilarity(teamName, ev.title || '');
+  const best = Math.max(simHome, simAway, simTitle);
+  if (best < 0.7) return false;
+  const matched =
+    simHome >= simAway && simHome >= simTitle
+      ? ev.homeTeam
+      : simAway >= simTitle
+        ? ev.awayTeam
+        : ev.title;
+  const a = normalizeTeamName(teamName);
+  const b = normalizeTeamName(matched || '');
+  if (a.color && b.color && a.color !== b.color) return false;
+  if (a.ageGroup && b.ageGroup && a.ageGroup !== b.ageGroup) return false;
+  if (a.squad && b.squad && a.squad !== b.squad) return false;
+  return true;
 }
 
 export function tournamentAgent(
