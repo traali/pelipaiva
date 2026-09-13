@@ -19,7 +19,7 @@ import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { helsinkiDateISO } from './lib/agents/time';
+import { helsinkiDateISO, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
@@ -883,55 +883,85 @@ export const App: React.FC = () => {
 
   const handleResolveMismatch = async (
     eventId: string,
-    decision: 'use_official' | 'keep_calendar' | 'unlink'
+    decision: 'use_official' | 'keep_calendar' | 'unlink' | 'dismiss'
   ) => {
-    const ev = rawEvents.find((e) => e.id === eventId);
-    if (!ev) return;
+    const ev = rawEvents.find((e) => e.id === eventId) || await db.events.get(eventId);
+    if (!ev) {
+      console.warn('[MISMATCH] Event not found for resolution:', eventId);
+      return;
+    }
 
-    if (decision === 'use_official' && ev.mismatchFlags) {
-      const officialIso = ev.mismatchFlags.officialStartTimeIso;
-      const officialVenue = ev.mismatchFlags.officialVenueName;
-      // Only fall back to keep_calendar if there's genuinely nothing to apply.
-      // A venue-only mismatch has officialVenue but no officialIso — that is valid.
-      if (!officialIso && !officialVenue) {
-        return handleResolveMismatch(eventId, 'keep_calendar');
-      }
-      const newStartTime = officialIso || ev.startTime;
-      let newWarmupTime = ev.warmupTime;
-      if (officialIso && new Date(officialIso).getTime() > new Date(ev.startTime).getTime()) {
-        newWarmupTime = newWarmupTime || ev.startTime;
-      }
-      const updated: MatchdayEvent = {
+    const nowIso = new Date().toISOString();
+
+    let updated: MatchdayEvent = ev;
+    if (decision === 'use_official') {
+      const officialIso =
+        ev.mismatchFlags?.officialStartTimeIso ||
+        parseHelsinkiClockOnEventDate(ev.startTime, ev.mismatchFlags?.officialStartTime);
+      const officialVenue = ev.mismatchFlags?.officialVenueName;
+      const timed = officialIso
+        ? applyOfficialKickoffKeepCalendarArrival(
+          { startTime: ev.startTime, warmupTime: ev.warmupTime, endTime: ev.endTime },
+          { startTime: officialIso }
+        )
+        : { startTime: ev.startTime, warmupTime: ev.warmupTime, endTime: ev.endTime };
+      updated = {
         ...ev,
-        startTime: newStartTime,
-        warmupTime: newWarmupTime,
-        venue: officialVenue
-          ? { ...ev.venue, name: officialVenue }
-          : ev.venue,
+        ...timed,
+        venue: officialVenue ? { ...ev.venue, name: officialVenue } : ev.venue,
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
         userOverride: {
           action: 'adopt_official',
-          appliedAt: new Date().toISOString(),
+          appliedAt: nowIso,
           notes: 'Päivitetty liiton tietoon'
         }
       };
-      await db.events.put(updated);
     } else if (decision === 'keep_calendar') {
-      const calendarVenue = ev.mismatchFlags?.calendarVenueName;
-      const updated: MatchdayEvent = {
+      updated = {
         ...ev,
-        venue: calendarVenue ? { ...ev.venue, name: calendarVenue } : ev.venue,
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
         userOverride: {
           action: 'keep_calendar',
-          appliedAt: new Date().toISOString(),
+          appliedAt: nowIso,
           notes: 'Säilytetty omat kalenteritiedot'
         }
       };
-      await db.events.put(updated);
+    } else if (decision === 'unlink') {
+      updated = {
+        ...ev,
+        officialFixtureId: undefined,
+        mismatchFlags: undefined,
+        reconciliationStatus: 'unlinked',
+        userOverride: {
+          action: 'unlink',
+          appliedAt: nowIso,
+          notes: 'Ottelulinkki purettu'
+        }
+      };
+    } else {
+      const dismissNote = 'Piilotettu aikatauluristiriita';
+      updated = {
+        ...ev,
+        mismatchFlags: undefined,
+        userOverride: ev.userOverride
+          ? {
+            ...ev.userOverride,
+            appliedAt: nowIso,
+            notes: ev.userOverride.notes
+              ? `${ev.userOverride.notes} • ${dismissNote}`
+              : dismissNote
+          }
+          : {
+            action: 'custom',
+            appliedAt: nowIso,
+            notes: dismissNote
+          }
+      };
     }
+
+    await db.events.put(updated);
   };
 
   if (isAmbientMode) {
@@ -1022,77 +1052,75 @@ export const App: React.FC = () => {
             onClearDemo={handleClearData}
           />
         )}
-        {/* Sticky Profile Filter & View Mode Switcher Header (Compact 2-Row Layout) */}
+        {/* Sticky Profile Filter & View Mode Switcher Header */}
         <div
           ref={stickyFilterRef}
           className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2 shadow-xs"
         >
-          {/* Row 1: Profile Carousel + View Mode Switcher */}
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <div className="flex-1 min-w-0">
-              <MultiProfileHeader
-                profiles={profiles}
-                activeProfileId={activeProfileId}
-                onSelectProfile={(id) => setActiveProfileId(id)}
-                onAddProfile={() => openAddTeam(activePlayerName)}
-              />
-            </div>
-
-            {/* View Mode Switcher: Cards vs Timeline vs Calendar */}
-            <div
-              role="tablist"
-              aria-label="Näkymän valitsin"
-              className="flex items-center rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0"
+          {/* Row 1: View Mode Switcher */}
+          <div
+            role="tablist"
+            aria-label="Näkymän valitsin"
+            className="grid w-full grid-cols-3 gap-1 rounded-xl bg-surface-elevated p-1 border border-border-subtle"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'cards'}
+              onClick={() => setViewMode('cards')}
+              title="Korttinäkymä"
+              className={`touch-target min-h-[44px] px-2 sm:px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                viewMode === 'cards'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'cards'}
-                onClick={() => setViewMode('cards')}
-                title="Korttinäkymä"
-                className={`touch-target min-h-[44px] px-2.5 sm:px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                  viewMode === 'cards'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <LayoutList className="w-4 h-4" />
-                <span>Kortit</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'timeline'}
-                onClick={() => setViewMode('timeline')}
-                title="Tiivis aikajana"
-                className={`touch-target min-h-[44px] px-2.5 sm:px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                  viewMode === 'timeline'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <TableProperties className="w-4 h-4" />
-                <span>Tiivis</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'calendar'}
-                onClick={() => setViewMode('calendar')}
-                title="Kalenteriruudukko"
-                className={`touch-target min-h-[44px] px-2.5 sm:px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                  viewMode === 'calendar'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <CalendarIcon className="w-4 h-4" />
-                <span>Kalenteri</span>
-              </button>
-            </div>
+              <LayoutList className="w-4 h-4" />
+              <span>Kortit</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'timeline'}
+              onClick={() => setViewMode('timeline')}
+              title="Tiivis aikajana"
+              className={`touch-target min-h-[44px] px-2 sm:px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                viewMode === 'timeline'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <TableProperties className="w-4 h-4" />
+              <span>Tiivis</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'calendar'}
+              onClick={() => setViewMode('calendar')}
+              title="Kalenteriruudukko"
+              className={`touch-target min-h-[44px] px-2 sm:px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                viewMode === 'calendar'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span>Kalenteri</span>
+            </button>
           </div>
 
-          {/* Row 2: Combined Single Horizontal Filter Ribbon (Attendance + Event Types) */}
+          {/* Row 2: Profile Carousel */}
+          <div className="min-w-0">
+            <MultiProfileHeader
+              profiles={profiles}
+              activeProfileId={activeProfileId}
+              onSelectProfile={(id) => setActiveProfileId(id)}
+              onAddProfile={() => openAddTeam(activePlayerName)}
+            />
+          </div>
+
+          {/* Row 3: Combined Single Horizontal Filter Ribbon (Attendance + Event Types) */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 text-xs">
             {/* Attendance Filter Chips */}
             <button
@@ -1104,7 +1132,7 @@ export const App: React.FC = () => {
                   : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
               }`}
             >
-              Kaikki ({filterCounts.all})
+              Kaikki
             </button>
             <button
               type="button"
@@ -1117,7 +1145,6 @@ export const App: React.FC = () => {
               title="Näytä vain tapahtumat joihin osallistutaan (IN)"
             >
               <span>🟢 Osallistuu</span>
-              <span className="text-[10px] opacity-80">({filterCounts.attending})</span>
             </button>
             {(filterCounts.out > 0 || attendanceFilter === 'out') && (
               <button
@@ -1130,8 +1157,7 @@ export const App: React.FC = () => {
                 }`}
                 title="Näytä vain tapahtumat mihin ei osallistuta (Poisjäännit / OUT)"
               >
-                <span>⛔ Pois</span>
-                <span className="text-[10px] opacity-80">({filterCounts.out})</span>
+                <span>⛔ Pois ({filterCounts.out})</span>
               </button>
             )}
 

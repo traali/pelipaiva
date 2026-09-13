@@ -33,6 +33,7 @@ import { MoreHorizontal, FileText, Edit3 } from 'lucide-react';
 import { useMatchdayLogistics } from '../hooks/useMatchdayLogistics';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { db } from '../lib/storage/db';
+import { MismatchResolveBanner, type MismatchDecision } from './MismatchResolveBanner';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -46,7 +47,7 @@ interface HeroMatchCardProps {
   onNavigate?: () => void;
   onOpenStats?: () => void;
   onOpenHomeModal?: () => void;
-  onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
+  onResolveMismatch?: (eventId: string, decision: MismatchDecision) => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
   onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
   onEventDeleted?: (deletedId: string) => void;
@@ -75,6 +76,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
+  const [dismissedConflictWarning, setDismissedConflictWarning] = useState(false);
+  const [mismatchBusy, setMismatchBusy] = useState(false);
 
   const stats: FullMatchStats | null = useMemo(() => {
     if (event.isTraining) return null;
@@ -407,32 +410,26 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           </button>
         </div>
 
-        {/* Schedule / Venue Mismatch Warning Banner */}
-        {!isOut && event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
-          <div className="mt-3 px-3 py-1.5 rounded-xl bg-whistle/10 border border-whistle/25 flex items-center gap-2 flex-wrap">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-whistle" />
-            <span className="text-whistle text-[11px] font-semibold flex-1 min-w-0 truncate">
-              {event.mismatchFlags.timeMismatch
-                ? `Aikataulumuutos: ${event.mismatchFlags.calendarStartTime || ''} ➔ ${event.mismatchFlags.officialStartTime || ''}`
-                : `Kenttämuutos: ${event.mismatchFlags.calendarVenueName || ''} ➔ ${event.mismatchFlags.officialVenueName || ''}`}
-            </span>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => onResolveMismatch?.(event.id, 'use_official')}
-                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[10px] font-bold hover:brightness-110 cursor-pointer"
-              >
-                Päivitä liiton tietoon
-              </button>
-              <button
-                type="button"
-                onClick={() => onResolveMismatch?.(event.id, 'keep_calendar')}
-                className="touch-target min-h-[44px] px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[10px] font-medium border border-border-subtle cursor-pointer"
-              >
-                Säilytä oma
-              </button>
-            </div>
-          </div>
+        {!isOut && (
+          <MismatchResolveBanner
+            event={event}
+            conflictWarning={
+              dismissedConflictWarning || consolidatedConflictGroups.length > 0
+                ? undefined
+                : event.briefing?.conflictWarning
+            }
+            resolving={mismatchBusy}
+            onDismissConflict={() => setDismissedConflictWarning(true)}
+            onResolve={async (eventId, decision) => {
+              if (!onResolveMismatch) return;
+              setMismatchBusy(true);
+              try {
+                await Promise.resolve(onResolveMismatch(eventId, decision));
+              } finally {
+                setMismatchBusy(false);
+              }
+            }}
+          />
         )}
 
         {/* 3-PHASE TIMING STEPPER (Lähde kotoa -> Paikalla/Alkulämpö -> Kickoff) */}

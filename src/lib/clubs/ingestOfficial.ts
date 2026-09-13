@@ -301,21 +301,25 @@ export async function ingestIcsForProfile(opts: {
             applyOfficialKickoffKeepCalendarArrival(ev, result.officialFixture);
           }
 
-          const diag = result.mismatches || computeMismatchDiagnostics({ ...ev, startTime: originalCalStart }, result.officialFixture);
-          if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
-            ev.mismatchFlags = {
-              timeMismatch: diag.hasKickoffMismatch,
-              timeDiffMinutes: diag.timeDiffMinutes,
-              calendarStartTime: diag.calendarStartTime,
-              officialStartTime: diag.officialStartTime,
-              officialStartTimeIso: result.officialFixture.startTime,
-              venueMismatch: diag.hasVenueMismatch,
-              calendarVenueName: diag.calendarVenueName,
-              officialVenueName: diag.officialVenueName,
-              opponentMismatch: diag.hasOpponentMismatch,
-              calendarOpponent: diag.calendarOpponent,
-              officialOpponent: diag.officialOpponent
-            };
+          if (ev.userOverride) {
+            ev.mismatchFlags = undefined;
+          } else {
+            const diag = result.mismatches || computeMismatchDiagnostics({ ...ev, startTime: originalCalStart }, result.officialFixture);
+            if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
+              ev.mismatchFlags = {
+                timeMismatch: diag.hasKickoffMismatch,
+                timeDiffMinutes: diag.timeDiffMinutes,
+                calendarStartTime: diag.calendarStartTime,
+                officialStartTime: diag.officialStartTime,
+                officialStartTimeIso: result.officialFixture.startTime,
+                venueMismatch: diag.hasVenueMismatch,
+                calendarVenueName: diag.calendarVenueName,
+                officialVenueName: diag.officialVenueName,
+                opponentMismatch: diag.hasOpponentMismatch,
+                calendarOpponent: diag.calendarOpponent,
+                officialOpponent: diag.officialOpponent
+              };
+            }
           }
 
           // Recalculate briefing so departure timing, WhatsApp brief and spectator advice
