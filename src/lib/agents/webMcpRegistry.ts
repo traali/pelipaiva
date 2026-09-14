@@ -58,6 +58,8 @@ declare global {
 /**
  * Ensures a shared ModelContextRegistry instance is mounted on document, navigator, and window.
  */
+let _webMcpMessageHandler: ((event: MessageEvent) => void) | null = null;
+
 function ensureModelContextRegistry(): ModelContextRegistry {
   const existing = (typeof document !== 'undefined' && document.modelContext) ||
     (typeof navigator !== 'undefined' && (navigator as any).modelContext) ||
@@ -166,7 +168,10 @@ function ensureModelContextRegistry(): ModelContextRegistry {
   if (typeof window !== 'undefined') {
     (window as any).modelContext = registry;
 
-    window.addEventListener('message', async (event: MessageEvent) => {
+    if (_webMcpMessageHandler) {
+      window.removeEventListener('message', _webMcpMessageHandler);
+    }
+    const messageHandler = async (event: MessageEvent) => {
       const data = event.data;
       if (!data || data.type !== 'webmcp:request' || !data.id) return;
 
@@ -186,7 +191,9 @@ function ensureModelContextRegistry(): ModelContextRegistry {
           error: { message: msg || 'WebMCP execution failed' },
         }, '*');
       }
-    });
+    };
+    _webMcpMessageHandler = messageHandler;
+    window.addEventListener('message', messageHandler);
 
     window.dispatchEvent(
       new CustomEvent('webmcp:ready', { detail: { location: 'navigator.modelContext & document.modelContext' } })
