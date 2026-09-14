@@ -210,8 +210,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveSuccess(false);
         onEventCreated?.();
       }, 1000);
-    } catch (err: any) {
-      setSaveError(err?.message || 'Päivitys epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(msg || 'Päivitys epäonnistui');
       setTimeout(() => setSaveError(''), 4000);
     } finally {
       setIsSaving(false);
@@ -287,8 +288,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveSuccess(false);
         onEventCreated?.();
       }, 1000);
-    } catch (err: any) {
-      setSaveError(err?.message || 'Tallennus epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(msg || 'Tallennus epäonnistui');
       setTimeout(() => setSaveError(''), 4000);
     } finally {
       setIsSaving(false);

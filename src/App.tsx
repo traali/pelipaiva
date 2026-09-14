@@ -716,12 +716,13 @@ export const App: React.FC = () => {
       }
 
       return { success: true, count: imported };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.warn('Team / Calendar fetch error:', err);
       return {
         success: false,
         count: 0,
-        error: err?.message || 'Kalenterin nouto epäonnistui. Tarkista verkko tai linkki.'
+        error: msg || 'Kalenterin nouto epäonnistui. Tarkista verkko tai linkki.'
       };
     }
   };

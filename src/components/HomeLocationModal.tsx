@@ -147,8 +147,9 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
         setSaveSuccess(false);
         onClose();
       }, 900);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Tallennus epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Tallennus epäonnistui');
     }
   };
 

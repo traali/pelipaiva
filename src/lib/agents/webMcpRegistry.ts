@@ -113,9 +113,10 @@ function ensureModelContextRegistry(): ModelContextRegistry {
           }],
           isError: false,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: 'text', text: `Error executing '${params.name}': ${err?.message || String(err)}` }],
+          content: [{ type: 'text', text: `Error executing '${params.name}': ${msg}` }],
           isError: true,
         };
       }
@@ -177,11 +178,12 @@ function ensureModelContextRegistry(): ModelContextRegistry {
           const result = await registry.callTool(data.params || { name: '', arguments: {} });
           window.postMessage({ type: 'webmcp:response', id: data.id, result }, '*');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         window.postMessage({
           type: 'webmcp:response',
           id: data.id,
-          error: { message: err?.message || 'WebMCP execution failed' },
+          error: { message: msg || 'WebMCP execution failed' },
         }, '*');
       }
     });

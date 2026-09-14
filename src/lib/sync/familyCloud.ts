@@ -131,9 +131,10 @@ export async function pushFamilyRoster(
       rev: data.rev || (ifMatchRev !== undefined ? ifMatchRev + 1 : 1),
       updatedAt: data.updatedAt || new Date().toISOString()
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.warn('[FAMILY_CLOUD] Push failed:', err);
-    return { success: false, error: err?.message || 'Network error' };
+    return { success: false, error: msg || 'Network error' };
   }
 }
 
@@ -473,13 +474,14 @@ async function executeSyncFamilyRosterCycle(
       success: pushRes.success,
       roster: rosterToPush
     };
-  } catch (err: any) {
-    if (err?.message === 'unknown_family') {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'unknown_family') {
       console.warn(`[FAMILY_CLOUD] Family code ${cleanCode} is operating in local mode (not registered on edge).`);
     } else {
       console.warn('[FAMILY_CLOUD] Sync cycle warning:', err);
     }
-    return { success: false, error: err?.message || 'Sync failed' };
+    return { success: false, error: msg || 'Sync failed' };
   }
 }
 
@@ -508,7 +510,7 @@ export async function fetchFamilyEvents(
     const data = (await res.json()) as FamilyEventsV1;
     if (!data || data.v !== 1 || !Array.isArray(data.events)) throw new Error('invalid_events_schema');
     return data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('[FAMILY_CLOUD] fetchFamilyEvents failed:', err);
     return null;
   }
@@ -547,8 +549,9 @@ export async function pushFamilyEvents(
 
     const data = await res.json();
     return { success: true, rev: data.rev, updatedAt: data.updatedAt };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Network error' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg || 'Network error' };
   }
 }
 
@@ -684,7 +687,7 @@ export async function syncManualEvents(
       overrides: remoteOverrides,
       success: true
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('[FAMILY_CLOUD] syncManualEvents failed:', err);
     const localLive = await databaseInstance.manualEvents
       .filter((e) => !e.deletedAt)

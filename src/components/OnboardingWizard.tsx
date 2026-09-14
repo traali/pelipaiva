@@ -183,8 +183,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           url: team.url
         }
       ]);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Lisäys epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Lisäys epäonnistui');
     } finally {
       setIsLoading(false);
     }
@@ -216,8 +217,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       ]);
       setCustomIcsUrl('');
       setShowCustomIcsInput(false);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Lisäys epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Lisäys epäonnistui');
     } finally {
       setIsLoading(false);
     }
@@ -229,8 +231,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         await onRemoveTeam(playerName, url);
       }
       setAddedSources((prev) => prev.filter((s) => s.id !== sourceId));
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Poisto epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Poisto epäonnistui');
     }
   };
 
@@ -278,8 +281,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
       localStorage.setItem('pelipaiva_onboarding_done', 'true');
       onFinishOnboarding?.();
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Liittyminen epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Liittyminen epäonnistui');
     } finally {
       setIsLoading(false);
     }

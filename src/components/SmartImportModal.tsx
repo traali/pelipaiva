@@ -359,8 +359,9 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         onClose();
       }, 1100)
       );
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Tallennus epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Tallennus epäonnistui');
     } finally {
       setIsSaving(false);
     }
@@ -403,8 +404,9 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
         onClose();
       }, 1000)
       );
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Nouto epäonnistui. Tarkista verkko tai linkin muoto.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Nouto epäonnistui. Tarkista verkko tai linkin muoto.');
     } finally {
       setIsSaving(false);
     }
