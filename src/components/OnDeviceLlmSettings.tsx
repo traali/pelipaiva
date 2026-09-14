@@ -19,7 +19,7 @@ export const OnDeviceLlmSettings: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    refresh().catch(() => undefined);
+    refresh().catch((err) => console.warn('[LLM Settings] refresh failed:', err));
   }, [refresh]);
 
   const handleSelect = async (id: OnDeviceLlmChoice) => {

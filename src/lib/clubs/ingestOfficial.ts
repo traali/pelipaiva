@@ -331,7 +331,7 @@ export async function ingestIcsForProfile(opts: {
         }
 
         if (duplicateFixtureIdsToDelete.length > 0) {
-          await database.events.bulkDelete(duplicateFixtureIdsToDelete).catch(() => {});
+          await database.events.bulkDelete(duplicateFixtureIdsToDelete).catch((err) => console.error('[DB] bulkDelete duplicates failed:', err));
         }
       }
     }
