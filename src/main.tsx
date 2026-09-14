@@ -17,14 +17,14 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then((registration) => {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        registration.update().catch(() => {});
+        registration.update().catch((err) => console.warn('[SW] Registration update failed:', err));
       }
     });
     // Check for new version every 30 minutes
     setInterval(() => {
-      registration.update().catch(() => {});
+      registration.update().catch((err) => console.warn('[SW] Registration update failed:', err));
     }, 30 * 60 * 1000);
-  }).catch(() => {});
+  }).catch((err) => console.warn('[SW] ready failed:', err));
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
