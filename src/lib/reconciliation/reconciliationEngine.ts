@@ -561,7 +561,9 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         if (includeLinked && (fix.officialFixtureId === cal.officialFixtureId || fix.id.endsWith(cal.officialFixtureId || '—'))) {
           return false;
         }
-        return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
+        return isTournamentish(cal)
+          ? isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix)
+          : isCalendarFixtureMatch(cal, fix);
       }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     // Already linked: still fold leftover same-day own-team TASO games onto this card.
@@ -609,7 +611,9 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
       if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
       if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
-      return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
+      return isTournamentish(cal)
+        ? isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix)
+        : isCalendarFixtureMatch(cal, fix);
     }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     if (sameDayTeam.length >= 1) {
