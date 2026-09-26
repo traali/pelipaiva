@@ -319,6 +319,53 @@ END:VCALENDAR`;
     expect(stitched[0]!.title).toBe('Westend Indians P14 Yellow');
   });
 
+  it('moves a Nimenhuuto Sunday tournament onto the Saturday TASO day and keeps the 09:00 clock', () => {
+    const sunday = mockEvent({
+      id: 'nh-sun',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'Westend Indians Yellow turnaus',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: '',
+      startTime: '2026-09-27T06:00:00.000Z', // su 27.9. 09:00 EEST
+      warmupTime: '2026-09-27T06:00:00.000Z',
+      venue: {
+        name: 'AC Myllypuro kenttä 4',
+        normalizedName: 'ac myllypuro kentta 4',
+        coordinates: { lat: 60.23, lng: 25.07 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-hawks',
+      officialFixtureId: 'ssbl_949672',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Hawks',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Hawks',
+      startTime: '2026-09-26T07:00:00.000Z', // la 26.9. 10:00
+      venue: sunday.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-aif',
+      officialFixtureId: 'ssbl_949675',
+      sport: 'floorball',
+      title: 'ÅIF Blå vs Westend Indians Yellow',
+      homeTeam: 'ÅIF Blå',
+      awayTeam: 'Westend Indians Yellow',
+      startTime: '2026-09-26T10:45:00.000Z', // la 26.9. 13:45
+      venue: sunday.venue
+    });
+    const card = stitchCalendarEventsWithFixtures([sunday, g1, g2]).find((e) => e.id === 'nh-sun')!;
+    expect(card.startTime).toBe('2026-09-26T07:00:00.000Z');
+    expect(card.warmupTime).toBe('2026-09-26T06:00:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_949672', 'ssbl_949675']);
+    expect(stitchCalendarEventsWithFixtures([sunday, g1, g2])).toHaveLength(1);
+  });
+
   it('lists both own-team TASO games on a Nimenhuuto day; clock stays the game after meetup', () => {
     const cal = mockEvent({
       id: 'nh-15',

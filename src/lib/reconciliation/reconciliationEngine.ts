@@ -157,6 +157,41 @@ function helsinkiDayKey(d: Date): string {
   }).format(d);
 }
 
+function helsinkiClock(d: Date): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Helsinki',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).format(d);
+}
+
+function helsinkiOffsetForDay(dayKey: string): string {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Helsinki',
+      hour: '2-digit',
+      hourCycle: 'h23'
+    }).format(new Date(`${dayKey}T12:00:00Z`))
+  );
+  return hour === 15 ? '+03:00' : '+02:00';
+}
+
+/** Keep the Helsinki clock, move the calendar day. Sunday 09:00 → Saturday 09:00. */
+function rebaseHelsinkiClock(iso: string, dayKey: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime()) || helsinkiDayKey(d) === dayKey) return iso;
+  const hm = helsinkiClock(d);
+  const moved = new Date(`${dayKey}T${hm}:00${helsinkiOffsetForDay(dayKey)}`);
+  return Number.isFinite(moved.getTime()) ? moved.toISOString() : iso;
+}
+
+function helsinkiDayDelta(a: Date, b: Date): number {
+  const ak = helsinkiDayKey(a);
+  const bk = helsinkiDayKey(b);
+  return Math.round((Date.parse(`${bk}T00:00:00Z`) - Date.parse(`${ak}T00:00:00Z`)) / 86_400_000);
+}
+
 /**
  * Computes explicit mismatch diagnostics between a calendar event and an official league fixture.
  */
@@ -550,7 +585,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   for (const cal of calendarMatches) {
-    const calDate = new Date(cal.startTime);
+    let calDate = new Date(cal.startTime);
 
     const collectSameDay = (includeLinked: boolean) =>
       bareFixtures.filter((fix) => {
@@ -567,9 +602,12 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     // Already linked: still fold leftover same-day own-team TASO games onto this card.
+    // If this calendar day has no TASO games, fall through — Nimenhuuto is often ±1 day
+    // off the official Saturday (Westend Yellow 26.9. shown as Sunday 27.9.).
     if (cal.officialFixtureId) {
       const extras = collectSameDay(true);
-      if (extras.length) {
+      const sameDayAny = collectSameDay(false);
+      if (extras.length || sameDayAny.length) {
         const selfTitle =
           cal.homeTeam && cal.awayTeam ? `${cal.homeTeam} vs ${cal.awayTeam}` : cal.title;
         const merged = [
@@ -597,8 +635,8 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
           usedFixtureIds.add(f.id);
           bareFixtureIdsToDelete.add(f.id);
         }
+        continue;
       }
-      continue;
     }
     let bestFix: MatchdayEvent | undefined;
     let bestDiffMins = Infinity;
@@ -638,6 +676,45 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
             bestFix = fix;
           }
         }
+      }
+    }
+
+    // Nimenhuuto day is empty, but the linked team plays the day before or after.
+    // TASO owns the date (Westend Yellow vs Hawks is la 26.9., not su 27.9.).
+    if (!bestFix) {
+      const nearby = bareFixtures.filter((fix) => {
+        if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
+        if (
+          fix.officialFixtureId &&
+          enrichedFixtureIds.has(fix.officialFixtureId) &&
+          helsinkiDayKey(calDate) === helsinkiDayKey(new Date(fix.startTime))
+        ) {
+          return false;
+        }
+        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+        const delta = helsinkiDayDelta(calDate, new Date(fix.startTime));
+        if (Math.abs(delta) !== 1) return false;
+        return isTournamentish(cal)
+          ? isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix)
+          : isCalendarFixtureMatch(cal, fix);
+      });
+      if (nearby.length) {
+        const byDay = new Map<string, MatchdayEvent[]>();
+        for (const fix of nearby) {
+          const key = helsinkiDayKey(new Date(fix.startTime));
+          const list = byDay.get(key) || [];
+          list.push(fix);
+          byDay.set(key, list);
+        }
+        const ranked = [...byDay.entries()].sort((a, b) => b[1].length - a[1].length);
+        const [dayKey, games] = ranked[0]!;
+        const pool = games.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        if (cal.warmupTime) cal.warmupTime = rebaseHelsinkiClock(cal.warmupTime, dayKey);
+        cal.startTime = rebaseHelsinkiClock(cal.startTime, dayKey);
+        calDate = new Date(cal.startTime);
+        const afterMeetup = pool.filter((f) => isKickoffAfterKokoontuminen(cal, f.startTime));
+        bestFix = afterMeetup[0] || pool[0];
+        if (pool.length >= 2) sameDayPool = pool;
       }
     }
 
