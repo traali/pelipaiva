@@ -375,6 +375,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <span className="text-pitch">
               {clockHeadline(heroClockKind, kickoff, {
                 multiGame: (event.officialGameTimes?.length || 0) > 1,
+                gameCount: event.officialGameTimes?.length,
                 warmupEqualsKickoff: warmup === kickoff
               })}
             </span>

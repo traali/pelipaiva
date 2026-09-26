@@ -520,6 +520,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <span>
                 {clockHeadline(clockKind, formattedKickoff, {
                   multiGame,
+                  gameCount: event.officialGameTimes?.length,
                   warmupEqualsKickoff: formattedWarmup === formattedKickoff
                 })}
               </span>

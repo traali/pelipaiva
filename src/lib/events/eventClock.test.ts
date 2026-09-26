@@ -27,7 +27,7 @@ describe('eventClock', () => {
   });
 
   it('tournament first game vs meetup-only', () => {
-    expect(clockHeadline('tournament', '16.00')).toBe('1. peli klo 16.00');
+    expect(clockHeadline('tournament', '16.00', { gameCount: 2 })).toBe('Turnaus, 2 peliä');
     expect(clockHeadline('tournament', '15.00', { warmupEqualsKickoff: true })).toBe(
       'Kokoontuminen klo 15.00'
     );

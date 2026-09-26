@@ -370,6 +370,58 @@ END:VCALENDAR`;
     expect(stitchCalendarEventsWithFixtures([sunday, g1, g2])).toHaveLength(1);
   });
 
+  it('a saved Hawks-only Sunday card still picks up the Saturday 13:45 game', () => {
+    const saved = mockEvent({
+      id: 'nh-saved',
+      sport: 'floorball',
+      eventType: 'match',
+      title: 'Westend Indians Yellow vs Hawks',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Hawks',
+      officialFixtureId: 'ssbl_949672',
+      startTime: '2026-09-27T07:00:00.000Z',
+      warmupTime: '2026-09-27T06:00:00.000Z',
+      venue: {
+        name: 'AC Myllypuro kenttä 4',
+        normalizedName: 'ac myllypuro kentta 4',
+        coordinates: { lat: 60.23, lng: 25.07 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-hawks',
+      officialFixtureId: 'ssbl_949672',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Hawks',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Hawks',
+      startTime: '2026-09-26T07:00:00.000Z',
+      endTime: '2026-09-26T08:30:00.000Z',
+      venue: saved.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-aif',
+      officialFixtureId: 'ssbl_949675',
+      sport: 'floorball',
+      title: 'ÅIF Blå vs Westend Indians Yellow',
+      homeTeam: 'ÅIF Blå',
+      awayTeam: 'Westend Indians Yellow',
+      startTime: '2026-09-26T10:45:00.000Z',
+      endTime: '2026-09-26T12:15:00.000Z',
+      venue: saved.venue
+    });
+    const card = stitchCalendarEventsWithFixtures([saved, g1, g2]).find((e) => e.id === 'nh-saved')!;
+    expect(new Date(card.startTime).toISOString()).toBe('2026-09-26T07:00:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.title)).toEqual([
+      'Westend Indians Yellow vs Hawks',
+      'ÅIF Blå vs Westend Indians Yellow'
+    ]);
+    expect(card.endTime).toBe('2026-09-26T12:15:00.000Z');
+    expect(stitchCalendarEventsWithFixtures([saved, g1, g2])).toHaveLength(1);
+  });
+
   it('lists both own-team TASO games on a Nimenhuuto day; clock stays the game after meetup', () => {
     const cal = mockEvent({
       id: 'nh-15',

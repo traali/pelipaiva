@@ -37,12 +37,13 @@ export type ClockKind = 'training' | 'match' | 'tournament' | 'school' | 'other'
 export function clockHeadline(
   kind: ClockKind,
   kickoff: string,
-  opts?: { multiGame?: boolean; warmupEqualsKickoff?: boolean }
+  opts?: { multiGame?: boolean; warmupEqualsKickoff?: boolean; gameCount?: number }
 ): string {
   if (kind === 'training') return `Treeni klo ${kickoff}`;
   if (kind === 'school') return `Koulu klo ${kickoff}`;
   if (kind === 'other') return `Alkaa klo ${kickoff}`;
   if (kind === 'tournament' || opts?.multiGame) {
+    if ((opts?.gameCount || 0) > 1) return `Turnaus, ${opts!.gameCount} peliä`;
     return opts?.warmupEqualsKickoff ? `Kokoontuminen klo ${kickoff}` : `1. peli klo ${kickoff}`;
   }
   return `Ottelu klo ${kickoff}`;

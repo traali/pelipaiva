@@ -735,6 +735,20 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       }
     }
 
+    // One named game (Yellow vs Hawks) must still carry the other own-team
+    // game that TASO put on that same day (ÅIF 13:45). Nimenhuuto often only
+    // names the first, or a previous save stored only that one.
+    if (bestFix && sameDayPool.length < 2) {
+      const dayKey = helsinkiDayKey(new Date(bestFix.startTime));
+      const siblings = bareFixtures.filter((fix) => {
+        if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
+        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+        if (helsinkiDayKey(new Date(fix.startTime)) !== dayKey) return false;
+        return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
+      }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+      if (siblings.length >= 2) sameDayPool = siblings;
+    }
+
     if (sameDayPool.length >= 2) {
       cal.officialGameTimes = sameDayPool.map((f) => toOfficialGame(f));
       for (const f of sameDayPool) {
@@ -760,6 +774,10 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       cal.tournamentName = cal.tournamentName || fix.tournamentName;
 
       applyOfficialKickoffKeepCalendarArrival(cal, fix);
+      if (sameDayPool.length >= 2) {
+        const last = sameDayPool[sameDayPool.length - 1]!;
+        cal.endTime = last.endTime || new Date(new Date(last.startTime).getTime() + 90 * 60_000).toISOString();
+      }
       if (keepMultiGameTitle) {
         cal.warmupTime = new Date(calDate).toISOString();
       }
