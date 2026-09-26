@@ -363,6 +363,10 @@ END:VCALENDAR`;
     expect(card.startTime).toBe('2026-09-26T07:00:00.000Z');
     expect(card.warmupTime).toBe('2026-09-26T06:00:00.000Z');
     expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_949672', 'ssbl_949675']);
+    expect(card.officialGameTimes?.map((g) => g.venueName)).toEqual([
+      'AC Myllypuro kenttä 4',
+      'AC Myllypuro kenttä 4'
+    ]);
     expect(stitchCalendarEventsWithFixtures([sunday, g1, g2])).toHaveLength(1);
   });
 

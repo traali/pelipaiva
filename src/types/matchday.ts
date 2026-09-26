@@ -568,7 +568,14 @@ export interface MatchdayEvent {
   // Milestone 1 & 3 additions:
   officialFixtureId?: string;
   /** TASO/Torneopal games under a Nimenhuuto/MyClub tournament card (ISO kickoffs). */
-  officialGameTimes?: Array<{ startTime: string; title: string; officialFixtureId?: string; score?: string }>;
+  officialGameTimes?: Array<{
+    startTime: string;
+    title: string;
+    officialFixtureId?: string;
+    score?: string;
+    /** Torneopal venue_name, including court (kenttä 4). */
+    venueName?: string;
+  }>;
   reconciliationStatus?: ReconciliationStatus;
   confidenceScore?: number;
   mismatchFlags?: MismatchFlags;

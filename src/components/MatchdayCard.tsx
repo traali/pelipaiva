@@ -538,14 +538,21 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     <span className="text-[10px] font-bold text-text-muted mr-1.5">{i + 1}.</span>
                     {g.title}
                   </span>
-                  <span className="font-black font-tabular text-pitch shrink-0 flex items-center gap-2">
-                    {new Date(g.startTime).toLocaleTimeString('fi-FI', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Europe/Helsinki'
-                    })}
-                    {g.score ? (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-pitch/15 border border-pitch/25">{g.score}</span>
+                  <span className="font-black font-tabular text-pitch shrink-0 flex flex-col items-end gap-0.5">
+                    <span className="flex items-center gap-2">
+                      {new Date(g.startTime).toLocaleTimeString('fi-FI', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: 'Europe/Helsinki'
+                      })}
+                      {g.score ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-pitch/15 border border-pitch/25">{g.score}</span>
+                      ) : null}
+                    </span>
+                    {g.venueName ? (
+                      <span className="text-[11px] font-bold text-pitch/90 text-right leading-tight max-w-[9.5rem]">
+                        {g.venueName}
+                      </span>
                     ) : null}
                   </span>
                 </li>
