@@ -21,6 +21,7 @@ Pelipäivä is a 100% local-first Progressive Web App (PWA) designed for Finnish
 
 ## Key File Locations & Live Endpoints
 - Live PWA URL: https://pelipaiva.pages.dev
+- Famday UI contract (cards, clocks, courts, element reasons): `docs/FAMDAY_UI_SPEC.md` — read this before changing HeroMatchCard or MatchdayCard
 - Live Ambient URL: https://pelipaiva.pages.dev/ambient
 - Live Edge Worker: https://pelipaiva-edge.sakkoja.workers.dev
 - Data Models: `src/types/matchday.ts`

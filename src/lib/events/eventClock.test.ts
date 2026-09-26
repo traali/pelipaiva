@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isInventedWarmup, shouldShowKokoontuminen, clockHeadline } from './eventClock';
+import { isInventedWarmup, shouldShowKokoontuminen, clockHeadline, arrivalPhaseLabel } from './eventClock';
 
 describe('eventClock', () => {
   it('hides default 15 min treeni kokoontuminen', () => {
@@ -31,5 +31,25 @@ describe('eventClock', () => {
     expect(clockHeadline('tournament', '15.00', { warmupEqualsKickoff: true })).toBe(
       'Kokoontuminen klo 15.00'
     );
+  });
+
+  it('names the arrival column from the source of the time', () => {
+    expect(
+      arrivalPhaseLabel({
+        startTime: '2026-09-26T08:00:00.000Z',
+        warmupTime: '2026-09-26T07:00:00.000Z',
+        eventType: 'tournament'
+      })
+    ).toBe('Kokoontuminen');
+    expect(
+      arrivalPhaseLabel({
+        startTime: '2026-09-26T08:00:00.000Z',
+        warmupTime: '2026-09-26T07:15:00.000Z',
+        eventType: 'match'
+      })
+    ).toBe('Alkulämpö');
+    expect(
+      arrivalPhaseLabel({ startTime: '2026-09-26T06:00:00.000Z', sport: 'school', eventType: 'school' })
+    ).toBe('Saapuminen');
   });
 });

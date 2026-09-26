@@ -24,7 +24,7 @@ import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
-import { clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
+import { arrivalPhaseLabel, clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
 import { lookupKnownField } from '../lib/geo/sportsGeocoder';
 import { MatchStatsModal } from './MatchStatsModal';
@@ -571,7 +571,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <div className="flex flex-col items-center border-x border-border-subtle/70 px-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-pitch">Paikalla</span>
                 <span className="font-tabular text-lg font-black text-text-primary mt-0.5">{formattedWarmup}</span>
-                <span className="text-[10px] text-text-muted">Kokoontuminen</span>
+                <span className="text-[10px] text-text-muted">{arrivalPhaseLabel(event)}</span>
               </div>
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Alkaa</span>

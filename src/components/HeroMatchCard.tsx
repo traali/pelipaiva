@@ -18,6 +18,7 @@ import { motion } from 'motion/react';
 import type { MatchdayEvent, PlayerProfile, FullMatchStats } from '../types/matchday';
 import type { FamilyConflict, SportKitPlan } from '../lib/agents';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
+import { arrivalPhaseLabel, clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
 import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { KitChecklist } from './KitChecklist';
@@ -100,6 +101,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
     dateLabel,
     isTournament,
     isTraining,
+    isSchool,
+    isOther,
     mapsUrl,
     transitEmoji,
     isOut,
@@ -130,19 +133,19 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const temp = effectiveWeather?.isForecastLongRange ? undefined : effectiveWeather?.temperatureC;
   const isWetOrCold = effectiveWeather && (effectiveWeather.precipitationMmh > 0.2 || (temp !== undefined && temp <= 3));
 
+  const heroClockKind = isTraining
+    ? 'training'
+    : isSchool
+      ? 'school'
+      : isOther
+        ? 'other'
+        : isTournament || (event.officialGameTimes?.length || 0) > 1
+          ? 'tournament'
+          : 'match';
+  const showMeetup = shouldShowKokoontuminen(event);
+  const phaseLabel = arrivalPhaseLabel(event);
   const jerseyColor = kit?.kitColors?.primary || profile?.colorHex || '#3b82f6';
   const jerseyText = event.isHomeMatch === false ? 'Vieraspaita (+ varapaita)' : 'Kotipeliasu (ykkönen)';
-
-  const heroSportIcon =
-    event.sport === 'volleyball'
-      ? '🏐'
-      : event.sport === 'basketball'
-      ? '🏀'
-      : event.sport === 'floorball'
-      ? '🏑'
-      : event.sport === 'icehockey'
-      ? '🏒'
-      : '⚽';
 
   if (isOut && !isOutExpanded) {
     return (
@@ -370,18 +373,13 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           <div className="flex items-center gap-1.5 font-black text-sm sm:text-base">
             <Clock className="w-4 h-4 text-pitch shrink-0" />
             <span className="text-pitch">
-              {isTraining
-                ? `🏃 Harjoitus alkaa klo ${kickoff}`
-                : isTournament
-                ? `🏆 Turnaus alkaa klo ${kickoff}`
-                : event.sport === 'school'
-                ? `🏫 Koulu alkaa klo ${kickoff}`
-                : event.sport === 'other'
-                ? `📌 Alkaa klo ${kickoff}`
-                : `${heroSportIcon} Ottelu alkaa klo ${kickoff}`}
+              {clockHeadline(heroClockKind, kickoff, {
+                multiGame: (event.officialGameTimes?.length || 0) > 1,
+                warmupEqualsKickoff: warmup === kickoff
+              })}
             </span>
           </div>
-          {warmup && warmup !== kickoff && (
+          {showMeetup && warmup !== kickoff && (
             <span className="text-xs font-semibold text-text-secondary pl-1.5 border-l border-border-subtle">
               Kokoontuminen klo {warmup}
             </span>
@@ -462,7 +460,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         <div className="mt-4 grid grid-cols-3 gap-1.5 p-3 rounded-xl bg-surface-elevated/80 border border-border-subtle text-center">
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-floodlight flex items-center gap-1">
-              {transitEmoji}
+              {transitEmoji} Lähde
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-floodlight mt-0.5">
               {departureTime}
@@ -484,11 +482,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               {warmup}
             </span>
             <span className="text-[10px] text-text-muted mt-0.5">
-              {event.sport === 'school' || event.sport === 'other' || event.eventType === 'school' || event.eventType === 'meeting' || event.eventType === 'other'
-                ? 'Saapuminen'
-                : event.isTraining
-                ? 'Kokoontuminen'
-                : 'Alkulämpö'}
+              {phaseLabel}
             </span>
           </div>
 

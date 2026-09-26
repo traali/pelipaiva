@@ -47,3 +47,22 @@ export function clockHeadline(
   }
   return `Ottelu klo ${kickoff}`;
 }
+
+/** Middle column of the Lähde / Paikalla / Alkaa stepper. */
+export function arrivalPhaseLabel(event: {
+  startTime: string;
+  warmupTime?: string;
+  isTraining?: boolean;
+  eventType?: string;
+  sport?: string;
+  officialFixtureId?: string;
+}): 'Kokoontuminen' | 'Alkulämpö' | 'Saapuminen' {
+  const school = event.sport === 'school' || event.eventType === 'school';
+  const other =
+    event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
+  if (school || other) return 'Saapuminen';
+  if (event.isTraining || event.eventType === 'training') return 'Kokoontuminen';
+  // Coach/Nimenhuuto wrote a time. Invented 45 min is only a recommended warm-up.
+  if (!isInventedWarmup(event)) return 'Kokoontuminen';
+  return 'Alkulämpö';
+}
