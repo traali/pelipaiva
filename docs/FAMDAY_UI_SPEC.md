@@ -25,11 +25,10 @@ Grok sign-off, 2026-09-26. This is the famday contract. Do not reopen it unless 
 **Not signed, so do not pretend it was:**
 
 - Inner buttons of chat, venue, stats, and merge modals. They are entry points only.
-- The **⋯** menu in/out switch. It writes IndexedDB and does not push Cloudflare. The card **Osallistuu / Pois** button does, when a family code is stored.
 - A phone that has not been killed and reopened. Stitch runs when Dexie reloads. Old Sunday cards can sit until then.
 - Ambient, onboarding, and import screens. Out of this spec.
 
-Attendance cloud path: `recordAttendanceOverride` → KV `fam_events:{code}` → `attendanceOverrides`. 30-day TTL. Other phones apply it on sync, same `eventId` only. No family code means the phone only. A failed push is a console warning, not a retry.
+Attendance cloud path: card button and the **⋯** menu both call `recordAttendanceOverride` → KV `fam_events:{code}` → `attendanceOverrides`. 30-day TTL. Other phones apply it on sync, same `eventId` only. No family code means the phone only. A failed push is a console warning, not a retry.
 
 ## 1. Screen, top to bottom
 

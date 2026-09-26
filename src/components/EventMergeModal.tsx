@@ -15,6 +15,7 @@ import {
 import type { MatchdayEvent } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { db } from '../lib/storage/db';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
 interface EventMergeModalProps {
   isOpen: boolean;
@@ -263,7 +264,8 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      await db.events.update(sourceEvent.id, { attendanceStatus: 'in' });
+                      const sync = await db.syncState.get('family').catch(() => null);
+                      await recordAttendanceOverride(sync?.syncKey || '', sourceEvent.id, 'in', db);
                       onEventMerged?.({ ...sourceEvent, attendanceStatus: 'in' }, '');
                       setSuccessMessage('Merkitty: Osallistuu (IN)');
                       setTimeout(() => onClose(), 800);
@@ -280,7 +282,8 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      await db.events.update(sourceEvent.id, { attendanceStatus: 'out' });
+                      const sync = await db.syncState.get('family').catch(() => null);
+                      await recordAttendanceOverride(sync?.syncKey || '', sourceEvent.id, 'out', db);
                       onEventMerged?.({ ...sourceEvent, attendanceStatus: 'out' }, '');
                       setSuccessMessage('Merkitty: Ei osallistu (OUT)');
                       setTimeout(() => onClose(), 800);
