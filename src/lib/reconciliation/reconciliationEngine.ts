@@ -192,6 +192,22 @@ function helsinkiDayDelta(a: Date, b: Date): number {
   return Math.round((Date.parse(`${bk}T00:00:00Z`) - Date.parse(`${ak}T00:00:00Z`)) / 86_400_000);
 }
 
+function tasoVenueName(ev?: { venue?: { name?: string } }): string | undefined {
+  const name = ev?.venue?.name?.trim();
+  if (!name || name === 'Kenttä ilmoitetaan') return undefined;
+  return name;
+}
+
+function toOfficialGame(ev: MatchdayEvent) {
+  return {
+    startTime: ev.startTime,
+    title: ev.homeTeam && ev.awayTeam ? `${ev.homeTeam} vs ${ev.awayTeam}` : ev.title,
+    officialFixtureId: ev.officialFixtureId || ev.id.replace(/^fixture-[^-]+-/, ''),
+    score: ev.score,
+    venueName: tasoVenueName(ev)
+  };
+}
+
 /**
  * Computes explicit mismatch diagnostics between a calendar event and an official league fixture.
  */
@@ -608,6 +624,11 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       const extras = collectSameDay(true);
       const sameDayAny = collectSameDay(false);
       if (extras.length || sameDayAny.length) {
+        const linked = bareFixtures.find(
+          (f) =>
+            f.officialFixtureId === cal.officialFixtureId ||
+            f.id.endsWith(cal.officialFixtureId || '—')
+        );
         const selfTitle =
           cal.homeTeam && cal.awayTeam ? `${cal.homeTeam} vs ${cal.awayTeam}` : cal.title;
         const merged = [
@@ -615,14 +636,10 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
             startTime: cal.startTime,
             title: selfTitle,
             officialFixtureId: cal.officialFixtureId,
-            score: cal.score
+            score: cal.score,
+            venueName: tasoVenueName(linked) || tasoVenueName(cal)
           },
-          ...extras.map((f) => ({
-            startTime: f.startTime,
-            title: f.homeTeam && f.awayTeam ? `${f.homeTeam} vs ${f.awayTeam}` : f.title,
-            officialFixtureId: f.officialFixtureId || f.id.replace(/^fixture-[^-]+-/, ''),
-            score: f.score
-          }))
+          ...extras.map((f) => toOfficialGame(f))
         ].sort((a, b) => a.startTime.localeCompare(b.startTime));
         const seen = new Set<string>();
         cal.officialGameTimes = merged.filter((g) => {
@@ -719,12 +736,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     }
 
     if (sameDayPool.length >= 2) {
-      cal.officialGameTimes = sameDayPool.map((f) => ({
-        startTime: f.startTime,
-        title: f.homeTeam && f.awayTeam ? `${f.homeTeam} vs ${f.awayTeam}` : f.title,
-        officialFixtureId: f.officialFixtureId || f.id.replace(/^fixture-[^-]+-/, ''),
-        score: f.score
-      }));
+      cal.officialGameTimes = sameDayPool.map((f) => toOfficialGame(f));
       for (const f of sameDayPool) {
         usedFixtureIds.add(f.id);
         bareFixtureIdsToDelete.add(f.id);

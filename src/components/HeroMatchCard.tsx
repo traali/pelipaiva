@@ -409,6 +409,32 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <Edit3 className="w-3.5 h-3.5" />
           </button>
         </div>
+        {(event.officialGameTimes?.length || 0) > 1 && (
+          <ul className="mt-2 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1.5">
+            {event.officialGameTimes!.map((g, i) => (
+              <li key={`${g.startTime}-${g.title}`} className="flex items-start justify-between gap-2 text-sm">
+                <span className="font-semibold text-text-primary leading-snug">
+                  <span className="text-[10px] font-bold text-text-muted mr-1.5">{i + 1}.</span>
+                  {g.title}
+                </span>
+                <span className="font-black font-tabular text-pitch shrink-0 flex flex-col items-end">
+                  <span>
+                    {new Date(g.startTime).toLocaleTimeString('fi-FI', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Europe/Helsinki'
+                    })}
+                  </span>
+                  {g.venueName ? (
+                    <span className="text-[11px] font-bold text-pitch/90 text-right leading-tight max-w-[9.5rem]">
+                      {g.venueName}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {!isOut && (
           <MismatchResolveBanner

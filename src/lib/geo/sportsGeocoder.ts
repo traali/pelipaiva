@@ -358,8 +358,14 @@ export async function resolveSportsVenue(
     const aliasHit = Object.entries(NATIONAL_FIELD_ALIASES)
       .sort((a, b) => b[0].length - a[0].length)
       .find(([alias]) => matchesAliasWord(normalized, alias));
+    const court = rawVenueString.match(/kenttä\s*\d+/i)?.[0];
+    const aliasName = aliasHit?.[1].name;
+    const name =
+      aliasName && court && !/kenttä\s*\d+/i.test(aliasName)
+        ? `${aliasName} (${court})`
+        : aliasName || rawVenueString;
     return {
-      name: aliasHit?.[1].name || rawVenueString,
+      name,
       normalizedName: normalized,
       city: hint.city,
       coordinates: { lat: hint.lat, lng: hint.lng },
@@ -392,8 +398,10 @@ export async function resolveSportsVenue(
 
   for (const [alias, data] of sortedAliases) {
     if (matchesAliasWord(normalized, alias)) {
+      const court = rawVenueString.match(/kenttä\s*\d+/i)?.[0];
+      const name = court && !/kenttä\s*\d+/i.test(data.name) ? `${data.name} (${court})` : data.name;
       return {
-        name: data.name,
+        name,
         normalizedName: normalized,
         coordinates: { lat: data.lat, lng: data.lng },
         isIndoor: data.isIndoor,
