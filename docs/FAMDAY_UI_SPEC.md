@@ -1,11 +1,35 @@
 # Famday UI spec
 
-Status: code-reviewed 2026-09-26 against `src/` on main after the clock-label alignment in this change.
+Status: **signed off 2026-09-26** for other models. Code-reviewed against `src/` on main. Live deploy of this contract: `d8fd9f2` and later. Pages and edge both HTTP 200 at sign-off.
 Audience: the next model. Do not rediscover the product from screenshots. Read this, then the cited files.
 If this doc and the code disagree, the code wins. Update this file in the same commit.
 
 Live app: https://pelipaiva.pages.dev
 Job of the screen: one parent, one phone, a car park. Which day, which court, when to leave, when to be there, when the first game starts, who is out, and where the time came from.
+
+## 0. Sign-off for other AIs
+
+Grok sign-off, 2026-09-26. This is the famday contract. Do not reopen it unless a parent screenshot contradicts a row in section 8.
+
+**Signed.** The famday screen (HUD, filters, weekend strip, hero card, list card) has every mounted element listed below, with why it exists. Leave time, Helsinki day, and Torneopal court are one function each. Hero and the list card share those functions. Tests in section 9 lock them. Production is that code.
+
+**Do not change these because they look odd:**
+
+- Lähde uses a written kokoontuminen, not kickoff minus 60. 10:29 after a 10:00 gathering is the bug.
+- A Sunday Nimenhuuto row moves to the TASO day inside ±1 Helsinki day.
+- `kenttä N` stays on each game row. Do not pretty-name it away.
+- Invented 45 min (match) and 15 min (training) are not announced as Kokoontuminen. The label is Alkulämpö.
+- The stepper and the court are not behind Lisätiedot.
+- Do not add a second attendance control. `AttendancePill` is unused on purpose.
+
+**Not signed, so do not pretend it was:**
+
+- Inner buttons of chat, venue, stats, and merge modals. They are entry points only.
+- The **⋯** menu in/out switch. It writes IndexedDB and does not push Cloudflare. The card **Osallistuu / Pois** button does, when a family code is stored.
+- A phone that has not been killed and reopened. Stitch runs when Dexie reloads. Old Sunday cards can sit until then.
+- Ambient, onboarding, and import screens. Out of this spec.
+
+Attendance cloud path: `recordAttendanceOverride` → KV `fam_events:{code}` → `attendanceOverrides`. 30-day TTL. Other phones apply it on sync, same `eventId` only. No family code means the phone only. A failed push is a console warning, not a retry.
 
 ## 1. Screen, top to bottom
 
