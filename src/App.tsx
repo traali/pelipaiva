@@ -392,7 +392,7 @@ export const App: React.FC = () => {
           for (const fix of fixEvents) {
             const fixDate = new Date(fix.startTime);
             const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-            if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
+            if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString() && !isTournamentish(cal)) {
               const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
               const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
               const sim = Math.max(simHome, simAway);

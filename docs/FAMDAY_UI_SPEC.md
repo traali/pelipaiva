@@ -121,7 +121,7 @@ If `officialFixtureId` is set, a non-45-looking gap is **not** invented. A linke
 | training | `Treeni klo {kickoff}` |
 | school | `Koulu klo {kickoff}` |
 | other | `Alkaa klo {kickoff}` |
-| tournament, or multi-game | `1. peli klo {kickoff}` |
+| tournament with 2+ TASO games | `Turnaus, N peliä` and the game list under it |
 | tournament and warmup equals kickoff | `Kokoontuminen klo {kickoff}` |
 | match | `Ottelu klo {kickoff}` |
 
