@@ -25,6 +25,7 @@ import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
 import { clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
+import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
 import { lookupKnownField } from '../lib/geo/sportsGeocoder';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
@@ -109,6 +110,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     isTraining,
     isSchool,
     isOther,
+    transitEmoji,
     isOut,
     isOutExpanded,
     setIsOutExpanded,
@@ -134,6 +136,11 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     : localVenue.coordinates || event.venue.coordinates;
   const multiGame = (event.officialGameTimes?.length || 0) > 1;
   const showMeetup = shouldShowKokoontuminen(event);
+  const { departureTime, countdownMinutes } = calculateDepartureCountdown(
+    event,
+    profile?.arrivalRules,
+    homeLocation
+  );
   const clockKind = isTraining
     ? 'training'
     : isSchool
@@ -544,6 +551,27 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 </li>
               ))}
             </ul>
+          )}
+          {!isOut && !isSchool && !isOther && (
+            <div className="mt-2 grid grid-cols-3 gap-1.5 p-2.5 rounded-xl bg-surface-elevated/80 border border-border-subtle text-center">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-floodlight">{transitEmoji} Lähde</span>
+                <span className="font-tabular text-lg font-black text-floodlight mt-0.5">{departureTime}</span>
+                <span className="text-[10px] text-text-muted">
+                  {countdownMinutes > 0 ? `${countdownMinutes} min` : isLive ? 'Käynnissä' : 'Menty'}
+                </span>
+              </div>
+              <div className="flex flex-col items-center border-x border-border-subtle/70 px-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-pitch">Paikalla</span>
+                <span className="font-tabular text-lg font-black text-text-primary mt-0.5">{formattedWarmup}</span>
+                <span className="text-[10px] text-text-muted">Kokoontuminen</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Alkaa</span>
+                <span className="font-tabular text-lg font-black text-text-primary mt-0.5">{formattedKickoff}</span>
+                <span className="text-[10px] text-text-muted">{isTraining ? 'Treeni' : '1. peli'}</span>
+              </div>
+            </div>
           )}
           {showExtras && isTournament && !(event.officialGameTimes?.length) && !event.officialFixtureId && (
             <p className="mt-1 mb-1 text-xs font-semibold text-text-muted">

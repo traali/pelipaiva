@@ -10,6 +10,7 @@ import {
 } from '../../types/matchday';
 import { resolveTransitPlan } from '../geo/transitEngine';
 import { isIndoorEvent } from '../sport/isIndoorEvent';
+import { isInventedWarmup } from '../events/eventClock';
 
 export function determineFootwear(
   surface: PitchSurface,
@@ -136,10 +137,24 @@ export function calculateDepartureCountdown(
   const parkingWalkMins = transitPlan.mode === 'car' ? (event.parking?.walkingTimeMinutes ?? 3) : 0;
   const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
 
-  // Kickoff time
+  // A real kokoontuminen (not the invented 45 min default) is when you must be there.
+  // Subtracting another warmup offset from kickoff put LÄHDE after PAIKALLA
+  // (Honka: paikalla 10:00, lähde 10:29, 14 min drive).
   const kickoffDate = new Date(event.startTime);
-  const totalOffsetMins = warmupOffset + transitTravelMins + departureBufferMins + parkingWalkMins + dutyBufferMins;
-  const leaveHomeDate = new Date(kickoffDate.getTime() - totalOffsetMins * 60 * 1000);
+  const travelAndSlack = transitTravelMins + departureBufferMins + parkingWalkMins + dutyBufferMins;
+  const explicitArrival =
+    !isTraining && !isSchool && !isOther && event.warmupTime && !isInventedWarmup(event)
+      ? new Date(event.warmupTime)
+      : null;
+  const arriveBy =
+    explicitArrival &&
+    Number.isFinite(explicitArrival.getTime()) &&
+    explicitArrival.getTime() < kickoffDate.getTime() - 5 * 60_000
+      ? explicitArrival
+      : null;
+  const leaveHomeDate = arriveBy
+    ? new Date(arriveBy.getTime() - travelAndSlack * 60 * 1000)
+    : new Date(kickoffDate.getTime() - (warmupOffset + travelAndSlack) * 60 * 1000);
 
   const now = new Date();
   const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - now.getTime()) / 60000));

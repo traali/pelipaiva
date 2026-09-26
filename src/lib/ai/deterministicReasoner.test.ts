@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { determineFootwear, generateMatchdayBriefing } from './deterministicReasoner';
+import { determineFootwear, generateMatchdayBriefing, calculateDepartureCountdown } from './deterministicReasoner';
 import { MatchdayEvent } from '../../types/matchday';
 
 describe('Deterministic AI Reasoner & Nappisvahti', () => {
@@ -69,5 +69,56 @@ describe('Deterministic AI Reasoner & Nappisvahti', () => {
     const briefing = generateMatchdayBriefing(event1, [event1, event2]);
     expect(briefing.conflictWarning).toBeDefined();
     expect(briefing.conflictWarning).toContain('AIKATAULURUUHKI');
+  });
+
+  it('leaves home before a real kokoontuminen, not after it', () => {
+    const event: MatchdayEvent = {
+      id: 'honka',
+      profileId: 'lilli',
+      sport: 'basketball',
+      eventType: 'match',
+      isTraining: false,
+      title: 'Honka vs TOPOLA',
+      homeTeam: 'Honka',
+      awayTeam: 'TOPOLA',
+      isHomeMatch: true,
+      startTime: '2026-09-26T08:00:00.000Z', // 11:00 EEST
+      endTime: '2026-09-26T09:00:00.000Z',
+      warmupTime: '2026-09-26T07:00:00.000Z', // 10:00 gathering, 60 min — not the 45 min default
+      venue: {
+        name: 'Honkahalli Tapiola',
+        normalizedName: 'honkahalli tapiola',
+        coordinates: { lat: 60.176, lng: 24.805 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      },
+      parking: {
+        easeScore: 'easy',
+        easeScoreValue: 80,
+        lotName: 'Honkahalli',
+        coordinates: { lat: 60.176, lng: 24.805 },
+        feeZone: 'Maksuton',
+        parkingDiscRequired: false,
+        walkingTimeMinutes: 3,
+        walkingDistanceMeters: 150,
+        warnings: [],
+        mapsNavigationUrl: 'https://maps.google.com'
+      },
+      transit: {
+        mode: 'car',
+        distanceKm: 6.4,
+        travelMinutes: 14,
+        transitLabel: 'Auto 14 min',
+        isSelfTransit: false,
+        isUnknownLocation: false
+      }
+    };
+    const { leaveHomeDate } = calculateDepartureCountdown(event);
+    const leave = leaveHomeDate.getTime();
+    const gather = new Date(event.warmupTime!).getTime();
+    expect(leave).toBeLessThan(gather);
+    // 14 min drive + 10 min buffer + 3 min walk = 27 min before 10:00 → 09:33
+    expect((gather - leave) / 60000).toBe(27);
   });
 });
