@@ -3,6 +3,7 @@
 Status: **signed off 2026-09-26** for other models. Code-reviewed against `src/` on main. Live deploy of this contract: `d8fd9f2` and later. Pages and edge both HTTP 200 at sign-off.
 Audience: the next model. Do not rediscover the product from screenshots. Read this, then the cited files.
 If this doc and the code disagree, the code wins. Update this file in the same commit.
+Every component file, including unmounted ones: [UI_COMPONENTS.md](./UI_COMPONENTS.md).
 
 Live app: https://pelipaiva.pages.dev
 Job of the screen: one parent, one phone, a car park. Which day, which court, when to leave, when to be there, when the first game starts, who is out, and where the time came from.
@@ -24,7 +25,7 @@ Grok sign-off, 2026-09-26. This is the famday contract. Do not reopen it unless 
 
 **Not signed, so do not pretend it was:**
 
-- Inner buttons of chat, venue, stats, and merge modals. They are entry points only.
+- Inner controls of chat, venue, stats, merge, import, and settings are listed in [UI_COMPONENTS.md](./UI_COMPONENTS.md), not repeated here.
 - A phone that has not been killed and reopened. Stitch runs when Dexie reloads. Old Sunday cards can sit until then.
 - Ambient, onboarding, and import screens. Out of this spec.
 
