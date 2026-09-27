@@ -602,6 +602,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
 
   for (const cal of calendarMatches) {
     let calDate = new Date(cal.startTime);
+    const originalDayKey = helsinkiDayKey(calDate);
 
     const collectSameDay = (includeLinked: boolean) =>
       bareFixtures.filter((fix) => {
@@ -711,6 +712,10 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
         const delta = helsinkiDayDelta(calDate, new Date(fix.startTime));
         if (Math.abs(delta) !== 1) return false;
+        // 23:30 and 00:30 are different Helsinki days but the same match. A real
+        // Nimenhuuto miss (Sunday card, Saturday games) is most of a day apart.
+        const gapH = Math.abs(new Date(fix.startTime).getTime() - calDate.getTime()) / 3_600_000;
+        if (gapH < 6) return false;
         return isTournamentish(cal)
           ? isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix)
           : isCalendarFixtureMatch(cal, fix);
@@ -738,7 +743,11 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     // One named game (Yellow vs Hawks) must still carry the other own-team
     // game that TASO put on that same day (ÅIF 13:45). Nimenhuuto often only
     // names the first, or a previous save stored only that one.
-    if (bestFix && sameDayPool.length < 2) {
+    if (
+      bestFix &&
+      sameDayPool.length < 2 &&
+      helsinkiDayKey(new Date(bestFix.startTime)) !== originalDayKey
+    ) {
       const dayKey = helsinkiDayKey(new Date(bestFix.startTime));
       const siblings = bareFixtures.filter((fix) => {
         if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
