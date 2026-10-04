@@ -67,9 +67,10 @@ export function shouldKeepHostContext(existing: { registerTool?: unknown } | nul
 }
 
 function ensureModelContextRegistry(): ModelContextRegistry {
-  const existing = (typeof document !== 'undefined' && document.modelContext) ||
-    (typeof navigator !== 'undefined' && (navigator as Navigator).modelContext) ||
-    (typeof window !== 'undefined' && window.modelContext);
+  const existing =
+    (typeof document !== 'undefined' ? document.modelContext : undefined) ||
+    (typeof navigator !== 'undefined' ? navigator.modelContext : undefined) ||
+    (typeof window !== 'undefined' ? window.modelContext : undefined);
 
   if (shouldKeepHostContext(existing)) {
     return existing as ModelContextRegistry;
