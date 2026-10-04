@@ -5,6 +5,7 @@ import { DEFAULT_HOME_LOCATION } from "../../lib/storage/homeLocation";
 import { db } from "../../lib/storage/db";
 import { resolveSportsVenue } from "../../lib/geo/sportsGeocoder";
 import { resolveTransitPlan } from "../../lib/geo/transitEngine";
+import { liveSatelliteUrl } from "../SatelliteEmbedDrawer";
 
 const SmartImportModal = lazy(() =>
   import("../SmartImportModal").then((m) => ({ default: m.SmartImportModal }))
@@ -254,17 +255,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
           isOpen={true}
           onClose={onClose}
           title={activeModal.title}
-          embedUrl={
-            activeModal.sport === "football-stats"
-              ? `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(activeModal.matchId)}?embed=true`
-              : activeModal.sport === "volleyball-stats"
-              ? `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(activeModal.matchId)}?embed=true`
-              : activeModal.sport === "basketball-stats"
-              ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(activeModal.matchId)}?embed=true`
-              : activeModal.sport === "parkkis"
-              ? `https://parkkis.pages.dev/?embed=true`
-              : `https://floorball-stats.pages.dev/match/${encodeURIComponent(activeModal.matchId)}?embed=true`
-          }
+          embedUrl={liveSatelliteUrl(activeModal.sport, activeModal.matchId, activeModal.title, true)}
           sourceRepo={activeModal.sport as any}
         />
       )}

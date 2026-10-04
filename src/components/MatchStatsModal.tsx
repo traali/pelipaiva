@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { FullMatchStats, PlayerMatchLog, SportType } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
-import { SatelliteEmbedDrawer } from './SatelliteEmbedDrawer';
+import { SatelliteEmbedDrawer, liveSatelliteUrl } from './SatelliteEmbedDrawer';
 
 interface MatchStatsModalProps {
   isOpen: boolean;
@@ -101,9 +101,6 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   // Clean, authoritative match ID: e.g. "palloliitto_60341_4321789" -> "4321789"
   const rawId = matchId || officialFixtureId || '';
   const resolvedNumericId = rawId.includes('_') ? rawId.split('_').pop() || rawId : rawId;
-  const footballMatchParam = /^\d+$/.test(resolvedNumericId)
-    ? resolvedNumericId
-    : `${homeTeam.replace(/\//g, ' ')} - ${awayTeam.replace(/\//g, ' ')}`;
 
   // Local state for recording player stats
   const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
@@ -360,30 +357,28 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   repo: 'football-stats',
                   name: '⚽ Football Stats (Night Captain)',
                   subtitle: 'Syväanalyysi, H2H & pelaajakortit',
-                  url: `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(footballMatchParam)}`,
+                  url: liveSatelliteUrl('football', resolvedNumericId, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
                 },
                 floorball: {
                   repo: 'floorball-stats',
                   name: '🏑 Floorball Stats (SSBL)',
                   subtitle: '3 erää, YV/AV radar & torjunnat',
-                  url: /^\d+$/.test(resolvedNumericId)
-                    ? `https://floorball-stats.pages.dev/#/match/${resolvedNumericId}`
-                    : `https://floorball-stats.pages.dev/#/search?q=${encodeURIComponent(`${homeTeam} ${awayTeam}`.trim())}`,
+                  url: liveSatelliteUrl('floorball', resolvedNumericId, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-[#5BC0BE]/15 border-[#5BC0BE]/30 text-[#6FFFE9] hover:bg-[#5BC0BE]/25'
                 },
                 basketball: {
                   repo: 'basketball-stats',
                   name: '🏀 Basketball Stats (Basket.fi)',
                   subtitle: '4 neljännestä, virheet & pistemiehet',
-                  url: `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  url: liveSatelliteUrl('basketball', resolvedNumericId, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25'
                 },
                 volleyball: {
                   repo: 'volleyball-stats',
                   name: '🏐 Volleyball Stats Pro',
                   subtitle: '25 pisteen erät & momenttivirta',
-                  url: `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}`,
+                  url: liveSatelliteUrl('volleyball', resolvedNumericId, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-blue-500/15 border-blue-500/30 text-blue-400 hover:bg-blue-500/25'
                 }
               };
@@ -1100,16 +1095,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             ? 'volleyball-stats'
             : 'football-stats';
 
-        const url =
-          sport === 'floorball'
-            ? (/^\d+$/.test(resolvedNumericId)
-                ? `https://floorball-stats.pages.dev/#/match/${resolvedNumericId}?embed=true`
-                : `https://floorball-stats.pages.dev/#/search?q=${encodeURIComponent(`${homeTeam} ${awayTeam}`.trim())}&embed=true`)
-            : sport === 'basketball'
-            ? `https://basketball-stats-byu.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
-            : sport === 'volleyball'
-            ? `https://volleyball-stats-7xq.pages.dev/match/${encodeURIComponent(`${homeTeam}-${awayTeam}`)}?embed=true`
-            : `https://football-stats-agk.pages.dev/#/match/${encodeURIComponent(footballMatchParam)}?embed=true`;
+        const url = liveSatelliteUrl(sport || 'football', resolvedNumericId, `${homeTeam} ${awayTeam}`, true);
 
         const title =
           sport === 'floorball'
