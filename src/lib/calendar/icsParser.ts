@@ -8,6 +8,7 @@ import {
 } from '../../types/matchday';
 import { geocodeSportsVenue } from '../geo/sportsGeocoder';
 import { detectSportFromText } from '../ai/eventCandidateRanker';
+import { eventDayKey } from '../agents/time';
 
 /**
  * Checks if an event is a training session, practice, or non-match exercise.
@@ -871,7 +872,7 @@ export async function parseICSFeed(
             );
 
             const baseUid = event.uid || generateDeterministicEventId(title, kickoffTime.toISOString(), location);
-            const instanceId = `${baseUid}-${kickoffTime.toISOString().slice(0, 10)}`;
+            const instanceId = `${baseUid}-${eventDayKey(kickoffTime.toISOString())}`;
 
             events.push({
               id: instanceId,
