@@ -22,7 +22,6 @@ import { NappisvahtiPill } from './NappisvahtiPill';
 import { ParkingEaseBadge } from './ParkingEaseBadge';
 import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
-import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
 import { arrivalPhaseLabel, clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
@@ -150,15 +149,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         : isTournament || multiGame
           ? 'tournament'
           : 'match';
-  const effectiveWeather = React.useMemo(() => {
-    if (event.weather) return event.weather;
-    if (indoor) return undefined;
-    const c = radarCoords;
-    if (c && Number.isFinite(c.lat) && Number.isFinite(c.lng) && !(c.lat === 0 && c.lng === 0)) {
-      return getDeterministicWeatherFallback(c, event.startTime);
-    }
-    return undefined;
-  }, [event.weather, indoor, radarCoords, event.startTime]);
+  const effectiveWeather = event.weather && !event.weather.isCacheFallback ? event.weather : undefined;
   const lightningAlert = event.lightning || effectiveWeather?.lightningSafety;
   const sourceInfo = React.useMemo(() => resolveEventSourceInfo(event, profile), [event, profile]);
 
@@ -362,6 +353,13 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
         )}
 
         {/* Lightning Danger Alert Banner */}
+        {!isOut && lightningAlert && lightningAlert.status === 'unknown' && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-surface-elevated border border-border-subtle text-text-secondary text-xs font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{lightningAlert.alertMessage || 'Salamatilaa ei saatu. Älä oleta, että sää on turvallinen.'}</span>
+          </div>
+        )}
+
         {!isOut && lightningAlert && (lightningAlert.status === 'danger' || lightningAlert.status === 'watch') && (
           <div className="mb-4 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold">
             <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -606,6 +604,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               onOpenRadar={indoor ? undefined : () => setIsWeatherDrawerOpen(true)}
             />
           </div>
+        )}
+        {!compact && !indoor && !effectiveWeather && (
+          <p className="mb-4 text-xs text-text-muted">Sää ei saatavilla. Ei keksitä lämpötilaa eikä tuulta.</p>
         )}
 
         {/* Overlap & Driving Buffer Conflict Warning Banner (Consolidated) */}

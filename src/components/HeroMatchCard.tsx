@@ -32,7 +32,6 @@ import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
 import { MoreHorizontal, FileText, Edit3 } from 'lucide-react';
 import { useMatchdayLogistics } from '../hooks/useMatchdayLogistics';
-import { getDeterministicWeatherFallback } from '../lib/weather/fmiWeatherEngine';
 import { db } from '../lib/storage/db';
 import { MismatchResolveBanner, type MismatchDecision } from './MismatchResolveBanner';
 
@@ -122,16 +121,12 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
     onEventUpdated,
   });
 
-  const effectiveWeather = useMemo(() => {
-    if (event.weather) return event.weather;
-    if (!event.venue.isIndoor && event.venue.coordinates?.lat && event.venue.coordinates?.lng) {
-      return getDeterministicWeatherFallback(event.venue.coordinates, event.startTime);
-    }
-    return undefined;
-  }, [event.weather, event.venue.isIndoor, event.venue.coordinates, event.startTime]);
+  const effectiveWeather = event.weather && !event.weather.isCacheFallback ? event.weather : undefined;
 
   const temp = effectiveWeather?.isForecastLongRange ? undefined : effectiveWeather?.temperatureC;
-  const isWetOrCold = effectiveWeather && (effectiveWeather.precipitationMmh > 0.2 || (temp !== undefined && temp <= 3));
+  const rain = effectiveWeather?.precipitationMmh;
+  const rainKnown = rain != null && Number.isFinite(rain);
+  const isWetOrCold = effectiveWeather && ((rainKnown && rain > 0.2) || (temp !== undefined && temp <= 3));
 
   const heroClockKind = isTraining
     ? 'training'
@@ -510,12 +505,12 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               </span>
               {event.venue.isIndoor ? (
                 <span className="text-text-muted">(Sisähalli)</span>
-              ) : (
+              ) : rainKnown ? (
                 <span className="text-text-muted">
-                  {effectiveWeather?.precipitationMmh && effectiveWeather.precipitationMmh > 0
-                    ? `• Sade ${effectiveWeather.precipitationMmh.toFixed(1)} mm/h`
-                    : '• Pouta'}
+                  {rain > 0 ? `• Sade ${rain.toFixed(1)} mm/h` : '• Pouta'}
                 </span>
+              ) : (
+                <span className="text-text-muted">• Sade ei tiedossa</span>
               )}
             </div>
 

@@ -4,6 +4,7 @@ import { parsePastedSpreadsheetText, parseExcelFileBuffer } from './tableAndExce
 import { parseScheduleImage, type OcrProgressCallback } from './ocrImageParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
+import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
@@ -106,7 +107,7 @@ export async function convertExtractedToMatchdayEvent(
     confidenceScore: extracted.confidenceScore
   };
 
-  const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
+  const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime, DEFAULT_PROXY_URL);
   const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
   if (weather) matchEvent.weather = weather;
   matchEvent.parking = parking;

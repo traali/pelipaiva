@@ -46,9 +46,11 @@ export const MatchdayCardWeatherBadge: React.FC<MatchdayCardWeatherBadgeProps> =
       ? 'Liukas tekonurmi'
       : 'Kuiva tekonurmi');
 
+  const rainKnown = Number.isFinite(precipitationMmh);
   const hasLightningAlert =
     lightningSafety &&
     (lightningSafety.status === 'danger' || lightningSafety.status === 'watch');
+  const lightningUnknown = lightningSafety?.status === 'unknown';
 
   if (indoor) {
     return (
@@ -75,7 +77,7 @@ export const MatchdayCardWeatherBadge: React.FC<MatchdayCardWeatherBadgeProps> =
               : `Salamoita lähellä (${lightningSafety?.nearestStrikeKm ?? '?'} km)`}
           </span>
         )}
-        {precipitationMmh > 0.2 && !hasLightningAlert && (
+        {rainKnown && precipitationMmh > 0.2 && !hasLightningAlert && (
           <span className="text-[11px] text-sky-300">Sade kyydillä {precipitationMmh.toFixed(1)} mm/h</span>
         )}
       </div>
@@ -127,11 +129,13 @@ export const MatchdayCardWeatherBadge: React.FC<MatchdayCardWeatherBadgeProps> =
         </div>
         <div className="flex items-center gap-1.5">
           <CloudRain className="w-3.5 h-3.5 text-sky-400" />
-          <span className="font-tabular font-medium">{precipitationMmh.toFixed(1)} mm/h</span>
+          <span className="font-tabular font-medium">
+            {rainKnown ? `${precipitationMmh.toFixed(1)} mm/h` : '—'}
+          </span>
         </div>
       </div>
 
-      {(rainOnsetLabel || windAdvisoryBadge || hasLightningAlert || isCacheFallback) && (
+      {(rainOnsetLabel || windAdvisoryBadge || hasLightningAlert || lightningUnknown || isCacheFallback) && (
         <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-border-subtle/50 text-[11px]">
           {hasLightningAlert && (
             <span className="text-red-400 font-bold flex items-center gap-1 bg-red-950/30 px-2 py-0.5 rounded border border-red-500/30">
@@ -139,6 +143,11 @@ export const MatchdayCardWeatherBadge: React.FC<MatchdayCardWeatherBadgeProps> =
               {lightningSafety?.status === 'danger'
                 ? `Salama ${lightningSafety.nearestStrikeKm ?? '?'} km — keskeytä ulkopeli`
                 : `Salamoita ${lightningSafety?.nearestStrikeKm ?? '?'} km päässä`}
+            </span>
+          )}
+          {lightningUnknown && (
+            <span className="text-text-secondary font-semibold">
+              {lightningSafety?.alertMessage || 'Salamatilaa ei saatu.'}
             </span>
           )}
           {rainOnsetLabel && <span className="text-sky-300 font-semibold">{rainOnsetLabel}</span>}

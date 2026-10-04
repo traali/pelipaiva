@@ -137,7 +137,7 @@ export async function ingestOfficialForProfile(opts: {
     };
 
     if (opts.includeWeather !== false) {
-      const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
+      const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime, DEFAULT_PROXY_URL);
       const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
       if (weather) matchEvent.weather = weather;
       matchEvent.parking = parking;
@@ -240,7 +240,7 @@ export async function ingestIcsForProfile(opts: {
   );
   const withMeta: MatchdayEvent[] = [];
   for (const ev of parsed) {
-    const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
+    const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime, DEFAULT_PROXY_URL);
     const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
     const fullEv: MatchdayEvent = { ...ev, parking };
     if (weather) fullEv.weather = weather;
