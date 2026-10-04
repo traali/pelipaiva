@@ -110,9 +110,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes wrangler@4 pages project create football-stats-agk --production-branch=main || true
-          npx --yes wrangler@4 pages deploy dist --project-name=football-stats-agk --commit-dirty=true
-          npx --yes wrangler@4 pages project create football-stats --production-branch=main || true
           npx --yes wrangler@4 pages deploy dist --project-name=football-stats --commit-dirty=true
 
   basketball:
@@ -132,14 +129,12 @@ jobs:
       - name: Install and build
         working-directory: basketball-stats
         run: npm ci && npm run build
-      - name: Publish both basketball hostnames
+      - name: Publish basketball-stats
         working-directory: basketball-stats
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes wrangler@4 pages project create basketball-stats-byu --production-branch=main || true
-          npx --yes wrangler@4 pages deploy dist --project-name=basketball-stats-byu --commit-dirty=true
           npx --yes wrangler@4 pages project create basketball-stats --production-branch=main || true
           npx --yes wrangler@4 pages deploy dist --project-name=basketball-stats --commit-dirty=true
 
@@ -160,13 +155,10 @@ jobs:
       - name: Install and build
         working-directory: volleyball-stats
         run: npm ci && npm run build
-      - name: Publish both volleyball hostnames
+      - name: Publish volleyball-stats
         working-directory: volleyball-stats
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes wrangler@4 pages project create volleyball-stats-7xq --production-branch=main || true
-          npx --yes wrangler@4 pages deploy dist --project-name=volleyball-stats-7xq --commit-dirty=true
-          npx --yes wrangler@4 pages project create volleyball-stats --production-branch=main || true
           npx --yes wrangler@4 pages deploy dist --project-name=volleyball-stats --commit-dirty=true
