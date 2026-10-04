@@ -1061,12 +1061,6 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 <p className="text-xs text-text-secondary leading-relaxed">
                   {stats.scoutAnalysis}
                 </p>
-                {!stats.isSynthetic && (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-surface-base/60 border border-border-subtle text-xs">
-                    <span>Kotijoukkueen kuntopuntari:</span>
-                    <span className="font-bold text-pitch">7 Voittoa peräkkäin 🔥</span>
-                  </div>
-                )}
               </div>
             )}
 

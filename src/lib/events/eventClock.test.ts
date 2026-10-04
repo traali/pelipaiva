@@ -12,6 +12,7 @@ describe('eventClock', () => {
     expect(isInventedWarmup(treeni)).toBe(true);
     expect(shouldShowKokoontuminen(treeni)).toBe(false);
     expect(clockHeadline('training', '18.45')).toBe('Treeni klo 18.45');
+    expect(arrivalPhaseLabel(treeni)).toBe('Alkulämpö');
   });
 
   it('does not call a filled-in 45 min a coach kokoontuminen', () => {

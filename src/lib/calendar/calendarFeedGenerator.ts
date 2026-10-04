@@ -1,4 +1,5 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import { isInventedWarmup } from '../events/eventClock';
 
 const helsinkiTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
@@ -115,7 +116,7 @@ export function generateIcsCalendarFeed(
     if (ev.eventType === 'tournament' || ev.tournamentName) descParts.push(`🏆 TURNAUS: ${ev.tournamentName || ''}`);
     if (ev.stage) descParts.push(`Sarja / Lohko: ${ev.stage}`);
 
-    if (ev.warmupTime) {
+    if (ev.warmupTime && !isInventedWarmup(ev)) {
       const clock = formatHelsinkiClock(ev.warmupTime);
       if (clock) {
         descParts.push(`⏰ Kokoontuminen: klo ${clock}`);
