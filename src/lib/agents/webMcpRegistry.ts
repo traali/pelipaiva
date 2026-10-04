@@ -7,6 +7,7 @@
  */
 
 import { db } from '../storage/db';
+import { eventDayKey, helsinkiDateISO } from './time';
 import { calculateParkingRiskContract } from '../../types/contracts';
 
 // WebMCP Type Declarations (W3C Standard Draft & Anthropic MCP Protocol)
@@ -232,12 +233,12 @@ export async function registerPelipaivaWebMCP(): Promise<ModelContextRegistry | 
         },
       },
       execute: async ({ date, playerName }) => {
-        const targetDate = typeof date === 'string' ? date : new Date().toISOString().split('T')[0];
+        const targetDate = typeof date === 'string' ? date : helsinkiDateISO();
         const [allEvents, allProfiles] = await Promise.all([db.events.toArray(), db.profiles.toArray()]);
         const profileMap = new Map(allProfiles.map((p) => [p.id, p]));
 
         const filtered = allEvents.filter((ev) => {
-          const matchDate = ev.startTime ? ev.startTime.split('T')[0] : '';
+          const matchDate = ev.startTime ? eventDayKey(ev.startTime) : '';
           const matchesDate = !date || matchDate === targetDate;
           const pName = profileMap.get(ev.profileId)?.playerName || '';
           const matchesPlayer =

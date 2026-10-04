@@ -577,7 +577,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Alkaa</span>
                 <span className="font-tabular text-lg font-black text-text-primary mt-0.5">{formattedKickoff}</span>
-                <span className="text-[10px] text-text-muted">{isTraining ? 'Treeni' : '1. peli'}</span>
+                <span className="text-[10px] text-text-muted">{isTraining ? 'Treeni' : multiGame ? '1. peli' : 'Ottelu'}</span>
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 import type { MatchdayEvent, PlayerProfile, SportType } from '../../types/matchday';
 import { extractDateFromFinnishText, extractTimesFromFinnishText } from './messageParserNLP';
+import { eventDayKey } from '../agents/time';
 import { sportLabelFi } from '../sport/sportMeta';
 
 export interface RankedEventCandidate {
@@ -143,7 +144,7 @@ export function rankEventCandidatesForMessage(
     let score = 0;
     const reasons: string[] = [];
     const eventProfile = profiles.find((p) => p.id === event.profileId);
-    const eventDateStr = event.startTime.split('T')[0];
+    const eventDateStr = eventDayKey(event.startTime);
 
     // 1. Player match (+35 points)
     if (detectedProfile && event.profileId === detectedProfile.id) {

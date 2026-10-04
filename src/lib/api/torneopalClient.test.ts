@@ -35,6 +35,11 @@ const kw: ParsedAssociationUrl = {
 };
 
 describe('torneopal match params', () => {
+  it('sends a lentopallo team to the volleyball API', () => {
+    const attempts = listTorneopalAttempts('torneopal', undefined, 'volleyball');
+    expect(attempts[0]?.base).toBe('https://lentopallo-api.torneopal.net/taso/rest');
+    expect(attempts[0]?.referer).toBe('https://tulospalvelu.lentopallo.fi/');
+  });
   it('does not send cup subdomain team ids to tupa (ids collide across federations)', () => {
     expect(shouldTryAssociationEndpoint('kwmemorialcup26')).toBe(false);
     expect(shouldTryAssociationEndpoint('spl')).toBe(true);

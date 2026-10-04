@@ -1,7 +1,7 @@
 import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { resolveTransitPlan } from '../geo/transitEngine';
 import type { FamilyConflict } from './types';
-import { estimateDriveMinutes, overlapMinutes } from './time';
+import { estimateDriveMinutes, eventDayKey, overlapMinutes } from './time';
 
 function childName(event: MatchdayEvent, profiles: PlayerProfile[]): string {
   return profiles.find((p) => p.id === event.profileId)?.playerName || 'Lapsi';
@@ -15,8 +15,13 @@ function formatShortWeekdayDate(isoString: string): string {
   try {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return '';
-    const days = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La'];
-    return `${days[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`;
+    const label = d.toLocaleDateString('fi-FI', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'numeric',
+      timeZone: 'Europe/Helsinki'
+    });
+    return label.charAt(0).toUpperCase() + label.slice(1);
   } catch {
     return '';
   }
@@ -57,8 +62,8 @@ export function conflictAgent(
       if (a.id === b.id) continue;
 
       // Only check conflicts between events occurring on the same local calendar day
-      const dateA = a.startTime.slice(0, 10);
-      const dateB = b.startTime.slice(0, 10);
+      const dateA = eventDayKey(a.startTime);
+      const dateB = eventDayKey(b.startTime);
       if (dateA !== dateB) continue;
 
       // Skip reconciled duplicates: if both events represent the same real-world

@@ -1,5 +1,6 @@
 import { SportType, EventType } from '../../types/matchday';
 import { NATIONAL_FIELD_ALIASES } from '../geo/sportsGeocoder';
+import { addHelsinkiDays, helsinkiDateISO } from '../agents/time';
 
 export interface ExtractedSportsEvent {
   title: string;
@@ -41,23 +42,23 @@ export function extractDateFromFinnishText(text: string, baseDate = new Date()):
   if (dateMatch && dateMatch[1] && dateMatch[2]) {
     const day = parseInt(dateMatch[1], 10);
     const month = parseInt(dateMatch[2], 10) - 1;
-    const year = dateMatch[3] ? parseInt(dateMatch[3], 10) : now.getFullYear();
-    const d = new Date(year, month, day, 12, 0, 0);
-    return d.toISOString().split('T')[0] || '2026-08-24';
+    const year = dateMatch[3] ? parseInt(dateMatch[3], 10) : Number(helsinkiDateISO(now).slice(0, 4));
+    const mm = String(month + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return `${year}-${mm}-${dd}`;
   }
 
   // Check for relative words
   const norm = text.toLowerCase();
+  const today = helsinkiDateISO(now);
   if (/\b(?:tänään|tämän\s+päivän)\b/i.test(norm)) {
-    return now.toISOString().split('T')[0] || '2026-08-24';
+    return today;
   }
   if (/\b(?:huomenna|huomisen|huomiseen|huomiselle)\b/i.test(norm)) {
-    const tmrw = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    return tmrw.toISOString().split('T')[0] || '2026-08-25';
+    return addHelsinkiDays(today, 1);
   }
   if (/\b(?:ylihuomenna|ylihuomisen|ylihuomiseen)\b/i.test(norm)) {
-    const dayAfter = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    return dayAfter.toISOString().split('T')[0] || '2026-08-26';
+    return addHelsinkiDays(today, 2);
   }
 
   // Weekdays with inflections (-na, -n, -in, -lle, -ksi) and common typos
@@ -73,11 +74,14 @@ export function extractDateFromFinnishText(text: string, baseDate = new Date()):
 
   for (const { day: targetDay, pattern } of weekdayPatterns) {
     if (pattern.test(norm)) {
-      const currentDay = now.getDay();
+      const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Helsinki',
+        weekday: 'short'
+      }).format(now);
+      const currentDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
       let diff = targetDay - currentDay;
-      if (diff <= 0) diff += 7; // Next occurrence
-      const targetDate = new Date(now.getTime() + diff * 24 * 60 * 60 * 1000);
-      return targetDate.toISOString().split('T')[0] || '2026-08-24';
+      if (diff <= 0) diff += 7;
+      return addHelsinkiDays(helsinkiDateISO(now), diff);
     }
   }
 
