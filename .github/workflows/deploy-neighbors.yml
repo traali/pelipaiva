@@ -1,0 +1,63 @@
+name: Deploy neighbor Pages
+
+# Parkkis and weather-stats do not have CLOUDFLARE_API_TOKEN.
+# This house does. Publish their production aliases from here.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-neighbors.yml
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  parkkis:
+    name: Deploy Parkkis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/Parkkis
+          ref: master
+          path: Parkkis
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Parkkis/web/package-lock.json
+      - name: Install and build
+        working-directory: Parkkis/web
+        run: npm ci && npm run build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: Parkkis/web
+          command: pages deploy dist --project-name=parkkis --commit-dirty=true
+
+  weather:
+    name: Deploy weather-stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/weather-stats
+          ref: main
+          path: weather-stats
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: weather-stats/package-lock.json
+      - name: Install and build
+        working-directory: weather-stats
+        run: npm ci && npm run build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: weather-stats
+          command: pages deploy dist --project-name=weather-stats --commit-dirty=true
