@@ -31,14 +31,14 @@ export function compute30_30Rule(
         nearestStrikeKm = distKm;
       }
       const strikeTimeMs30 = new Date(strike.timeIso).getTime();
-      if (!mostRecentStrikeWithin30kmTimeMs || strikeTimeMs30 > mostRecentStrikeWithin30kmTimeMs) {
+      if (Number.isFinite(strikeTimeMs30) && (!mostRecentStrikeWithin30kmTimeMs || strikeTimeMs30 > mostRecentStrikeWithin30kmTimeMs)) {
         mostRecentStrikeWithin30kmTimeMs = strikeTimeMs30;
       }
     }
 
     if (distKm <= 10) {
       const strikeTimeMs = new Date(strike.timeIso).getTime();
-      if (!mostRecentStrikeWithin10kmTimeMs || strikeTimeMs > mostRecentStrikeWithin10kmTimeMs) {
+      if (Number.isFinite(strikeTimeMs) && (!mostRecentStrikeWithin10kmTimeMs || strikeTimeMs > mostRecentStrikeWithin10kmTimeMs)) {
         mostRecentStrikeWithin10kmTimeMs = strikeTimeMs;
       }
     }
@@ -53,7 +53,7 @@ export function compute30_30Rule(
       const remainingMinutes = Math.ceil(30 - elapsedMinutes);
       return {
         status: 'danger',
-        nearestStrikeKm: nearestStrikeKm ? Math.round(nearestStrikeKm * 10) / 10 : undefined,
+        nearestStrikeKm: nearestStrikeKm != null ? Math.round(nearestStrikeKm * 10) / 10 : undefined,
         strikesWithin30kmCount,
         suspendMatchRecommended: true,
         resumeCountdownMinutes: remainingMinutes,
