@@ -61,7 +61,7 @@ export function normalizeTournamentArrival<T extends { startTime: string; warmup
  * Calendar DTSTART is often the gathering time, 30–60 min before official kickoff.
  */
 export function applyOfficialKickoffKeepCalendarArrival<
-  T extends { startTime: string; warmupTime?: string; endTime?: string }
+  T extends { startTime: string; warmupTime?: string; endTime?: string; warmupIsEstimate?: boolean }
 >(
   event: T,
   official: { startTime: string; endTime?: string },
@@ -82,6 +82,7 @@ export function applyOfficialKickoffKeepCalendarArrival<
 
   const arrivalMs = arrivals.length ? Math.max(...arrivals) : offMs - defaultWarmupMins * 60_000
   event.warmupTime = new Date(arrivalMs).toISOString()
+  event.warmupIsEstimate = arrivals.length === 0 ? true : event.warmupIsEstimate === true
   return event
 }
 

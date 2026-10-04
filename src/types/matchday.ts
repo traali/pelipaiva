@@ -535,6 +535,8 @@ export interface MatchdayEvent {
   startTime: string; // ISO 8601
   endTime: string;
   warmupTime: string; // ISO 8601
+  /** True when warmupTime is an app default, not a time a person wrote. */
+  warmupIsEstimate?: boolean;
   isTournament?: boolean;
   tournamentName?: string;
   stage?: string; // e.g. "P14 Haastaja Lohko B" or "Jatko-ottelut"
