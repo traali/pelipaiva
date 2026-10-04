@@ -31,12 +31,14 @@ jobs:
       - name: Install and build
         working-directory: Parkkis/web
         run: npm ci && npm run build
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: Parkkis/web
-          command: pages deploy dist --project-name=parkkis --commit-dirty=true
+      - name: Publish Parkkis
+        working-directory: Parkkis/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create parkkis --production-branch=master || true
+          npx --yes wrangler@4 pages deploy dist --project-name=parkkis --commit-dirty=true
 
   weather:
     name: Deploy weather-stats
@@ -55,9 +57,11 @@ jobs:
       - name: Install and build
         working-directory: weather-stats
         run: npm ci && npm run build
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: weather-stats
-          command: pages deploy dist --project-name=weather-stats --commit-dirty=true
+      - name: Publish weather-stats
+        working-directory: weather-stats
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create weather-stats --production-branch=main || true
+          npx --yes wrangler@4 pages deploy dist --project-name=weather-stats --commit-dirty=true
