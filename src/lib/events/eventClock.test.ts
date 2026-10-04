@@ -14,16 +14,30 @@ describe('eventClock', () => {
     expect(clockHeadline('training', '18.45')).toBe('Treeni klo 18.45');
   });
 
-  it('shows real MyClub kokoontuminen on a league game', () => {
-    const match = {
+  it('does not call a filled-in 45 min a coach kokoontuminen', () => {
+    const filled = {
       startTime: '2026-09-12T10:00:00.000Z',
       warmupTime: '2026-09-12T09:15:00.000Z',
       officialFixtureId: 'spl_1',
-      eventType: 'match'
+      eventType: 'match' as const
     };
-    expect(isInventedWarmup(match)).toBe(false);
-    expect(shouldShowKokoontuminen(match)).toBe(true);
-    expect(clockHeadline('match', '13.00')).toBe('Ottelu klo 13.00');
+    expect(isInventedWarmup(filled)).toBe(true);
+    expect(shouldShowKokoontuminen(filled)).toBe(false);
+    expect(arrivalPhaseLabel(filled)).toBe('Alkulämpö');
+  });
+
+  it('keeps a written arrival even when it is 45 minutes', () => {
+    const written = {
+      startTime: '2026-09-12T10:00:00.000Z',
+      warmupTime: '2026-09-12T09:15:00.000Z',
+      officialFixtureId: 'spl_1',
+      eventType: 'match' as const,
+      warmupIsEstimate: false,
+      notes: 'Kokoontuminen klo 09:15'
+    };
+    expect(isInventedWarmup(written)).toBe(false);
+    expect(shouldShowKokoontuminen(written)).toBe(true);
+    expect(arrivalPhaseLabel(written)).toBe('Kokoontuminen');
   });
 
   it('tournament first game vs meetup-only', () => {

@@ -124,6 +124,7 @@ export async function ingestOfficialForProfile(opts: {
       startTime,
       endTime,
       warmupTime,
+      warmupIsEstimate: true,
       tournamentName: thisCup ? fixture.leagueName || officialData.leagueName : undefined,
       stage: fixture.stage,
       matchNumber: fixture.matchNumber,

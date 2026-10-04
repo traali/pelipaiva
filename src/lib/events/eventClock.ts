@@ -5,6 +5,9 @@ export function isInventedWarmup(event: {
   isTraining?: boolean;
   eventType?: string;
   officialFixtureId?: string;
+  warmupIsEstimate?: boolean;
+  notes?: string;
+  title?: string;
 }): boolean {
   if (!event.warmupTime) return true;
   const kick = new Date(event.startTime).getTime();
@@ -12,9 +15,14 @@ export function isInventedWarmup(event: {
   if (!Number.isFinite(kick) || !Number.isFinite(warm)) return true;
   const diffMin = (kick - warm) / 60_000;
   if (diffMin <= 0) return true;
+  if (event.warmupIsEstimate === true) return true;
+  if (event.warmupIsEstimate === false) return false;
+  const wroteIt = /kokoontum|paikalle|alkulämpö/i.test(`${event.notes || ''} ${event.title || ''}`);
+  if (wroteIt) return false;
   const training = event.isTraining || event.eventType === 'training';
   if (training) return Math.abs(diffMin - 15) <= 2;
-  if (event.officialFixtureId) return false;
+  // A linked fixture with a round 30/45/60 min gap is the app's fill-in, not a coach message.
+  if (event.officialFixtureId && [30, 45, 60].some((gap) => Math.abs(diffMin - gap) <= 2)) return true;
   return Math.abs(diffMin - 45) <= 2;
 }
 
@@ -24,6 +32,9 @@ export function shouldShowKokoontuminen(event: {
   isTraining?: boolean;
   eventType?: string;
   officialFixtureId?: string;
+  warmupIsEstimate?: boolean;
+  notes?: string;
+  title?: string;
 }): boolean {
   if (!event.warmupTime) return false;
   if (isInventedWarmup(event)) return false;
@@ -57,6 +68,9 @@ export function arrivalPhaseLabel(event: {
   eventType?: string;
   sport?: string;
   officialFixtureId?: string;
+  warmupIsEstimate?: boolean;
+  notes?: string;
+  title?: string;
 }): 'Kokoontuminen' | 'Alkulämpö' | 'Saapuminen' {
   const school = event.sport === 'school' || event.eventType === 'school';
   const other =

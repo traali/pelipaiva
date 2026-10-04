@@ -338,7 +338,7 @@ export function resolveEventTimes(
   description: string = '',
   isTraining: boolean = false,
   defaultWarmupOffsetMins?: number
-): { kickoffTime: Date; warmupTime: Date; endTime: Date } {
+): { kickoffTime: Date; warmupTime: Date; endTime: Date; warmupIsEstimate: boolean } {
   const text = `${title} ${description}`;
   const isTournamentEvent = /turnaus|tournament|cup\b|memorial|pelitapahtuma|vastuuturnaus/i.test(text);
   const defaultOffset = defaultWarmupOffsetMins !== undefined
@@ -350,6 +350,7 @@ export function resolveEventTimes(
   let warmupTime = isTournamentEvent
     ? new Date(dtStart.getTime())
     : new Date(dtStart.getTime() - defaultOffset * 60 * 1000);
+  let warmupIsEstimate = !isTournamentEvent;
   let endTime = new Date(dtEnd.getTime());
 
   // Look for explicit kickoff / match start times in description:
@@ -374,9 +375,11 @@ export function resolveEventTimes(
       if (explicitKickoff.getTime() >= dtStart.getTime()) {
         kickoffTime = explicitKickoff;
         warmupTime = dtStart;
+        warmupIsEstimate = false;
       } else {
         kickoffTime = explicitKickoff;
         warmupTime = new Date(kickoffTime.getTime() - defaultOffset * 60 * 1000);
+        warmupIsEstimate = true;
       }
     }
   }
@@ -388,6 +391,7 @@ export function resolveEventTimes(
 
     if (!isNaN(explicitWarmup.getTime()) && Math.abs(explicitWarmup.getTime() - kickoffTime.getTime()) <= 3 * 3600 * 1000) {
       warmupTime = explicitWarmup;
+      warmupIsEstimate = false;
     }
   }
 
@@ -395,6 +399,7 @@ export function resolveEventTimes(
   // do not invent a 45 min earlier kokoontuminen.
   if (!isTournamentEvent && warmupTime.getTime() >= kickoffTime.getTime()) {
     warmupTime = new Date(kickoffTime.getTime() - defaultOffset * 60 * 1000);
+    warmupIsEstimate = true;
   }
 
   // Ensure endTime is after kickoff
@@ -405,7 +410,8 @@ export function resolveEventTimes(
   return {
     kickoffTime,
     warmupTime,
-    endTime
+    endTime,
+    warmupIsEstimate
   };
 }
 
@@ -856,7 +862,7 @@ export async function parseICSFeed(
             if (instanceStartDate > maxDate) break;
             const instanceEndDate = new Date(instanceStartDate.getTime() + durationMs);
 
-            const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
+            const { kickoffTime, warmupTime, endTime, warmupIsEstimate } = resolveEventTimes(
               instanceStartDate,
               instanceEndDate,
               title,
@@ -882,6 +888,7 @@ export async function parseICSFeed(
               startTime: kickoffTime.toISOString(),
               endTime: endTime.toISOString(),
               warmupTime: warmupTime.toISOString(),
+              warmupIsEstimate,
               venue,
               volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined,
               attendanceStatus
@@ -900,7 +907,7 @@ export async function parseICSFeed(
           ? event.endDate.toJSDate()
           : new Date(startDate.getTime() + 90 * 60 * 1000);
 
-        const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
+        const { kickoffTime, warmupTime, endTime, warmupIsEstimate } = resolveEventTimes(
           startDate,
           endDate,
           title,
@@ -923,6 +930,7 @@ export async function parseICSFeed(
           startTime: kickoffTime.toISOString(),
           endTime: endTime.toISOString(),
           warmupTime: warmupTime.toISOString(),
+          warmupIsEstimate,
           venue,
           volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined,
           attendanceStatus
