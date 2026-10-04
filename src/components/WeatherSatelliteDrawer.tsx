@@ -345,6 +345,8 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
                   ? 'Kenttä on jäinen tai kuurassa. Nappulakengät voivat olla vaarallisen liukkaat — suositellaan tekonurmiturffikenkiä (TF).'
                   : weather?.turfCondition === 'slick'
                   ? 'Märkä tekonurmi nopeuttaa pallon liukua. Maalivahdille suositellaan sadekäsineitä ja pelaajille pitosukkia.'
+                  : weather?.turfConditionLabelFi === 'Sade ei tiedossa'
+                  ? 'Sademäärää ei saatu. Älä oleta, että kenttä on kuiva.'
                   : 'Kuiva tekonurmi tarjoaa normaalin pidon ja vakaan pompun.'}
               </p>
             </div>

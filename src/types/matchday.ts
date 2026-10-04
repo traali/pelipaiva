@@ -97,7 +97,7 @@ export interface WeatherCondition {
 }
 
 export interface LightningSafetyAlert {
-  status: 'clear' | 'watch' | 'danger';
+  status: 'clear' | 'watch' | 'danger' | 'unknown';
   nearestStrikeKm?: number;
   strikesWithin30kmCount: number;
   suspendMatchRecommended: boolean;

@@ -1,6 +1,7 @@
 import type { MatchdayEvent, PlayerProfile, EventChatMessage } from '../../types/matchday';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
+import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
 import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import {
   extractTimesFromFinnishText,
@@ -135,7 +136,7 @@ export async function applyEventChatUpdate(
       const resolved = await resolveSportsVenue(rawVenue);
       updated.venue = resolved;
       const coords = resolved.coordinates || { lat: 60.169, lng: 24.938 };
-      const weather = await fetchFmiMatchWeather(coords, updated.startTime, updated.endTime);
+      const weather = await fetchFmiMatchWeather(coords, updated.startTime, updated.endTime, DEFAULT_PROXY_URL);
       const parking = calculateParkingEase(resolved.name, coords, new Date(updated.startTime));
       if (weather) updated.weather = weather;
       if (parking) updated.parking = parking;
