@@ -61,13 +61,18 @@ declare global {
  */
 let _webMcpMessageHandler: ((event: MessageEvent) => void) | null = null;
 
+/** A Chrome or ChatGPT host has registerTool and no callTool. Do not replace it. */
+export function shouldKeepHostContext(existing: { registerTool?: unknown } | null | undefined): boolean {
+  return Boolean(existing && typeof existing.registerTool === 'function');
+}
+
 function ensureModelContextRegistry(): ModelContextRegistry {
   const existing = (typeof document !== 'undefined' && document.modelContext) ||
-    (typeof navigator !== 'undefined' && (navigator as any).modelContext) ||
-    (typeof window !== 'undefined' && (window as any).modelContext);
+    (typeof navigator !== 'undefined' && (navigator as Navigator).modelContext) ||
+    (typeof window !== 'undefined' && window.modelContext);
 
-  if (existing && typeof existing.registerTool === 'function' && typeof existing.callTool === 'function') {
-    return existing;
+  if (shouldKeepHostContext(existing)) {
+    return existing as ModelContextRegistry;
   }
 
   const registeredTools = new Map<string, ModelContextTool>();
