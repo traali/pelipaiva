@@ -296,6 +296,7 @@ describe('familyCloud Sync & Merge Engine', () => {
 
   describe('Manual Events & Attendance Overrides Sync', () => {
     it('mergeFamilyEvents resolves tombstones and last-write-wins', () => {
+      const recentTombstone = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
       const local: any[] = [
         {
           id: 'me-1',
@@ -310,7 +311,7 @@ describe('familyCloud Sync & Merge Engine', () => {
           title: 'Hammaslääkäri',
           startTime: '2026-09-11T09:00:00Z',
           updatedAt: '2026-09-02T10:00:00Z',
-          deletedAt: '2026-09-02T10:05:00Z',
+          deletedAt: recentTombstone,
           authorDeviceId: 'dev-1',
           profileIds: []
         }
@@ -350,7 +351,7 @@ describe('familyCloud Sync & Merge Engine', () => {
       expect(me1?.title).toBe('Vanhempainilta (Local Edit)');
 
       const me2 = merged.find((e) => e.id === 'me-2');
-      expect(me2?.deletedAt).toBe('2026-09-02T10:05:00Z');
+      expect(me2?.deletedAt).toBe(recentTombstone);
 
       const me3 = merged.find((e) => e.id === 'me-3');
       expect(me3?.title).toBe('Koulun myyjäiset');

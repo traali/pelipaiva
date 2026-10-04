@@ -20,7 +20,7 @@ const SALIBANDY_KEY = "zsn3anknxzcfzc23k53jqdcd4pymutsf";
 const BASKET_KEY = "df8e84j9xtdz269euy3h";
 
 const ENDPOINTS: Partial<
-  Record<AssociationType, { base: string; apiKey: string; referer: string }>
+  Record<AssociationType | "volleyball", { base: string; apiKey: string; referer: string }>
 > = {
   palloliitto: {
     base: "https://spl.torneopal.net/taso/rest",
@@ -36,6 +36,11 @@ const ENDPOINTS: Partial<
     base: "https://koripallo-api.torneopal.net/taso/rest",
     apiKey: BASKET_KEY,
     referer: "https://tulospalvelu.basket.fi/",
+  },
+  volleyball: {
+    base: "https://lentopallo-api.torneopal.net/taso/rest",
+    apiKey: BASKET_KEY,
+    referer: "https://tulospalvelu.lentopallo.fi/",
   },
   torneopal: {
     base: "https://tupa.api.torneopal.com/taso/rest",
@@ -127,6 +132,7 @@ function federationEndpoint(
   if (association === "salibandy" || sport === "floorball") return ENDPOINTS.salibandy;
   if (association === "palloliitto" || sport === "football") return ENDPOINTS.palloliitto;
   if (association === "basket" || sport === "basketball") return ENDPOINTS.basket;
+  if (sport === "volleyball") return ENDPOINTS.volleyball;
   return ENDPOINTS.torneopal;
 }
 
@@ -160,6 +166,8 @@ export function listTorneopalAttempts(
       push({ base, apiKey: PALL_KEY, referer });
       push({ base, apiKey: TUPA_KEY, referer });
       push({ base, apiKey: SALIBANDY_KEY, referer });
+    } else if (sport === "volleyball") {
+      push({ base, apiKey: BASKET_KEY, referer });
     } else {
       push({ base, apiKey: TUPA_KEY, referer });
       push({ base, apiKey: SALIBANDY_KEY, referer });

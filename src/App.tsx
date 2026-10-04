@@ -19,7 +19,7 @@ import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { helsinkiDateISO, parseHelsinkiClockOnEventDate } from './lib/agents/time';
+import { eventDayKey, helsinkiDateISO, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
@@ -822,9 +822,9 @@ export const App: React.FC = () => {
       const fixEvents = freshEvents.filter((e) => e.id.startsWith('fixture-'));
 
       for (const cal of calEvents) {
-        const calDate = cal.startTime.split('T')[0];
+        const calDate = eventDayKey(cal.startTime);
         const match = fixEvents.find((f) => {
-          const fDate = f.startTime.split('T')[0];
+          const fDate = eventDayKey(f.startTime);
           return f.profileId === cal.profileId && fDate === calDate;
         });
         if (match) {

@@ -10,6 +10,14 @@ export function helsinkiDateISO(d: Date = new Date()): string {
   }).format(d);
 }
 
+/** Calendar day in Helsinki, even when the stored timestamp is UTC. */
+export function eventDayKey(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return helsinkiDateISO(d);
+}
+
 export function formatFiTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fi-FI', {
     hour: '2-digit',

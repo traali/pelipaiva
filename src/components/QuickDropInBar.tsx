@@ -16,6 +16,7 @@ import { syncFamilyRosterCycle } from '../lib/sync/familyCloud';
 import { extractTextFromImage } from '../lib/ai/ocrImageParser';
 
 import { rankEventCandidatesForMessage, CandidateRankingResult } from '../lib/ai/eventCandidateRanker';
+import { eventDayKey } from '../lib/agents/time';
 import { sportLabelFi } from '../lib/sport/sportMeta';
 
 interface QuickDropInBarProps {
@@ -173,7 +174,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
               profileId: e.profileId,
               playerName: prof?.playerName || 'Pelaaja',
               title: e.title,
-              dateStr: e.startTime.split('T')[0] || '',
+              dateStr: eventDayKey(e.startTime),
               startTime: new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }),
               warmupTime: e.warmupTime ? new Date(e.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }) : undefined,
               venueName: e.venue?.name,

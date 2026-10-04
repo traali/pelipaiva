@@ -7,6 +7,7 @@ import {
   extractCarpoolAssignmentsFromText,
   extractKitColorFromText
 } from './messageParserNLP';
+import { eventDayKey, helsinkiDateISO } from '../agents/time';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 
 export interface EventChatResult {
@@ -27,7 +28,7 @@ export async function applyEventChatUpdate(
   const norm = message.toLowerCase().trim();
   const appliedChanges: string[] = [];
   const updated: MatchdayEvent = { ...event };
-  const eventDateStr = event.startTime.split('T')[0] || new Date().toISOString().split('T')[0];
+  const eventDateStr = eventDayKey(event.startTime) || helsinkiDateISO();
   const offset = getFinnishTimezoneOffset(new Date(`${eventDateStr}T12:00:00Z`));
   const targetPlayerName = _profile?.playerName;
 
