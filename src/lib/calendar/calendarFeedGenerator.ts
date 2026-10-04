@@ -1,4 +1,5 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import { isInventedWarmup } from '../events/eventClock';
 
 const helsinkiTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
@@ -118,7 +119,8 @@ export function generateIcsCalendarFeed(
     if (ev.warmupTime) {
       const clock = formatHelsinkiClock(ev.warmupTime);
       if (clock) {
-        descParts.push(`⏰ Kokoontuminen: klo ${clock}`);
+        const label = isInventedWarmup(ev) ? 'Alkulämpö (arvio)' : 'Kokoontuminen';
+        descParts.push(`⏰ ${label}: klo ${clock}`);
       }
     }
 

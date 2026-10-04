@@ -206,7 +206,7 @@ describe('Adversarial Stress Suite — M2 RFC 5545 Feed Export & Voice Assistant
       expect(feed).not.toContain('DTSTART:20260912T061500Z');
 
       // Gathering time must be cleanly available in DESCRIPTION
-      expect(parsedEvent.description).toContain('Kokoontuminen:');
+      expect(parsedEvent.description).toContain('Alkulämpö (arvio):');
       expect(parsedEvent.description).toContain('15');
     });
 
@@ -238,7 +238,7 @@ describe('Adversarial Stress Suite — M2 RFC 5545 Feed Export & Voice Assistant
       const desc = vevent.getFirstPropertyValue('description') as string;
 
       // Assert all elements are present in DESCRIPTION for voice assistance
-      expect(desc).toContain('⏰ Kokoontuminen:');
+      expect(desc).toContain('⏰ Alkulämpö (arvio):');
       expect(desc).toContain('🚗 Kotoalähtöaika:');
       expect(desc).toContain('👕 Peliasu: Keltainen pelipaita (vara: Musta)');
       expect(desc).toContain('☕ Talkoovuoro: ⏱️ Toimitsijavuoro: Kello klo 11:00–12:30');
@@ -381,7 +381,7 @@ describe('Adversarial Stress Suite — M2 RFC 5545 Feed Export & Voice Assistant
         } as any
       });
       const feed = generateIcsCalendarFeed([event], [profileTuomas]);
-      expect(feed).toContain('⏰ Kokoontuminen: klo 09:15');
+      expect(feed).toContain('⏰ Alkulämpö (arvio): klo 09:15');
       expect(feed).toContain('🚗 Kotoalähtöaika: klo 08:35');
     });
   });

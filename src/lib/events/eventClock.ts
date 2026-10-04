@@ -76,8 +76,7 @@ export function arrivalPhaseLabel(event: {
   const other =
     event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
   if (school || other) return 'Saapuminen';
-  if (event.isTraining || event.eventType === 'training') return 'Kokoontuminen';
-  // Coach/Nimenhuuto wrote a time. Invented 45 min is only a recommended warm-up.
+  // A written time is Kokoontuminen. A filled-in treeni or 45 min gap is only Alkulämpö.
   if (!isInventedWarmup(event)) return 'Kokoontuminen';
   return 'Alkulämpö';
 }
