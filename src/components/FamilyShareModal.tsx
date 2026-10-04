@@ -15,6 +15,7 @@ import {
   Tv
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
+import { helsinkiDateISO } from '../lib/agents/time';
 import { PlayerProfile } from '../types/matchday';
 import { db } from '../lib/storage/db';
 import { exportFamilyBackup, importFamilyBackup, generateSharePayload } from '../lib/sync/familyShare';
@@ -227,7 +228,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pelipaiva-varmuuskopio-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `pelipaiva-varmuuskopio-${helsinkiDateISO()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
