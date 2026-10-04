@@ -486,7 +486,7 @@ describe('Feature 26: Multi-Source Event Reconciliation, Stitching & Feed Export
 
       // DESCRIPTION rich embeddings:
       // Gathering time
-      expect(feed).toContain('Kokoontuminen: klo 09:15');
+      expect(feed).toContain('Alkulämpö (arvio): klo 09:15');
       // Recommended departure time
       expect(feed).toContain('Kotoalähtöaika: klo 08:35');
       // Kit recommendation

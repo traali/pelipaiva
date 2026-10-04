@@ -116,10 +116,11 @@ export function generateIcsCalendarFeed(
     if (ev.eventType === 'tournament' || ev.tournamentName) descParts.push(`🏆 TURNAUS: ${ev.tournamentName || ''}`);
     if (ev.stage) descParts.push(`Sarja / Lohko: ${ev.stage}`);
 
-    if (ev.warmupTime && !isInventedWarmup(ev)) {
+    if (ev.warmupTime) {
       const clock = formatHelsinkiClock(ev.warmupTime);
       if (clock) {
-        descParts.push(`⏰ Kokoontuminen: klo ${clock}`);
+        const label = isInventedWarmup(ev) ? 'Alkulämpö (arvio)' : 'Kokoontuminen';
+        descParts.push(`⏰ ${label}: klo ${clock}`);
       }
     }
 
