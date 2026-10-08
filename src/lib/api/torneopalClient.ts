@@ -318,20 +318,37 @@ export function mapFixture(
   const home = str(match.team_A_name);
   const away = str(match.team_B_name);
   const statusRaw = str(match.status).toLowerCase();
+  // TASO sends "Forfeited" for a walkover. It is a result (e.g. 3–0) that the
+  // league table counts, not a cancelled or upcoming game.
+  const isWalkover = statusRaw === "forfeited" || statusRaw === "forfeit" || statusRaw === "walkover";
   const status: OfficialLeagueFixture["status"] =
-    statusRaw === "played"
+    statusRaw === "played" || isWalkover
       ? "played"
-      : statusRaw === "cancelled" || statusRaw === "forfeit"
+      : statusRaw === "cancelled"
         ? "cancelled"
         : statusRaw === "postponed"
           ? "postponed"
           : "upcoming";
-  const homeScore = str(match.fs_A) === "" ? undefined : num(match.fs_A);
-  const awayScore = str(match.fs_B) === "" ? undefined : num(match.fs_B);
+  // getMatch sends fs_A/fs_B = "0" for games that have not been played, and
+  // stale past "Fixture" rows keep that 0–0. A score is only real once TASO
+  // says the game was played (or forfeited).
+  const homeScore = status === "played" && str(match.fs_A) !== "" ? num(match.fs_A) : undefined;
+  const awayScore = status === "played" && str(match.fs_B) !== "" ? num(match.fs_B) : undefined;
   const lat = num(match.venue_lat);
   const lng = num(match.venue_lon);
+  // End = the slot TASO reserved (time_end). A game is "Käynnissä" until then,
+  // so it must not be cut short by a guessed length. Fall back to playing time,
+  // then 90 min, only when TASO sends no end.
   const durationMin = num(match.playing_time_min) || 90;
-  const endTime = new Date(new Date(startTime).getTime() + durationMin * 60 * 1000).toISOString();
+  const startMs = new Date(startTime).getTime();
+  let endMs = startMs + durationMin * 60 * 1000;
+  const reservedEnd = finnishIso(str(match.date), str(match.time_end));
+  if (reservedEnd && str(match.time_end) !== "00:00:00") {
+    let reservedMs = new Date(reservedEnd).getTime();
+    if (reservedMs <= startMs) reservedMs += 24 * 60 * 60 * 1000; // slot runs past midnight
+    endMs = Math.max(endMs, reservedMs);
+  }
+  const endTime = new Date(endMs).toISOString();
   const matchId = str(match.match_id);
 
   return {
@@ -353,6 +370,7 @@ export function mapFixture(
     categoryId: str(match.category_id) || undefined,
     groupId: str(match.group_id) || undefined,
     status,
+    ...(isWalkover ? { isWalkover: true } : {}),
     score:
       homeScore != null && awayScore != null ? `${homeScore}–${awayScore}` : undefined,
     homeScore,
@@ -610,13 +628,14 @@ export function buildMatchStatsFromOfficial(
     awayScore: f.awayScore ?? 0,
   }));
 
-  const hasScore = fixture.homeScore != null && fixture.awayScore != null;
+  const hasScore =
+    fixture.status === "played" && fixture.homeScore != null && fixture.awayScore != null;
   const liveScore = hasScore
     ? {
         home: fixture.homeScore as number,
         away: fixture.awayScore as number,
         isLive: false,
-        period: fixture.status === "played" ? "Pelattu" : "Tulos",
+        period: fixture.isWalkover ? "Luovutus" : "Pelattu",
       }
     : undefined;
 

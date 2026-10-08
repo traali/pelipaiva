@@ -320,6 +320,8 @@ export interface OfficialLeagueFixture {
   categoryId?: string;
   groupId?: string;
   status: 'upcoming' | 'played' | 'cancelled' | 'postponed';
+  /** TASO "Forfeited": a walkover result, counted by the league table. */
+  isWalkover?: boolean;
   score?: string;
   homeScore?: number;
   awayScore?: number;
