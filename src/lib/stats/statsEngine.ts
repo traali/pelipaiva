@@ -215,7 +215,7 @@ export function parseTorneopalHtml(
         let scoreStr = '';
         let rawVenue = '';
         let dateStr = '';
-        let timeStr = '15:00';
+        let timeStr = '';
         let matchCode = '';
 
         if (kotiIdx !== -1 && vierasIdx !== -1) {
@@ -226,24 +226,24 @@ export function parseTorneopalHtml(
           } else if (vierasIdx === kotiIdx + 2 && row[kotiIdx + 1]) {
             scoreStr = row[kotiIdx + 1] || '';
           }
-          rawVenue = (kenttaIdx !== -1 ? row[kenttaIdx] : '') || 'Kotikenttä TN';
+          rawVenue = (kenttaIdx !== -1 ? row[kenttaIdx] : '') || 'Kenttä ilmoitetaan';
           dateStr = (pvmIdx !== -1 ? row[pvmIdx] : '') || '';
-          timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '15:00';
+          timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '';
           matchCode = (nroIdx !== -1 ? row[nroIdx] : '') || `${teamId}_${i}`;
         } else if (row.length >= 6) {
           // Standard Torneopal 6-column layout: Nro, Pvm, Kenttä, Koti, Tulos, Vieras
           matchCode = row[0] || `${teamId}_${i}`;
           dateStr = row[1] || '';
-          rawVenue = row[2] || 'Kotikenttä TN';
+          rawVenue = row[2] || 'Kenttä ilmoitetaan';
           home = row[3] || '';
           scoreStr = row[4] || '';
           away = row[5] || '';
         } else {
           dateStr = (pvmIdx !== -1 ? row[pvmIdx] : row[0]) || '';
-          timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '15:00';
+          timeStr = (aikaIdx !== -1 ? row[aikaIdx] : '') || '';
           home = row[1] || '';
           away = row[2] || '';
-          rawVenue = row[3] || 'Kotikenttä TN';
+          rawVenue = row[3] || 'Kenttä ilmoitetaan';
           matchCode = `${teamId}_${i}`;
         }
 

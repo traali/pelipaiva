@@ -1,3 +1,5 @@
+import { federationMatchLinks, type FederationMatchLinks } from '../sport/federationLinks'
+
 /**
  * Live Matchday Streamer & Event Dispatcher
  * Manages real-time goal, period, and penalty notifications across sport satellites.
@@ -10,6 +12,8 @@ export type LiveEventType = 'goal' | 'point' | 'penalty_2min' | 'yellow_card' | 
 export interface LiveMatchEvent {
   id: string
   matchId: string
+  /** TASO fixture id (`${association}_${teamId}_${match_id}`). Links need it. */
+  officialFixtureId?: string
   sport: LiveSportType
   eventType: LiveEventType
   homeTeam: string
@@ -79,3 +83,13 @@ class MatchdayStreamer {
 }
 
 export const matchdayStreamer = new MatchdayStreamer()
+
+/**
+ * Match links for a live event: own sport app first, tulospalvelu second.
+ * Only from a TASO fixture id; a bare or unknown id gets no link.
+ */
+export function liveEventMatchLinks(
+  event: Pick<LiveMatchEvent, 'matchId' | 'sport' | 'officialFixtureId'>
+): FederationMatchLinks | null {
+  return federationMatchLinks({ officialFixtureId: event.officialFixtureId || event.matchId, sport: event.sport })
+}

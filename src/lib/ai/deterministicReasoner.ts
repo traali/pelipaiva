@@ -188,7 +188,9 @@ export function generateMatchdayBriefing(
 ): MatchdayBriefing {
   const { weather, venue, volunteerDuty } = event;
   const isOutdoor = !isIndoorEvent(event);
-  const temp = weather?.temperatureC ?? 15;
+  // No weather data means no temperature. Do not assume a mild day.
+  const hasTemp = typeof weather?.temperatureC === 'number' && Number.isFinite(weather.temperatureC);
+  const temp = hasTemp ? weather!.temperatureC : Number.NaN;
   const rain = weather?.precipitationMmh ?? 0;
   const isSchool = event.sport === 'school' || event.eventType === 'school';
   const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
@@ -236,7 +238,10 @@ export function generateMatchdayBriefing(
     footwear = footRes.footwear;
     footwearReason = footRes.reason;
 
-    if (isOutdoor) {
+    if (isOutdoor && !hasTemp) {
+      clothingAdvice = 'Sää ei tiedossa: pakkaa sekä lyhyt- että pitkähihainen peliasu.';
+      spectatorGear = 'Sää ei tiedossa: pukeudu säänmukaisesti.';
+    } else if (isOutdoor) {
       if (temp < 6) {
         clothingAdvice = 'Pelaajalle tekninen aluskerrasto, pipo ja ohuet pelihanskat.';
         spectatorGear = 'Kylmä katsomossa! Toppatakki, istuinalusta, lämpimät kengät ja termospullo.';
@@ -271,7 +276,7 @@ export function generateMatchdayBriefing(
 
   const postMatchWhatsApp = isSchool || isOther
     ? `📌 Muistutus: ${event.title} klo ${startTimeFormatted} (${venue.name}).`
-    : `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}. Seuraava peli: [PVM].`;
+    : `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}.`;
 
   const emoji = isSchool ? '🏫' : isOther ? '📌' : '⚽';
 
