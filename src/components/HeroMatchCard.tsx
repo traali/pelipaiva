@@ -98,6 +98,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   
   const {
     isLive,
+    isPast,
     formattedKickoff: kickoff,
     formattedWarmup: warmup,
     dateLabel,
@@ -482,6 +483,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             transitPlan={transitPlan}
             transitEmoji={transitEmoji}
             isLive={isLive}
+            isPast={isPast}
             onOpenHomeModal={onOpenHomeModal}
             onOpenVenueModal={() => setIsVenueModalOpen(true)}
             size="xl"
@@ -558,9 +560,9 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               <div className="flex-1 min-w-0">
                 <div className="font-extrabold flex items-center justify-between gap-1">
                   <span>{group.severity === 'info' ? group.title : `⚠️ ${group.title}`}</span>
-                  {group.severity !== 'info' && group.maxTravel > 0 && (
+                  {group.severity !== 'info' && group.minGap > 0 && (
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black/10 dark:bg-white/10 shrink-0">
-                      ~{group.maxTravel} min ajo
+                      väli {group.minGap} min
                     </span>
                   )}
                 </div>
@@ -575,7 +577,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
                       <div key={idx} className="flex items-center gap-1.5 flex-wrap">
                         <span>•</span>
                         <span className="font-bold">{sub.venueA !== sub.venueB ? `${sub.venueA} & ${sub.venueB}` : sub.venueA}</span>
-                        <span>— päällekkäin {sub.overlap} min</span>
+                        <span>{sub.overlap > 0 ? `— päällekkäin ${sub.overlap} min` : `— väli ${sub.gap} min`}</span>
                       </div>
                     ))}
                   </div>

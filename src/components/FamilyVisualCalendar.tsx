@@ -537,7 +537,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                       <div className="flex items-center gap-0.5">
                         {cell.hasConflict && (
                           <span
-                            title="Päällekkäisyys tai tiukka siirtymä"
+                            title="Päällekkäisyys tai peräkkäiset pelit eri kentillä"
                             className="text-[10px] text-stoppage animate-pulse"
                           >
                             ⚠️
@@ -820,7 +820,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                               <div>
                                 {c.overlapMinutes > 0
                                   ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                  : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                  : `⏱️ Peräkkäin eri kentillä (väli ${c.gapMinutes} min)`}
                               </div>
                               <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
                                 {c.message}

@@ -19,7 +19,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
       venueA: 'Lauttasaari',
       venueB: 'Töölö',
       overlapMinutes: 45,
-      travelMinutesEstimate: 15,
+      gapMinutes: 0,
       message: 'Päällekkäisyys: Lassi on merkitty kahteen peliin samaan aikaan päällekkäin 45 min.',
       suggestedFix: 'Ilmoita valmentajalle valinta.'
     };
@@ -28,7 +28,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
     expect(grouped).toHaveLength(1);
     expect(grouped[0].id).toBe('c-1-2');
     expect(grouped[0].maxOverlap).toBe(45);
-    expect(grouped[0].maxTravel).toBe(15);
+    expect(grouped[0].minGap).toBe(0);
     expect(grouped[0].subItems).toHaveLength(0);
     expect(grouped[0].conflicts).toHaveLength(1);
   });
@@ -45,7 +45,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
         venueA: 'Lauttasaaren urheilupuisto "Pyrkkä"',
         venueB: 'Lauttasaari TN B',
         overlapMinutes: 105,
-        travelMinutesEstimate: 4,
+        gapMinutes: 0,
         message: 'Päällekkäisyys: S on merkitty kahteen peliin samaan aikaan päällekkäin 105 min.',
         suggestedFix: 'Ilmoita valmentajalle valinta.'
       },
@@ -59,7 +59,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
         venueA: 'Lauttasaaren urheilupuisto "Pyrkkä"',
         venueB: 'Lauttasaaren urheilupuisto "Pyrkkä"',
         overlapMinutes: 75,
-        travelMinutesEstimate: 0,
+        gapMinutes: 0,
         message: 'Päällekkäisyys: S on merkitty kahteen peliin samaan aikaan päällekkäin 75 min.',
         suggestedFix: 'Ilmoita valmentajalle valinta.'
       },
@@ -73,7 +73,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
         venueA: 'Lauttasaaren urheilupuisto "Pyrkkä"',
         venueB: 'Lauttasaari TN B',
         overlapMinutes: 35,
-        travelMinutesEstimate: 4,
+        gapMinutes: 0,
         message: 'Päällekkäisyys: S on merkitty kahteen peliin samaan aikaan päällekkäin 35 min.',
         suggestedFix: 'Ilmoita valmentajalle valinta.'
       }
@@ -86,7 +86,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
     expect(g.conflicts).toHaveLength(3);
     expect(g.severity).toBe('critical');
     expect(g.maxOverlap).toBe(105);
-    expect(g.maxTravel).toBe(4);
+    expect(g.minGap).toBe(0);
     expect(g.title).toContain('3 päällekkäistä peliaikaa (max 105 min)');
     expect(g.subItems).toHaveLength(3);
     expect(g.subItems[0].overlap).toBe(105);
@@ -106,7 +106,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
         venueA: 'Hernesaari',
         venueB: 'Matinkylä',
         overlapMinutes: 30,
-        travelMinutesEstimate: 20,
+        gapMinutes: 0,
         message: 'Päällekkäisyys: Lassi ja Ella päällekkäin 30 min.',
         suggestedFix: 'Yksi vanhempi per kenttä.'
       },
@@ -120,7 +120,7 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
         venueA: 'Hernesaari',
         venueB: 'Hernesaari',
         overlapMinutes: 60,
-        travelMinutesEstimate: 0,
+        gapMinutes: 0,
         message: 'Päällekkäisyys: Lassi samaan aikaan kahdessa tapahtumassa.',
         suggestedFix: 'Ilmoita valinta.'
       }
@@ -128,5 +128,29 @@ describe('Conflict Consolidation (groupActiveConflicts)', () => {
 
     const grouped = groupActiveConflicts(siblingConflicts);
     expect(grouped).toHaveLength(2);
+  });
+
+  it('back-to-back group shows the shortest real gap, never a drive estimate', () => {
+    const tight = (id: string, gap: number): FamilyConflict => ({
+      id,
+      severity: 'critical',
+      childA: 'S',
+      childB: 'S',
+      eventAId: `${id}-a`,
+      eventBId: `${id}-b`,
+      venueA: 'Otahalli',
+      venueB: 'Töölön Pallokenttä',
+      overlapMinutes: 0,
+      gapMinutes: gap,
+      message: `Peräkkäiset pelit eri kentillä: väli ${gap} min.`,
+      suggestedFix: 'Kysy valmentajalta.'
+    });
+    const [single] = groupActiveConflicts([tight('t1', 20)]);
+    expect(single.title).toBe('Peräkkäiset pelit eri kentillä (väli 20 min)');
+    expect(single.minGap).toBe(20);
+    const [g] = groupActiveConflicts([tight('t1', 20), tight('t2', 10)]);
+    expect(g.minGap).toBe(10);
+    expect(g.subItems.map((x) => x.gap)).toEqual([20, 10]);
+    expect(JSON.stringify(g)).not.toMatch(/min ajo|siirtymä|ajoaika/i);
   });
 });

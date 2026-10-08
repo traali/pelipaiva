@@ -40,7 +40,7 @@ const home: HomeLocation = {
   defaultTransitMode: 'car'
 } as HomeLocation;
 
-const invented = /~\s*\d+\s*min|\d+\s*min\s*ajo|siirtymä\s*~|ajoaika\s*\d/i;
+const invented = /~\s*\d+\s*min|min\s*ajo|siirtymä|ajoaika/i;
 
 describe('two-driver advice for overlapping games at different venues', () => {
   it('with a home: states the clash and says two drivers are needed', () => {
@@ -59,7 +59,10 @@ describe('two-driver advice for overlapping games at different venues', () => {
   });
 
   it('logistics plan carries the advice next to each conflict', () => {
-    const plan = planFamilyLogistics(events, profiles, '2027-05-15', undefined);
+    // planFamilyLogistics looks at the day from 12.00 Helsinki; use the same clash in the afternoon.
+    const shift = (iso: string) => new Date(new Date(iso).getTime() + 4 * 3600_000).toISOString();
+    const afternoon = events.map((e) => ({ ...e, startTime: shift(e.startTime), endTime: shift(e.endTime), warmupTime: shift(e.warmupTime) }));
+    const plan = planFamilyLogistics(afternoon, profiles, '2027-05-15', undefined);
     expect(plan.hasConflicts).toBe(true);
     expect(plan.conflictFixes).toHaveLength(plan.conflictDetails.length);
     expect(plan.conflictFixes[0]).toMatch(/kaksi kuskia/i);
@@ -71,5 +74,34 @@ describe('two-driver advice for overlapping games at different venues', () => {
     expect(legs.map((l) => driverSlotLabel(l.driverSlot))).toEqual(['Kuski 1', 'Kuski 2']);
     expect(driverSlotLabel('oma-kyyti')).toBe('Omatoiminen kulku');
     expect(driverSlotLabel('yhteiskyyti')).toBe('Yhteiskyyti');
+  });
+
+  it('back-to-back at different venues: venues and the real gap only, no drive guess', () => {
+    // Tuomas ends 11:15 at Otahalli; Aino meets 11:30 at Töölö (gap 15 min).
+    const later = game('a2', 'p-aino', '2027-05-15T09:15:00.000Z', '2027-05-15T10:30:00.000Z', '2027-05-15T08:30:00.000Z', 'Töölön Pallokenttä', 60.1873, 24.9258, 'football');
+    for (const h of [undefined, home]) {
+      const conflicts = conflictAgent([events[0]!, later], profiles, h);
+      expect(conflicts).toHaveLength(1);
+      const c = conflicts[0]!;
+      expect(c.overlapMinutes).toBe(0);
+      expect(c.gapMinutes).toBe(15);
+      expect(c.message).toContain('Peräkkäiset pelit eri kentillä');
+      expect(c.message).toContain('väli 15 min');
+      expect(c.message).toContain('Otahalli Espoo');
+      expect(c.message).toContain('Töölön Pallokenttä');
+      expect(`${c.message} ${c.suggestedFix}`).not.toMatch(invented);
+    }
+  });
+
+  it('a gap of 30 min or more between venues is not flagged', () => {
+    const later = game('a3', 'p-aino', '2027-05-15T09:30:00.000Z', '2027-05-15T10:45:00.000Z', '2027-05-15T08:45:00.000Z', 'Töölön Pallokenttä', 60.1873, 24.9258, 'football');
+    expect(conflictAgent([events[0]!, later], profiles)).toHaveLength(0);
+  });
+
+  it('a clash with a game that is already over is not raised again', () => {
+    // 11:20 Helsinki: Tuomas finished at 11:15, Aino still playing.
+    expect(conflictAgent(events, profiles, undefined, new Date('2027-05-15T08:20:00.000Z'))).toHaveLength(0);
+    // 10:40: both still on, the clash stands.
+    expect(conflictAgent(events, profiles, undefined, new Date('2027-05-15T07:40:00.000Z'))).toHaveLength(1);
   });
 });

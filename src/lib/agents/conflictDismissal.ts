@@ -123,14 +123,15 @@ export interface ConsolidatedConflictGroup {
   conflicts: FamilyConflict[];
   severity: 'critical' | 'warn' | 'info';
   maxOverlap: number;
-  maxTravel: number;
+  /** Shortest gap (min) between back-to-back games in the group; 0 when none. */
+  minGap: number;
   childA: string;
   childB: string;
   isSameChild: boolean;
   title: string;
   message: string;
   suggestedFix: string;
-  subItems: Array<{ overlap: number; venueA: string; venueB: string; travel: number }>;
+  subItems: Array<{ overlap: number; gap: number; venueA: string; venueB: string }>;
 }
 
 export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedConflictGroup[] {
@@ -156,15 +157,15 @@ export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedC
         conflicts: [c],
         severity: c.severity,
         maxOverlap: c.overlapMinutes,
-        maxTravel: c.travelMinutesEstimate,
+        minGap: c.gapMinutes,
         childA: c.childA,
         childB: c.childB,
         isSameChild: c.childA.toLowerCase() === c.childB.toLowerCase(),
         title: c.severity === 'info'
-          ? 'Omatoiminen siirtymä'
+          ? 'Omatoiminen kulku'
           : c.overlapMinutes > 0
             ? `Päällekkäisyys (${c.overlapMinutes} min)`
-            : 'Tiukka siirtymä / Ajoaika',
+            : `Peräkkäiset pelit eri kentillä (väli ${c.gapMinutes} min)`,
         message: c.message,
         suggestedFix: c.suggestedFix,
         subItems: []
@@ -172,38 +173,39 @@ export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedC
     } else {
       const isSameChild = groupList[0]!.childA.toLowerCase() === groupList[0]!.childB.toLowerCase();
       const maxOverlap = Math.max(...groupList.map((c) => c.overlapMinutes));
-      const maxTravel = Math.max(...groupList.map((c) => c.travelMinutesEstimate));
+      const tightGaps = groupList.filter((c) => c.overlapMinutes === 0).map((c) => c.gapMinutes);
+      const minGap = tightGaps.length ? Math.min(...tightGaps) : 0;
       const hasCritical = groupList.some((c) => c.severity === 'critical');
       const childName = groupList[0]!.childA;
 
       const subItems = groupList.map((c) => ({
         overlap: c.overlapMinutes,
+        gap: c.gapMinutes,
         venueA: c.venueA,
-        venueB: c.venueB,
-        travel: c.travelMinutesEstimate
+        venueB: c.venueB
       }));
 
       const hasOverlap = maxOverlap > 0;
       const title = isSameChild
         ? hasOverlap
           ? `Päällekkäisyys: ${groupList.length} päällekkäistä peliaikaa (max ${maxOverlap} min)`
-          : `Tiukka siirtymä: ${groupList.length} peräkkäistä tapahtumaa`
+          : `Peräkkäiset pelit eri kentillä: ${groupList.length} tapahtumaa`
         : hasOverlap
           ? `Päällekkäisyys: ${groupList.length} aikatauluristeystä (${groupList[0]!.childA} & ${groupList[0]!.childB})`
-          : `Tiukka siirtymä: ${groupList.length} tapahtumaa (${groupList[0]!.childA} & ${groupList[0]!.childB})`;
+          : `Peräkkäiset pelit eri kentillä: ${groupList.length} tapahtumaa (${groupList[0]!.childA} & ${groupList[0]!.childB})`;
 
       const message = isSameChild
         ? hasOverlap
           ? `${childName} on merkitty ${groupList.length} päällekkäiseen tapahtumaan samana päivänä.`
-          : `${childName} on merkitty ${groupList.length} peräkkäiseen tapahtumaan samana päivänä. Tarkista siirtymäajat.`
+          : `${childName} on merkitty ${groupList.length} peräkkäiseen tapahtumaan eri kentillä samana päivänä.`
         : hasOverlap
           ? `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat samaan aikaan ${groupList.length} ottelussa.`
-          : `${groupList[0]!.childA} ja ${groupList[0]!.childB} siirtyvät eri kentille samana päivänä.`;
+          : `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat peräkkäin eri kentillä samana päivänä.`;
 
       const suggestedFix = isSameChild
         ? hasOverlap
           ? `Ilmoita valmentajille valinta mihin tapahtumiin ${childName} osallistuu.`
-          : `Tarkista että siirtymäaika kenttien välillä riittää.`
+          : `Kysy valmentajilta, ehtiikö ${childName} peleihin ajoissa.`
         : 'Sovi kuskijako ja kyydit etukäteen turnauspäivälle.';
 
       result.push({
@@ -211,7 +213,7 @@ export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedC
         conflicts: groupList,
         severity: hasCritical ? 'critical' : 'warn',
         maxOverlap,
-        maxTravel,
+        minGap,
         childA: groupList[0]!.childA,
         childB: groupList[0]!.childB,
         isSameChild,

@@ -8,6 +8,8 @@ interface LeaveTimeCellProps {
   transitPlan: TransitPlan;
   transitEmoji: string;
   isLive: boolean;
+  /** Finished game: nothing to leave for, so no leave time and no add-home prompt. */
+  isPast?: boolean;
   onOpenHomeModal?: () => void;
   onOpenVenueModal?: () => void;
   size?: 'lg' | 'xl';
@@ -21,6 +23,7 @@ export const LeaveTimeCell: React.FC<LeaveTimeCellProps> = ({
   transitPlan,
   transitEmoji,
   isLive,
+  isPast = false,
   onOpenHomeModal,
   onOpenVenueModal,
   size = 'lg'
@@ -29,6 +32,15 @@ export const LeaveTimeCell: React.FC<LeaveTimeCellProps> = ({
     size === 'xl'
       ? 'font-tabular text-xl sm:text-2xl font-black text-floodlight mt-0.5'
       : 'font-tabular text-lg font-black text-floodlight mt-0.5';
+
+  if (isPast || (isLive && !hasDepartureTime)) {
+    return (
+      <div className="flex flex-col items-center" data-testid="leave-time-done">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{isPast ? '🏁 Ottelu' : '● Ottelu'}</span>
+        <span className="text-sm font-black text-text-primary mt-0.5">{isPast ? 'Päättynyt' : 'Käynnissä'}</span>
+      </div>
+    );
+  }
 
   if (hasDepartureTime) {
     return (

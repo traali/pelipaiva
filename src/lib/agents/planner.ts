@@ -194,7 +194,7 @@ export function runMissionControlGraph(
   const specialistEvents =
     nextEvent && !graphEvents.some((e) => e.id === nextEvent.id) ? [...graphEvents, nextEvent] : graphEvents;
 
-  const conflicts = conflictAgent(specialistEvents, profiles, homeLocation);
+  const conflicts = conflictAgent(specialistEvents, profiles, homeLocation, now);
   const carpool = carpoolAgent(specialistEvents, profiles, conflicts, homeLocation);
   const talkoo = volunteerAgent(specialistEvents, profiles);
   const tournaments = tournamentAgent(activeEvents, profiles, now, homeLocation);

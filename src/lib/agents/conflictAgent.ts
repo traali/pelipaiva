@@ -1,14 +1,17 @@
 import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { effectiveTransitPlan } from '../geo/transitEngine';
 import type { FamilyConflict } from './types';
-import { estimateDriveMinutes, eventDayKey, overlapMinutes } from './time';
+import { eventDayKey, isFinishedGame, overlapMinutes } from './time';
+
+/**
+ * Back-to-back games at different venues are flagged when the next game's meeting
+ * time is less than this many minutes after the previous game ends. Pelipäivä does
+ * not know the drive between venues, so it only states the venues and the gap.
+ */
+export const TIGHT_GAP_MINUTES = 30;
 
 function childName(event: MatchdayEvent, profiles: PlayerProfile[]): string {
   return profiles.find((p) => p.id === event.profileId)?.playerName || 'Lapsi';
-}
-
-function plusMinutes(iso: string, minutes: number): string {
-  return new Date(new Date(iso).getTime() + minutes * 60000).toISOString();
 }
 
 function formatShortWeekdayDate(isoString: string): string {
@@ -48,10 +51,13 @@ function eventTitle(e: MatchdayEvent): string {
 export function conflictAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  homeLocation?: HomeLocation
+  homeLocation?: HomeLocation,
+  /** When given, games already finished at this moment are left out: a clash that is over needs no plan. */
+  now?: Date
 ): FamilyConflict[] {
   const upcoming = [...events]
     .filter((e) => e && !e.isHidden && e.attendanceStatus !== 'out')
+    .filter((e) => !now || !isFinishedGame(e, now))
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   const conflicts: FamilyConflict[] = [];
 
@@ -78,12 +84,6 @@ export function conflictAgent(
       }
 
       const sameVenue = a.venue.normalizedName === b.venue.normalizedName || a.venue.name === b.venue.name;
-      const drive = estimateDriveMinutes(
-        a.venue?.coordinates?.lat,
-        a.venue?.coordinates?.lng,
-        b.venue?.coordinates?.lat,
-        b.venue?.coordinates?.lng
-      );
       const nameA = childName(a, profiles);
       const nameB = childName(b, profiles);
       const isSameChild = nameA.toLowerCase() === nameB.toLowerCase();
@@ -128,7 +128,7 @@ export function conflictAgent(
             venueA: a.venue.name,
             venueB: b.venue.name,
             overlapMinutes: overlap,
-            travelMinutesEstimate: sameVenue ? 0 : drive,
+            gapMinutes: 0,
             isResolvedByActiveTransit: true,
             date: dateA,
             formattedDate: dateLabel,
@@ -144,7 +144,7 @@ export function conflictAgent(
           continue;
         }
 
-        const severity = isSameChild || (drive > 0 && drive > 25) || overlap > 40 ? 'critical' : 'warn';
+        const severity = isSameChild || overlap > 40 ? 'critical' : 'warn';
         conflicts.push({
           id: `c-${a.id}-${b.id}`,
           severity,
@@ -155,7 +155,7 @@ export function conflictAgent(
           venueA: a.venue.name,
           venueB: b.venue.name,
           overlapMinutes: overlap,
-          travelMinutesEstimate: sameVenue ? 0 : drive,
+          gapMinutes: 0,
           date: dateA,
           formattedDate: dateLabel,
           eventATitle: titleA,
@@ -178,18 +178,13 @@ export function conflictAgent(
 
       if (sameVenue) continue;
 
-      // Expand A's window by drive + 10 min parkki so a warmup that starts
-      // during the other match, or a gap shorter than the drive, both flag.
-      const travelOverlap = overlapMinutes(
-        a.warmupTime,
-        plusMinutes(a.endTime, drive + 10),
-        b.warmupTime,
-        b.endTime
-      );
-      if (travelOverlap > 0) {
-        const gapWarmup = (new Date(b.warmupTime).getTime() - new Date(a.endTime).getTime()) / 60000;
-        const gapKickoff = (new Date(b.startTime).getTime() - new Date(a.endTime).getTime()) / 60000;
-        const isDriveImpossible = gapKickoff < drive;
+      // Back-to-back at different venues: only facts from the schedule (end time,
+      // next meeting time, venue names). No drive estimate between venues.
+      const gapToMeet = Math.round((new Date(b.warmupTime).getTime() - new Date(a.endTime).getTime()) / 60000);
+      if (gapToMeet >= 0 && gapToMeet < TIGHT_GAP_MINUTES) {
+        const endA = formatTime(a.endTime);
+        const meetB = formatTime(b.warmupTime);
+        const gapText = `väli ${gapToMeet} min (${titleA} päättyy klo ${endA} @ ${a.venue.name}, ${titleB} kokoontuminen klo ${meetB} @ ${b.venue.name})`;
 
         if (!isSameChild && (aIsActive || bIsActive)) {
           if (aIsActive && bIsActive) {
@@ -211,7 +206,7 @@ export function conflictAgent(
             venueA: a.venue.name,
             venueB: b.venue.name,
             overlapMinutes: 0,
-            travelMinutesEstimate: drive,
+            gapMinutes: gapToMeet,
             isResolvedByActiveTransit: true,
             date: dateA,
             formattedDate: dateLabel,
@@ -221,16 +216,15 @@ export function conflictAgent(
             eventBTime: timeB,
             eventASport: a.sport,
             eventBSport: b.sport,
-            message: `🟢 Siirtymä ratkaistu (${dateLabel}): ${activeChild} kulkee ${transitWord} omatoimisesti, auto vapaana pelaajalle ${carChild}.`,
-            suggestedFix: `${activeChild} siirtyy ${transitWord} omatoimisesti.`
+            message: `🟢 Peräkkäiset pelit ratkaistu (${dateLabel}): ${activeChild} kulkee ${transitWord} omatoimisesti, auto vapaana pelaajalle ${carChild}.`,
+            suggestedFix: `${activeChild} kulkee ${transitWord} omatoimisesti.`
           });
           continue;
         }
 
-        const tightDriveLabel = drive > 0 ? ` (ajo ~${drive} min)` : '';
         conflicts.push({
           id: `c-${a.id}-${b.id}-tight`,
-          severity: isDriveImpossible || isSameChild ? 'critical' : 'warn',
+          severity: isSameChild ? 'critical' : 'warn',
           childA: nameA,
           childB: nameB,
           eventAId: a.id,
@@ -238,7 +232,7 @@ export function conflictAgent(
           venueA: a.venue.name,
           venueB: b.venue.name,
           overlapMinutes: 0,
-          travelMinutesEstimate: drive,
+          gapMinutes: gapToMeet,
           date: dateA,
           formattedDate: dateLabel,
           eventATitle: titleA,
@@ -248,15 +242,11 @@ export function conflictAgent(
           eventASport: a.sport,
           eventBSport: b.sport,
           message: isSameChild
-            ? `Tiukka siirtymä (${dateLabel}): ${nameA} siirtyy pelistä ${titleA} (${timeA} @ ${a.venue.name}) peliin ${titleB} (${timeB} @ ${b.venue.name}) — väli ${Math.max(0, Math.round(gapKickoff))} min${tightDriveLabel}.`
-            : isDriveImpossible
-              ? `Ajoaika ei riitä (${dateLabel}): ${nameA} (${titleA}, ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, ${timeB} @ ${b.venue.name}) — siirtymäaikaa ${Math.round(gapKickoff)} min${tightDriveLabel}.`
-              : `Tiukka aikataulu (${dateLabel}): ${nameA} (${titleA}, ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, ${timeB} @ ${b.venue.name}) — väli ${Math.max(0, Math.round(gapWarmup))} min${tightDriveLabel}.`,
+            ? `Peräkkäiset pelit eri kentillä (${dateLabel}): ${nameA}, ${gapText}.`
+            : `Peräkkäiset pelit eri kentillä (${dateLabel}): ${nameA} ja ${nameB}, ${gapText}.`,
           suggestedFix: isSameChild
-            ? `Aikataulu on liian tiukka samalle pelaajalle. Varoita valmentajaa myöhästymisestä.`
-            : isDriveImpossible
-              ? 'Kaksi kuskia tarvitaan. Yksi auto ei ehdi siirtymää pelien välillä.'
-              : 'Lähde suoraan kentältä. Pakkaa kakkosen kassi autoon valmiiksi.'
+            ? `Kysy valmentajalta, ehtiikö ${nameA} toiseen peliin ajoissa.`
+            : `Sovi etukäteen, kuka vie kenetkin: väliä on vain ${gapToMeet} min.`
         });
       }
     }

@@ -19,7 +19,7 @@ import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { eventDayKey, helsinkiDateISO, parseHelsinkiClockOnEventDate } from './lib/agents/time';
+import { eventDayKey, helsinkiDateISO, isFinishedGame, isPastHelsinkiDay, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
@@ -584,14 +584,15 @@ export const App: React.FC = () => {
     });
   }, [filteredEvents, attendanceFilter, eventTypeFilter]);
 
-  const nowMs = Date.now();
+  // Today's games (played, live or coming) stay until Helsinki midnight; a game
+  // moves to "aiemmat" only once its Helsinki date is in the past.
   const pastEvents = useMemo(
-    () => categoryFilteredEvents.filter((e) => new Date(e.endTime).getTime() < nowMs - 60 * 60 * 1000),
+    () => categoryFilteredEvents.filter((e) => isPastHelsinkiDay(e)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categoryFilteredEvents, clockTick]
   );
   const upcomingEvents = useMemo(
-    () => categoryFilteredEvents.filter((e) => new Date(e.endTime).getTime() >= nowMs - 60 * 60 * 1000),
+    () => categoryFilteredEvents.filter((e) => !isPastHelsinkiDay(e)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categoryFilteredEvents, clockTick]
   );
@@ -1372,7 +1373,8 @@ export const App: React.FC = () => {
                     <div className="flex flex-col gap-3">
                       {dayGroup.events.map((event) => {
                         const profile = profiles.find((p) => p.id === event.profileId);
-                        const isFeaturedNext = event.id === snapshot.nextEvent?.id;
+                        // A finished game is never "next": it shows as a result card.
+                        const isFeaturedNext = event.id === snapshot.nextEvent?.id && !isFinishedGame(event);
 
                         if (isFeaturedNext) {
                           return (
