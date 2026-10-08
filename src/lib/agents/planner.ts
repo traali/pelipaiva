@@ -1,6 +1,6 @@
 import type { ArrivalRules, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
-import { carpoolAgent } from './carpoolAgent';
+import { carpoolAgent, driverSlotLabel } from './carpoolAgent';
 import { conflictAgent } from './conflictAgent';
 import { kitAgent } from './kitAgent';
 import { tournamentAgent } from './tournamentAgent';
@@ -215,7 +215,7 @@ export function runMissionControlGraph(
       ? 'Ei merkittyjä otteluita tai harjoituksia tälle viikolle.'
       : windowEvents.length === 0 && nextEvent
         ? `Seuraava: ${childName(nextEvent, profiles)} ${formatFiTime(nextEvent.startTime)} · ${nextEvent.venue.name}. ${conflictLine}`
-        : `${windowEvents.length} tapahtumaa ${week.label}. ${conflictLine} ${talkoo.recommendation}`;
+        : `${windowEvents.length} tapahtumaa ${week.label.replace(/\.$/, '')}. ${conflictLine} ${talkoo.recommendation}`;
 
   const transitBadge = depart?.transitPlan?.mode === 'walk' ? '🚶' : depart?.transitPlan?.mode === 'bicycle' ? '🚴' : '🚗';
   const ambientLine = nextEvent
@@ -232,13 +232,13 @@ export function runMissionControlGraph(
       const modeEmoji = l.transit?.mode === 'walk' ? '🚶' : l.transit?.mode === 'bicycle' ? '🚴' : '🚗';
       const slotDesc = l.transit?.isSelfTransit
         ? `${modeEmoji} ${l.transit.mode === 'walk' ? 'Kävellen' : 'Pyörällä'} (${l.transit.travelMinutes} min, omatoiminen)`
-        : `${modeEmoji} ${l.driverSlot}${l.canShareRideWith ? ` + ${l.canShareRideWith}` : ''}`;
+        : `${modeEmoji} ${driverSlotLabel(l.driverSlot)}${l.canShareRideWith ? ` + ${l.canShareRideWith}` : ''}`;
       return l.leaveBy
         ? `• Lähde ${l.leaveBy} · ${l.childName} → ${l.venueName} (${slotDesc})`
         : `• Paikalla ${l.time} · ${l.childName} → ${l.venueName} (${slotDesc})`;
     }),
     conflicts.length
-      ? `\nHuom:\n${conflicts.map((c) => (c.isResolvedByActiveTransit ? `• ${c.message}` : `⚠️ ${c.message}`)).join('\n')}`
+      ? `\nHuom:\n${conflicts.map((c) => (c.isResolvedByActiveTransit ? `• ${c.message}` : `⚠️ ${c.message} ${c.suggestedFix}`)).join('\n')}`
       : '',
     talkooWhatsAppLine(talkoo)
   ]

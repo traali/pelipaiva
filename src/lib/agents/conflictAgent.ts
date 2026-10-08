@@ -145,7 +145,6 @@ export function conflictAgent(
         }
 
         const severity = isSameChild || (drive > 0 && drive > 25) || overlap > 40 ? 'critical' : 'warn';
-        const driveLabel = drive > 0 ? ` — siirtymä ~${drive} min` : '';
         conflicts.push({
           id: `c-${a.id}-${b.id}`,
           severity,
@@ -167,7 +166,7 @@ export function conflictAgent(
           eventBSport: b.sport,
           message: isSameChild
             ? `Päällekkäisyys (${dateLabel}): ${nameA} on merkitty kahteen peliin samaan aikaan: ${titleA} (klo ${timeA} @ ${a.venue.name}) ja ${titleB} (klo ${timeB} @ ${b.venue.name}) — päällekkäin ${overlap} min.`
-            : `Päällekkäisyys (${dateLabel}): ${nameA} (${titleA}, klo ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, klo ${timeB} @ ${b.venue.name}) päällekkäin ${overlap} min${driveLabel}.`,
+            : `Päällekkäisyys (${dateLabel}): ${nameA} (${titleA}, klo ${timeA} @ ${a.venue.name}) ja ${nameB} (${titleB}, klo ${timeB} @ ${b.venue.name}) päällekkäin ${overlap} min.`,
           suggestedFix: isSameChild
             ? `Ilmoita valmentajalle valinta kumpaan peliin ${nameA} osallistuu.`
             : severity === 'critical'

@@ -16,6 +16,8 @@ export interface FamilyLogisticsPlan {
   date: string;
   hasConflicts: boolean;
   conflictDetails: string[];
+  /** suggestedFix for each entry in conflictDetails (same index). */
+  conflictFixes: string[];
   departureSchedule: Array<{
     time: string;
     /** 'leave' = leave home (needs a home), 'arrive' = be at the venue. */
@@ -137,6 +139,7 @@ export function planFamilyLogistics(
       date,
       hasConflicts: false,
       conflictDetails: [],
+      conflictFixes: [],
       departureSchedule: [],
       summaryNarrative: 'Ei merkittyjä otteluita tai harjoituksia tälle viikonlopulle.',
       whatsAppShareText: 'Ei otteluita tänä viikonloppuna.'
@@ -147,6 +150,7 @@ export function planFamilyLogistics(
     date,
     hasConflicts: snap.conflicts.some((c) => !c.isResolvedByActiveTransit),
     conflictDetails: snap.conflicts.map((c) => c.message),
+    conflictFixes: snap.conflicts.map((c) => c.suggestedFix),
     departureSchedule: snap.carpool.map((step) => ({
       time: step.leaveBy || step.time,
       timeKind: step.leaveBy ? ('leave' as const) : ('arrive' as const),

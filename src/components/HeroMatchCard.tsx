@@ -148,6 +148,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   if (isOut && !isOutExpanded) {
     return (
       <article
+        data-testid="matchday-card"
         className="liquid-glass relative mb-4 overflow-hidden rounded-2xl border border-dashed border-border-strong/60 bg-surface/30 opacity-80 hover:opacity-100 transition-all p-3 pl-4 flex items-center justify-between gap-3 shadow-xs"
       >
         <div
@@ -198,6 +199,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
   return (
     <article
+      data-testid="matchday-card"
       className={`liquid-glass relative mb-4 overflow-hidden rounded-2xl border transition-all ${
         isOut
           ? 'opacity-65 grayscale-20 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100'

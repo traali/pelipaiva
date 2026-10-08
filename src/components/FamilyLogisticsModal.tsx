@@ -4,6 +4,7 @@ import { X, Car, AlertTriangle, CheckCircle2, Share2, Copy, MapPin, User, Home, 
 import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { planFamilyLogistics } from '../lib/ai/localAiEngine';
+import { driverSlotLabel } from '../lib/agents/carpoolAgent';
 
 interface FamilyLogisticsModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
         date: '',
         hasConflicts: false,
         conflictDetails: [] as string[],
+        conflictFixes: [] as string[],
         departureSchedule: [],
         summaryNarrative: '',
         whatsAppShareText: ''
@@ -147,6 +149,11 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
                 {plan.conflictDetails.map((c, i) => (
                   <p key={i} className="text-[11px] text-text-primary leading-relaxed pl-6">
                     {c}
+                    {plan.conflictFixes[i] && (
+                      <span data-testid="conflict-advice" className="block mt-1 font-bold text-amber-600">
+                        💡 {plan.conflictFixes[i]}
+                      </span>
+                    )}
                   </p>
                 ))}
               </div>
@@ -182,7 +189,7 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
                               ? 'bg-pitch/20 text-pitch border border-pitch/30'
                               : 'bg-surface-elevated text-text-muted font-normal'
                           }`}>
-                            {step.driverRole === 'oma-kyyti' ? 'Omatoiminen kulku' : `Kuski: ${step.driverRole}`}
+                            {driverSlotLabel(step.driverRole)}
                           </span>
                         )}
                       </div>
