@@ -178,7 +178,8 @@ export function listTorneopalAttempts(
   return attempts;
 }
 
-async function torneopalGet<T>(
+/** One TASO REST call with the app's federation keys, deadline and error handling. Null on any failure. */
+export async function torneopalGet<T>(
   association: AssociationType,
   method: string,
   params: Record<string, string>,

@@ -26,7 +26,6 @@ import { db } from '../lib/storage/db';
 import { recordManualFamilyEvent } from '../lib/sync/familyCloud';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
-import { type ClubPreset } from '../lib/clubs/popularClubsCatalog';
 import { parseAssociationUrl } from '../lib/stats/statsEngine';
 import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsParser';
 import { fetchRawIcsFeed } from '../lib/clubs/ingestOfficial';
@@ -79,6 +78,11 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   onImportClassic
 }) => {
   const isEditing = Boolean(initialTeamUrl || initialTeamName || editingProfileId);
+  // The child the import was opened for must be pickable even before they have a saved team.
+  const playerChoices = React.useMemo(() => {
+    const extra = (initialPlayerName || '').trim();
+    return extra && !existingPlayers.includes(extra) ? [...existingPlayers, extra] : existingPlayers;
+  }, [existingPlayers, initialPlayerName]);
   const [activeTab, setActiveTab] = useState<ImportTab>(initialTab);
   const [selectedPlayer, setSelectedPlayer] = useState(initialPlayerName || existingPlayers[0] || '');
   const [selectedSport, setSelectedSport] = useState<SportType>(initialSport || 'football');
@@ -103,8 +107,6 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
   const [classicUrl, setClassicUrl] = useState(initialTeamUrl || '');
   const [classicTeamName, setClassicTeamName] = useState(initialTeamName || '');
   const [colorHex, setColorHex] = useState(pickNextTeamColor([]).hex);
-  const [clubSearchQuery, setClubSearchQuery] = useState('');
-  const [clubMatches, setClubMatches] = useState<ClubPreset[]>([]);
   const [discoveredCategories, setDiscoveredCategories] = useState<FeedCategory[]>([]);
   const [excludedCategories, setExcludedCategories] = useState<string[]>([]);
   const [isScanningCategories, setIsScanningCategories] = useState(false);
@@ -468,7 +470,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                   👤 Kenelle lapselle / pelaajalle lisätään?
                 </label>
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                  {existingPlayers.map((p) => (
+                  {playerChoices.map((p) => (
                     <button
                       key={p}
                       type="button"
@@ -492,8 +494,8 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                       setCustomPlayerDraft(e.target.value);
                       if (e.target.value.trim()) {
                         setSelectedPlayer(e.target.value.trim());
-                      } else if (existingPlayers[0]) {
-                        setSelectedPlayer(existingPlayers[0]);
+                      } else if (playerChoices[0]) {
+                        setSelectedPlayer(playerChoices[0]);
                       }
                     }}
                     placeholder="+ Uusi nimi"
@@ -645,10 +647,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
             {activeTab === 'classic' && (
               <ClassicUrlImportTab
                 isEditing={isEditing}
-                clubSearchQuery={clubSearchQuery}
-                setClubSearchQuery={setClubSearchQuery}
-                clubMatches={clubMatches as any}
-                setClubMatches={setClubMatches as any}
+                selectedSport={selectedSport}
                 setClassicTeamName={setClassicTeamName}
                 setSelectedSport={setSelectedSport}
                 setClassicUrl={handleUrlChange}

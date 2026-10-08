@@ -1,15 +1,23 @@
 import React from "react";
-import { Plus, Search, Filter, RefreshCw, Loader2, Save } from "lucide-react";
+import { Plus, Filter, RefreshCw, Loader2, Save } from "lucide-react";
 import type { SportType } from "../../../types/matchday";
-import { searchPopularClubs, type ClubPreset } from "../../../lib/clubs/popularClubsCatalog";
+import { POPULAR_FINNISH_CLUBS } from "../../../lib/clubs/popularClubsCatalog";
+import type { TasoClub, TasoTeam } from "../../../lib/api/tasoDirectory";
 import { TeamColorPicker } from "../../TeamColorPicker";
+import { TasoTeamSearch } from "../TasoTeamSearch";
+
+/** Club colour preset only when TASO's club is unmistakably the same club (exact short name). */
+function presetColorFor(club: TasoClub): string | undefined {
+  const names = [club.abbreviation, club.name].map((n) => n.trim().toLowerCase()).filter(Boolean);
+  const preset = POPULAR_FINNISH_CLUBS.find(
+    (p) => p.sport === club.sport && names.includes(p.shortName.trim().toLowerCase())
+  );
+  return preset?.colorHex;
+}
 
 export interface ClassicUrlImportTabProps {
   isEditing: boolean;
-  clubSearchQuery: string;
-  setClubSearchQuery: (val: string) => void;
-  clubMatches: ClubPreset[];
-  setClubMatches: (val: ClubPreset[]) => void;
+  selectedSport: SportType;
   setClassicTeamName: (val: string) => void;
   setSelectedSport: (val: SportType) => void;
   setClassicUrl: (val: string) => void;
@@ -29,10 +37,7 @@ export interface ClassicUrlImportTabProps {
 
 export const ClassicUrlImportTab: React.FC<ClassicUrlImportTabProps> = ({
   isEditing,
-  clubSearchQuery,
-  setClubSearchQuery,
-  clubMatches,
-  setClubMatches,
+  selectedSport,
   setClassicTeamName,
   setSelectedSport,
   setClassicUrl,
@@ -52,29 +57,18 @@ export const ClassicUrlImportTab: React.FC<ClassicUrlImportTabProps> = ({
   return (
     <div className="flex flex-col gap-4">
       {!isEditing && (
-        <>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-text-secondary flex items-center gap-1">
-              <Search className="w-3.5 h-3.5 text-pitch" />
-              <span>Hae seura (täyttää nimen ja lajin):</span>
-            </label>
-            <input type="text" value={clubSearchQuery} placeholder="Kirjoita seuran nimi..." onChange={(e) => { const q = e.target.value; setClubSearchQuery(q); setClubMatches(q.trim().length > 1 ? searchPopularClubs(q).slice(0, 5) : []); }} className="w-full rounded-xl border border-pitch/30 bg-pitch/10 px-3.5 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-pitch focus:outline-none" />
-            {clubMatches.length > 0 && (
-              <div className="mt-1.5 flex flex-col gap-1" role="listbox" aria-label="Seuraehdotukset">
-                {clubMatches.map((club) => (
-                  <button key={club.id} type="button" role="option" aria-selected={false} onClick={() => { setClassicTeamName(club.name); setSelectedSport(club.sport); setColorHex(club.colorHex); setClubMatches([]); setClubSearchQuery(""); }} className="flex items-center justify-between p-2 rounded-xl bg-surface border border-border-subtle hover:border-pitch text-left text-xs cursor-pointer transition-all">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: club.colorHex }} />
-                      <span className="font-bold text-text-primary">{club.name}</span>
-                      <span className="text-[10px] text-text-muted">({club.city})</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-pitch">Valitse</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+        <TasoTeamSearch
+          sport={selectedSport}
+          onSportChange={setSelectedSport}
+          selectedPlayer={selectedPlayer}
+          onPickTeam={(team: TasoTeam, club: TasoClub) => {
+            setSelectedSport(team.sport);
+            setClassicTeamName(team.teamName);
+            setClassicUrl(team.url);
+            const preset = presetColorFor(club);
+            if (preset) setColorHex(preset);
+          }}
+        />
       )}
       <form onSubmit={handleClassicSubmit} className="flex flex-col gap-3">
         <div>
