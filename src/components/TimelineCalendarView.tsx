@@ -453,7 +453,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                                 onNavigate(ev);
                               } else {
                                 const isApprox = ev.venue?.isApproximateLocation;
-                                const coords = ev.parking?.coordinates || (!isApprox ? ev.venue.coordinates : undefined);
+                                const coords = (!isApprox ? ev.venue.coordinates : undefined);
                                 const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
                                 const destination =
                                   hasValidCoords

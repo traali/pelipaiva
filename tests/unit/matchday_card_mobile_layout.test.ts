@@ -82,10 +82,6 @@ vi.mock('../../src/components/NappisvahtiPill', () => ({
   NappisvahtiPill: () => React.createElement('div', null, 'Nappisvahti stub'),
 }));
 
-vi.mock('../../src/components/ParkingEaseBadge', () => ({
-  ParkingEaseBadge: () => React.createElement('div', null, 'Parking stub'),
-}));
-
 vi.mock('../../src/components/MatchdayCardWeatherBadge', () => ({
   MatchdayCardWeatherBadge: ({ weather }: { weather: { temperatureC: number } }) =>
     React.createElement('div', null, `Sää ${weather.temperatureC}°C`),
@@ -166,18 +162,6 @@ const event: MatchdayEvent = {
     suspendMatchRecommended: true,
     downpourWarning: false,
     alertMessage: 'Salamavaara lähellä kenttää',
-  },
-  parking: {
-    easeScore: 'moderate',
-    easeScoreValue: 50,
-    lotName: 'P-Areena',
-    coordinates: { lat: 60.15, lng: 24.91 },
-    feeZone: 'A',
-    parkingDiscRequired: false,
-    walkingTimeMinutes: 5,
-    walkingDistanceMeters: 300,
-    warnings: [],
-    mapsNavigationUrl: 'https://example.com/parking',
   },
   briefing: {
     scoutSummary: 'Tiivistelmä',

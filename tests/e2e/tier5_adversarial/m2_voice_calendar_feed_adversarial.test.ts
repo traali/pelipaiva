@@ -239,7 +239,8 @@ describe('Adversarial Stress Suite — M2 RFC 5545 Feed Export & Voice Assistant
 
       // Assert all elements are present in DESCRIPTION for voice assistance
       expect(desc).toContain('⏰ Alkulämpö (arvio):');
-      expect(desc).toContain('🚗 Kotoalähtöaika:');
+      // No leave-home time in the feed: it was never computed from the family's home
+      expect(desc).not.toContain('Kotoalähtöaika');
       expect(desc).toContain('👕 Peliasu: Keltainen pelipaita (vara: Musta)');
       expect(desc).toContain('☕ Talkoovuoro: ⏱️ Toimitsijavuoro: Kello klo 11:00–12:30');
       expect(desc).toContain('📍 Pelipaikka: Otahalli, Otaranta 6, 02150 Espoo');
@@ -382,7 +383,7 @@ describe('Adversarial Stress Suite — M2 RFC 5545 Feed Export & Voice Assistant
       });
       const feed = generateIcsCalendarFeed([event], [profileTuomas]);
       expect(feed).toContain('⏰ Alkulämpö (arvio): klo 09:15');
-      expect(feed).toContain('🚗 Kotoalähtöaika: klo 08:35');
+      expect(feed).not.toContain('Kotoalähtöaika');
     });
   });
 

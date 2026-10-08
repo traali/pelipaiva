@@ -1,4 +1,4 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
 import { calculateTeamSimilarity, normalizeTeamName } from '../reconciliation/teamNameMatcher';
 import type { TournamentBlock } from './types';
@@ -36,7 +36,8 @@ function involvesTeam(ev: MatchdayEvent, teamName?: string): boolean {
 export function tournamentAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  now?: Date
+  now?: Date,
+  homeLocation?: HomeLocation
 ): TournamentBlock[] {
   const groups = new Map<string, MatchdayEvent[]>();
 
@@ -84,7 +85,7 @@ export function tournamentAgent(
             (new Date(sorted[1]!.startTime).getTime() - new Date(first.endTime).getTime()) / 60000
           )
         : 0;
-    const { departureTime } = calculateDepartureCountdown(first, profile?.arrivalRules);
+    const { departureTime } = calculateDepartureCountdown(first, profile?.arrivalRules, homeLocation);
     const dayIso = helsinkiDateISO(new Date(first.startTime));
 
     blocks.push({

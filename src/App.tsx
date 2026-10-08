@@ -25,7 +25,7 @@ import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
-import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
+import { HOME_STORAGE_KEY, parseStoredHomeLocation, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
@@ -429,31 +429,14 @@ export const App: React.FC = () => {
   const arrivalRules = useLiveQuery(() => db.arrivalRules.toArray(), []) || [];
   const homeSync = useLiveQuery(() => db.syncState.get('home_location'), []);
 
-  const homeLocation: HomeLocation = useMemo(() => {
-    if (homeSync && homeSync.syncKey) {
-      try {
-        const parsed = JSON.parse(homeSync.syncKey);
-        if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
-          return parsed;
-        }
-      } catch {
-        // fallback
-      }
-    }
+  // No default home: without a saved home there is no leave time.
+  const homeLocation: HomeLocation | undefined = useMemo(() => {
+    const fromDb = parseStoredHomeLocation(homeSync?.syncKey);
+    if (fromDb) return fromDb;
     if (typeof localStorage !== 'undefined') {
-      const local = localStorage.getItem('pelipaiva_home_location');
-      if (local) {
-        try {
-          const parsed = JSON.parse(local);
-          if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
-            return parsed;
-          }
-        } catch {
-          // fallback
-        }
-      }
+      return parseStoredHomeLocation(localStorage.getItem(HOME_STORAGE_KEY)) ?? undefined;
     }
-    return DEFAULT_HOME_LOCATION;
+    return undefined;
   }, [homeSync]);
 
   const isDemoActive =
@@ -808,6 +791,16 @@ export const App: React.FC = () => {
         if (homeLocation && currentVenue?.coordinates) {
           const freshTransit = resolveTransitPlan(homeLocation, currentVenue.coordinates, ev.weather);
           updates.transit = freshTransit;
+          updated = true;
+        } else if (!homeLocation && ev.transit) {
+          // A plan saved from an old default home is not this family's trip.
+          updates.transit = undefined;
+          updated = true;
+        }
+
+        // Old builds stored invented parking facts on each event. Drop them.
+        if ('parking' in ev) {
+          (updates as Record<string, unknown>).parking = undefined;
           updated = true;
         }
 
@@ -1391,7 +1384,7 @@ export const App: React.FC = () => {
                               onOpenHomeModal={modalStore.openHomeLocation}
                               onNavigate={() => {
                                   const isApprox = event.venue?.isApproximateLocation;
-                                  const coords = event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined);
+                                  const coords = (!isApprox ? event.venue?.coordinates : undefined);
                                   const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
                                   const destination =
                                     hasValidCoords
@@ -1514,7 +1507,7 @@ export const App: React.FC = () => {
               onClearFilter={() => setActiveProfileId('all')}
               onNavigate={(ev) => {
                 const isApprox = ev.venue?.isApproximateLocation;
-                const coords = ev.parking?.coordinates || (!isApprox ? ev.venue?.coordinates : undefined);
+                const coords = (!isApprox ? ev.venue?.coordinates : undefined);
                 const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
                 const destination =
                   hasValidCoords

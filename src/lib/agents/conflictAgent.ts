@@ -1,5 +1,5 @@
 import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
-import { resolveTransitPlan } from '../geo/transitEngine';
+import { effectiveTransitPlan } from '../geo/transitEngine';
 import type { FamilyConflict } from './types';
 import { estimateDriveMinutes, eventDayKey, overlapMinutes } from './time';
 
@@ -94,8 +94,8 @@ export function conflictAgent(
       const timeB = formatTime(b.startTime);
 
       // Check active transit mode for both events from home
-      const transitA = a.transit || resolveTransitPlan(homeLocation, a.venue.coordinates, a.weather);
-      const transitB = b.transit || resolveTransitPlan(homeLocation, b.venue.coordinates, b.weather);
+      const transitA = effectiveTransitPlan(a, homeLocation);
+      const transitB = effectiveTransitPlan(b, homeLocation);
       const aIsActive = transitA.isSelfTransit;
       const bIsActive = transitB.isSelfTransit;
 

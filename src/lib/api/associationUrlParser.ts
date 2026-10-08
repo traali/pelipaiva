@@ -481,34 +481,34 @@ export function getFinnishTimezoneOffset(date: Date): string {
 }
 
 /** Returned when a date or kickoff time is missing or invalid. Callers skip it. */
-export const UNPARSED_DATETIME = '1970-01-01T00:00:00+02:00';
-
 /**
  * "la 24.05.2026" + "15:00" -> "2026-05-24T15:00:00+03:00" (Helsinki).
  * A missing time can also sit in the date cell ("24.05.2026 klo 15.00").
- * Missing or invalid date/time returns UNPARSED_DATETIME: no guessed noon,
- * no clamped month, no "now".
+ * Missing or invalid date/time returns null (parse failure, no event): no
+ * guessed noon, no clamped month, no "now", no 1970 placeholder.
  */
-export function parseFinnishDateTime(dateStr: string, timeStr: string = ''): string {
+export function parseFinnishDateTime(dateStr: string, timeStr: string = ''): string | null {
   const cleanDate = (dateStr || '').replace(/^[a-zA-ZåäöÅÄÖ]{2,3}\s+/i, '').trim();
   const dateParts = cleanDate.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-  if (!dateParts) return UNPARSED_DATETIME;
+  if (!dateParts) return null;
 
   const day = parseInt(dateParts[1]!, 10);
   const month = parseInt(dateParts[2]!, 10);
   const year = parseInt(dateParts[3]!, 10);
-  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return UNPARSED_DATETIME;
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return null;
 
   const afterDate = cleanDate.slice((dateParts.index ?? 0) + dateParts[0].length);
-  const timeSource = (timeStr || '').trim() || afterDate;
-  const timeParts = timeSource.replace(/klo\s*/i, '').match(/(\d{1,2})[:.](\d{2})/);
-  if (!timeParts) return UNPARSED_DATETIME;
+  // The time cell first; if it holds no time, a time printed in the date cell.
+  const timeRe = /(\d{1,2})[:.](\d{2})/;
+  const timeParts =
+    (timeStr || '').replace(/klo\s*/i, '').match(timeRe) || afterDate.replace(/klo\s*/i, '').match(timeRe);
+  if (!timeParts) return null;
   const hours = parseInt(timeParts[1]!, 10);
   const minutes = parseInt(timeParts[2]!, 10);
-  if (hours > 23 || minutes > 59) return UNPARSED_DATETIME;
+  if (hours > 23 || minutes > 59) return null;
 
   const tempUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-  if (isNaN(tempUtc.getTime()) || tempUtc.getUTCDate() !== day) return UNPARSED_DATETIME;
+  if (isNaN(tempUtc.getTime()) || tempUtc.getUTCDate() !== day) return null;
   const offset = getFinnishTimezoneOffset(tempUtc);
 
   const pad = (n: number) => n.toString().padStart(2, '0');

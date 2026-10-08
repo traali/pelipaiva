@@ -115,7 +115,13 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
                 <div className="min-w-0">
                   <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">Lähtöpaikka:</span>
                   <span className="font-bold text-text-primary truncate block">
-                    {homeLocation?.name || 'Lauttasaari'} <span className="font-normal text-text-secondary">({homeLocation?.address || 'Koti'})</span>
+                    {homeLocation ? (
+                      <>
+                        {homeLocation.name || 'Koti'} <span className="font-normal text-text-secondary">({homeLocation.address || 'Koti'})</span>
+                      </>
+                    ) : (
+                      'Lisää kotiosoite, niin näet lähtöajan'
+                    )}
                   </span>
                 </div>
               </div>
@@ -164,7 +170,7 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
                     className="p-3 rounded-xl bg-surface border border-border-strong flex items-start gap-3"
                   >
                     <div className="px-2 py-1 rounded-lg bg-pitch/15 text-pitch font-bold text-xs whitespace-nowrap">
-                      klo {step.time}
+                      {step.timeKind === 'arrive' ? 'Paikalla' : 'Lähde'} klo {step.time}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary">

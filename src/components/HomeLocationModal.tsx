@@ -14,10 +14,11 @@ import {
   Sparkles
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { HomeLocation, TransitMode } from '../types/matchday';
+import { Coordinates, HomeLocation, TransitMode } from '../types/matchday';
 import {
   POPULAR_HOME_PRESETS,
-  DEFAULT_HOME_LOCATION,
+  DEFAULT_WALKING_DISTANCE_KM,
+  DEFAULT_CYCLING_DISTANCE_KM,
   geocodeAddress,
   getCurrentGpsLocation
 } from '../lib/storage/homeLocation';
@@ -25,7 +26,8 @@ import {
 interface HomeLocationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentHome: HomeLocation;
+  /** null when no home is set yet. */
+  currentHome: HomeLocation | null;
   onSaveHome: (home: HomeLocation) => Promise<void> | void;
 }
 
@@ -35,12 +37,12 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
   currentHome,
   onSaveHome
 }) => {
-  const [name, setName] = useState(currentHome.name || 'Kotiosoite');
-  const [address, setAddress] = useState(currentHome.address || '');
-  const [coords, setCoords] = useState(currentHome.coordinates || DEFAULT_HOME_LOCATION.coordinates);
-  const [maxWalk, setMaxWalk] = useState(currentHome.maxWalkingDistanceKm ?? 1.5);
-  const [maxBike, setMaxBike] = useState(currentHome.maxCyclingDistanceKm ?? 5.0);
-  const [preferredMode, setPreferredMode] = useState<TransitMode>(currentHome.defaultTransitMode || 'auto');
+  const [name, setName] = useState(currentHome?.name || '');
+  const [address, setAddress] = useState(currentHome?.address || '');
+  const [coords, setCoords] = useState<Coordinates | null>(currentHome?.coordinates ?? null);
+  const [maxWalk, setMaxWalk] = useState(currentHome?.maxWalkingDistanceKm ?? DEFAULT_WALKING_DISTANCE_KM);
+  const [maxBike, setMaxBike] = useState(currentHome?.maxCyclingDistanceKm ?? DEFAULT_CYCLING_DISTANCE_KM);
+  const [preferredMode, setPreferredMode] = useState<TransitMode>(currentHome?.defaultTransitMode || 'auto');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -51,12 +53,12 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
   // Sync state when opened
   useEffect(() => {
     if (isOpen) {
-      setName(currentHome.name || 'Kotiosoite');
-      setAddress(currentHome.address || '');
-      setCoords(currentHome.coordinates || DEFAULT_HOME_LOCATION.coordinates);
-      setMaxWalk(currentHome.maxWalkingDistanceKm ?? 1.5);
-      setMaxBike(currentHome.maxCyclingDistanceKm ?? 5.0);
-      setPreferredMode(currentHome.defaultTransitMode || 'auto');
+      setName(currentHome?.name || '');
+      setAddress(currentHome?.address || '');
+      setCoords(currentHome?.coordinates ?? null);
+      setMaxWalk(currentHome?.maxWalkingDistanceKm ?? DEFAULT_WALKING_DISTANCE_KM);
+      setMaxBike(currentHome?.maxCyclingDistanceKm ?? DEFAULT_CYCLING_DISTANCE_KM);
+      setPreferredMode(currentHome?.defaultTransitMode || 'auto');
       setSearchQuery('');
       setSaveSuccess(false);
       setErrorMessage('');
@@ -129,6 +131,10 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
         finalCoords = hit;
       }
     }
+    if (!finalCoords) {
+      setErrorMessage('Valitse kotiosoite: hae osoite, käytä GPS:ää tai valitse alue.');
+      return;
+    }
 
     const updated: HomeLocation = {
       name: name.trim() || 'Kotiosoite',
@@ -198,13 +204,15 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
                 <MapPin className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-black text-text-primary truncate">{name}</div>
-                <div className="text-[11px] text-text-secondary truncate">{address || 'Koordinaatit asetettu'}</div>
+                <div className="text-xs font-black text-text-primary truncate">{coords ? name || 'Kotiosoite' : 'Kotiosoitetta ei ole asetettu'}</div>
+                <div className="text-[11px] text-text-secondary truncate">{coords ? address || 'Koordinaatit asetettu' : 'Hae osoite tai valitse alue alta'}</div>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded-md bg-pitch/15 text-pitch text-[10px] font-bold shrink-0">
-              Valittu
-            </span>
+            {coords ? (
+              <span className="px-2 py-0.5 rounded-md bg-pitch/15 text-pitch text-[10px] font-bold shrink-0">
+                Valittu
+              </span>
+            ) : null}
           </div>
 
           {/* Address Search & GPS */}

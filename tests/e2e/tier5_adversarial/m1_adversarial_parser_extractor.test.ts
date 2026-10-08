@@ -326,14 +326,11 @@ describe('Adversarial Stress Suite — M1 URL Parser & HTML Extractor', () => {
       });
 
       it('handles missing or malformed time and date inputs gracefully without crashing', () => {
-        // Missing time is not guessed (no 12:00): the unparsed sentinel, which callers skip
-        const defTime = parseFinnishDateTime('24.05.2026');
-        expect(defTime.startsWith('1970-01-01')).toBe(true);
+        // Missing time is a parse failure (no 12:00, no 1970 placeholder)
+        expect(parseFinnishDateTime('24.05.2026')).toBeNull();
 
-        // Garbage date string returns ISO string fallback
-        const fallback1 = parseFinnishDateTime('invalid date', 'invalid time');
-        expect(fallback1).toBeDefined();
-        expect(new Date(fallback1).getTime()).not.toBeNaN();
+        // Garbage date/time is a parse failure, not a made-up date
+        expect(parseFinnishDateTime('invalid date', 'invalid time')).toBeNull();
       });
     });
   });

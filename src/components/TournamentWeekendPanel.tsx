@@ -98,9 +98,11 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                   </div>
 
                   <div className="mt-1.5 flex items-center gap-2 text-xs">
-                    <span className="text-[11px] font-bold text-floodlight flex items-center gap-1">
-                      🚗 Lähde klo {b.leaveBy}
-                    </span>
+                    {b.leaveBy ? (
+                      <span className="text-[11px] font-bold text-floodlight flex items-center gap-1">
+                        🚗 Lähde klo {b.leaveBy}
+                      </span>
+                    ) : null}
                     <span className="text-[11px] text-text-muted">
                       ({b.packingNote})
                     </span>
@@ -206,7 +208,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                                 aria-label={`Navigoi kentälle ${m.venue.name}`}
                                 onClick={() => {
                                     const isApprox = m.venue?.isApproximateLocation;
-                                  const coords = m.parking?.coordinates || (!isApprox ? m.venue?.coordinates : undefined);
+                                  const coords = (!isApprox ? m.venue?.coordinates : undefined);
                                   const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
 
                                   if (onNavigate && hasValidCoords) {

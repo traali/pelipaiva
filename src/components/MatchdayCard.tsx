@@ -19,7 +19,9 @@ import {
 import { MatchdayEvent, FullMatchStats, PlayerMatchLog, PlayerProfile } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { NappisvahtiPill } from './NappisvahtiPill';
-import { ParkingEaseBadge } from './ParkingEaseBadge';
+import { LeaveTimeCell } from './LeaveTimeCell';
+import { ParkkisLink } from './ParkkisLink';
+import { parkkisVenueUrl } from '../lib/parking/parkkisLink';
 import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
@@ -140,7 +142,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   const linkSourceUrl = profile && profile.id === event.profileId ? profile.associationUrl : undefined;
   const matchLinks = multiGame ? null : federationMatchLinks(event, { associationUrl: linkSourceUrl });
   const showMeetup = shouldShowKokoontuminen(event);
-  const { departureTime, countdownMinutes } = calculateDepartureCountdown(
+  const { departureTime, countdownMinutes, hasDepartureTime } = calculateDepartureCountdown(
     event,
     profile?.arrivalRules,
     homeLocation
@@ -573,13 +575,16 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           )}
           {!isOut && !isSchool && !isOther && (
             <div className="mt-2 grid grid-cols-3 gap-1.5 p-2.5 rounded-xl bg-surface-elevated/80 border border-border-subtle text-center">
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-floodlight">{transitEmoji} Lähde</span>
-                <span className="font-tabular text-lg font-black text-floodlight mt-0.5">{departureTime}</span>
-                <span className="text-[10px] text-text-muted">
-                  {countdownMinutes > 0 ? `${countdownMinutes} min` : isLive ? 'Käynnissä' : 'Menty'}
-                </span>
-              </div>
+              <LeaveTimeCell
+                departureTime={departureTime}
+                countdownMinutes={countdownMinutes}
+                hasDepartureTime={hasDepartureTime}
+                transitPlan={transitPlan}
+                transitEmoji={transitEmoji}
+                isLive={isLive}
+                onOpenHomeModal={onOpenHomeModal}
+                onOpenVenueModal={() => setIsVenueModalOpen(true)}
+              />
               <div className="flex flex-col items-center border-x border-border-subtle/70 px-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-pitch">Paikalla</span>
                 <span className="font-tabular text-lg font-black text-text-primary mt-0.5">{formattedWarmup}</span>
@@ -890,12 +895,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     reason={event.briefing.gearAndPackingAdvice.footwearReason}
                   />
                 )}
-                {event.parking && (
-                  <ParkingEaseBadge
-                    parking={event.parking}
-                    venueName={event.venue.name}
-                    compact={transitPlan?.isSelfTransit}
-                  />
+                {parkkisVenueUrl(event.venue) && (
+                  <div className="flex items-center">
+                    <ParkkisLink venue={event.venue} />
+                  </div>
                 )}
               </div>
 
@@ -994,10 +997,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                   onNavigateToVenue ||
                   (() => {
                     const isApprox = event.venue?.isApproximateLocation;
-                    const isSelfTransit = transitPlan?.isSelfTransit;
-                    const targetCoords = isSelfTransit
-                      ? (!isApprox ? event.venue?.coordinates : undefined)
-                      : (event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined));
+                    const targetCoords = !isApprox ? event.venue?.coordinates : undefined;
                     const hasValidCoords = targetCoords && (targetCoords.lat !== 0 || targetCoords.lng !== 0);
                     const destination =
                       hasValidCoords

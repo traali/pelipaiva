@@ -177,8 +177,13 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
                 )}
               </div>
               <div className="mt-1 font-tabular text-4xl font-semibold text-floodlight md:text-5xl">
-                {depart?.departureTime || '—'}
+                {depart?.hasDepartureTime ? depart.departureTime : '—'}
               </div>
+              {depart && !depart.hasDepartureTime && (
+                <div className="mt-1 text-sm text-text-muted">
+                  {depart.transitPlan.needsHome ? 'Lisää kotiosoite, niin näet lähtöajan' : 'Kentän sijainti puuttuu'}
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-border-subtle bg-surface-elevated p-5">
               <div className="text-sm font-medium uppercase tracking-wide text-text-muted">Sää</div>

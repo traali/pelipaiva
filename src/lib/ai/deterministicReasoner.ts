@@ -8,7 +8,7 @@ import {
   PitchSurface,
   TransitPlan
 } from '../../types/matchday';
-import { resolveTransitPlan } from '../geo/transitEngine';
+import { effectiveTransitPlan, hasRealTravelTime } from '../geo/transitEngine';
 import { isIndoorEvent } from '../sport/isIndoorEvent';
 import { isInventedWarmup } from '../events/eventClock';
 
@@ -77,6 +77,8 @@ export function calculateDepartureCountdown(
   countdownMinutes: number;
   leaveHomeDate: Date;
   transitPlan: TransitPlan;
+  /** False when home or venue location is unknown; departureTime is then ''. */
+  hasDepartureTime: boolean;
 } {
   const isTraining = event.isTraining || event.eventType === 'training';
   const isTournament = event.eventType === 'tournament';
@@ -97,20 +99,8 @@ export function calculateDepartureCountdown(
         }
       : undefined;
 
-  const isApprox = Boolean(event.venue?.isApproximateLocation);
-  const coords = event.venue?.coordinates;
-  const hasValidCoords = Boolean(coords && coords.lat >= 59.0 && coords.lat <= 71.0 && coords.lng >= 19.0 && coords.lng <= 32.0);
-
-  const transitPlan =
-    (!isApprox && hasValidCoords && event.transit && !event.transit.isUnknownLocation && event.transit.distanceKm < 300)
-      ? event.transit
-      : resolveTransitPlan(
-          normalizedHome,
-          event.venue?.coordinates,
-          event.weather,
-          undefined,
-          arrivalRules?.defaultDrivingEstimateMinutes ?? 20
-        );
+  const transitPlan = effectiveTransitPlan(event, normalizedHome);
+  const hasDepartureTime = hasRealTravelTime(transitPlan);
 
   const isNearbyActiveTransit = transitPlan.mode === 'walk' || transitPlan.mode === 'bicycle';
 
@@ -133,15 +123,13 @@ export function calculateDepartureCountdown(
   const transitTravelMins = transitPlan.travelMinutes;
   const defaultBuffer = isNearbyActiveTransit ? 2 : 10;
   const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? defaultBuffer;
-  // Walking from parking only applies if traveling by car
-  const parkingWalkMins = transitPlan.mode === 'car' ? (event.parking?.walkingTimeMinutes ?? 3) : 0;
   const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
 
   // A real kokoontuminen (not the invented 45 min default) is when you must be there.
   // Subtracting another warmup offset from kickoff put LÄHDE after PAIKALLA
   // (Honka: paikalla 10:00, lähde 10:29, 14 min drive).
   const kickoffDate = new Date(event.startTime);
-  const travelAndSlack = transitTravelMins + departureBufferMins + parkingWalkMins + dutyBufferMins;
+  const travelAndSlack = transitTravelMins + departureBufferMins + dutyBufferMins;
   const explicitArrival =
     !isTraining && !isSchool && !isOther && event.warmupTime && !isInventedWarmup(event)
       ? new Date(event.warmupTime)
@@ -156,6 +144,17 @@ export function calculateDepartureCountdown(
     ? new Date(arriveBy.getTime() - travelAndSlack * 60 * 1000)
     : new Date(kickoffDate.getTime() - (warmupOffset + travelAndSlack) * 60 * 1000);
 
+  // No home or no venue pin: no travel time, so no leave time. Never guess one.
+  if (!hasDepartureTime) {
+    return {
+      departureTime: '',
+      countdownMinutes: 0,
+      leaveHomeDate: new Date(Number.NaN),
+      transitPlan,
+      hasDepartureTime: false
+    };
+  }
+
   const now = new Date();
   const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - now.getTime()) / 60000));
 
@@ -169,7 +168,8 @@ export function calculateDepartureCountdown(
     departureTime,
     countdownMinutes,
     leaveHomeDate,
-    transitPlan
+    transitPlan,
+    hasDepartureTime: true
   };
 }
 

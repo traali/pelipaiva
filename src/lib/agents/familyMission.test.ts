@@ -435,8 +435,13 @@ describe('runMissionControlGraph', () => {
         }
       })
     ];
-    const snap = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'));
+    const home = { name: 'Koti', address: 'Testikatu 1', coordinates: { lat: 60.29, lng: 25.04 }, maxWalkingDistanceKm: 1.5, maxCyclingDistanceKm: 5 };
+    const snap = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'), [], home);
     expect(snap.leaveBy).toBeTruthy();
+    // No saved home: no leave time, never a guessed drive.
+    const noHome = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'));
+    expect(noHome.leaveBy).toBeUndefined();
+    expect(noHome.ambientLine).not.toMatch(/lähde klo/);
     expect(snap.whatsAppShareText.includes('PELIPÄIVÄ')).toBe(true);
     expect(snap.whatsAppShareText.includes('Kyytisuunnitelma')).toBe(true);
     expect(snap.conflicts.length).toBe(1);

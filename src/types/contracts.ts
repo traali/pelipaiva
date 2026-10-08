@@ -84,20 +84,26 @@ export interface WeatherForecastContract {
   updatedAt?: string;
 }
 
+/** Arto's Parkkis app (Cloudflare Pages project "parkkis", deploy-neighbors.yml). */
+export const PARKKIS_BASE_URL = 'https://parkkis.pages.dev';
+
 /**
- * Helper to construct a deep-link to Parkkis parking view
+ * Deep link to Parkkis at a venue. Parkkis reads the venue name from
+ * `/venue/<name>` and centres its map on `?lat=&lon=`. Without real
+ * coordinates there is nothing to point at, so this returns null.
  */
 export function buildParkingDeepLink(
   parkkisBaseUrl: string,
-  venueSlug: string,
+  venueName: string,
   lat?: number,
   lon?: number
-): string {
+): string | null {
+  const valid = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+  if (!valid(lat) || !valid(lon) || (lat === 0 && lon === 0)) return null;
   const url = new URL(parkkisBaseUrl);
-  url.searchParams.set('venue', venueSlug);
-  if (lat && lon) {
-    url.searchParams.set('lat', lat.toString());
-    url.searchParams.set('lon', lon.toString());
-  }
+  const name = venueName.trim();
+  url.pathname = name ? `/venue/${encodeURIComponent(name)}` : '/';
+  url.searchParams.set('lat', String(lat));
+  url.searchParams.set('lon', String(lon));
   return url.toString();
 }

@@ -3,7 +3,16 @@ import {
   calculateDepartureCountdown,
   generateMatchdayBriefing
 } from '../../../src/lib/ai/deterministicReasoner';
-import { MatchdayEvent, ArrivalRules } from '../../../src/types/matchday';
+import { MatchdayEvent, ArrivalRules, HomeLocation } from '../../../src/types/matchday';
+
+const HOME: HomeLocation = {
+  name: 'Koti',
+  address: 'Testikatu 1',
+  coordinates: { lat: 60.2, lng: 25.0 },
+  maxWalkingDistanceKm: 1.5,
+  maxCyclingDistanceKm: 5,
+  defaultTransitMode: 'car'
+};
 
 describe('Feature 13: Configurable Match & Training Arrival Rules', () => {
   const baseEvent: MatchdayEvent = {
@@ -27,38 +36,28 @@ describe('Feature 13: Configurable Match & Training Arrival Rules', () => {
       surface: 'artificial_turf_3g',
       hasFloodlights: true
     },
-    parking: {
-      easeScore: 'easy',
-      easeScoreValue: 85,
-      lotName: 'Puotilan P-alue',
-      coordinates: { lat: 60.2135, lng: 25.1095 },
-      feeZone: 'Maksuton',
-      parkingDiscRequired: false,
-      walkingTimeMinutes: 3,
-      walkingDistanceMeters: 200,
-      warnings: [],
-      mapsNavigationUrl: 'https://maps.google.com'
-    }
   };
 
   it('should apply default arrival rules (45m home, 60m away, 15m training)', () => {
-    const homeCountdown = calculateDepartureCountdown(baseEvent);
+    const homeCountdown = calculateDepartureCountdown(baseEvent, undefined, HOME);
     const homeKickoff = new Date(baseEvent.startTime).getTime();
     const homeDiffMins = (homeKickoff - homeCountdown.leaveHomeDate.getTime()) / 60000;
-    // 45m warmup + 20m drive + 10m buffer + 3m walk = 78m
-    expect(homeDiffMins).toBe(78);
+    // 45m warmup + drive from the saved home + 10m buffer
+    const drive = homeCountdown.transitPlan.travelMinutes;
+    expect(drive).toBeGreaterThan(0);
+    expect(homeDiffMins).toBe(45 + drive + 10);
 
     const awayEvent: MatchdayEvent = { ...baseEvent, isHomeMatch: false };
-    const awayCountdown = calculateDepartureCountdown(awayEvent);
+    const awayCountdown = calculateDepartureCountdown(awayEvent, undefined, HOME);
     const awayDiffMins = (homeKickoff - awayCountdown.leaveHomeDate.getTime()) / 60000;
-    // 60m warmup + 20m drive + 10m buffer + 3m walk = 93m
-    expect(awayDiffMins).toBe(93);
+    // 60m warmup + drive + 10m buffer
+    expect(awayDiffMins).toBe(60 + drive + 10);
 
     const trainingEvent: MatchdayEvent = { ...baseEvent, isTraining: true, eventType: 'training' };
-    const trainingCountdown = calculateDepartureCountdown(trainingEvent);
+    const trainingCountdown = calculateDepartureCountdown(trainingEvent, undefined, HOME);
     const trainDiffMins = (homeKickoff - trainingCountdown.leaveHomeDate.getTime()) / 60000;
-    // 15m warmup + 20m drive + 10m buffer + 3m walk = 48m
-    expect(trainDiffMins).toBe(48);
+    // 15m warmup + drive + 10m buffer
+    expect(trainDiffMins).toBe(15 + drive + 10);
   });
 
   it('should apply custom user-configured warmup offsets and departure buffers', () => {
@@ -75,11 +74,11 @@ describe('Feature 13: Configurable Match & Training Arrival Rules', () => {
       defaultDrivingEstimateMinutes: 25
     };
 
-    const countdown = calculateDepartureCountdown(baseEvent, customRules);
+    const countdown = calculateDepartureCountdown(baseEvent, customRules, HOME);
     const kickoff = new Date(baseEvent.startTime).getTime();
     const totalDiffMins = (kickoff - countdown.leaveHomeDate.getTime()) / 60000;
-    // 30m warmup + 25m drive + 20m buffer + 3m walk = 78m
-    expect(totalDiffMins).toBe(78);
+    // 30m warmup + real drive + 20m buffer (defaultDrivingEstimateMinutes is not used)
+    expect(totalDiffMins).toBe(30 + countdown.transitPlan.travelMinutes + 20);
   });
 
   it('should add volunteer duty arrival buffer when volunteer duty is assigned', () => {
@@ -88,8 +87,8 @@ describe('Feature 13: Configurable Match & Training Arrival Rules', () => {
       volunteerDuty: '☕ Kahviovuoro (klo 14:30 - 16:00)'
     };
 
-    const withoutDuty = calculateDepartureCountdown(baseEvent);
-    const withDuty = calculateDepartureCountdown(dutyEvent);
+    const withoutDuty = calculateDepartureCountdown(baseEvent, undefined, HOME);
+    const withDuty = calculateDepartureCountdown(dutyEvent, undefined, HOME);
 
     const diff = (withoutDuty.leaveHomeDate.getTime() - withDuty.leaveHomeDate.getTime()) / 60000;
     // Extra 15 min volunteer arrival buffer
@@ -116,11 +115,19 @@ describe('Feature 13: Configurable Match & Training Arrival Rules', () => {
       defaultDrivingEstimateMinutes: 20
     };
 
-    const countdown = calculateDepartureCountdown(tournamentEvent, rules);
+    const countdown = calculateDepartureCountdown(tournamentEvent, rules, HOME);
     const kickoff = new Date(tournamentEvent.startTime).getTime();
     const totalDiffMins = (kickoff - countdown.leaveHomeDate.getTime()) / 60000;
-    // 40m tournament warmup + 20m drive + 10m buffer + 3m walk = 73m
-    expect(totalDiffMins).toBe(73);
+    // 40m tournament warmup + drive + 10m buffer
+    expect(totalDiffMins).toBe(40 + countdown.transitPlan.travelMinutes + 10);
+  });
+
+  it('shows no leave time without a saved home (no guessed drive)', () => {
+    const noHome = calculateDepartureCountdown(baseEvent);
+    expect(noHome.hasDepartureTime).toBe(false);
+    expect(noHome.departureTime).toBe('');
+    expect(noHome.transitPlan.needsHome).toBe(true);
+    expect(noHome.transitPlan.transitLabel).not.toMatch(/~20 min/);
   });
 
   it('should incorporate custom arrival rules into matchday briefing generation', () => {

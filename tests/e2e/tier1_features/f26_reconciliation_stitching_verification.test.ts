@@ -487,8 +487,8 @@ describe('Feature 26: Multi-Source Event Reconciliation, Stitching & Feed Export
       // DESCRIPTION rich embeddings:
       // Gathering time
       expect(feed).toContain('Alkulämpö (arvio): klo 09:15');
-      // Recommended departure time
-      expect(feed).toContain('Kotoalähtöaika: klo 08:35');
+      // No leave-home time: the briefing had no home, so it would be a guess
+      expect(feed).not.toContain('Kotoalähtöaika');
       // Kit recommendation
       expect(feed).toContain('Peliasu: Sininen (vara: Keltainen)');
       // Volunteer duty
@@ -497,7 +497,7 @@ describe('Feature 26: Multi-Source Event Reconciliation, Stitching & Feed Export
       expect(feed).toContain('Pelipaikka: Väinämöinen tn\\, Väinämöisenkatu 4\\, 00100 Helsinki');
     });
 
-    it('verifies departure time fallback via (ev as any).leaveHomeBy when briefing is absent', () => {
+    it('never prints a stored leave-home time (no home behind it)', () => {
       const eventWithLeaveHomeBy = createMockEvent({
         id: 'ev-export-fallback',
         profileId: profileTuomas.id,
@@ -515,7 +515,7 @@ describe('Feature 26: Multi-Source Event Reconciliation, Stitching & Feed Export
       } as any);
 
       const feed = generateIcsCalendarFeed([eventWithLeaveHomeBy], [profileTuomas]);
-      expect(feed).toContain('Kotoalähtöaika: klo 12:45');
+      expect(feed).not.toContain('Kotoalähtöaika');
       expect(feed).toContain('Pelipaikka: Sahara tn');
     });
   });

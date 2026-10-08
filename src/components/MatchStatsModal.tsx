@@ -84,7 +84,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   const homeTeam = rawHomeTeam || 'Kotijoukkue';
   const awayTeam = rawAwayTeam || 'Vastustaja';
   const stats: FullMatchStats = statsProp ?? {
-    leagueName: 'Sarjaottelu',
+    leagueName: '', // unknown: show nothing rather than a placeholder
     isSynthetic: true,
     homeStanding: blankStanding(homeTeam),
     awayStanding: blankStanding(awayTeam),
@@ -256,10 +256,14 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   <BarChart3 className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold text-pitch uppercase tracking-wider">
-                    {stage || stats.leagueName}
-                  </div>
-                  <div className="text-xs text-text-muted">{division ? `${division} • ${stats.round || 'Sarjaottelu'}` : (stats.round || 'Sarjaottelu')}</div>
+                  {(stage || stats.leagueName) ? (
+                    <div className="text-[11px] font-bold text-pitch uppercase tracking-wider">
+                      {stage || stats.leagueName}
+                    </div>
+                  ) : null}
+                  {(division || stats.round) ? (
+                    <div className="text-xs text-text-muted">{[division, stats.round].filter(Boolean).join(' • ')}</div>
+                  ) : null}
                 </div>
               </div>
               <button

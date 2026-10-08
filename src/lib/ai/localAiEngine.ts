@@ -1,3 +1,5 @@
+import { PARKKIS_BASE_URL } from '../../types/contracts';
+import { parkkisVenueUrl } from '../parking/parkkisLink';
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { ExtractedSportsEvent, parseFreeformSportsMessage, parseMultipleSportsMessages } from './messageParserNLP';
 import { parsePastedSpreadsheetText, parseExcelFileBuffer } from './tableAndExcelParser';
@@ -5,7 +7,6 @@ import { parseScheduleImage, type OcrProgressCallback } from './ocrImageParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
-import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from './deterministicReasoner';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
@@ -17,6 +18,8 @@ export interface FamilyLogisticsPlan {
   conflictDetails: string[];
   departureSchedule: Array<{
     time: string;
+    /** 'leave' = leave home (needs a home), 'arrive' = be at the venue. */
+    timeKind?: 'leave' | 'arrive';
     action: string;
     childName: string;
     venueName: string;
@@ -108,9 +111,7 @@ export async function convertExtractedToMatchdayEvent(
   };
 
   const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime, DEFAULT_PROXY_URL);
-  const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
   if (weather) matchEvent.weather = weather;
-  matchEvent.parking = parking;
   matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
 
   return matchEvent;
@@ -147,7 +148,8 @@ export function planFamilyLogistics(
     hasConflicts: snap.conflicts.some((c) => !c.isResolvedByActiveTransit),
     conflictDetails: snap.conflicts.map((c) => c.message),
     departureSchedule: snap.carpool.map((step) => ({
-      time: step.leaveBy,
+      time: step.leaveBy || step.time,
+      timeKind: step.leaveBy ? ('leave' as const) : ('arrive' as const),
       action: step.action,
       childName: step.childName,
       venueName: step.venueName,
@@ -156,6 +158,11 @@ export function planFamilyLogistics(
     summaryNarrative: snap.summary,
     whatsAppShareText: snap.whatsAppShareText
   };
+}
+
+/** "parkki", "parkkeerata", "pysäköinti", "pysäköintikiekko"; not "jääkiekko". */
+export function isParkingQuestion(norm: string): boolean {
+  return /(?:^|[^a-zåäö])(?:parkk|pysäk|pysäköi)/i.test(norm);
 }
 
 /**
@@ -237,6 +244,21 @@ export function queryFamilySchedule(
     };
   }
 
+  // Parking: Pelipäivä has no parking facts. Parkkis does.
+  if (isParkingQuestion(norm)) {
+    const next = scopedEvents
+      .filter((e) => new Date(e.endTime) >= new Date())
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
+    const link = next ? parkkisVenueUrl(next.venue) : null;
+    const where = next && link ? ` Kenttä ${next.venue.name}: ${link}` : `: ${PARKKIS_BASE_URL}`;
+    return {
+      answer: `Pelipäivä ei arvioi pysäköintiä. Pysäköintitiedot tulevat Parkkis-sovelluksesta${where}`,
+      relevantEvents: next ? [next] : [],
+      confidence: 0.9,
+      engineUsed: 'deterministic'
+    };
+  }
+
   // Next game query
   if (
     norm.includes('seuraava') ||
@@ -309,10 +331,12 @@ export async function queryFamilyScheduleWithLLM(
   profiles: PlayerProfile[]
 ): Promise<CopilotQueryResult> {
   const fallback = queryFamilySchedule(query, events, profiles);
+  // Parking answers must point to Parkkis, never a model guess.
+  if (isParkingQuestion(query.toLowerCase())) return fallback;
 
   try {
     const boxed = await createOnDeviceLanguageSession(
-      'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta. Älä keksi otteluita, aikoja tai tuloksia joita listassa ei ole.'
+      'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta. Älä keksi otteluita, aikoja tai tuloksia joita listassa ei ole. Pysäköintitietoja sinulla ei ole: ohjaa Parkkis-sovellukseen.'
     );
     if (!boxed) return fallback;
 
