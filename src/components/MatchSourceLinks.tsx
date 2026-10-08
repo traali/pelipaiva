@@ -13,6 +13,8 @@ interface MatchSourceLinksProps {
   links: FederationMatchLinks | null | undefined;
   /** Smaller variant for a game row inside a tournament list. */
   dense?: boolean;
+  /** Light text for dark surfaces (live toast). */
+  onDark?: boolean;
   className?: string;
 }
 
@@ -21,7 +23,7 @@ interface MatchSourceLinksProps {
  * the federation tulospalvelu match page. Both open in a new tab.
  * Renders nothing without a real TASO match_id.
  */
-export const MatchSourceLinks: React.FC<MatchSourceLinksProps> = ({ links, dense = false, className = '' }) => {
+export const MatchSourceLinks: React.FC<MatchSourceLinksProps> = ({ links, dense = false, onDark = false, className = '' }) => {
   if (!links) return null;
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`} data-testid="match-source-links">
@@ -47,7 +49,9 @@ export const MatchSourceLinks: React.FC<MatchSourceLinksProps> = ({ links, dense
         onClick={(e) => e.stopPropagation()}
         aria-label="Avaa tulospalvelussa (uusi välilehti)"
         title="Avaa tulospalvelussa"
-        className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl px-3 text-xs font-semibold text-text-secondary hover:text-text-primary underline-offset-2 hover:underline transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
+        className={`inline-flex min-h-[44px] items-center justify-center gap-1 rounded-xl px-3 text-xs font-semibold underline-offset-2 hover:underline transition-colors focus-visible:ring-2 focus-visible:ring-pitch ${
+          onDark ? 'text-slate-300 hover:text-white' : 'text-text-secondary hover:text-text-primary'
+        }`}
       >
         <span className="whitespace-nowrap">Tulospalvelu</span>
         <ExternalLink className="w-3 h-3 shrink-0" />

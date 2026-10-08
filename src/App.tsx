@@ -1570,17 +1570,7 @@ export const App: React.FC = () => {
       />
 
       {/* Real-Time Live Goal & Event Toast Alert Banner */}
-      <LiveMatchToast
-        onOpenSatelliteDrawer={(sport, matchId, title) => {
-          const repoMap: Record<string, string> = {
-            football: 'football-stats',
-            floorball: 'floorball-stats',
-            basketball: 'basketball-stats',
-            volleyball: 'volleyball-stats',
-          };
-          modalStore.openDrawer(repoMap[sport] || 'floorball-stats', matchId, title);
-        }}
-      />
+      <LiveMatchToast />
 
       {/* Unified In-App Fetch & Status Notifications */}
       <NotificationToastContainer />

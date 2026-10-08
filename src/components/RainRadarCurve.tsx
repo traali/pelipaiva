@@ -28,12 +28,12 @@ export const RainRadarCurve: React.FC<RainRadarCurveProps> = ({
             <Thermometer className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs font-semibold text-text-primary">Sisäilmasto</div>
-            <div className="text-[11px] text-text-secondary">Vakioitu hallilämpötila ~18-20°C</div>
+            <div className="text-xs font-semibold text-text-primary">Sisäpeli</div>
+            <div className="text-[11px] text-text-secondary">Ulkosää ei vaikuta peliin.</div>
           </div>
         </div>
         <span className="text-xs px-2.5 py-1 rounded-full bg-pitch/10 text-pitch font-medium border border-pitch/20">
-          Kuiva alusta
+          Halli
         </span>
       </div>
     );

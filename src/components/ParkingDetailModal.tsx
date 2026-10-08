@@ -57,15 +57,15 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
     : '🟢 Helppo pysäköidä';
 
   const discTime = calculateParkingDiscTime(new Date());
-  const lat = parking.coordinates?.lat ?? 60.1699;
-  const lng = parking.coordinates?.lng ?? 24.9384;
+  // No coordinates means no map pin: never a Helsinki-centre stand-in.
+  const lat = parking.coordinates?.lat ?? 0;
+  const lng = parking.coordinates?.lng ?? 0;
+  const hasValidCoords = Boolean(lat !== 0 && lng !== 0 && lat >= 59.0 && lat <= 71.0 && lng >= 19.0 && lng <= 32.0);
 
   // OpenStreetMap Bounding Box for embedded interactive map
   const delta = 0.004;
   const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`;
-
-  const hasValidCoords = Boolean(lat !== 0 && lng !== 0 && lat >= 59.0 && lat <= 71.0 && lng >= 19.0 && lng <= 32.0);
 
   const openGoogleMaps = () => {
     const dest = hasValidCoords ? `${lat},${lng}` : encodeURIComponent(venueName || 'Kenttä');
@@ -203,7 +203,12 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
             {/* TAB 1: KARTTA & YLEISKUVA */}
             {activeTab === 'map' && (
               <div className="flex flex-col gap-4">
-                {/* Embedded Interactive OSM Map */}
+                {/* Embedded Interactive OSM Map (only with real coordinates) */}
+                {!hasValidCoords ? (
+                  <p className="p-3.5 rounded-2xl bg-surface-elevated/70 border border-border-subtle text-xs text-text-secondary">
+                    Pysäköintipaikan sijainti ei ole tiedossa.
+                  </p>
+                ) : (
                 <div className="relative h-48 md:h-56 w-full rounded-2xl overflow-hidden border border-border-subtle bg-surface-elevated">
                   <iframe
                     title="Pysäköintikartta"
@@ -221,6 +226,7 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
                     <span>{lat.toFixed(4)}, {lng.toFixed(4)}</span>
                   </div>
                 </div>
+                )}
 
                 {/* Walking Distance & Kiekkokello Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -556,7 +562,7 @@ export const ParkingDetailModal: React.FC<ParkingDetailModalProps> = ({
         onClose={() => setIsParkkisDrawerOpen(false)}
         title={`ParkkiS: ${venueName}`}
         subtitle="Helsingin kaupungin 165k pysäköintivirhettä & PMTiles-vektorikartta"
-        embedUrl={`https://parkkis.pages.dev/venue/${encodeURIComponent(venueName)}?lat=${lat}&lon=${lng}&embed=true&theme=night-captain`}
+        embedUrl={`https://parkkis.pages.dev/venue/${encodeURIComponent(venueName)}?${hasValidCoords ? `lat=${lat}&lon=${lng}&` : ''}embed=true&theme=night-captain`}
         sourceRepo="parkkis"
       />
     </AnimatePresence>

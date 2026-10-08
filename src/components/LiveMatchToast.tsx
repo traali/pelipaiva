@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { matchdayStreamer, type LiveMatchEvent } from '../lib/live/matchdayStreamer'
+import { matchdayStreamer, liveEventMatchLinks, type LiveMatchEvent } from '../lib/live/matchdayStreamer'
 import { springTactile } from '../lib/motion/springs'
-import { X, ExternalLink, Zap } from 'lucide-react'
+import { X, Zap } from 'lucide-react'
+import { MatchSourceLinks } from './MatchSourceLinks'
 
-interface LiveMatchToastProps {
-  onOpenSatelliteDrawer?: (sport: string, matchId: string, title: string) => void
-}
-
-export const LiveMatchToast: React.FC<LiveMatchToastProps> = ({ onOpenSatelliteDrawer }) => {
+export const LiveMatchToast: React.FC = () => {
   const [currentEvent, setCurrentEvent] = useState<LiveMatchEvent | null>(null)
 
   useEffect(() => {
@@ -69,8 +66,10 @@ export const LiveMatchToast: React.FC<LiveMatchToastProps> = ({ onOpenSatelliteD
             </div>
 
             <button
+              type="button"
               onClick={() => setCurrentEvent(null)}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              aria-label="Sulje ilmoitus"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -m-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -105,23 +104,10 @@ export const LiveMatchToast: React.FC<LiveMatchToastProps> = ({ onOpenSatelliteD
             </div>
           )}
 
-          {/* Action button */}
-          {onOpenSatelliteDrawer && (
-            <button
-              onClick={() => {
-                onOpenSatelliteDrawer(
-                  currentEvent.sport,
-                  currentEvent.matchId,
-                  `${currentEvent.homeTeam} vs ${currentEvent.awayTeam}`
-                )
-                setCurrentEvent(null)
-              }}
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl bg-[#3A506B] hover:bg-[#5BC0BE] hover:text-[#0B132B] transition-all text-xs font-bold text-slate-100 cursor-pointer"
-            >
-              <span>Avaa tilastokeskus</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {/* Exact match: own sport app first, tulospalvelu second. None without a real match id. */}
+          <div onClickCapture={() => setCurrentEvent(null)}>
+            <MatchSourceLinks links={liveEventMatchLinks(currentEvent)} onDark />
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

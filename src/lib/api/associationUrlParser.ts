@@ -140,18 +140,7 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
         canonicalUrl: `https://espooliikkuutournament.fi/team/${teamId}`
       };
     }
-    const matchMatch = pathname.match(/^\/match\/(\d+)(?:\/.*)?$/i);
-    if (matchMatch && matchMatch[1]) {
-      const matchId = matchMatch[1]!;
-      return {
-        sport: 'basketball',
-        association: 'basket',
-        teamId: '203621',
-        matchId,
-        seasonId: 'esli2026',
-        canonicalUrl: `https://espooliikkuutournament.fi/match/${matchId}`
-      };
-    }
+    // A match URL names no team. Fail the parse rather than pick a team.
     return null;
   }
 
@@ -297,35 +286,10 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
     const rawSubdomain = hostname.replace(/\.torneopal\.fi$/i, '').replace(/^www\./i, '');
     const subdomain = rawSubdomain || 'taso';
 
-    // 4a. Torneopal Player Page: /taso/pelaaja.php?pelaaja=146432 or /pelaaja/146432
-    const isTorneopalPlayerPath = /^\/(?:taso\/)?(?:pelaaja\.php|pelaaja|player)(?:\/.*)?$/i.test(pathname);
-    if (isTorneopalPlayerPath) {
-      let playerId =
-        searchParams.get('pelaaja') ||
-        searchParams.get('player_id') ||
-        searchParams.get('player') ||
-        searchParams.get('id');
-
-      if (!playerId) {
-        const pathMatch = pathname.match(/^\/(?:taso\/)?(?:pelaaja|player)\/(\d+)/i);
-        if (pathMatch && pathMatch[1]) {
-          playerId = pathMatch[1]!;
-        }
-      }
-
-      if (playerId && /^\d+$/.test(playerId)) {
-        const sport = inferSportFromSubdomain(subdomain);
-        const playerName = playerId === '146432' ? 'Pelaaja 55' : undefined;
-        return {
-          sport,
-          association: 'torneopal',
-          teamId: '34013', // Associated team
-          playerId,
-          playerName,
-          subdomain,
-          canonicalUrl: `https://${subdomain}.torneopal.fi/taso/pelaaja.php?pelaaja=${playerId}`
-        };
-      }
+    // 4a. Torneopal player page (/taso/pelaaja.php?pelaaja=…): the URL names a
+    // player, not a team. Fail the parse rather than invent a team or a name.
+    if (/^\/(?:taso\/)?(?:pelaaja\.php|pelaaja|player)(?:\/.*)?$/i.test(pathname)) {
+      return null;
     }
 
     const isTorneopalPath = /^\/(?:taso\/)?(?:joukkue\.php|joukkue)(?:\/.*)?$/i.test(pathname);
@@ -516,39 +480,35 @@ export function getFinnishTimezoneOffset(date: Date): string {
   return '+02:00'; // EET
 }
 
+/** Returned when a date or kickoff time is missing or invalid. Callers skip it. */
+export const UNPARSED_DATETIME = '1970-01-01T00:00:00+02:00';
+
 /**
- * Converts a Finnish date string (e.g. "24.05.2026", "la 24.5.2026") and time string ("15:00", "klo 15.00")
- * into a valid ISO 8601 string with Finland's timezone offset.
+ * "la 24.05.2026" + "15:00" -> "2026-05-24T15:00:00+03:00" (Helsinki).
+ * A missing time can also sit in the date cell ("24.05.2026 klo 15.00").
+ * Missing or invalid date/time returns UNPARSED_DATETIME: no guessed noon,
+ * no clamped month, no "now".
  */
-export function parseFinnishDateTime(dateStr: string, timeStr: string = '12:00'): string {
-  const cleanDate = dateStr.replace(/^[a-zA-ZåäöÅÄÖ]{2,3}\s+/i, '').trim();
+export function parseFinnishDateTime(dateStr: string, timeStr: string = ''): string {
+  const cleanDate = (dateStr || '').replace(/^[a-zA-ZåäöÅÄÖ]{2,3}\s+/i, '').trim();
   const dateParts = cleanDate.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (!dateParts) return UNPARSED_DATETIME;
 
-  if (!dateParts) {
-    const candidate = new Date(`${dateStr} ${timeStr}`);
-    return isNaN(candidate.getTime()) ? '1970-01-01T00:00:00+02:00' : candidate.toISOString();
-  }
+  const day = parseInt(dateParts[1]!, 10);
+  const month = parseInt(dateParts[2]!, 10);
+  const year = parseInt(dateParts[3]!, 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900 || year > 2100) return UNPARSED_DATETIME;
 
-  let day = parseInt(dateParts[1] || '1', 10);
-  let month = parseInt(dateParts[2] || '1', 10);
-  let year = parseInt(dateParts[3] || '2026', 10);
-
-  if (month < 1 || month > 12) month = 1;
-  if (day < 1 || day > 31) day = 1;
-  if (year < 1900 || year > 2100) year = 2026;
-
-  const cleanTime = timeStr.replace(/klo\s*/i, '').trim();
-  const timeParts = cleanTime.match(/(\d{1,2})[:.](\d{2})/);
-  let hours = timeParts && timeParts[1] ? parseInt(timeParts[1], 10) : 12;
-  let minutes = timeParts && timeParts[2] ? parseInt(timeParts[2], 10) : 0;
-
-  if (hours < 0 || hours > 23) hours = 12;
-  if (minutes < 0 || minutes > 59) minutes = 0;
+  const afterDate = cleanDate.slice((dateParts.index ?? 0) + dateParts[0].length);
+  const timeSource = (timeStr || '').trim() || afterDate;
+  const timeParts = timeSource.replace(/klo\s*/i, '').match(/(\d{1,2})[:.](\d{2})/);
+  if (!timeParts) return UNPARSED_DATETIME;
+  const hours = parseInt(timeParts[1]!, 10);
+  const minutes = parseInt(timeParts[2]!, 10);
+  if (hours > 23 || minutes > 59) return UNPARSED_DATETIME;
 
   const tempUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-  if (isNaN(tempUtc.getTime())) {
-    return new Date().toISOString();
-  }
+  if (isNaN(tempUtc.getTime()) || tempUtc.getUTCDate() !== day) return UNPARSED_DATETIME;
   const offset = getFinnishTimezoneOffset(tempUtc);
 
   const pad = (n: number) => n.toString().padStart(2, '0');
