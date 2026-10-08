@@ -1,342 +1,193 @@
 /**
- * WebMCP Tool Registry for Pelipäivä
- * Standard: W3C Web Machine Learning Working Group & AAIF WebMCP Specification
- * Reference: https://aaif.io/blog/designing-websites-for-ai-agents-with-webmcp
+ * WebMCP tools for Pelipäivä (imperative API, early preview).
+ * https://developer.chrome.com/docs/ai/webmcp/imperative-api
  *
- * Exposes structured browser-level tools to AI user agents via `document.modelContext`.
+ * - Uses the browser's own `document.modelContext` (Chromium 146+, behind
+ *   chrome://flags/#enable-webmcp-testing, HTTPS only). Older builds exposed
+ *   `navigator.modelContext`; used only if it exists.
+ * - Without it this is a no-op: no polyfill, no globals, no host objects
+ *   replaced, no postMessage bridge (any frame could call tools through one).
+ * - Tools are unregistered by aborting the AbortSignal passed to registerTool.
+ * - Every tool reads only what is stored on this device (Dexie). Missing data
+ *   stays null; nothing is estimated or filled in.
  */
 
-import { db } from '../storage/db';
+import { db as defaultDb, type PelipaivaDB } from '../storage/db';
 import { eventDayKey, helsinkiDateISO } from './time';
-import { calculateParkingRiskContract } from '../../types/contracts';
+import { federationMatchLinks } from '../sport/federationLinks';
 
-// WebMCP Type Declarations (W3C Standard Draft & Anthropic MCP Protocol)
-export interface ModelContextTool {
-  name: string;
-  description: string;
+export interface WebMcpToolResult {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+export interface WebMcpToolAnnotations {
   readOnlyHint?: boolean;
   untrustedContentHint?: boolean;
+  consequentialHint?: boolean;
+}
+
+export interface WebMcpTool {
+  name: string;
+  description: string;
   inputSchema: {
-    type: string;
+    type: 'object';
     properties?: Record<string, unknown>;
     required?: string[];
   };
-  execute: (args: Record<string, unknown>) => Promise<unknown>;
+  annotations?: WebMcpToolAnnotations;
+  execute: (input: Record<string, unknown>, client?: unknown) => Promise<WebMcpToolResult>;
 }
 
-export interface ModelContextRegistry {
-  registerTool: (tool: ModelContextTool) => Promise<void> | void;
-  unregisterTool?: (name: string) => Promise<void> | void;
-  getTools: () => ModelContextTool[];
-  listTools: () => Promise<{
-    tools: Array<{
-      name: string;
-      description: string;
-      readOnlyHint?: boolean;
-      untrustedContentHint?: boolean;
-      inputSchema: ModelContextTool['inputSchema'];
-    }>;
-  }>;
-  callTool: (params: { name: string; arguments?: Record<string, unknown> }) => Promise<{
-    content: Array<{ type: 'text'; text: string }>;
-    isError?: boolean;
-  }>;
-  executeTool: (name: string, args?: Record<string, unknown>) => Promise<unknown>;
+/** The part of the browser's ModelContext we use. */
+export interface ModelContextLike {
+  registerTool: (tool: WebMcpTool, options?: { signal?: AbortSignal }) => unknown;
 }
 
-declare global {
-  interface Document {
-    modelContext?: ModelContextRegistry;
-  }
-  interface Navigator {
-    modelContext?: ModelContextRegistry;
-  }
-  interface Window {
-    modelContext?: ModelContextRegistry;
-  }
+function asModelContext(value: unknown): ModelContextLike | null {
+  return value && typeof (value as { registerTool?: unknown }).registerTool === 'function'
+    ? (value as ModelContextLike)
+    : null;
 }
 
-/**
- * Ensures a shared ModelContextRegistry instance is mounted on document, navigator, and window.
- */
-let _webMcpMessageHandler: ((event: MessageEvent) => void) | null = null;
-
-/** A Chrome or ChatGPT host has registerTool and no callTool. Do not replace it. */
-export function shouldKeepHostContext(existing: { registerTool?: unknown } | null | undefined): boolean {
-  return Boolean(existing && typeof existing.registerTool === 'function');
+/** document.modelContext, else a legacy navigator.modelContext, else null. */
+export function getModelContext(): ModelContextLike | null {
+  const fromDocument =
+    typeof document !== 'undefined' ? asModelContext((document as unknown as { modelContext?: unknown }).modelContext) : null;
+  if (fromDocument) return fromDocument;
+  return typeof navigator !== 'undefined'
+    ? asModelContext((navigator as unknown as { modelContext?: unknown }).modelContext)
+    : null;
 }
 
-function ensureModelContextRegistry(): ModelContextRegistry {
-  const existing =
-    (typeof document !== 'undefined' ? document.modelContext : undefined) ||
-    (typeof navigator !== 'undefined' ? navigator.modelContext : undefined) ||
-    (typeof window !== 'undefined' ? window.modelContext : undefined);
+function textResult(value: unknown): WebMcpToolResult {
+  return { content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] };
+}
 
-  if (shouldKeepHostContext(existing)) {
-    return existing as ModelContextRegistry;
-  }
+function errorResult(message: string): WebMcpToolResult {
+  return { content: [{ type: 'text', text: message }], isError: true };
+}
 
-  const registeredTools = new Map<string, ModelContextTool>();
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-  const registry: ModelContextRegistry = {
-    registerTool: async (tool: ModelContextTool) => {
-      registeredTools.set(tool.name, tool);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('webmcp:tool_registered', { detail: { toolName: tool.name } })
-        );
-      }
+export function buildPelipaivaTools(database: PelipaivaDB = defaultDb): WebMcpTool[] {
+  const getMatchdaySchedule: WebMcpTool = {
+    name: 'get_matchday_schedule',
+    description:
+      'Lists the junior sports games, trainings and other events saved in this Pelipäivä app for one day ' +
+      '(Europe/Helsinki). Only stored data: a field the app does not know is null. Team names and titles ' +
+      'come from club calendars and federation results services.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        date: {
+          type: 'string',
+          description: 'Day as YYYY-MM-DD (Europe/Helsinki). Defaults to today.',
+        },
+        playerName: {
+          type: 'string',
+          description: 'Optional child name (or part of it) to show only that child.',
+        },
+      },
     },
-    unregisterTool: async (name: string) => {
-      registeredTools.delete(name);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('webmcp:tool_unregistered', { detail: { toolName: name } })
-        );
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => {
+      const rawDate = input?.date;
+      if (rawDate !== undefined && (typeof rawDate !== 'string' || !ISO_DATE.test(rawDate))) {
+        return errorResult('date must be YYYY-MM-DD');
       }
-    },
-    getTools: () => Array.from(registeredTools.values()),
-    listTools: async () => ({
-      tools: Array.from(registeredTools.values()).map((t) => ({
-        name: t.name,
-        description: t.description,
-        readOnlyHint: t.readOnlyHint ?? true,
-        untrustedContentHint: t.untrustedContentHint ?? false,
-        inputSchema: t.inputSchema,
-      })),
-    }),
-    callTool: async (params: { name: string; arguments?: Record<string, unknown> }) => {
-      const tool = registeredTools.get(params.name);
-      if (!tool) {
-        return {
-          content: [{ type: 'text', text: `Error: Tool '${params.name}' not found in WebMCP registry.` }],
-          isError: true,
-        };
-      }
-      try {
-        const rawResult = await tool.execute(params.arguments || {});
-        return {
-          content: [{
-            type: 'text',
-            text: typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult, null, 2),
-          }],
-          isError: false,
-        };
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return {
-          content: [{ type: 'text', text: `Error executing '${params.name}': ${msg}` }],
-          isError: true,
-        };
-      }
-    },
-    executeTool: async (name: string, args: Record<string, unknown> = {}) => {
-      const tool = registeredTools.get(name);
-      if (!tool) {
-        throw new Error(`WebMCP Tool '${name}' is not registered.`);
-      }
-      return tool.execute(args);
+      const targetDate = typeof rawDate === 'string' ? rawDate : helsinkiDateISO();
+      const playerFilter = typeof input?.playerName === 'string' ? input.playerName.trim().toLowerCase() : '';
+
+      const [allEvents, allProfiles] = await Promise.all([database.events.toArray(), database.profiles.toArray()]);
+      const profileMap = new Map(allProfiles.map((p) => [p.id, p]));
+
+      const events = allEvents
+        .filter((ev) => !ev.isHidden && !ev.mergedIntoEventId)
+        .filter((ev) => Boolean(ev.startTime) && eventDayKey(ev.startTime) === targetDate)
+        .filter((ev) => {
+          if (!playerFilter) return true;
+          const name = profileMap.get(ev.profileId)?.playerName || '';
+          return name.toLowerCase().includes(playerFilter);
+        })
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+        .map((e) => {
+          const profile = profileMap.get(e.profileId);
+          const links = federationMatchLinks(e, { associationUrl: profile?.associationUrl });
+          return {
+            id: e.id,
+            title: e.title,
+            eventType: e.eventType,
+            sport: e.sport,
+            playerName: profile?.playerName ?? null,
+            homeTeam: e.homeTeam || null,
+            awayTeam: e.awayTeam || null,
+            startTime: e.startTime,
+            endTime: e.endTime || null,
+            meetTime: e.warmupTime || null,
+            meetTimeIsAppDefault: Boolean(e.warmupIsEstimate),
+            venue: e.venue?.name || null,
+            venueLocationApproximate: Boolean(e.venue?.isApproximateLocation),
+            score: e.score || null,
+            attendance: e.attendanceStatus ?? null,
+            fromFederation: Boolean(links),
+            statsAppUrl: links?.appUrl ?? null,
+            federationMatchUrl: links?.federationUrl ?? null,
+          };
+        });
+
+      return textResult({ date: targetDate, timeZone: 'Europe/Helsinki', count: events.length, events });
     },
   };
 
-  // Bind to document.modelContext defensively (some Chrome builds expose getter-only modelContext)
-  if (typeof document !== 'undefined') {
-    try {
-      Object.defineProperty(document, 'modelContext', {
-        value: registry,
-        configurable: true,
-        enumerable: true,
-        writable: true,
+  const getFamilyProfiles: WebMcpTool = {
+    name: 'get_family_profiles',
+    description: 'Lists the child player profiles saved in this Pelipäivä app (name, team, sport).',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async () => {
+      const profiles = await database.profiles.toArray();
+      return textResult({
+        count: profiles.length,
+        profiles: profiles.map((p) => ({
+          id: p.id,
+          playerName: p.playerName,
+          teamName: p.teamName || null,
+          sport: p.sport,
+        })),
       });
-    } catch {
-      try {
-        (document as any).modelContext = registry;
-      } catch {
-        // Ignore if document.modelContext is read-only
-      }
-    }
-  }
+    },
+  };
 
-  // Bind to navigator.modelContext for standard browser detection
-  if (typeof navigator !== 'undefined') {
-    try {
-      Object.defineProperty(navigator, 'modelContext', {
-        value: registry,
-        configurable: true,
-        enumerable: true,
-        writable: true,
-      });
-    } catch {
-      (navigator as any).modelContext = registry;
-    }
-  }
+  return [getMatchdaySchedule, getFamilyProfiles];
+}
 
-  // Bind to window.modelContext and enable cross-boundary message listeners
-  if (typeof window !== 'undefined') {
-    (window as any).modelContext = registry;
+let activeRegistration: AbortController | null = null;
 
-    if (_webMcpMessageHandler) {
-      window.removeEventListener('message', _webMcpMessageHandler);
-    }
-    const messageHandler = async (event: MessageEvent) => {
-      const data = event.data;
-      if (!data || data.type !== 'webmcp:request' || !data.id) return;
-
-      try {
-        if (data.method === 'tools/list' || data.method === 'listTools') {
-          const result = await registry.listTools();
-          window.postMessage({ type: 'webmcp:response', id: data.id, result }, '*');
-        } else if (data.method === 'tools/call' || data.method === 'callTool') {
-          const result = await registry.callTool(data.params || { name: '', arguments: {} });
-          window.postMessage({ type: 'webmcp:response', id: data.id, result }, '*');
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        window.postMessage({
-          type: 'webmcp:response',
-          id: data.id,
-          error: { message: msg || 'WebMCP execution failed' },
-        }, '*');
-      }
-    };
-    _webMcpMessageHandler = messageHandler;
-    window.addEventListener('message', messageHandler);
-
-    window.dispatchEvent(
-      new CustomEvent('webmcp:ready', { detail: { location: 'navigator.modelContext & document.modelContext' } })
-    );
-  }
-
-  return registry;
+/** Unregisters every Pelipäivä tool. */
+export function unregisterPelipaivaWebMCP(): void {
+  activeRegistration?.abort();
+  activeRegistration = null;
 }
 
 /**
- * Register all Pelipäivä WebMCP tools with the browser agent context.
+ * Registers the tools with the browser's model context. Returns the
+ * AbortController (abort to unregister), or null when WebMCP is not available.
  */
-export async function registerPelipaivaWebMCP(): Promise<ModelContextRegistry | undefined> {
-  if (typeof window === 'undefined') return;
+export async function registerPelipaivaWebMCP(database: PelipaivaDB = defaultDb): Promise<AbortController | null> {
+  const modelContext = getModelContext();
+  if (!modelContext) return null;
 
-  const registry = ensureModelContextRegistry();
+  unregisterPelipaivaWebMCP();
+  const controller = new AbortController();
+  activeRegistration = controller;
 
-  try {
-    // 1. Tool: get_matchday_schedule
-    await registry.registerTool({
-      name: 'get_matchday_schedule',
-      description: 'Returns the list of junior sports matches, training sessions, and school events for the family matchday schedule.',
-      readOnlyHint: true,
-      untrustedContentHint: false,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          date: {
-            type: 'string',
-            description: 'Optional ISO date string (YYYY-MM-DD) to filter events. Defaults to today.',
-          },
-          playerName: {
-            type: 'string',
-            description: 'Optional player name to filter events for a specific child.',
-          },
-        },
-      },
-      execute: async ({ date, playerName }) => {
-        const targetDate = typeof date === 'string' ? date : helsinkiDateISO();
-        const [allEvents, allProfiles] = await Promise.all([db.events.toArray(), db.profiles.toArray()]);
-        const profileMap = new Map(allProfiles.map((p) => [p.id, p]));
-
-        const filtered = allEvents.filter((ev) => {
-          const matchDate = ev.startTime ? eventDayKey(ev.startTime) : '';
-          const matchesDate = !date || matchDate === targetDate;
-          const pName = profileMap.get(ev.profileId)?.playerName || '';
-          const matchesPlayer =
-            !playerName || (typeof playerName === 'string' && pName.toLowerCase().includes(playerName.toLowerCase()));
-          return matchesDate && matchesPlayer;
-        });
-
-        return {
-          date: targetDate,
-          count: filtered.length,
-          events: filtered.map((e) => ({
-            id: e.id,
-            title: e.title,
-            sport: e.sport,
-            homeTeam: e.homeTeam,
-            awayTeam: e.awayTeam,
-            startTime: e.startTime,
-            venue: e.venue?.name || 'Kenttä',
-            attendanceStatus: e.attendanceStatus || 'in',
-            playerName: profileMap.get(e.profileId)?.playerName || '',
-            isOfficial: Boolean(e.officialFixtureId),
-          })),
-        };
-      },
-    });
-
-    // 2. Tool: check_parking_risk
-    await registry.registerTool({
-      name: 'check_parking_risk',
-      description: 'Calculates parking safety score (1-10 risk rating), zone rules, and fine likelihood for a sports venue via ParkkiS data contract.',
-      readOnlyHint: true,
-      untrustedContentHint: false,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          venueSlug: {
-            type: 'string',
-            description: 'Identifier or slug of the venue (e.g. "vaiski", "toolon-pallokentta-6").',
-          },
-          venueName: {
-            type: 'string',
-            description: 'Human-readable venue name.',
-          },
-          coordinates: {
-            type: 'object',
-            properties: {
-              lat: { type: 'number' },
-              lng: { type: 'number' },
-            },
-            required: ['lat', 'lng'],
-          },
-        },
-        required: ['venueSlug', 'coordinates'],
-      },
-      execute: async ({ venueSlug, venueName, coordinates }) => {
-        const slug = String(venueSlug || 'default');
-        const name = String(venueName || 'Kenttä');
-        const coords = coordinates as { lat: number; lng: number };
-
-        return calculateParkingRiskContract(slug, name, coords);
-      },
-    });
-
-    // 3. Tool: get_family_profiles
-    await registry.registerTool({
-      name: 'get_family_profiles',
-      description: 'Lists all registered child/family player profiles in the local Pelipäivä PWA database.',
-      readOnlyHint: true,
-      untrustedContentHint: false,
-      inputSchema: {
-        type: 'object',
-        properties: {},
-      },
-      execute: async () => {
-        const profiles = await db.profiles.toArray();
-        return {
-          count: profiles.length,
-          profiles: profiles.map((p) => ({
-            id: p.id,
-            playerName: p.playerName,
-            teamName: p.teamName,
-            sport: p.sport,
-            colorHex: p.colorHex,
-          })),
-        };
-      },
-    });
-
-    console.log('✨ [WebMCP] Successfully registered Pelipäivä AI agent tools into navigator.modelContext & document.modelContext');
-    return registry;
-  } catch (err) {
-    console.warn('[WebMCP] Failed to register WebMCP tools:', err);
-    return registry;
+  for (const tool of buildPelipaivaTools(database)) {
+    try {
+      await modelContext.registerTool(tool, { signal: controller.signal });
+    } catch (err) {
+      console.warn(`[WebMCP] registerTool ${tool.name} failed`, err);
+    }
   }
+  return controller;
 }
