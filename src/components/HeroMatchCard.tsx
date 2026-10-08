@@ -34,6 +34,8 @@ import { MoreHorizontal, FileText, Edit3 } from 'lucide-react';
 import { useMatchdayLogistics } from '../hooks/useMatchdayLogistics';
 import { db } from '../lib/storage/db';
 import { MismatchResolveBanner, type MismatchDecision } from './MismatchResolveBanner';
+import { MatchSourceLinks } from './MatchSourceLinks';
+import { federationMatchLinks } from '../lib/sport/federationLinks';
 
 interface HeroMatchCardProps {
   event: MatchdayEvent;
@@ -403,14 +405,30 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             <Edit3 className="w-3.5 h-3.5" />
           </button>
         </div>
+        {(event.officialGameTimes?.length || 0) <= 1 && (
+          <MatchSourceLinks
+            className="mt-2"
+            links={federationMatchLinks(event, {
+              associationUrl: profile && profile.id === event.profileId ? profile.associationUrl : undefined
+            })}
+          />
+        )}
         {(event.officialGameTimes?.length || 0) > 1 && (
           <ul className="mt-2 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1.5">
             {event.officialGameTimes!.map((g, i) => (
               <li key={`${g.startTime}-${g.title}`} className="flex items-start justify-between gap-2 text-sm">
-                <span className="font-semibold text-text-primary leading-snug">
+                <div className="font-semibold text-text-primary leading-snug">
                   <span className="text-[10px] font-bold text-text-muted mr-1.5">{i + 1}.</span>
                   {g.title}
-                </span>
+                  <MatchSourceLinks
+                    dense
+                    className="mt-0.5"
+                    links={federationMatchLinks(
+                      { officialFixtureId: g.officialFixtureId, sport: event.sport },
+                      { associationUrl: profile && profile.id === event.profileId ? profile.associationUrl : undefined }
+                    )}
+                  />
+                </div>
                 <span className="font-black font-tabular text-pitch shrink-0 flex flex-col items-end">
                   <span>
                     {new Date(g.startTime).toLocaleTimeString('fi-FI', {

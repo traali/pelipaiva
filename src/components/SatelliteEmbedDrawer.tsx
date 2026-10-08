@@ -3,29 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 
-const LIVE_HOST: Record<string, string> = {
-  'football-stats': 'https://football-stats-agk.pages.dev',
-  football: 'https://football-stats-agk.pages.dev',
-  'floorball-stats': 'https://floorball-stats.pages.dev',
-  floorball: 'https://floorball-stats.pages.dev',
-  'basketball-stats': 'https://basketball-stats-byu.pages.dev',
-  basketball: 'https://basketball-stats-byu.pages.dev',
-  'volleyball-stats': 'https://volleyball-stats-7xq.pages.dev',
-  volleyball: 'https://volleyball-stats-7xq.pages.dev',
-  parkkis: 'https://parkkis.pages.dev',
-};
-
-/** Hash routes. A path URL opens the home page and the match is missed. */
-export function liveSatelliteUrl(sport: string, matchId: string, query = '', embed = false): string {
-  if (sport === 'parkkis') return 'https://parkkis.pages.dev/?embed=true';
-  const host = LIVE_HOST[sport] || LIVE_HOST['football-stats'];
-  const raw = matchId.includes('_') ? matchId.split('_').pop() || matchId : matchId;
-  const numeric = /^\d+$/.test(raw);
-  const q = encodeURIComponent((query || raw).trim());
-  const hash = numeric ? `#/match/${encodeURIComponent(raw)}` : `#/search?q=${q}`;
-  const flag = embed ? (hash.includes('?') ? '&embed=true' : '?embed=true') : '';
-  return `${host}/${hash}${flag}`;
-}
+// Hosts and hash routes live in lib/sport/federationLinks (one source of truth).
+export { liveSatelliteUrl } from '../lib/sport/federationLinks';
 
 interface SatelliteEmbedDrawerProps {
   isOpen: boolean;

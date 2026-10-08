@@ -573,6 +573,9 @@ describe('Association Extractor & Parser', () => {
       expect(f1.score).toBe('3 - 1');
       expect(f1.venueName).toBe('Töölö PK 1 TN');
       expect(f1.fieldNumber).toBe('Kenttä 1');
+      // HTML gives the match number, not TASO's match_id: id must not look like one.
+      expect(f1.id).not.toMatch(/_\d+$/);
+      expect(data.fixtures.every((f) => !/_\d+$/.test(f.id))).toBe(true);
 
       const f2 = data.fixtures[1]!;
       expect(f2.homeTeam).toBe('FC Honka Musta');

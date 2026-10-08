@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { FullMatchStats, PlayerMatchLog, SportType } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
-import { SatelliteEmbedDrawer, liveSatelliteUrl } from './SatelliteEmbedDrawer';
+import { SatelliteEmbedDrawer } from './SatelliteEmbedDrawer';
+import { federationMatchLinks, liveSatelliteUrl } from '../lib/sport/federationLinks';
 
 interface MatchStatsModalProps {
   isOpen: boolean;
@@ -30,7 +31,10 @@ interface MatchStatsModalProps {
   homeTeam: string;
   awayTeam: string;
   officialFixtureId?: string;
-  matchId?: string;
+  /** Event id; `fixture-…` ids carry the TASO fixture id too. */
+  eventId?: string;
+  /** Profile federation URL, needed only for generic Torneopal ids. */
+  associationUrl?: string;
   playerName?: string;
   playerLog?: PlayerMatchLog;
   score?: string;
@@ -66,7 +70,8 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   homeTeam: rawHomeTeam,
   awayTeam: rawAwayTeam,
   officialFixtureId,
-  matchId,
+  eventId,
+  associationUrl,
   playerName,
   playerLog,
   score,
@@ -98,9 +103,12 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
   const [isSatelliteDrawerOpen, setIsSatelliteDrawerOpen] = useState(false);
   
-  // Clean, authoritative match ID: e.g. "palloliitto_60341_4321789" -> "4321789"
-  const rawId = matchId || officialFixtureId || '';
-  const resolvedNumericId = rawId.includes('_') ? rawId.split('_').pop() || rawId : rawId;
+  // TASO match_id from the fixture id ("palloliitto_60341_4321789" -> "4321789").
+  // Not event.matchNumber: that is the printed game number, another game's id.
+  const matchLinks = federationMatchLinks({ id: eventId, officialFixtureId, sport }, { associationUrl });
+  const satelliteSport = matchLinks?.sport || sport || 'football';
+  // Without a real match_id the app opens a team-name search, never a guessed match.
+  const satelliteMatchKey = matchLinks?.matchId || '';
 
   // Local state for recording player stats
   const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
@@ -357,56 +365,69 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   repo: 'football-stats',
                   name: '⚽ Football Stats (Night Captain)',
                   subtitle: 'Syväanalyysi, H2H & pelaajakortit',
-                  url: liveSatelliteUrl('football', resolvedNumericId, `${homeTeam} ${awayTeam}`),
+                  url: liveSatelliteUrl('football', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
                 },
                 floorball: {
                   repo: 'floorball-stats',
                   name: '🏑 Floorball Stats (SSBL)',
                   subtitle: '3 erää, YV/AV radar & torjunnat',
-                  url: liveSatelliteUrl('floorball', resolvedNumericId, `${homeTeam} ${awayTeam}`),
+                  url: liveSatelliteUrl('floorball', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-[#5BC0BE]/15 border-[#5BC0BE]/30 text-[#6FFFE9] hover:bg-[#5BC0BE]/25'
                 },
                 basketball: {
                   repo: 'basketball-stats',
                   name: '🏀 Basketball Stats (Basket.fi)',
                   subtitle: '4 neljännestä, virheet & pistemiehet',
-                  url: liveSatelliteUrl('basketball', resolvedNumericId, `${homeTeam} ${awayTeam}`),
+                  url: liveSatelliteUrl('basketball', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25'
                 },
                 volleyball: {
                   repo: 'volleyball-stats',
                   name: '🏐 Volleyball Stats Pro',
                   subtitle: '25 pisteen erät & momenttivirta',
-                  url: liveSatelliteUrl('volleyball', resolvedNumericId, `${homeTeam} ${awayTeam}`),
+                  url: liveSatelliteUrl('volleyball', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
                   btnColor: 'bg-blue-500/15 border-blue-500/30 text-blue-400 hover:bg-blue-500/25'
                 }
               };
-              const active: SportConfigItem = (sport && sportConfig[sport]) || sportConfig['football']!;
+              const active: SportConfigItem = sportConfig[satelliteSport] || sportConfig['football']!;
 
               return (
-                <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle">
+                <div className="mb-4 flex flex-col gap-2 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle">
                   <div className="flex items-center gap-2 text-xs">
                     <span className="font-bold text-text-primary">{active.name}</span>
                     <span className="text-[10px] text-text-muted hidden sm:inline">{active.subtitle}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 self-end sm:self-center">
+                  <div className="flex flex-wrap items-center gap-2">
                     <a
                       href={active.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-strong transition-all"
-                      title="Avaa täysi ottelusivu uudessa välilehdessä"
+                      className={`inline-flex min-h-[44px] flex-1 sm:flex-none items-center justify-center gap-1.5 px-4 rounded-xl text-sm font-bold transition-all border shadow-xs ${active.btnColor}`}
+                      aria-label={matchLinks ? `Avaa ottelu: ${matchLinks.appName} (uusi välilehti)` : 'Hae ottelua tilastosovelluksesta (uusi välilehti)'}
                     >
-                      <span>Uuteen välilehteen</span>
+                      <span>{matchLinks ? 'Avaa ottelu' : 'Hae sovelluksesta'}</span>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
+                    {matchLinks && (
+                      <a
+                        href={matchLinks.federationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Avaa tulospalvelussa (uusi välilehti)"
+                        title="Avaa tulospalvelussa"
+                        className="inline-flex min-h-[44px] items-center justify-center gap-1 px-3 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary hover:underline underline-offset-2 transition-colors"
+                      >
+                        <span>Tulospalvelu</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                     <button
                       type="button"
                       onClick={() => setIsSatelliteDrawerOpen(true)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-xs ${active.btnColor}`}
+                      className="inline-flex min-h-[44px] items-center gap-1.5 px-3 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-strong transition-all cursor-pointer"
                     >
-                      <span>Avaa drawer</span>
+                      <span>Näytä tässä</span>
                     </button>
                   </div>
                 </div>
@@ -1081,22 +1102,22 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
       {/* Embedded Satellite Analytics Drawer */}
       {(() => {
         const repo =
-          sport === 'floorball'
+          satelliteSport === 'floorball'
             ? 'floorball-stats'
-            : sport === 'basketball'
+            : satelliteSport === 'basketball'
             ? 'basketball-stats'
-            : sport === 'volleyball'
+            : satelliteSport === 'volleyball'
             ? 'volleyball-stats'
             : 'football-stats';
 
-        const url = liveSatelliteUrl(sport || 'football', resolvedNumericId, `${homeTeam} ${awayTeam}`, true);
+        const url = liveSatelliteUrl(satelliteSport, satelliteMatchKey, `${homeTeam} ${awayTeam}`, true);
 
         const title =
-          sport === 'floorball'
+          satelliteSport === 'floorball'
             ? `Floorball Stats: ${homeTeam} vs ${awayTeam}`
-            : sport === 'basketball'
+            : satelliteSport === 'basketball'
             ? `Basketball Stats: ${homeTeam} vs ${awayTeam}`
-            : sport === 'volleyball'
+            : satelliteSport === 'volleyball'
             ? `Volleyball Stats: ${homeTeam} vs ${awayTeam}`
             : `Football Stats: ${homeTeam} vs ${awayTeam}`;
 

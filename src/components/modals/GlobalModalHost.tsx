@@ -233,7 +233,8 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
           homeTeam={activeModal.event.homeTeam}
           awayTeam={activeModal.event.awayTeam || "Vastustaja"}
           officialFixtureId={activeModal.event.officialFixtureId}
-          matchId={activeModal.event.matchNumber}
+          eventId={activeModal.event.id}
+          associationUrl={profiles.find((p) => p.id === activeModal.event.profileId)?.associationUrl}
           playerName={profiles.find((p) => p.id === activeModal.event.profileId)?.playerName}
           playerLog={activeModal.event.playerLog}
           score={activeModal.event.score}

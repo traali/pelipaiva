@@ -17,6 +17,8 @@ import { getContrastTextColor } from '../lib/sport/teamColors';
 import { FamilyVisualCalendar } from './FamilyVisualCalendar';
 import { db } from '../lib/storage/db';
 import { recordAttendanceOverride } from '../lib/sync/familyCloud';
+import { MatchSourceLinks } from './MatchSourceLinks';
+import { federationMatchLinks } from '../lib/sport/federationLinks';
 
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
@@ -472,6 +474,40 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         )}
                       </div>
                     </div>
+
+                    {/* Exact match: own sport app first, federation page second (real TASO match_id only) */}
+                    {(() => {
+                      const sourceUrl = profileMap.get(ev.profileId)?.associationUrl;
+                      const games = ev.officialGameTimes || [];
+                      if (games.length > 1) {
+                        const rows = games
+                          .map((g, gi) => ({
+                            gi,
+                            links: federationMatchLinks(
+                              { officialFixtureId: g.officialFixtureId, sport: ev.sport },
+                              { associationUrl: sourceUrl }
+                            )
+                          }))
+                          .filter((r) => r.links);
+                        if (rows.length === 0) return null;
+                        return (
+                          <div className="pl-1.5 pt-1.5 space-y-0.5">
+                            {rows.map((r) => (
+                              <div key={r.gi} className="flex items-center gap-2 text-xs">
+                                <span className="text-[10px] font-bold text-text-muted w-4">{r.gi + 1}.</span>
+                                <MatchSourceLinks dense links={r.links} />
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return (
+                        <MatchSourceLinks
+                          className="pl-1.5 pt-2"
+                          links={federationMatchLinks(ev, { associationUrl: sourceUrl })}
+                        />
+                      );
+                    })()}
                   </motion.div>
                 );
               })}

@@ -249,7 +249,10 @@ export function parseTorneopalHtml(
 
         if (!home || !away) continue;
 
-        const matchId = matchCode.replace(/\D/g, '') || `${teamId}_${i}`;
+        // HTML has the match number (Nro), not TASO's match_id. Keep the key
+        // non-numeric so no federation or stats-app link is built from it.
+        const nro = matchCode === `${teamId}_${i}` ? '' : matchCode.replace(/\D/g, '');
+        const matchId = nro ? `nro${nro}` : `row${i}`;
         const startTime = parseFinnishDateTime(dateStr, timeStr);
         if (startTime.startsWith('1970-01-01')) continue;
         const { venueName, fieldNumber } = extractVenueAndField(rawVenue);
@@ -273,6 +276,7 @@ export function parseTorneopalHtml(
         fixtures.push({
           id: `${association}_${teamId}_${matchId}`,
           matchId,
+          matchNumber: nro || undefined,
           teamId,
           association,
           sport,
