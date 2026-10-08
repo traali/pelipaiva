@@ -78,3 +78,33 @@ describe('TASO truth gates (real payloads)', () => {
     expect(stats?.liveScore).toBeUndefined();
   });
 });
+
+import tournament from '../../../tests/fixtures/json/taso-tournament-2026-04-25.json';
+import { clipToNextGame } from './torneopalClient';
+
+describe('Tournament day (real TASO payload, Westend Indians Yellow 25.4.2026)', () => {
+  const wiy = team('floorball', 'salibandy', '25301');
+  const games = clipToNextGame(
+    (tournament as Record<string, unknown>[])
+      .map((m) => mapFixture(m, wiy, 'Westend Indians Yellow')!)
+  );
+  const hhmm = (iso: string) =>
+    new Date(iso).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' });
+
+  it('keeps all four games of the day', () => {
+    expect(games.map((g) => hhmm(g.startTime))).toEqual(['11.30', '13.00', '14.30', '16.45']);
+  });
+
+  it('never has two of the team\'s own games running at once', () => {
+    for (let i = 1; i < games.length; i++) {
+      expect(new Date(games[i - 1]!.endTime!).getTime()).toBeLessThanOrEqual(new Date(games[i]!.startTime).getTime());
+    }
+  });
+
+  it('ends a game at the next kickoff, not at TASO\'s flat +2 h', () => {
+    expect(hhmm(games[0]!.endTime!)).toBe('13.00');
+    expect(hhmm(games[1]!.endTime!)).toBe('14.30');
+    expect(hhmm(games[2]!.endTime!)).toBe('16.30');
+    expect(hhmm(games[3]!.endTime!)).toBe('18.45');
+  });
+});

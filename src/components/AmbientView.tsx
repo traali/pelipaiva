@@ -148,7 +148,7 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
               {sportLabelFi(shown.sport)}
             </span>
             <span>
-              {shown.isTraining ? 'Treenit' : 'Alkulämpö'}{' '}
+              {shown.isTraining ? 'Treenit' : 'Peli alkaa'}{' '}
               {new Date(shown.startTime).toLocaleTimeString('fi-FI', {
                 hour: '2-digit',
                 minute: '2-digit',

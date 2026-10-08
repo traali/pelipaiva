@@ -308,6 +308,32 @@ function pickCurrentGroup(groups: Record<string, unknown>[]): Record<string, unk
   );
 }
 
+/**
+ * TASO often sends time_end as a flat start + 2 h, even for tournament games
+ * that run every 45 min. A team cannot still be playing when its next game
+ * starts, so end each game no later than the team's next kickoff that day.
+ * Without this, a tournament shows two games "Käynnissä" at once and a
+ * false clash between a kid's own back-to-back games.
+ */
+export function clipToNextGame<T extends { startTime: string; endTime?: string }>(fixtures: T[]): T[] {
+  const sorted = [...fixtures].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
+  const helsinkiDay = (iso: string) =>
+    new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Helsinki' });
+  return sorted.map((f, i) => {
+    if (!f.endTime) return f;
+    const start = new Date(f.startTime).getTime();
+    const end = new Date(f.endTime).getTime();
+    const next = sorted
+      .slice(i + 1)
+      .find((n) => new Date(n.startTime).getTime() > start);
+    if (!next || helsinkiDay(next.startTime) !== helsinkiDay(f.startTime)) return f;
+    const nextStart = new Date(next.startTime).getTime();
+    return nextStart < end ? { ...f, endTime: new Date(nextStart).toISOString() } : f;
+  });
+}
+
 export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
@@ -558,6 +584,7 @@ export async function fetchTorneopalTeamData(
     .map((m) => mapFixture(m, parsed, teamName))
     .filter((f): f is NonNullable<typeof f> => Boolean(f))
     .filter((f) => new Date(f.startTime).getUTCFullYear() >= 2024);
+  fixtures = clipToNextGame(fixtures);
   if (looksLikeCupRequest(parsed)) {
     const cupRows = fixtures.filter((f) => /turnaus|tournament|cup|memorial/i.test(f.leagueName));
     if (cupRows.length) fixtures = cupRows;
