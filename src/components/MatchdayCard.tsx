@@ -233,6 +233,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   if (isOut && !isOutExpanded) {
     return (
       <motion.div
+        data-testid="matchday-card"
         layout
         transition={springTactile.squishy}
         className="liquid-glass relative overflow-hidden rounded-2xl border border-dashed border-border-strong/60 bg-surface/30 opacity-80 hover:opacity-100 transition-all p-3 pl-4 flex items-center justify-between gap-3 shadow-xs"
@@ -289,6 +290,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
   return (
     <>
       <motion.div
+        data-testid="matchday-card"
         layout
         whileTap={{ scale: 0.99 }}
         transition={springTactile.squishy}

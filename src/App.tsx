@@ -1260,6 +1260,11 @@ export const App: React.FC = () => {
                       </span>
                     </div>
                   )}
+                  {firstConflict.suggestedFix && (
+                    <div data-testid="conflict-advice" className="mt-1.5 text-xs font-semibold text-text-primary">
+                      💡 {firstConflict.suggestedFix}
+                    </div>
+                  )}
                   <div className="text-xs font-bold text-whistle mt-1.5 flex items-center gap-1">
                     <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
                   </div>
