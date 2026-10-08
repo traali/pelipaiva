@@ -26,6 +26,8 @@ import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
 import { arrivalPhaseLabel, clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
 import { lookupKnownField } from '../lib/geo/sportsGeocoder';
+import { MatchSourceLinks } from './MatchSourceLinks';
+import { federationMatchLinks } from '../lib/sport/federationLinks';
 import { MatchStatsModal } from './MatchStatsModal';
 import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventChatModal } from './EventChatModal';
@@ -134,6 +136,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
     ? { lat: knownField.lat, lng: knownField.lng }
     : localVenue.coordinates || event.venue.coordinates;
   const multiGame = (event.officialGameTimes?.length || 0) > 1;
+  // Real TASO match_id only; the profile URL is needed for generic Torneopal ids.
+  const linkSourceUrl = profile && profile.id === event.profileId ? profile.associationUrl : undefined;
+  const matchLinks = multiGame ? null : federationMatchLinks(event, { associationUrl: linkSourceUrl });
   const showMeetup = shouldShowKokoontuminen(event);
   const { departureTime, countdownMinutes } = calculateDepartureCountdown(
     event,
@@ -533,10 +538,18 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             <ul className="mt-1.5 mb-1 rounded-xl border border-border-subtle bg-surface-elevated/80 px-3 py-2 space-y-1">
               {event.officialGameTimes!.map((g, i) => (
                 <li key={`${g.startTime}-${g.title}`} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="font-semibold text-text-primary leading-snug">
+                  <div className="font-semibold text-text-primary leading-snug">
                     <span className="text-[10px] font-bold text-text-muted mr-1.5">{i + 1}.</span>
                     {g.title}
-                  </span>
+                    <MatchSourceLinks
+                      dense
+                      className="mt-0.5"
+                      links={federationMatchLinks(
+                        { officialFixtureId: g.officialFixtureId, sport: event.sport },
+                        { associationUrl: linkSourceUrl }
+                      )}
+                    />
+                  </div>
                   <span className="font-black font-tabular text-pitch shrink-0 flex flex-col items-end gap-0.5">
                     <span className="flex items-center gap-2">
                       {new Date(g.startTime).toLocaleTimeString('fi-FI', {
@@ -594,6 +607,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               )}
             </span>
           </div>
+          <MatchSourceLinks links={matchLinks} className="mt-2" />
         </div>
 
         {!compact && effectiveWeather && (
@@ -1020,7 +1034,8 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           homeTeam={event.homeTeam || event.title || 'Kotijoukkue'}
           awayTeam={event.awayTeam || 'Vastustaja'}
           officialFixtureId={event.officialFixtureId}
-          matchId={event.matchNumber}
+          eventId={event.id}
+          associationUrl={linkSourceUrl}
           playerName={playerName}
           playerLog={playerLog}
           score={currentScore}
