@@ -71,6 +71,43 @@ function namesMatch(a: string, b: string): boolean {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
+function normTeamName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[./_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Does a raw TASO match (from a group / series listing) involve this team?
+ * Decided by team_A_id / team_B_id whenever TASO sends ids. Only when a match
+ * carries no team ids at all do we fall back to an exact normalized name match
+ * (never a substring: "PPJ" must not claim "PPJ/Eira Oranssi").
+ */
+export function isOwnTeamMatch(
+  match: Record<string, unknown>,
+  teamId: string,
+  teamName: string
+): boolean {
+  const idA = str(match.team_A_id);
+  const idB = str(match.team_B_id);
+  const hasId = (v: string) => v !== "" && v !== "0";
+  if (hasId(idA) || hasId(idB)) return idA === teamId || idB === teamId;
+  const own = normTeamName(teamName);
+  if (!own) return false;
+  return normTeamName(str(match.team_A_name)) === own || normTeamName(str(match.team_B_name)) === own;
+}
+
+/** Keep only the team's own games from a group / series match list. */
+export function keepOwnTeamMatches(
+  matches: Record<string, unknown>[],
+  teamId: string,
+  teamName: string
+): Record<string, unknown>[] {
+  return matches.filter((m) => isOwnTeamMatch(m, teamId, teamName));
+}
+
 function finnishIso(dateStr: string, timeStr: string): string | null {
   const date = str(dateStr);
   const time = str(timeStr) || "12:00:00";
@@ -386,7 +423,13 @@ export function mapFixture(
     leagueName: str(match.competition_name) || [str(match.category_name), str(match.group_name)].filter(Boolean).join(" · "),
     homeTeam: home,
     awayTeam: away,
-    isHome: namesMatch(home, teamName) || str(match.team_A_id) === parsed.teamId,
+    // Ids decide home/away when TASO sends them; names only as a last resort.
+    isHome:
+      str(match.team_A_id) === parsed.teamId
+        ? true
+        : str(match.team_B_id) === parsed.teamId
+          ? false
+          : namesMatch(home, teamName),
     startTime,
     endTime,
     venueName: str(match.venue_name) || "Kenttä ilmoitetaan",
@@ -467,7 +510,7 @@ async function collectCupGroupMatches(
   competitionId: string,
   categoryId: string,
   teamName: string
-): Promise<Record<string, unknown>[]> {
+): Promise<{ rows: Record<string, unknown>[]; complete: boolean }> {
   const groupsJson = await torneopalGet<TorneopalGroupsPayload>(
     parsed.association,
     "getGroups",
@@ -477,6 +520,7 @@ async function collectCupGroupMatches(
   );
   const groups = Array.isArray(groupsJson?.groups) ? groupsJson!.groups : [];
   const rows: Record<string, unknown>[] = [];
+  let complete = groupsJson !== null;
   const chunks: Record<string, unknown>[][] = [];
   for (let i = 0; i < groups.length; i += 4) chunks.push(groups.slice(i, i + 4));
   for (const chunk of chunks) {
@@ -497,21 +541,13 @@ async function collectCupGroupMatches(
       )
     );
     for (const full of found) {
+      if (full === null) complete = false;
       const matches = full?.group?.matches;
       if (!Array.isArray(matches)) continue;
-      for (const m of matches as Record<string, unknown>[]) {
-        if (
-          namesMatch(str(m.team_A_name), teamName) ||
-          namesMatch(str(m.team_B_name), teamName) ||
-          str(m.team_A_id) === parsed.teamId ||
-          str(m.team_B_id) === parsed.teamId
-        ) {
-          rows.push(m);
-        }
-      }
+      rows.push(...keepOwnTeamMatches(matches as Record<string, unknown>[], parsed.teamId, teamName));
     }
   }
-  return rows;
+  return { rows, complete };
 }
 
 export async function fetchTorneopalTeamData(
@@ -565,6 +601,9 @@ export async function fetchTorneopalTeamData(
   ]);
 
   let rawMatches = Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [];
+  // True only when every TASO call the fixture list depends on answered, so an
+  // empty list means "no games" rather than "network hiccup".
+  let fixturesComplete = matchesJson !== null;
   const claimedTotal = num(
     (matchesJson as { call?: { total_result_count?: unknown } } | null)?.call?.total_result_count
   );
@@ -576,9 +615,17 @@ export async function fetchTorneopalTeamData(
     categoryId &&
     (looksLikeCupRequest(parsed) || claimedTotal > 0)
   ) {
-    rawMatches = await collectCupGroupMatches(parsed, competitionId, categoryId, teamName);
-  } else if (Array.isArray(groupJson?.group?.matches) && rawMatches.length === 0) {
-    rawMatches = groupJson!.group!.matches as Record<string, unknown>[];
+    const cupRows = await collectCupGroupMatches(parsed, competitionId, categoryId, teamName);
+    rawMatches = cupRows.rows;
+    fixturesComplete = fixturesComplete && cupRows.complete;
+  } else if (rawMatches.length === 0 && currentGroup) {
+    // A group lists every team's games. Only this team's own games are ours.
+    const groupMatches = groupJson?.group?.matches;
+    if (Array.isArray(groupMatches)) {
+      rawMatches = keepOwnTeamMatches(groupMatches as Record<string, unknown>[], parsed.teamId, teamName);
+    } else {
+      fixturesComplete = false;
+    }
   }
 
   let fixtures = rawMatches
@@ -620,6 +667,7 @@ export async function fetchTorneopalTeamData(
     groupId: str(currentGroup?.group_id) || undefined,
     sourceUrl: parsed.canonicalUrl,
     fetchedAt: new Date().toISOString(),
+    fixturesComplete,
   };
 }
 
