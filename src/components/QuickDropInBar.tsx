@@ -35,7 +35,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   const [selectedPlayer, setSelectedPlayer] = useState(
     activeProfilePlayerName && activeProfilePlayerName !== 'all'
       ? activeProfilePlayerName
-      : existingPlayers[0] || 'Maija'
+      : existingPlayers[0] || ''
   );
   const [selectedSport, setSelectedSport] = useState<SportType>('football');
   const [playerActiveSports, setPlayerActiveSports] = useState<SportType[]>([]);
@@ -503,7 +503,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                   rows={2}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="Esim: Lauantaina 24.8. harkkapeli Väiskillä klo 16.30 (kokoontuminen 15.45). Mustat paidat. Maijalla kahviovuoro klo 16-18."
+                  placeholder="Liitä valmentajan viesti, esim. aika, paikka ja vastustaja"
                   className="w-full p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
                 />
 

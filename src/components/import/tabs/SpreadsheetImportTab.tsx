@@ -40,7 +40,7 @@ export const SpreadsheetImportTab: React.FC<SpreadsheetImportTabProps> = ({
         rows={4}
         value={pastedTableText}
         onChange={(e) => setPastedTableText(e.target.value)}
-        placeholder="Pvm&#9;Klo&#9;Ottelu&#9;Kenttä&#9;Kahviovuoro&#10;24.8.&#9;15:00&#9;HJK vs Honka&#9;Väiski&#9;Maija&#10;31.8.&#9;12:00&#9;EPS vs HJK&#9;Tapiola 2&#9;Eemil"
+        placeholder="Liitä taulukko: päivä, kellonaika, ottelu, kenttä"
         className="w-full p-3 rounded-2xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch resize-none font-mono"
       />
 

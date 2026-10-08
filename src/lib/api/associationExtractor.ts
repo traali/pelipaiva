@@ -15,7 +15,6 @@ import {
   cleanHtmlText,
   parseHtmlTableRows,
   parseTorneopalHtml,
-  generateSyntheticOfficialTeamData,
   extractOfficialTeamData,
   DEFAULT_PROXY_URL,
   type ExtractorOptions
@@ -29,7 +28,6 @@ export {
   cleanHtmlText,
   parseHtmlTableRows,
   parseTorneopalHtml,
-  generateSyntheticOfficialTeamData,
   extractOfficialTeamData,
   DEFAULT_PROXY_URL,
   type ExtractorOptions

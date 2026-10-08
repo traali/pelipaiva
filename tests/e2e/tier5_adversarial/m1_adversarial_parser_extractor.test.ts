@@ -16,9 +16,9 @@ import {
   normalizePlayerPosition,
   cleanHtmlText,
   parseHtmlTableRows,
-  parseTorneopalHtml,
-  generateSyntheticOfficialTeamData
+  parseTorneopalHtml
 } from '../../../src/lib/stats/statsEngine';
+import { generateSyntheticOfficialTeamData } from '../../../src/lib/testing/syntheticMockFactory';
 import {
   detectAssociationType,
   normalizeAssociationUrl

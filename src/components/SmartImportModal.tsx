@@ -26,7 +26,6 @@ import { db } from '../lib/storage/db';
 import { recordManualFamilyEvent } from '../lib/sync/familyCloud';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
-import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import { type ClubPreset } from '../lib/clubs/popularClubsCatalog';
 import { parseAssociationUrl } from '../lib/stats/statsEngine';
 import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsParser';
@@ -412,14 +411,6 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
     }
   };
 
-  const handleSelectCupPreset = (cup: (typeof EXAMPLE_TOURNAMENTS)[number]) => {
-    setClassicTeamName(cup.teamName);
-    setSelectedSport(cup.sport);
-    setClassicUrl(cup.url);
-    setColorHex(cup.colorHex);
-    setActiveTab('classic');
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -654,8 +645,6 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
             {activeTab === 'classic' && (
               <ClassicUrlImportTab
                 isEditing={isEditing}
-                exampleTournaments={EXAMPLE_TOURNAMENTS}
-                handleSelectCupPreset={handleSelectCupPreset}
                 clubSearchQuery={clubSearchQuery}
                 setClubSearchQuery={setClubSearchQuery}
                 clubMatches={clubMatches as any}

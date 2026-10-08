@@ -42,7 +42,7 @@ export const MessageNlpImportTab: React.FC<MessageNlpImportTabProps> = ({
         rows={4}
         value={pastedMessage}
         onChange={(e) => setPastedMessage(e.target.value)}
-        placeholder="Esim: Lauantaina 24.8. turnaus Väiskillä:&#10;klo 10:00 vs KäPa&#10;klo 13:00 vs Honka&#10;Mustat paidat päälle. Maijalla kahviovuoro klo 12-14."
+        placeholder="Liitä valmentajan tai joukkueen WhatsApp-viesti tähän"
         className="w-full p-3 rounded-2xl bg-surface-elevated border border-border-strong text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
       />
 

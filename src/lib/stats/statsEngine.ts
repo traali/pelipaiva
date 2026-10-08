@@ -1,4 +1,3 @@
-import { generateSyntheticOfficialTeamData } from "../testing/syntheticMockFactory";
 import { parseFinnishDateTime } from "../api/associationUrlParser";
 import type {
   TeamSquadRoster,
@@ -37,10 +36,6 @@ export {
 } from '../api/associationUrlParser';
 
 export {
-  generateSyntheticOfficialTeamData,
-} from '../testing/syntheticMockFactory';
-
-export {
   SportRulesRegistry,
   FootballStrategy,
   FloorballStrategy,
@@ -57,6 +52,7 @@ export interface ExtractorOptions {
   proxyUrl?: string;
   bypassProxy?: boolean;
   timeoutMs?: number;
+  /** @deprecated Ignored. Pelipäivä never invents a season. */
   fallbackToSynthetic?: boolean;
   customTeamName?: string;
 }
@@ -447,7 +443,6 @@ export async function extractOfficialTeamData(
     proxyUrl = DEFAULT_PROXY_URL,
     bypassProxy = false,
     timeoutMs = 8000,
-    fallbackToSynthetic = false,
     customTeamName
   } = options;
 
@@ -504,16 +499,10 @@ export async function extractOfficialTeamData(
     if (extracted.fixtures.length === 0 && jsonData) {
       return jsonData;
     }
-    if (extracted.fixtures.length === 0 && fallbackToSynthetic) {
-      return generateSyntheticOfficialTeamData(parsedUrl, customTeamName);
-    }
     return extracted;
   } catch (err) {
     clearTimeout(timeoutId);
     if (jsonData) return jsonData;
-    if (fallbackToSynthetic) {
-      return generateSyntheticOfficialTeamData(parsedUrl, customTeamName);
-    }
     return {
       teamId: parsedUrl.teamId,
       association: parsedUrl.association,

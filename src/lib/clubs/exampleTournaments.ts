@@ -299,6 +299,6 @@ export function mergeOfficialWithCupFallback(
       categoryId: official?.categoryId || cup.categoryId
     };
   }
-  if ((official?.fixtures || []).length > 0) return official ?? null;
-  return officialFromExampleCup(cup);
+  // Never fall back to canned cup matches: an empty live cup stays empty.
+  return official ?? null;
 }

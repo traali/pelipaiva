@@ -65,7 +65,7 @@ function detectColumnMapping(headers: string[]): {
 export function parseTableRows(
   rows: string[][],
   defaultSport: SportType = 'football',
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): ParsedTableResult {
   if (!rows || rows.length === 0) {
     return { events: [], headers: [], totalRows: 0, unrecognizedRows: 0 };
@@ -219,7 +219,7 @@ function detectDelimiter(lines: string[]): string {
 export function parsePastedSpreadsheetText(
   tsvText: string,
   sport: SportType = 'football',
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): ParsedTableResult {
   const lines = tsvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) {
@@ -238,7 +238,7 @@ export function parsePastedSpreadsheetText(
 export async function parseExcelFileBuffer(
   buffer: ArrayBuffer,
   sport: SportType = 'football',
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): Promise<ParsedTableResult> {
   const MAX_BYTES = 2 * 1024 * 1024;
   if (buffer.byteLength > MAX_BYTES) {
