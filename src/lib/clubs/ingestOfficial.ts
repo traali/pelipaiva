@@ -43,6 +43,36 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
   return out;
 }
 
+/**
+ * Drop this profile's official game events whose fixture TASO no longer lists
+ * (e.g. other teams' games an older build stored from a group listing), and the
+ * team's cached official fixtures likewise. Only events this ingest creates
+ * (`fixture-<profileId>-…`) are candidates; calendar, manual and other
+ * user-created events are never deleted here.
+ */
+export async function pruneStaleOfficialData(
+  database: PelipaivaDB,
+  profileId: string,
+  keepEventFixtureIds: Set<string>,
+  team?: { teamId: string; keepFixtureIds: Set<string> }
+): Promise<{ events: number; fixtures: number }> {
+  const prefix = `fixture-${profileId}-`;
+  const existing = await database.events.where('profileId').equals(profileId).toArray();
+  const staleEvents = existing
+    .filter((e) => e.id.startsWith(prefix))
+    .filter((e) => !keepEventFixtureIds.has(e.officialFixtureId || e.id.slice(prefix.length)))
+    .map((e) => e.id);
+  if (staleEvents.length > 0) await database.events.bulkDelete(staleEvents);
+
+  let staleFixtures: string[] = [];
+  if (team?.teamId) {
+    const cached = await database.officialFixtures.where('teamId').equals(team.teamId).toArray();
+    staleFixtures = cached.filter((f) => !team.keepFixtureIds.has(f.id)).map((f) => f.id);
+    if (staleFixtures.length > 0) await database.officialFixtures.bulkDelete(staleFixtures);
+  }
+  return { events: staleEvents.length, fixtures: staleFixtures.length };
+}
+
 export async function ingestOfficialForProfile(opts: {
   profileId: string;
   playerName: string;
@@ -76,6 +106,15 @@ export async function ingestOfficialForProfile(opts: {
   officialData = mergeOfficialWithCupFallback(cup, officialData);
 
   if (!officialData || officialData.fixtures.length === 0) {
+    // TASO answered every call and the team has no games: earlier stored games
+    // for this profile are no longer TASO's and must go. A failed or partial
+    // fetch keeps the offline cache.
+    if (officialData?.fixturesComplete) {
+      await pruneStaleOfficialData(database, opts.profileId, new Set(), {
+        teamId: officialData.teamId,
+        keepFixtureIds: new Set()
+      });
+    }
     // No synthetic or canned fallback: if federation returned 0 matches,
     // return null and let caller show "ei julkaistu".
     return { official: officialData, resolvedTeamName: cup?.teamName || opts.teamName };
@@ -150,12 +189,13 @@ export async function ingestOfficialForProfile(opts: {
   }
 
   if (events.length > 0) {
-    const keep = new Set(events.map((e) => e.id));
-    const existing = await database.events.where("profileId").equals(opts.profileId).toArray();
-    const stale = existing
-      .filter((e) => e.id.startsWith(`fixture-${opts.profileId}-`) && !keep.has(e.id))
-      .map((e) => e.id);
-    if (stale.length > 0) await database.events.bulkDelete(stale);
+    // Re-ingest replaces this profile's official games with exactly the fetched set.
+    await pruneStaleOfficialData(
+      database,
+      opts.profileId,
+      new Set(fixtures.map((f) => f.id)),
+      { teamId: officialData.teamId, keepFixtureIds: new Set(officialData.fixtures.map((f) => f.id)) }
+    );
     await database.events.bulkPut(events);
   }
 

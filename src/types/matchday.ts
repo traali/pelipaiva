@@ -365,6 +365,11 @@ export interface OfficialTeamData {
   groupId?: string;
   sourceUrl?: string;
   fetchedAt?: string;
+  /**
+   * True when TASO answered every call the fixture list depends on. Only then
+   * may an empty fixture list prune previously stored games.
+   */
+  fixturesComplete?: boolean;
 }
 
 // ============================================================================

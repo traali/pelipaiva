@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { stitchCalendarEventsWithFixtures, fixtureInvolvesOwnTeam, isKickoffAfterKokoontuminen, applyResolutionDecision } from './reconciliationEngine';
 import { parseICSFeed } from '../calendar/icsParser';
 import { generateIcsCalendarFeed } from '../calendar/calendarFeedGenerator';
@@ -31,6 +31,18 @@ function mockEvent(partial: Partial<MatchdayEvent>): MatchdayEvent {
     ...partial,
   };
 }
+
+// parseICSFeed resolves venues over the network (LIPAS, Helsinki servicemap). These
+// tests are about calendar parsing, so they run offline: same assertions, no live
+// API latency (CI hit the 5 s timeout on slow responses).
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    throw new TypeError('offline in tests');
+  }));
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('Torneopal & MyClub Reconciliation & Stitching Engine', () => {
   const profile: PlayerProfile = {
