@@ -29,8 +29,24 @@ interface AddedSource {
   url?: string;
 }
 
+/** A team already saved for a player (from IndexedDB profiles). */
+export interface OnboardingExistingTeam {
+  id: string;
+  playerName: string;
+  teamName: string;
+  sport: SportType;
+  url?: string;
+}
+
+const NO_EXISTING_TEAMS: OnboardingExistingTeam[] = [];
+
 interface OnboardingWizardProps {
-  onOpenImportModal?: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
+  onOpenImportModal?: (
+    initialSport?: SportType,
+    initialTeamUrl?: string,
+    initialTeamName?: string,
+    playerName?: string
+  ) => void;
   onOpenFamilyShare?: () => void;
   onOpenSmartImport?: () => void;
   onQuickAddTeam: (
@@ -42,6 +58,8 @@ interface OnboardingWizardProps {
   onRemoveTeam?: (playerName: string, url?: string) => Promise<void>;
   onFinishOnboarding?: () => void;
   existingProfilesCount?: number;
+  /** Saved teams, so imports done in the search modal show up under the right child. */
+  existingTeams?: OnboardingExistingTeam[];
 }
 
 type OnboardingMode = 'choice' | 'local' | 'family_create' | 'family_join';
@@ -52,7 +70,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onQuickAddTeam,
   onRemoveTeam,
   onFinishOnboarding,
-  existingProfilesCount = 0
+  existingProfilesCount = 0,
+  existingTeams = NO_EXISTING_TEAMS
 }) => {
   // Mode selection state: choice (initial) vs local vs family_create vs family_join
   const [onboardingMode, setOnboardingMode] = useState<OnboardingMode>('choice');
@@ -73,17 +92,39 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Sources added here plus teams saved via the import modal, once each.
+  const allSources = React.useMemo(() => {
+    const key = (s: { playerName: string; url?: string; name: string }) =>
+      `${s.playerName.trim().toLowerCase()}|${(s.url || s.name).trim()}`;
+    const out = [...addedSources];
+    const seen = new Set(out.map(key));
+    for (const team of existingTeams) {
+      const src: AddedSource = {
+        id: `profile-${team.id}`,
+        playerName: team.playerName,
+        sourceType: /\.ics|webcal:/i.test(team.url || '') ? 'ics' : 'torneopal',
+        name: team.teamName,
+        sport: team.sport,
+        url: team.url
+      };
+      if (seen.has(key(src))) continue;
+      seen.add(key(src));
+      out.push(src);
+    }
+    return out;
+  }, [addedSources, existingTeams]);
+
   // Group added sources by player name
   const playerGroups = React.useMemo(() => {
     const map = new Map<string, AddedSource[]>();
-    for (const src of addedSources) {
+    for (const src of allSources) {
       if (!map.has(src.playerName)) map.set(src.playerName, []);
       map.get(src.playerName)!.push(src);
     }
     return Array.from(map.entries());
-  }, [addedSources]);
+  }, [allSources]);
 
-  const currentPlayerSources = addedSources.filter(
+  const currentPlayerSources = allSources.filter(
     (s) => s.playerName.toLowerCase() === activePlayerName.trim().toLowerCase()
   );
 
@@ -242,7 +283,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     }
   };
 
-  const totalSourcesCount = addedSources.length || existingProfilesCount;
+  const totalSourcesCount = allSources.length || existingProfilesCount;
 
   return (
     <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 pt-[max(1.5rem,env(safe-area-inset-top))] md:py-10 flex flex-col justify-between">
@@ -642,7 +683,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       {onOpenImportModal && (
                         <button
                           type="button"
-                          onClick={() => onOpenImportModal()}
+                          onClick={() => onOpenImportModal(undefined, undefined, undefined, activePlayerName)}
                           className="px-3.5 py-2 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer"
                         >
                           Hae seura tai joukkue

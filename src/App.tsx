@@ -986,7 +986,14 @@ export const App: React.FC = () => {
             setIsOnboardingActive(false);
           }}
           existingProfilesCount={profiles.length}
-          onOpenImportModal={(sport, url, name) => modalStore.openSmartImport({ sport, url, name })}
+          onOpenImportModal={(sport, url, name, playerName) => modalStore.openSmartImport({ sport, url, name, playerName })}
+          existingTeams={profiles.map((p) => ({
+            id: p.id,
+            playerName: p.playerName,
+            teamName: p.teamName,
+            sport: p.sport,
+            url: p.calendarUrl || p.associationUrl
+          }))}
           onOpenFamilyShare={modalStore.openFamilyShare}
           onOpenSmartImport={modalStore.openSmartImport}
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
