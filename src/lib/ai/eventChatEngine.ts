@@ -2,7 +2,6 @@ import type { MatchdayEvent, PlayerProfile, EventChatMessage } from '../../types
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
 import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
-import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import {
   extractTimesFromFinnishText,
   extractCarpoolAssignmentsFromText,
@@ -135,12 +134,19 @@ export async function applyEventChatUpdate(
     if (rawVenue.length > 3 && !rawVenue.includes('klo') && !rawVenue.includes('tulos')) {
       const resolved = await resolveSportsVenue(rawVenue);
       updated.venue = resolved;
-      const coords = resolved.coordinates || { lat: 60.169, lng: 24.938 };
-      const weather = await fetchFmiMatchWeather(coords, updated.startTime, updated.endTime, DEFAULT_PROXY_URL);
-      const parking = calculateParkingEase(resolved.name, coords, new Date(updated.startTime));
+      // Weather only for a real venue pin; no city-centre stand-in.
+      const coords = resolved.coordinates;
+      const hasPin =
+        !resolved.isApproximateLocation &&
+        Boolean(coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng) && (coords.lat !== 0 || coords.lng !== 0));
+      const weather = hasPin
+        ? await fetchFmiMatchWeather(coords, updated.startTime, updated.endTime, DEFAULT_PROXY_URL)
+        : null;
       if (weather) updated.weather = weather;
-      if (parking) updated.parking = parking;
-      appliedChanges.push(`Kenttä päivitetty: ${resolved.name} (sää ja parkkitiedot päivitetty)`);
+      else delete updated.weather;
+      appliedChanges.push(
+        `Kenttä päivitetty: ${resolved.name}${weather ? ' (sää päivitetty)' : ''}. Pysäköinnin tiedot löytyvät Parkkis-sovelluksesta.`
+      );
     }
   }
 

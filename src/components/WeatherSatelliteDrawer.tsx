@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ShieldAlert, Radio, AlertTriangle, Play, Pause, ChevronLeft, ChevronRight, Wind, CloudRain } from 'lucide-react';
 import { Coordinates, WeatherCondition } from '../types/matchday';
 
+/** Half-height of the map view in km; the label reads this same value. */
+const DRAWER_RADIUS_KM = 50;
+
 interface WeatherSatelliteDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -24,8 +27,8 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
   const [frameIndex, setFrameIndex] = useState<number>(4);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
 
-  // Compute 50km BBOX with 1.8 deltaLng aspect compensation for 60°N Finnish latitude
-  const deltaLat = 50 / 111.32;
+  // BBOX reaches DRAWER_RADIUS_KM north and south; 1.8x east-west for 60°N.
+  const deltaLat = DRAWER_RADIUS_KM / 111.32;
   const deltaLng = deltaLat * 1.8;
   const minLng = Math.round((venueCoords.lng - deltaLng) * 10000) / 10000;
   const minLat = Math.round((venueCoords.lat - deltaLat) * 10000) / 10000;
@@ -263,9 +266,9 @@ export const WeatherSatelliteDrawer: React.FC<WeatherSatelliteDrawerProps> = ({
                 </div>
               </div>
 
-              {/* 10km Safety Circle Legend in Corner */}
+              {/* View extent, from the bbox above */}
               <div className="absolute bottom-2.5 left-2.5 px-2 py-1 rounded-lg bg-black/70 backdrop-blur-xs text-[10px] font-medium text-gray-300 border border-white/10 z-10">
-                Säde: ~50 km • Keskipiste: Kenttä
+                Säde: {DRAWER_RADIUS_KM} km pohjoiseen ja etelään • Keskipiste: {venueName}
               </div>
 
               {/* Current Frame Timestamp Badge */}

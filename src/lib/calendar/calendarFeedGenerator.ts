@@ -124,13 +124,8 @@ export function generateIcsCalendarFeed(
       }
     }
 
-    const depTime = ev.briefing?.recommendedDepartureTime || (ev as any).leaveHomeBy;
-    if (depTime) {
-      const clock = formatHelsinkiClock(depTime);
-      if (clock) {
-        descParts.push(`🚗 Kotoalähtöaika: klo ${clock}`);
-      }
-    }
+    // No leave-home time here: the stored briefing was computed without the
+    // family's home, so any time would be a guess.
 
     const kitAdvice = (ev as any).kitAdvice;
     if (kitAdvice) {

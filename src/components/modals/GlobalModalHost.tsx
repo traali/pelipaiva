@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import type { MatchdayEvent, PlayerProfile, HomeLocation } from "../../types/matchday";
 import type { ActiveModal } from "../../lib/modals/useModalStore";
-import { DEFAULT_HOME_LOCATION } from "../../lib/storage/homeLocation";
 import { db } from "../../lib/storage/db";
 import { resolveSportsVenue } from "../../lib/geo/sportsGeocoder";
 import { resolveTransitPlan } from "../../lib/geo/transitEngine";
@@ -121,7 +120,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
         <HomeLocationModal
           isOpen={true}
           onClose={onClose}
-          currentHome={homeLocation || DEFAULT_HOME_LOCATION}
+          currentHome={homeLocation ?? null}
           onSaveHome={async (h) => {
             await saveHomeLocation(h);
             const all = await db.events.toArray();

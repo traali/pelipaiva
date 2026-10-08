@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parseAssociationUrl, parseFinnishDateTime, UNPARSED_DATETIME } from './associationUrlParser'
+import { parseAssociationUrl, parseFinnishDateTime } from './associationUrlParser'
+import { extractFixturesFromHtml } from './associationExtractor'
 
 describe('parseAssociationUrl never invents a team or player', () => {
   it('a Torneopal player page names no team: parse fails', () => {
@@ -41,14 +42,28 @@ describe('parseFinnishDateTime never guesses a kickoff', () => {
   })
 
   it('missing time is not noon or 15:00', () => {
-    expect(parseFinnishDateTime('24.05.2026', '')).toBe(UNPARSED_DATETIME)
-    expect(parseFinnishDateTime('24.05.2026')).toBe(UNPARSED_DATETIME)
+    expect(parseFinnishDateTime('24.05.2026', '')).toBeNull()
+    expect(parseFinnishDateTime('24.05.2026')).toBeNull()
   })
 
   it('invalid date is not clamped or today', () => {
-    expect(parseFinnishDateTime('32.13.2026', '15:00')).toBe(UNPARSED_DATETIME)
-    expect(parseFinnishDateTime('31.02.2026', '15:00')).toBe(UNPARSED_DATETIME)
-    expect(parseFinnishDateTime('huomenna', '15:00')).toBe(UNPARSED_DATETIME)
-    expect(parseFinnishDateTime('24.05.2026', '25:00')).toBe(UNPARSED_DATETIME)
+    expect(parseFinnishDateTime('32.13.2026', '15:00')).toBeNull()
+    expect(parseFinnishDateTime('31.02.2026', '15:00')).toBeNull()
+    expect(parseFinnishDateTime('huomenna', '15:00')).toBeNull()
+    expect(parseFinnishDateTime('24.05.2026', '25:00')).toBeNull()
+  })
+})
+
+describe('rows without a real date/time give no event (no 1970 game)', () => {
+  it('extractFixturesFromHtml skips the row', () => {
+    const parsed = parseAssociationUrl('https://lentopallo.torneopal.fi/taso/joukkue.php?joukkue=30200')!
+    const html = `<table>
+      <tr class="fixture-row" data-match-id="111"><td>la 24.05.2026</td><td>15:00</td><td>A</td><td>-</td><td>B</td><td>Halli 1</td></tr>
+      <tr class="fixture-row" data-match-id="112"><td>la 31.05.2026</td><td></td><td>A</td><td>-</td><td>C</td><td>Halli 1</td></tr>
+      <tr class="fixture-row" data-match-id="113"><td>ilmoitetaan</td><td>12:00</td><td>A</td><td>-</td><td>D</td><td>Halli 1</td></tr>
+    </table>`
+    const fixtures = extractFixturesFromHtml(html, parsed)
+    expect(fixtures.map((f) => f.matchId)).toEqual(['111'])
+    expect(fixtures.every((f) => !f.startTime.startsWith('1970'))).toBe(true)
   })
 })

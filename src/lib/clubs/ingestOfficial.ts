@@ -11,7 +11,6 @@ import {
 } from '../storage/db';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
-import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from '../ai/deterministicReasoner';
 import { buildMatchStatsFromOfficial, hasRenderableStats } from '../api/torneopalClient';
 import { parseICSFeed } from '../calendar/icsParser';
@@ -177,9 +176,7 @@ export async function ingestOfficialForProfile(opts: {
 
     if (opts.includeWeather !== false) {
       const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime, DEFAULT_PROXY_URL);
-      const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
       if (weather) matchEvent.weather = weather;
-      matchEvent.parking = parking;
     }
     return matchEvent;
   });
@@ -281,8 +278,7 @@ export async function ingestIcsForProfile(opts: {
   const withMeta: MatchdayEvent[] = [];
   for (const ev of parsed) {
     const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime, DEFAULT_PROXY_URL);
-    const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-    const fullEv: MatchdayEvent = { ...ev, parking };
+    const fullEv: MatchdayEvent = { ...ev };
     if (weather) fullEv.weather = weather;
     fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
     withMeta.push(fullEv);

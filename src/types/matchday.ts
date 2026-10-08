@@ -48,6 +48,7 @@ export interface TransitPlan {
   transitLabel: string;
   isSelfTransit: boolean; // true for walk/bicycle (independent transit, no parent driver needed)
   isUnknownLocation?: boolean; // true when venue coordinates are missing, approximate, or (0,0)
+  needsHome?: boolean; // true when no home location is set: no travel time, no leave time
   weatherWarning?: string;
 }
 
@@ -104,56 +105,6 @@ export interface LightningSafetyAlert {
   resumeCountdownMinutes?: number; // 30-30 Rule
   downpourWarning: boolean;
   alertMessage?: string;
-}
-
-export interface ParkingZoneSpot {
-  id: string;
-  name: string;
-  type: 'standard' | 'accessible' | 'ev' | 'street' | 'no_parking';
-  typeLabel: string;
-  capacityEstimated?: number;
-  restrictionText: string;
-  discRequired: boolean;
-  maxHours?: number;
-  walkingTimeMinutes: number;
-  isRecommended?: boolean;
-}
-
-export interface TrafficSignInfo {
-  code: string; // e.g. 'E2 (Pysäköintipaikka)', 'C38 (Pysäköintikieltoalue)', 'H12.1 (Pysäköintikiekko 4h)', 'H18 (Maksullinen)'
-  name: string;
-  description: string;
-  iconType: 'p_sign' | 'no_parking' | 'disc' | 'payment' | 'ev' | 'warning';
-}
-
-export interface FineRiskInfo {
-  riskLevel: 'low' | 'moderate' | 'high';
-  riskLabel: string; // e.g. '🔴 Korkea valvontariski', '🟡 Kohtalainen valvontariski'
-  riskRating1to10?: number; // 1 (safest) to 10 (highest trap/fine risk)
-  standardFineAmountEur: number; // e.g. 60 or 80
-  fineType: string; // e.g. 'Kunnallinen pysäköintivirhemaksu (80 €) / Valvontamaksu'
-  criticalPitfalls: string[];
-  preventionChecklist: string[];
-}
-
-export interface ParkingInfo {
-  easeScore: 'easy' | 'moderate' | 'tight';
-  easeScoreValue: number; // 1 to 100
-  lotName: string;
-  coordinates: Coordinates;
-  feeZone: string;
-  parkingDiscRequired: boolean;
-  maxParkingHours?: number;
-  walkingTimeMinutes: number;
-  walkingDistanceMeters: number;
-  warnings: string[];
-  mapsNavigationUrl: string;
-  // Rich Parking App features (Spots, Signs, Fine Risk):
-  spots?: ParkingZoneSpot[];
-  trafficSigns?: TrafficSignInfo[];
-  fineRisk?: FineRiskInfo;
-  easyParkZoneCode?: string;
-  parkManZoneCode?: string;
 }
 
 export interface MatchGoal {
@@ -555,7 +506,6 @@ export interface MatchdayEvent {
   volunteerDuty?: string; // e.g. "☕ Kahviovuoro (klo 11:30 - 13:00)"
   weather?: WeatherCondition;
   lightning?: LightningSafetyAlert;
-  parking?: ParkingInfo;
   transit?: TransitPlan;
   stats?: FullMatchStats;
   playerLog?: PlayerMatchLog;

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { MatchdayEvent, HomeLocation, PitchSurface, TransitPlan } from "../types/matchday";
 import type { FamilyConflict } from "../lib/agents";
 import { useDismissedConflicts, groupActiveConflicts } from "../lib/agents/conflictDismissal";
-import { resolveTransitPlan } from "../lib/geo/transitEngine";
+import { effectiveTransitPlan } from "../lib/geo/transitEngine";
 import { db } from "../lib/storage/db";
 import { recordAttendanceOverride } from "../lib/sync/familyCloud";
 
@@ -62,32 +62,11 @@ export function useMatchdayLogistics({
   const consolidatedConflictGroups = useMemo(() => groupActiveConflicts(activeConflicts), [activeConflicts]);
 
   // Transit Plan
-  const transitPlan: TransitPlan = useMemo(() => {
-    const isApprox = Boolean(event.venue?.isApproximateLocation);
-    const coords = event.venue?.coordinates;
-    const hasValidCoords = Boolean(coords && coords.lat >= 59.0 && coords.lat <= 71.0 && coords.lng >= 19.0 && coords.lng <= 32.0);
-
-    if (isApprox || !hasValidCoords) {
-      return {
-        mode: 'car',
-        distanceKm: 0,
-        travelMinutes: 0,
-        transitLabel: '📍 Sijainti tuntematon',
-        isSelfTransit: false,
-        isUnknownLocation: true
-      };
-    }
-
-    if (
-      event.transit &&
-      !event.transit.isUnknownLocation &&
-      event.transit.distanceKm < 300 &&
-      event.transit.travelMinutes < 300
-    ) {
-      return event.transit;
-    }
-    return resolveTransitPlan(homeLocation, coords, event.weather);
-  }, [event.transit, event.venue?.isApproximateLocation, event.venue?.coordinates, homeLocation, event.weather]);
+  // No home or no exact venue pin gives needsHome / isUnknownLocation, never a guessed drive.
+  const transitPlan: TransitPlan = useMemo(
+    () => effectiveTransitPlan(event, homeLocation),
+    [event, homeLocation]
+  );
 
   // Time & Status Calculations
   // A game with a final score from TASO is over, even if its slot has not ended.
@@ -129,10 +108,7 @@ export function useMatchdayLogistics({
 
   // Navigation URLs
   const isApprox = Boolean(event.venue?.isApproximateLocation);
-  const isSelfTransit = Boolean(transitPlan?.isSelfTransit);
-  const targetCoords = isSelfTransit
-    ? (!isApprox ? event.venue?.coordinates : undefined)
-    : (event.parking?.coordinates || (!isApprox ? event.venue?.coordinates : undefined));
+  const targetCoords = !isApprox ? event.venue?.coordinates : undefined;
   const hasValidCoords = Boolean(targetCoords && (targetCoords.lat !== 0 || targetCoords.lng !== 0));
   const destination = hasValidCoords
     ? `${targetCoords!.lat},${targetCoords!.lng}`

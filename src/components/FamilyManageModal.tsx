@@ -284,10 +284,10 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-black text-text-primary truncate">
-                    Kotiosoite: {homeLocation?.name || 'Lauttasaari'}
+                    {homeLocation ? `Kotiosoite: ${homeLocation.name || 'Koti'}` : 'Kotiosoitetta ei ole asetettu'}
                   </div>
                   <div className="text-[11px] text-text-muted truncate">
-                    {homeLocation?.address || 'Aseta koti — lähikentille kävellen / pyörällä'}
+                    {homeLocation ? homeLocation.address : 'Lisää kotiosoite, niin näet lähtöajan'}
                   </div>
                   <div className="text-[11px] text-pitch truncate">
                     {formatHomeTransitSummary(homeLocation)}

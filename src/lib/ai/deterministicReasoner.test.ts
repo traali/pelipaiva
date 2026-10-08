@@ -93,18 +93,6 @@ describe('Deterministic AI Reasoner & Nappisvahti', () => {
         surface: 'indoor_synthetic',
         hasFloodlights: true
       },
-      parking: {
-        easeScore: 'easy',
-        easeScoreValue: 80,
-        lotName: 'Honkahalli',
-        coordinates: { lat: 60.176, lng: 24.805 },
-        feeZone: 'Maksuton',
-        parkingDiscRequired: false,
-        walkingTimeMinutes: 3,
-        walkingDistanceMeters: 150,
-        warnings: [],
-        mapsNavigationUrl: 'https://maps.google.com'
-      },
       transit: {
         mode: 'car',
         distanceKm: 6.4,
@@ -114,11 +102,13 @@ describe('Deterministic AI Reasoner & Nappisvahti', () => {
         isUnknownLocation: false
       }
     };
-    const { leaveHomeDate } = calculateDepartureCountdown(event);
+    const home = { name: 'Koti', address: 'Testikatu 1', coordinates: { lat: 60.2, lng: 24.9 }, maxWalkingDistanceKm: 1.5, maxCyclingDistanceKm: 5, defaultTransitMode: 'car' as const };
+    const { leaveHomeDate, transitPlan } = calculateDepartureCountdown(event, undefined, home);
     const leave = leaveHomeDate.getTime();
     const gather = new Date(event.warmupTime!).getTime();
     expect(leave).toBeLessThan(gather);
-    // 14 min drive + 10 min buffer + 3 min walk = 27 min before 10:00 → 09:33
-    expect((gather - leave) / 60000).toBe(27);
+    // real drive from the saved home + 10 min buffer before 10:00 (no invented parking walk)
+    expect(transitPlan.travelMinutes).toBeGreaterThan(0);
+    expect((gather - leave) / 60000).toBe(transitPlan.travelMinutes + 10);
   });
 });

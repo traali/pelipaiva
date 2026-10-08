@@ -1,4 +1,4 @@
-import { Coordinates, HomeLocation, TransitMode, TransitPlan, WeatherCondition } from '../../types/matchday';
+import { Coordinates, HomeLocation, MatchdayEvent, TransitMode, TransitPlan, WeatherCondition } from '../../types/matchday';
 
 /**
  * Calculates straight-line distance in kilometers using the Haversine formula.
@@ -37,8 +37,7 @@ export function resolveTransitPlan(
   home: HomeLocation | null | undefined,
   venueCoords: Coordinates | null | undefined,
   weather?: WeatherCondition,
-  overrideMode?: TransitMode,
-  defaultDrivingMinutes = 20
+  overrideMode?: TransitMode
 ): TransitPlan {
   // Defensive guard against invalid coordinates, Null Island (0,0), or coordinates outside Finland
   const isCoordValid = (c?: Coordinates | null) =>
@@ -54,31 +53,30 @@ export function resolveTransitPlan(
       c.lng <= 32.0
     );
 
-  if (
-    !home ||
-    !home.coordinates ||
-    !isCoordValid(home.coordinates) ||
-    !venueCoords ||
-    !isCoordValid(venueCoords)
-  ) {
-    const isVenueMissing = !venueCoords || !isCoordValid(venueCoords);
+  const isVenueMissing = !venueCoords || !isCoordValid(venueCoords);
+  const isHomeMissing = !home || !home.coordinates || !isCoordValid(home.coordinates);
+
+  // No guessing: without both ends there is no travel time.
+  if (isVenueMissing || isHomeMissing) {
     return {
       mode: 'car',
       distanceKm: 0,
-      travelMinutes: isVenueMissing ? 0 : defaultDrivingMinutes,
-      transitLabel: isVenueMissing ? '📍 Sijainti tuntematon' : `🚗 Auto ~${defaultDrivingMinutes} min`,
+      travelMinutes: 0,
+      transitLabel: isVenueMissing ? '📍 Sijainti tuntematon' : '🏠 Lisää kotiosoite',
       isSelfTransit: false,
-      isUnknownLocation: isVenueMissing
+      isUnknownLocation: isVenueMissing,
+      needsHome: isHomeMissing
     };
   }
 
-  const rawDistKm = calculateHaversineDistanceKm(home.coordinates, venueCoords);
+  const h = home as HomeLocation;
+  const rawDistKm = calculateHaversineDistanceKm(h.coordinates, venueCoords as Coordinates);
   // Account for Finnish city street grid detours (approx 1.25x Manhattan/grid factor)
   const distanceKm = Math.max(0.1, Number((rawDistKm * 1.25).toFixed(2)));
   const distLabel = formatTransitDistance(distanceKm);
 
-  const maxWalk = home.maxWalkingDistanceKm ?? 1.5;
-  const maxBike = home.maxCyclingDistanceKm ?? 5.0;
+  const maxWalk = h.maxWalkingDistanceKm ?? 1.5;
+  const maxBike = h.maxCyclingDistanceKm ?? 5.0;
 
   // Unfavorable cycling / walking weather:
   // Rain >= 1.0 mm/h, freezing icy conditions <= 0°C, high wind gusts >= 14 m/s (sea bridges), or soaked/snowy ground.
@@ -97,7 +95,7 @@ export function resolveTransitPlan(
       weather.windGustMs >= 17);
 
   let selectedMode: 'walk' | 'bicycle' | 'car' | 'transit' = 'car';
-  const preferred = home.defaultTransitMode || 'auto';
+  const preferred = h.defaultTransitMode || 'auto';
 
   if (overrideMode && overrideMode !== 'auto') {
     selectedMode = overrideMode;
@@ -120,7 +118,7 @@ export function resolveTransitPlan(
     selectedMode = 'car';
   }
 
-  let travelMinutes = defaultDrivingMinutes;
+  let travelMinutes = 0;
   let transitLabel = '';
   let isSelfTransit = false;
   let weatherWarning: string | undefined;
@@ -178,4 +176,24 @@ export function resolveTransitPlan(
     isSelfTransit,
     weatherWarning
   };
+}
+
+/** True when a plan has a real, computed travel time (home and venue both known). */
+export function hasRealTravelTime(plan: TransitPlan | null | undefined): boolean {
+  return Boolean(plan && !plan.needsHome && !plan.isUnknownLocation);
+}
+
+/**
+ * The trip plan for one event, always computed from the home that is saved now.
+ * A plan stored on the event may come from an old default home or an older
+ * address, so it is never shown. No home or no exact venue pin gives
+ * needsHome / isUnknownLocation instead of a guessed drive.
+ */
+export function effectiveTransitPlan(
+  event: Pick<MatchdayEvent, 'venue' | 'weather'>,
+  home: HomeLocation | null | undefined
+): TransitPlan {
+  const isApprox = Boolean(event.venue?.isApproximateLocation);
+  const venueCoords = isApprox ? undefined : event.venue?.coordinates;
+  return resolveTransitPlan(home, venueCoords, event.weather);
 }

@@ -197,7 +197,7 @@ export function runMissionControlGraph(
   const conflicts = conflictAgent(specialistEvents, profiles, homeLocation);
   const carpool = carpoolAgent(specialistEvents, profiles, conflicts, homeLocation);
   const talkoo = volunteerAgent(specialistEvents, profiles);
-  const tournaments = tournamentAgent(activeEvents, profiles, now);
+  const tournaments = tournamentAgent(activeEvents, profiles, now, homeLocation);
   const kitByEventId = kitAgent(specialistEvents, profiles);
   const difficultDays = detectDifficultDays(activeEvents, profiles, conflicts, now);
 
@@ -219,7 +219,9 @@ export function runMissionControlGraph(
 
   const transitBadge = depart?.transitPlan?.mode === 'walk' ? '🚶' : depart?.transitPlan?.mode === 'bicycle' ? '🚴' : '🚗';
   const ambientLine = nextEvent
-    ? `${childName(nextEvent, profiles)} · ${transitBadge} lähde klo ${depart?.departureTime} · ${nextEvent.venue.name}`
+    ? depart?.hasDepartureTime
+      ? `${childName(nextEvent, profiles)} · ${transitBadge} lähde klo ${depart.departureTime} · ${nextEvent.venue.name}`
+      : `${childName(nextEvent, profiles)} · alkaa ${formatFiTime(nextEvent.startTime)} · ${nextEvent.venue.name}`
     : 'Ei seuraavaa peliä.';
 
   const whatsAppShareText = [
@@ -231,7 +233,9 @@ export function runMissionControlGraph(
       const slotDesc = l.transit?.isSelfTransit
         ? `${modeEmoji} ${l.transit.mode === 'walk' ? 'Kävellen' : 'Pyörällä'} (${l.transit.travelMinutes} min, omatoiminen)`
         : `${modeEmoji} ${l.driverSlot}${l.canShareRideWith ? ` + ${l.canShareRideWith}` : ''}`;
-      return `• Lähde ${l.leaveBy} · ${l.childName} → ${l.venueName} (${slotDesc})`;
+      return l.leaveBy
+        ? `• Lähde ${l.leaveBy} · ${l.childName} → ${l.venueName} (${slotDesc})`
+        : `• Paikalla ${l.time} · ${l.childName} → ${l.venueName} (${slotDesc})`;
     }),
     conflicts.length
       ? `\nHuom:\n${conflicts.map((c) => (c.isResolvedByActiveTransit ? `• ${c.message}` : `⚠️ ${c.message}`)).join('\n')}`
@@ -246,7 +250,7 @@ export function runMissionControlGraph(
     weekendLabel: week.label,
     nextEvent,
     nextPlayer,
-    leaveBy: depart?.departureTime,
+    leaveBy: depart?.departureTime || undefined,
     leaveCountdownMinutes: depart?.countdownMinutes,
     leaveTransitLabel: depart?.transitPlan?.transitLabel,
     homeLocation,

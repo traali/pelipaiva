@@ -254,7 +254,7 @@ export function parseTorneopalHtml(
         const nro = matchCode === `${teamId}_${i}` ? '' : matchCode.replace(/\D/g, '');
         const matchId = nro ? `nro${nro}` : `row${i}`;
         const startTime = parseFinnishDateTime(dateStr, timeStr);
-        if (startTime.startsWith('1970-01-01')) continue;
+        if (!startTime) continue; // no date/time, no event
         const { venueName, fieldNumber } = extractVenueAndField(rawVenue);
 
         let status: 'upcoming' | 'played' | 'cancelled' | 'postponed' = 'upcoming';

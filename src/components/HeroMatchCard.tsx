@@ -22,7 +22,8 @@ import { arrivalPhaseLabel, clockHeadline, shouldShowKokoontuminen } from '../li
 import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { KitChecklist } from './KitChecklist';
-import { ParkingEaseBadge } from './ParkingEaseBadge';
+import { LeaveTimeCell } from './LeaveTimeCell';
+import { ParkkisLink } from './ParkkisLink';
 import { SportGlyph } from './SportGlyph';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
@@ -89,7 +90,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const sourceInfo = resolveEventSourceInfo(event, profile);
 
   // Respect the child's configured arrival rules and family home location
-  const { departureTime, countdownMinutes, transitPlan } = calculateDepartureCountdown(
+  const { departureTime, countdownMinutes, transitPlan, hasDepartureTime } = calculateDepartureCountdown(
     event,
     profile?.arrivalRules,
     homeLocation
@@ -472,21 +473,17 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
         {/* 3-PHASE TIMING STEPPER (Lähde kotoa -> Paikalla/Alkulämpö -> Kickoff) */}
         <div className="mt-4 grid grid-cols-3 gap-1.5 p-3 rounded-xl bg-surface-elevated/80 border border-border-subtle text-center">
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-floodlight flex items-center gap-1">
-              {transitEmoji} Lähde
-            </span>
-            <span className="font-tabular text-xl sm:text-2xl font-black text-floodlight mt-0.5">
-              {departureTime}
-            </span>
-            <span className="text-[10px] text-text-muted mt-0.5">
-              {countdownMinutes > 0
-                ? `${countdownMinutes} min`
-                : isLive
-                  ? 'Käynnissä'
-                  : 'Menty'}
-            </span>
-          </div>
+          <LeaveTimeCell
+            departureTime={departureTime}
+            countdownMinutes={countdownMinutes}
+            hasDepartureTime={hasDepartureTime}
+            transitPlan={transitPlan}
+            transitEmoji={transitEmoji}
+            isLive={isLive}
+            onOpenHomeModal={onOpenHomeModal}
+            onOpenVenueModal={() => setIsVenueModalOpen(true)}
+            size="xl"
+          />
 
           <div className="flex flex-col items-center border-x border-border-subtle/70 px-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-pitch flex items-center gap-1">
@@ -801,16 +798,10 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           )}
         </div>
 
-        {/* Secondary Badges (Parking info - compact when walking/cycling) */}
-        {event.parking && (
-          <div className="mt-2">
-            <ParkingEaseBadge
-              parking={event.parking}
-              venueName={event.venue.name}
-              compact={transitPlan?.isSelfTransit}
-            />
-          </div>
-        )}
+                {/* Parking facts come from Parkkis, not from Pelipäivä */}
+        <div className="mt-2 empty:hidden">
+          <ParkkisLink venue={event.venue} />
+        </div>
 
         {/* Applied Notes / Carpool / Volunteer / School Details */}
         {event.notes && (
@@ -854,7 +845,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
                 ? `Kävele paikalle (${transitPlan.travelMinutes} min)`
                 : transitPlan?.mode === 'bicycle'
                   ? `Pyöräile paikalle (${transitPlan.travelMinutes} min)`
-                  : `Navigoi parkkiin (${event.parking?.lotName || event.venue.name})`}
+                  : `Navigoi kentälle (${event.venue.name})`}
             </span>
           </motion.button>
 

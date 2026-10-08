@@ -725,7 +725,7 @@ export function buildMatchStatsFromOfficial(
   if (!hasAnything) return undefined;
 
   return {
-    leagueName: fixture.leagueName || data.leagueName || "Sarja",
+    leagueName: fixture.leagueName || data.leagueName || "",
     round: fixture.round,
     scoreType: data.sport === "volleyball" ? "sets" : data.sport === "basketball" ? "points" : "goals",
     liveScore,

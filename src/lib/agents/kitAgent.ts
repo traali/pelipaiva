@@ -65,6 +65,13 @@ function sportCore(sport: SportType, isTraining: boolean): KitItem[] {
   }
 }
 
+/** Temperature from a real, short-range forecast; undefined when unknown. */
+function knownTemp(event: MatchdayEvent): number | undefined {
+  const w = event.weather;
+  if (!w || w.isForecastLongRange || w.isCacheFallback) return undefined;
+  return typeof w.temperatureC === 'number' && Number.isFinite(w.temperatureC) ? w.temperatureC : undefined;
+}
+
 function weatherExtras(event: MatchdayEvent): KitItem[] {
   const extras: KitItem[] = [];
   const w = event.weather;
@@ -72,9 +79,13 @@ function weatherExtras(event: MatchdayEvent): KitItem[] {
     extras.push(item('sisahalli', 'Sisäkengät kopissa', 'Ulkokengät pois salista.', true, false));
     return extras;
   }
-  const temp = w?.isForecastLongRange ? undefined : w?.temperatureC;
+  const temp = knownTemp(event);
   const rain = w?.isForecastLongRange ? 0 : w?.precipitationMmh ?? 0;
-  if ((temp ?? 12) < 6) {
+  // Unknown weather: no temperature-based advice, and say so.
+  if (temp === undefined) {
+    extras.push(item('saa', 'Sää ei tiedossa', 'Tarkista sää ennen lähtöä ja pakkaa sen mukaan.', false, true));
+  }
+  if (temp !== undefined && temp < 6) {
     extras.push(
       item('alus', 'Tekninen aluskerrasto + pipo', 'Ulkokenttä alle +6 °C.', true, true),
       item('hanskat', 'Ohuet pelihanskat', 'Sormet jäätyvät tekonurmella.', false, true)
@@ -85,7 +96,7 @@ function weatherExtras(event: MatchdayEvent): KitItem[] {
       item('sade', 'Sadeasu / kuorikerros', 'Sade yli 0.4 mm/h — kassi märäksi ilman kuorta.', true, true)
     );
   }
-  if ((temp ?? 12) < 2) {
+  if (temp !== undefined && temp < 2) {
     extras.push(item('vaihto', 'Vaihtoehtoinen kuiva paita', 'Jäätynyt paita pois heti pelin jälkeen.', true, true));
   }
   return extras;
@@ -97,9 +108,12 @@ function spectatorExtras(event: MatchdayEvent): KitItem[] {
     items.push(item('sisakenka', 'Sisäkengät halliin', 'Nappikset / ulkokengät jäävät aulaan.', true, false));
     return items;
   }
-  const temp = event.weather?.isForecastLongRange ? undefined : event.weather?.temperatureC;
+  const temp = knownTemp(event);
   const rain = event.weather?.isForecastLongRange ? 0 : event.weather?.precipitationMmh ?? 0;
-  if ((temp ?? 12) < 8) {
+  if (temp === undefined) {
+    items.push(item('saa-katsomo', 'Sää ei tiedossa', 'Tarkista sää ennen lähtöä.', false, true));
+  }
+  if (temp !== undefined && temp < 8) {
     items.push(
       item('termos', 'Termos + istuinalusta', 'Kylmä katsomo, ei penkkiä.', true, true)
     );
@@ -116,7 +130,8 @@ function spectatorExtras(event: MatchdayEvent): KitItem[] {
 export function buildSportKitPlan(event: MatchdayEvent, profile?: PlayerProfile): SportKitPlan {
   const { footwear, reason } = determineFootwear(
     event.venue.surface,
-    event.weather?.isForecastLongRange ? 12 : event.weather?.temperatureC ?? 12,
+    // NaN = unknown: footwear by surface only, no temperature claim.
+    knownTemp(event) ?? Number.NaN,
     event.weather?.isForecastLongRange ? 0 : event.weather?.precipitationMmh ?? 0,
     event.venue.isIndoor
   );

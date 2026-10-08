@@ -293,9 +293,8 @@ describe('Tier 2 Boundary: URLs, API Ingestion & HTML Extraction', () => {
       canonicalUrl: 'https://tulospalvelu.palloliitto.fi/team/60341'
     };
 
+    // 30 Feb / 25:99 is a parse failure: no event rather than a made-up date
     const fixtures = extractFixturesFromHtml(invalidDateHtml, dummyUrl);
-    expect(fixtures.length).toBe(1);
-    expect(fixtures[0]?.startTime).toBeDefined();
-    expect(typeof fixtures[0]?.startTime).toBe('string');
+    expect(fixtures.length).toBe(0);
   });
 });

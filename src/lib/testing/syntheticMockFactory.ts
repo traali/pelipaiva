@@ -1,4 +1,11 @@
 import { parseFinnishDateTime } from "../api/associationUrlParser";
+
+/** Test fixtures use fixed, valid dates; a parse failure here is a bug. */
+function fixedKickoff(date: string, time: string): string {
+  const iso = parseFinnishDateTime(date, time);
+  if (!iso) throw new Error(`Invalid fixture date ${date} ${time}`);
+  return iso;
+}
 import type {
   ParsedAssociationUrl,
   OfficialTeamData,
@@ -330,10 +337,10 @@ export function generateSyntheticOfficialTeamData(
   const today = new Date();
   const isTestTeam = teamId === '3512345';
 
-  const dToday = isTestTeam ? parseFinnishDateTime('10.05.2026', '15:00') : new Date(today.setHours(16, 30, 0, 0)).toISOString();
-  const dTomorrow = isTestTeam ? parseFinnishDateTime('17.05.2026', '13:30') : new Date(new Date().setDate(new Date().getDate() + 1)).toISOString();
-  const dDay3 = isTestTeam ? parseFinnishDateTime('24.05.2026', '15:00') : new Date(new Date().setDate(new Date().getDate() + 3)).toISOString();
-  const dDay5 = isTestTeam ? parseFinnishDateTime('31.05.2026', '12:00') : new Date(new Date().setDate(new Date().getDate() + 5)).toISOString();
+  const dToday = isTestTeam ? fixedKickoff('10.05.2026', '15:00') : new Date(today.setHours(16, 30, 0, 0)).toISOString();
+  const dTomorrow = isTestTeam ? fixedKickoff('17.05.2026', '13:30') : new Date(new Date().setDate(new Date().getDate() + 1)).toISOString();
+  const dDay3 = isTestTeam ? fixedKickoff('24.05.2026', '15:00') : new Date(new Date().setDate(new Date().getDate() + 3)).toISOString();
+  const dDay5 = isTestTeam ? fixedKickoff('31.05.2026', '12:00') : new Date(new Date().setDate(new Date().getDate() + 5)).toISOString();
 
   const opponents =
     sport === 'floorball'
