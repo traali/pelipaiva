@@ -90,7 +90,11 @@ export function useMatchdayLogistics({
   }, [event.transit, event.venue?.isApproximateLocation, event.venue?.coordinates, homeLocation, event.weather]);
 
   // Time & Status Calculations
-  const isLive = new Date(event.startTime) <= new Date() && new Date() <= new Date(event.endTime);
+  // A game with a final score from TASO is over, even if its slot has not ended.
+  const isLive =
+    currentScore === undefined &&
+    new Date(event.startTime) <= new Date() &&
+    new Date() <= new Date(event.endTime);
   const isPast = new Date(event.endTime) <= new Date() || currentScore !== undefined;
 
   const formattedKickoff = new Date(event.startTime).toLocaleTimeString("fi-FI", {
