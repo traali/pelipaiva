@@ -14,13 +14,13 @@ import {
   extractVenueAndField,
   normalizePlayerPosition,
   parseTorneopalHtml,
-  generateSyntheticOfficialTeamData,
   inferSportFromSubdomain,
   normalizeUrlString,
   cleanHtmlText,
   parseHtmlTableRows,
   extractOfficialTeamData
 } from './statsEngine';
+import { generateSyntheticOfficialTeamData } from '../testing/syntheticMockFactory';
 import {
   PelipaivaDB,
   saveOfficialTeamData,
@@ -624,8 +624,10 @@ describe('Association Extractor & Parser', () => {
       expect(synthetic.standings?.length).toBeGreaterThanOrEqual(6);
       expect(synthetic.roster?.players.length).toBeGreaterThanOrEqual(5);
 
+      // Production never falls back to invented data, even if a caller asks.
       const extracted = await extractOfficialTeamData(parsedUrl, { fallbackToSynthetic: true });
       expect(extracted.teamId).toBe('1289');
+      expect(extracted.fixtures).toHaveLength(0);
     });
   });
 });

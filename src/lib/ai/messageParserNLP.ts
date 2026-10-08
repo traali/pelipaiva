@@ -398,7 +398,7 @@ export function extractKitColorFromText(text: string): string | undefined {
  */
 export function parseFreeformSportsMessage(
   rawText: string,
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): ExtractedSportsEvent {
   const all = parseMultipleSportsMessages(rawText, defaultPlayer);
   return all[0] || parseSingleFreeformBlock(rawText, defaultPlayer);
@@ -440,7 +440,7 @@ function extractMatchTimeInLine(line: string): string | null {
  */
 export function parseMultipleSportsMessages(
   rawText: string,
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): ExtractedSportsEvent[] {
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length <= 1) {
@@ -531,7 +531,7 @@ export function parseMultipleSportsMessages(
 
 function parseSingleFreeformBlock(
   rawText: string,
-  _defaultPlayer = 'Maija'
+  _defaultPlayer = ''
 ): ExtractedSportsEvent {
   const norm = normalizeText(rawText);
 

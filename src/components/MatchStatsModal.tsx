@@ -655,7 +655,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     <textarea
                       value={logNotes}
                       onChange={(e) => setLogNotes(e.target.value)}
-                      placeholder="Esim. Loistava prässi toisella jaksolla, hieno syöttö Maijan maaliin!"
+                      placeholder="Omat muistiinpanot ottelusta"
                       rows={2}
                       className="w-full px-3 py-2 rounded-xl bg-surface-base border border-border-subtle text-xs text-text-primary placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-pitch resize-none"
                     />

@@ -2,13 +2,10 @@ import React from "react";
 import { Plus, Search, Filter, RefreshCw, Loader2, Save } from "lucide-react";
 import type { SportType } from "../../../types/matchday";
 import { searchPopularClubs, type ClubPreset } from "../../../lib/clubs/popularClubsCatalog";
-import type { ExampleTournament } from "../../../lib/clubs/exampleTournaments";
 import { TeamColorPicker } from "../../TeamColorPicker";
 
 export interface ClassicUrlImportTabProps {
   isEditing: boolean;
-  exampleTournaments: ExampleTournament[];
-  handleSelectCupPreset: (cup: ExampleTournament) => void;
   clubSearchQuery: string;
   setClubSearchQuery: (val: string) => void;
   clubMatches: ClubPreset[];
@@ -32,8 +29,6 @@ export interface ClassicUrlImportTabProps {
 
 export const ClassicUrlImportTab: React.FC<ClassicUrlImportTabProps> = ({
   isEditing,
-  exampleTournaments,
-  handleSelectCupPreset,
   clubSearchQuery,
   setClubSearchQuery,
   clubMatches,
@@ -59,30 +54,15 @@ export const ClassicUrlImportTab: React.FC<ClassicUrlImportTabProps> = ({
       {!isEditing && (
         <>
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-text-secondary">Valmiit turnaukset (1-napin liitos):</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {exampleTournaments.map((cup) => (
-                <button key={cup.id} type="button" onClick={() => handleSelectCupPreset(cup)} className="flex items-center gap-2 p-2 rounded-xl border border-border-subtle bg-surface-elevated text-left hover:border-pitch cursor-pointer transition-all">
-                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: cup.colorHex }} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-bold text-text-primary">{cup.name}</div>
-                    <div className="truncate text-[10px] text-text-muted">{cup.teamName}</div>
-                  </div>
-                  <Plus className="h-3.5 w-3.5 shrink-0 text-pitch" />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
             <label className="mb-1 block text-xs font-semibold text-text-secondary flex items-center gap-1">
               <Search className="w-3.5 h-3.5 text-pitch" />
-              <span>Pikahaku seuroista (HJK, Honka, ErVi, TOPOLA...):</span>
+              <span>Hae seura (täyttää nimen ja lajin):</span>
             </label>
             <input type="text" value={clubSearchQuery} placeholder="Kirjoita seuran nimi..." onChange={(e) => { const q = e.target.value; setClubSearchQuery(q); setClubMatches(q.trim().length > 1 ? searchPopularClubs(q).slice(0, 5) : []); }} className="w-full rounded-xl border border-pitch/30 bg-pitch/10 px-3.5 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-pitch focus:outline-none" />
             {clubMatches.length > 0 && (
               <div className="mt-1.5 flex flex-col gap-1" role="listbox" aria-label="Seuraehdotukset">
                 {clubMatches.map((club) => (
-                  <button key={club.id} type="button" role="option" aria-selected={false} onClick={() => { setClassicTeamName(club.name); setSelectedSport(club.sport); setClassicUrl(club.sampleTeamUrl); setColorHex(club.colorHex); setClubMatches([]); setClubSearchQuery(""); }} className="flex items-center justify-between p-2 rounded-xl bg-surface border border-border-subtle hover:border-pitch text-left text-xs cursor-pointer transition-all">
+                  <button key={club.id} type="button" role="option" aria-selected={false} onClick={() => { setClassicTeamName(club.name); setSelectedSport(club.sport); setColorHex(club.colorHex); setClubMatches([]); setClubSearchQuery(""); }} className="flex items-center justify-between p-2 rounded-xl bg-surface border border-border-subtle hover:border-pitch text-left text-xs cursor-pointer transition-all">
                     <div className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: club.colorHex }} />
                       <span className="font-bold text-text-primary">{club.name}</span>

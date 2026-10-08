@@ -16,7 +16,6 @@ import {
   Loader2
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import type { SportType } from '../types/matchday';
 import { db } from '../lib/storage/db';
 import { syncFamilyRosterCycle, hydrateRosterProfiles, normalizeFamilyCode, isValidFamilyCode, mintFamilyCode } from '../lib/sync/familyCloud';
@@ -45,75 +44,10 @@ interface OnboardingWizardProps {
   existingProfilesCount?: number;
 }
 
-const PRESET_TORNEOPAL_TEAMS: Array<{
-  name: string;
-  teamName: string;
-  sport: SportType;
-  url: string;
-  association: string;
-  colorHex: string;
-}> = [
-  {
-    name: 'PPJ/Laru sin · P13 Kolmonen',
-    teamName: 'PPJ/Laru sin',
-    sport: 'football',
-    url: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
-    association: 'Palloliitto',
-    colorHex: '#3b82f6'
-  },
-  {
-    name: 'PPJ/Laru mus · P13 Vitonen',
-    teamName: 'PPJ/Laru mus',
-    sport: 'football',
-    url: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-    association: 'Palloliitto',
-    colorHex: '#64748b'
-  },
-  {
-    name: 'PPJ/Laru oran · P13 Vitonen',
-    teamName: 'PPJ/Laru oran',
-    sport: 'football',
-    url: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
-    association: 'Palloliitto',
-    colorHex: '#f97316'
-  },
-  {
-    name: 'Salibandy · Tulospalvelu (tiimi 25301)',
-    teamName: 'ErVi Salibandy',
-    sport: 'floorball',
-    url: 'https://tulospalvelu.salibandy.fi/team/25301/info',
-    association: 'Salibandy.fi',
-    colorHex: '#0284c7'
-  },
-  {
-    name: 'Lentopallo · Tulospalvelu (tiimi 57672)',
-    teamName: 'PuMa Lentopallo',
-    sport: 'volleyball',
-    url: 'https://tulospalvelu.lentopallo.fi/team/57672/info',
-    association: 'Lentopallo.fi',
-    colorHex: '#8b5cf6'
-  },
-  {
-    name: 'Koripallo · Tulospalvelu (tiimi 5756346)',
-    teamName: 'Koripallojoukkue',
-    sport: 'basketball',
-    url: 'https://tulospalvelu.basket.fi/team/5756346/info',
-    association: 'Basket.fi',
-    colorHex: '#f59e0b'
-  },
-  ...EXAMPLE_TOURNAMENTS.map((cup) => ({
-    name: `${cup.name} · ${cup.teamName}`,
-    teamName: cup.teamName,
-    sport: cup.sport,
-    url: cup.url,
-    association: cup.name,
-    colorHex: cup.colorHex
-  }))
-];
-
 type OnboardingMode = 'choice' | 'local' | 'family_create' | 'family_join';
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
+  onOpenImportModal,
   onOpenSmartImport,
   onQuickAddTeam,
   onRemoveTeam,
@@ -160,35 +94,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setErrorMessage('');
     setActivePlayerName(trimmed);
     setIsNamingStep(false);
-  };
-
-  const handleAddPresetTorneopal = async (team: (typeof PRESET_TORNEOPAL_TEAMS)[0]) => {
-    if (!activePlayerName) return;
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const res = await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
-      if (res && res.success === false) {
-        setErrorMessage(res.error || 'Otteluiden haku epäonnistui. Tarkista verkko.');
-        return;
-      }
-      setAddedSources((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-${Math.random()}`,
-          playerName: activePlayerName,
-          sourceType: 'torneopal',
-          name: team.name,
-          sport: team.sport,
-          url: team.url
-        }
-      ]);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(msg || 'Lisäys epäonnistui');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleAddCustomIcs = async () => {
@@ -658,7 +563,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         autoFocus
                         value={nameInputDraft}
                         onChange={(e) => setNameInputDraft(e.target.value)}
-                        placeholder="Esim. Simo, Eemil, Aada..."
+                        placeholder="Lapsen etunimi"
                         className="flex-1 px-4 py-3 rounded-2xl bg-surface-base border border-border-strong text-sm font-bold text-text-primary focus-visible:ring-2 focus-visible:ring-pitch"
                       />
                       <button
@@ -673,7 +578,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   </div>
                 </form>
               ) : (
-                /* STEP 2: SELECT PRESET OR ADD TEAMS FOR ACTIVE PLAYER */
+                /* STEP 2: ADD REAL TEAMS FOR ACTIVE PLAYER */
                 <div className="space-y-5">
                   <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
                     <div className="flex items-center gap-2">
@@ -728,67 +633,37 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     </div>
                   )}
 
-                  {/* PRESET QUICK ATTACH BUTTONS */}
-                  <div className="space-y-2.5">
-                    <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-pitch" />
-                      <span>Valitse joukkue tai turnaus suoraan listasta:</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {PRESET_TORNEOPAL_TEAMS.map((team) => {
-                        const isAdded = currentPlayerSources.some(
-                          (s) => s.url === team.url
-                        );
-                        return (
-                          <button
-                            key={team.url}
-                            type="button"
-                            disabled={isAdded || isLoading}
-                            onClick={() => handleAddPresetTorneopal(team)}
-                            className={`p-3 rounded-2xl border text-left flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
-                              isAdded
-                                ? 'bg-pitch/15 border-pitch/40 text-pitch opacity-80 cursor-default'
-                                : 'bg-surface-elevated hover:bg-surface-base border-border-subtle text-text-primary hover:border-pitch/40'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ background: team.colorHex }}
-                              />
-                              <span className="truncate">{team.name}</span>
-                            </div>
-                            {isAdded ? (
-                              <CheckCircle2 className="w-4 h-4 text-pitch shrink-0" />
-                            ) : (
-                              <Plus className="w-4 h-4 text-text-muted shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* CUSTOM ICS LINK OR SMART IMPORT */}
+                  {/* ADD A REAL TEAM: club search or pasted link. No ready-made demo teams. */}
                   <div className="pt-2 border-t border-border-subtle flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-text-secondary">
+                      Lisää {activePlayerName ? `pelaajan ${activePlayerName}` : 'pelaajan'} joukkue
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onOpenImportModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenImportModal()}
+                          className="px-3.5 py-2 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer"
+                        >
+                          Hae seura tai joukkue
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowCustomIcsInput((v) => !v)}
+                        aria-expanded={showCustomIcsInput}
                         className="text-xs font-bold text-pitch hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Link className="w-3.5 h-3.5" />
-                        <span>{showCustomIcsInput ? 'Piilota oma .ics -linkki' : '+ Lisää oma MyClub / Nimenhuuto .ics'}</span>
+                        <span>{showCustomIcsInput ? 'Piilota linkki' : 'Liitä tulospalvelu- tai kalenterilinkki'}</span>
                       </button>
-
                       {onOpenSmartImport && (
                         <button
                           type="button"
                           onClick={onOpenSmartImport}
                           className="text-xs font-bold text-text-secondary hover:text-text-primary underline cursor-pointer"
                         >
-                          Tekoälytuonti ➔
+                          Liitä WhatsApp-viesti
                         </button>
                       )}
                     </div>
@@ -799,7 +674,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           type="url"
                           value={customIcsUrl}
                           onChange={(e) => setCustomIcsUrl(e.target.value)}
-                          placeholder="https://nimenhuuto.com/team.ics"
+                          placeholder="https://tulospalvelu.palloliitto.fi/team/… tai .ics-linkki"
                           className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-border-subtle text-xs text-text-primary font-mono focus-visible:ring-2 focus-visible:ring-pitch"
                         />
                         <div className="flex items-center justify-between">
@@ -821,7 +696,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             onClick={handleAddCustomIcs}
                             className="px-3.5 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 disabled:opacity-40 cursor-pointer"
                           >
-                            Lisää kalenteri
+                            Lisää joukkue
                           </button>
                         </div>
                       </div>
