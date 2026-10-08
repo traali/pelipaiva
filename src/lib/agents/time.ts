@@ -18,6 +18,28 @@ export function eventDayKey(iso?: string): string {
   return helsinkiDateISO(d);
 }
 
+/**
+ * True once the game's Helsinki calendar day is over. Today's games, played or
+ * not, stay with the current games until Helsinki midnight; only then do they
+ * move to "aiemmat". Uses the end time (a game past midnight belongs to the day
+ * it ends), else the start time. Unknown times never hide a game.
+ */
+export function isPastHelsinkiDay(
+  event: { startTime?: string; endTime?: string },
+  now: Date = new Date()
+): boolean {
+  const ref = [event.endTime, event.startTime].find((iso) => iso && !Number.isNaN(new Date(iso).getTime()));
+  if (!ref) return false;
+  return eventDayKey(ref) < helsinkiDateISO(now);
+}
+
+/** Finished: TASO has a final score, or the reserved slot has ended. */
+export function isFinishedGame(event: { endTime?: string; score?: string }, now: Date = new Date()): boolean {
+  if (event.score) return true;
+  const end = event.endTime ? new Date(event.endTime).getTime() : NaN;
+  return Number.isFinite(end) && end <= now.getTime();
+}
+
 export function formatFiTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
@@ -136,48 +158,4 @@ export function overlapMinutes(aStart: string, aEnd: string, bStart: string, bEn
   const s = Math.max(new Date(aStart).getTime(), new Date(bStart).getTime());
   const e = Math.min(new Date(aEnd).getTime(), new Date(bEnd).getTime());
   return Math.max(0, Math.round((e - s) / 60000));
-}
-
-export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/** Urban Helsinki driving estimate: ~2.1 min/km + 8 min parkki.
- *  Returns 0 when either venue has no geocoded coordinates (lat=0, lng=0 or undefined/NaN),
- *  which is the fallback sentinel from resolveSportsVenue for unknown venues.
- *  Callers must treat 0 as "unknown", not "same location". */
-export function estimateDriveMinutes(
-  lat1?: number,
-  lng1?: number,
-  lat2?: number,
-  lng2?: number
-): number {
-  if (
-    lat1 == null ||
-    lng1 == null ||
-    lat2 == null ||
-    lng2 == null ||
-    isNaN(lat1) ||
-    isNaN(lng1) ||
-    isNaN(lat2) ||
-    isNaN(lng2) ||
-    (lat1 === 0 && lng1 === 0) ||
-    (lat2 === 0 && lng2 === 0) ||
-    lat1 < 50 || // Sanity check for Finland coordinates (lat ~60)
-    lat2 < 50 ||
-    lng1 < 15 ||
-    lng2 < 15
-  ) {
-    return 0;
-  }
-  const km = haversineKm(lat1, lng1, lat2, lng2);
-  if (km < 0.25) return 4;
-  // Cap at 90 min max for regional sports transit
-  return Math.min(90, Math.round(km * 2.1 + 8));
 }

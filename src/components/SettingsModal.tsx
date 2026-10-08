@@ -120,7 +120,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <ToggleSlider
                 id="toggle-conflicts"
                 label="Päällekkäisyysvaroitukset"
-                description="Ilmoita jos perheenjäsenten pelit menevät päällekkäin tai siirtymäaika kenttien välillä on liian tiukka."
+                description="Ilmoita jos perheenjäsenten pelit menevät päällekkäin tai ovat peräkkäin eri kentillä lyhyellä välillä."
                 checked={settings.showConflictWarnings}
                 onChange={(val) => onToggleSetting('showConflictWarnings', val)}
                 icon={<AlertTriangle className="w-4 h-4" />}

@@ -526,7 +526,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
               <ToggleSlider
                 id="family-toggle-conflicts"
                 label="Päällekkäisyysvaroitukset"
-                description="Ilmoita jos perheenjäsenten pelit menevät päällekkäin tai siirtymäaika kenttien välillä on liian tiukka."
+                description="Ilmoita jos perheenjäsenten pelit menevät päällekkäin tai ovat peräkkäin eri kentillä lyhyellä välillä."
                 checked={aiSettings.showConflictWarnings}
                 onChange={(val) => onToggleAiSetting('showConflictWarnings', val)}
                 icon={<AlertTriangle className="w-4 h-4" />}

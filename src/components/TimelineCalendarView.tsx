@@ -389,7 +389,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                                 <div>
                                   {c.overlapMinutes > 0
                                     ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                    : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                    : `⏱️ Peräkkäin eri kentillä (väli ${c.gapMinutes} min)`}
                                 </div>
                                 <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
                                   {c.message}

@@ -25,7 +25,8 @@ export interface FamilyConflict {
   venueA: string;
   venueB: string;
   overlapMinutes: number;
-  travelMinutesEstimate: number;
+  /** Back-to-back: minutes from the first game's end to the next meeting time. 0 for overlaps. */
+  gapMinutes: number;
   message: string;
   suggestedFix: string;
   isResolvedByActiveTransit?: boolean;
