@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { liveText } from '../lib/agents/eventPhase';
 import { motion } from 'motion/react';
 import {
   Clock,
@@ -257,7 +258,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               {isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
-              {isLive ? 'Käynnissä · alkoi' : isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {formattedKickoff} • {venue?.name || 'Kenttä'}
+              {isLive ? `${liveText(event)} · alkoi` : isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {formattedKickoff} • {venue?.name || 'Kenttä'}
             </span>
           </div>
         </div>
@@ -443,7 +444,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             {isLive ? (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-stoppage/15 text-stoppage border border-stoppage/30 text-xs font-bold animate-pulse">
                 <span className="h-2 w-2 rounded-full bg-stoppage" />
-                KÄYNNISSÄ
+                {liveText(event).toUpperCase()}
               </div>
             ) : null}
             <button

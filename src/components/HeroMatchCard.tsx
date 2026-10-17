@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { liveText } from '../lib/agents/eventPhase';
 import {
   AlertTriangle,
   MapPin,
@@ -168,7 +169,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               {event.isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
-              {isLive ? 'Käynnissä · alkoi' : event.isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {kickoff} • {event.venue?.name || 'Kenttä'}
+              {isLive ? `${liveText(event)} · alkoi` : event.isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {kickoff} • {event.venue?.name || 'Kenttä'}
             </span>
           </div>
         </div>
@@ -335,7 +336,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           <div className="flex items-center gap-1.5">
             {isLive && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider text-[10px] bg-stoppage/20 text-stoppage border border-stoppage/30 animate-pulse">
-                ● Käynnissä
+                ● {liveText(event)}
               </span>
             )}
             <button
@@ -503,7 +504,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1">
-              {isLive ? '● Käynnissä · alkoi' : event.sport === 'school' ? '🏫 Koulu alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Harjoitus alkaa' : '⏱️ Ottelu alkaa'}
+              {isLive ? `● ${liveText(event)} · alkoi` : event.sport === 'school' ? '🏫 Koulu alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Harjoitus alkaa' : '⏱️ Ottelu alkaa'}
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-text-primary mt-0.5">
               {kickoff}
