@@ -19,6 +19,7 @@
     "visit": "node scripts/monastery-visitor.mjs",
     "preview": "vite preview",
     "check:neighbors": "node scripts/check-neighbors.mjs",
+    "canary:taso-football": "node scripts/canary-taso-football.mjs",
     "understand": "node scripts/understand.mjs"
   },
   "dependencies": {

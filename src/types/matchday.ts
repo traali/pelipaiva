@@ -321,6 +321,8 @@ export interface OfficialTeamData {
    * may an empty fixture list prune previously stored games.
    */
   fixturesComplete?: boolean;
+  /** True when the federation fetch failed; fixtures is then not authoritative. */
+  fetchFailed?: boolean;
 }
 
 // ============================================================================

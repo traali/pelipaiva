@@ -19,6 +19,31 @@ const PALL_KEY = "4h7dznqdxwtp3hsfdyf5r793uahfxy7x";
 const SALIBANDY_KEY = "zsn3anknxzcfzc23k53jqdcd4pymutsf";
 const BASKET_KEY = "df8e84j9xtdz269euy3h";
 
+/**
+ * Since Oct 2026 Palloliitto's TASO host (spl.torneopal.net) answers an empty
+ * HTTP 403 to any call without a `hash` query param. tulospalvelu.palloliitto.fi
+ * signs each call as sha256 hex of `<method>?<salt>&k1=v1&k2=v2…` (raw values,
+ * query order) and sends `hash` last. Same scheme as traali/football-stats#18.
+ */
+export const PALL_HASH_SALT = "ysnyp4h6e9egetkc3s3v";
+export const PALL_SIGNED_HOST = "spl.torneopal.net";
+
+export async function tasoHash(method: string, params: Record<string, string>): Promise<string> {
+  let input = `${method}?${PALL_HASH_SALT}`;
+  for (const [k, v] of Object.entries(params)) input += `&${k}=${v}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Request URL for one TASO call; Palloliitto calls carry the signature. */
+export async function tasoRequestUrl(base: string, method: string, params: Record<string, string>): Promise<string> {
+  const qs = new URLSearchParams(params);
+  if (new URL(base).hostname === PALL_SIGNED_HOST) qs.append("hash", await tasoHash(method, params));
+  return `${base}/${method}?${qs.toString()}`;
+}
+
 const ENDPOINTS: Partial<
   Record<AssociationType | "volleyball", { base: string; apiKey: string; referer: string }>
 > = {
@@ -237,8 +262,7 @@ export async function torneopalGet<T>(
   for (const ep of attempts) {
     const remaining = deadline - Date.now();
     if (remaining <= 500) break;
-    const search = new URLSearchParams(clean);
-    const url = `${ep.base}/${method}?${search.toString()}`;
+    const url = await tasoRequestUrl(ep.base, method, clean);
 
     try {
       const res = await fetch(url, {
