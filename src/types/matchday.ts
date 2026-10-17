@@ -511,6 +511,8 @@ export interface MatchdayEvent {
   /** Running TASO score while the game is on; never a final score. */
   liveScore?: string;
   liveBreak?: boolean;
+  /** When the live score was last read from TASO (ISO). */
+  liveUpdatedAt?: string;
   venue: VenueInfo;
   volunteerDuty?: string; // e.g. "☕ Kahviovuoro (klo 11:30 - 13:00)"
   weather?: WeatherCondition;

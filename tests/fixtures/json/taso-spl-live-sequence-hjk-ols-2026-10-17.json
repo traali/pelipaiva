@@ -1,0 +1,57 @@
+{
+ "_source": "Real signed getMatch?match_id=4291688 (HJK–OLS) polled from spl.torneopal.net on 2026-10-17; OLS scored between polls (4–0 → 4–1). Trimmed to state fields.",
+ "sequence": [
+  {
+   "fetchedAtHelsinki": "2026-10-17T14:13:12+03:00",
+   "match": {
+    "match_id": "4291688",
+    "date": "2026-10-17",
+    "time": "13:00:00",
+    "time_end": "15:00:00",
+    "status": "Live",
+    "team_A_id": "60797",
+    "team_A_name": "HJK",
+    "team_B_id": "60822",
+    "team_B_name": "OLS",
+    "fs_A": "4",
+    "fs_B": "0",
+    "live_A": "4",
+    "live_B": "0",
+    "live_time": "00:02:43",
+    "live_time_mmss": "02:43",
+    "live_minutes": 47,
+    "live_timer_on": "1",
+    "live_timer_start": "2026-10-17 14:09:09",
+    "live_period": "2",
+    "periods_played": 1,
+    "playing_time_min": "120"
+   }
+  },
+  {
+   "fetchedAtHelsinki": "2026-10-17T14:14:15+03:00",
+   "match": {
+    "match_id": "4291688",
+    "date": "2026-10-17",
+    "time": "13:00:00",
+    "time_end": "15:00:00",
+    "status": "Live",
+    "team_A_id": "60797",
+    "team_A_name": "HJK",
+    "team_B_id": "60822",
+    "team_B_name": "OLS",
+    "fs_A": "4",
+    "fs_B": "1",
+    "live_A": "4",
+    "live_B": "1",
+    "live_time": "00:04:43",
+    "live_time_mmss": "04:43",
+    "live_minutes": 49,
+    "live_timer_on": "1",
+    "live_timer_start": "2026-10-17 14:09:09",
+    "live_period": "2",
+    "periods_played": 1,
+    "playing_time_min": "120"
+   }
+  }
+ ]
+}

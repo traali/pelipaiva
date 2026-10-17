@@ -273,6 +273,8 @@ export async function torneopalGet<T>(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         },
         referrerPolicy: "origin",
+        // Live scores must never come from the HTTP cache.
+        cache: "no-store",
         signal: AbortSignal.timeout(Math.min(10000, remaining)),
       });
       if (!res.ok) continue;

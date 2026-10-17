@@ -184,7 +184,7 @@ export async function ingestOfficialForProfile(opts: {
       score: fixture.score,
       venue,
       officialFixtureId: fixture.id,
-      ...(fixture.liveScore ? { liveScore: fixture.liveScore, liveBreak: fixture.liveBreak } : {}),
+      ...(fixture.liveScore ? { liveScore: fixture.liveScore, liveBreak: fixture.liveBreak, liveUpdatedAt: fixture.fetchedAt } : {}),
       reconciliationStatus: 'auto_matched',
       confidenceScore: 1.0,
       stats: hasRenderableStats(officialStats) ? officialStats : undefined
