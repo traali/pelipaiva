@@ -481,7 +481,9 @@ export function mapFixture(
   }
   const endTime = new Date(endMs).toISOString();
   const matchId = str(match.match_id);
-  const live = status === "upcoming" ? tasoLiveScore(match) : null;
+  // TASO leaves some old games on "Live" forever (e.g. SISU/Valkoinen 2025:
+  // 3891605, 3891623). A game whose slot has ended is not running.
+  const live = status === "upcoming" && Date.now() < endMs ? tasoLiveScore(match) : null;
 
   return {
     id: `${parsed.association}_${parsed.teamId}_${matchId || str(match.date)}`,

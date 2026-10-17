@@ -3,6 +3,8 @@ import type { MatchdayEvent } from '../../types/matchday';
 import { torneopalGet, tasoLiveScore } from '../api/torneopalClient';
 import { isEventLive } from '../agents/eventPhase';
 
+const ev0 = (evs: MatchdayEvent[]) => evs[0]!;
+
 export const LIVE_REFRESH_MS = 60_000;
 export const LIVE_BACKOFF_MAX_MS = 10 * 60_000;
 
@@ -52,7 +54,8 @@ export async function refreshLiveGames(
     if (status === 'played' && /^\d+$/.test(String(m.fs_A ?? '')) && /^\d+$/.test(String(m.fs_B ?? ''))) {
       patch = { score: `${Number(m.fs_A)}–${Number(m.fs_B)}`, liveScore: undefined, liveBreak: undefined, liveUpdatedAt: stamp };
     } else {
-      const live = tasoLiveScore(m);
+      // Never trust a stuck "Live" past the slot: isEventLive already ended it locally.
+      const live = isEventLive(ev0(evs), new Date()) ? tasoLiveScore(m) : null;
       patch = live
         ? { liveScore: live.score, liveBreak: live.isBreak, liveUpdatedAt: stamp }
         : { liveUpdatedAt: stamp };

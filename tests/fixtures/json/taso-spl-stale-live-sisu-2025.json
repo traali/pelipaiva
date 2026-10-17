@@ -1,0 +1,51 @@
+{
+ "_source": "Real signed getMatch responses from spl.torneopal.net fetched 2026-10-17 14:35 Helsinki: SISU/Valkoinen 2025 games TASO still reports as status Live. Trimmed to state fields.",
+ "matches": [
+  {
+   "match_id": "3891605",
+   "date": "2025-09-03",
+   "time": "18:30:00",
+   "time_end": "19:40:00",
+   "status": "Live",
+   "team_A_id": "35118072",
+   "team_A_name": "SISU/Valkoinen",
+   "team_B_id": "35186049",
+   "team_B_name": "EPS/Punainen B",
+   "fs_A": "7",
+   "fs_B": "0",
+   "live_A": "7",
+   "live_B": "0",
+   "live_time": "00:30:51",
+   "live_time_mmss": "30:51",
+   "live_minutes": 60,
+   "live_timer_on": "0",
+   "live_timer_start": "2025-09-03 19:35:52",
+   "live_period": "2",
+   "periods_played": 1,
+   "playing_time_min": "70"
+  },
+  {
+   "match_id": "3891623",
+   "date": "2025-10-01",
+   "time": "18:30:00",
+   "time_end": "19:40:00",
+   "status": "Live",
+   "team_A_id": "35118072",
+   "team_A_name": "SISU/Valkoinen",
+   "team_B_id": "35147748",
+   "team_B_name": "KaPy/Valkoinen",
+   "fs_A": "2",
+   "fs_B": "6",
+   "live_A": "2",
+   "live_B": "6",
+   "live_time": "00:30:26",
+   "live_time_mmss": "30:26",
+   "live_minutes": 60,
+   "live_timer_on": "0",
+   "live_timer_start": "2025-10-01 19:32:49",
+   "live_period": "2",
+   "periods_played": 1,
+   "playing_time_min": "70"
+  }
+ ]
+}
