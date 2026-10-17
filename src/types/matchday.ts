@@ -274,6 +274,10 @@ export interface OfficialLeagueFixture {
   /** TASO "Forfeited": a walkover result, counted by the league table. */
   isWalkover?: boolean;
   score?: string;
+  /** Running score while TASO says the game is on (status Live/Break and the whistle has blown). Not a final score. */
+  liveScore?: string;
+  /** TASO "Break" = half-time. */
+  liveBreak?: boolean;
   homeScore?: number;
   awayScore?: number;
   setScores?: string[];
@@ -504,6 +508,9 @@ export interface MatchdayEvent {
   roundInfo?: string;
   matchNumber?: string; // e.g. "227"
   score?: string; // e.g. "2–12", "4–9", "7–3"
+  /** Running TASO score while the game is on; never a final score. */
+  liveScore?: string;
+  liveBreak?: boolean;
   venue: VenueInfo;
   volunteerDuty?: string; // e.g. "☕ Kahviovuoro (klo 11:30 - 13:00)"
   weather?: WeatherCondition;

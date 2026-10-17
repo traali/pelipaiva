@@ -396,6 +396,47 @@ export function clipToNextGame<T extends { startTime: string; endTime?: string }
   });
 }
 
+const numericStr = (v: unknown): boolean => /^\d+$/.test(str(v));
+
+/**
+ * Proof the whistle has blown (football-stats#19): a running clock, a played
+ * minute, a finished period or a goal. TASO sets status "Live" as soon as the
+ * match card is opened, before kickoff, so status alone is not proof.
+ */
+export function tasoHasStarted(m: Record<string, unknown>): boolean {
+  if (str(m.time).includes("'")) return true;
+  const start = str(m.live_timer_start);
+  if (num(m.live_timer_on) === 1 && /^\d{4}-\d{2}-\d{2}/.test(start) && !start.startsWith("0000")) return true;
+  const mmss = str(m.live_time_mmss);
+  if (mmss && mmss !== "00:00") return true;
+  const lt = str(m.live_time);
+  if (lt && !/^0{1,2}(:00){0,2}$/.test(lt)) return true;
+  if (num(m.periods_played) > 0) return true;
+  return false;
+}
+
+/**
+ * Running score of a game TASO reports as on (Live, or Break = half-time).
+ * getMatch carries it in live_A/live_B; getMatches/getGroup rows leave those
+ * empty and carry it in fs_A/fs_B (football-stats#19/#20). A 0–0 before the
+ * whistle (card opened early) is not a score.
+ */
+export function tasoLiveScore(m: Record<string, unknown>): { score: string; isBreak: boolean } | null {
+  const status = str(m.status).toLowerCase();
+  const isBreak = status === "break";
+  if (status !== "live" && !isBreak) return null;
+  let a: string, b: string;
+  if (numericStr(m.live_A) && numericStr(m.live_B)) {
+    a = str(m.live_A); b = str(m.live_B);
+  } else if (str(m.live_A) === "" && str(m.live_B) === "" && numericStr(m.fs_A) && numericStr(m.fs_B)) {
+    a = str(m.fs_A); b = str(m.fs_B);
+  } else {
+    return null;
+  }
+  if (!isBreak && !tasoHasStarted(m) && Number(a) + Number(b) === 0) return null;
+  return { score: `${Number(a)}–${Number(b)}`, isBreak };
+}
+
 export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
@@ -438,6 +479,7 @@ export function mapFixture(
   }
   const endTime = new Date(endMs).toISOString();
   const matchId = str(match.match_id);
+  const live = status === "upcoming" ? tasoLiveScore(match) : null;
 
   return {
     id: `${parsed.association}_${parsed.teamId}_${matchId || str(match.date)}`,
@@ -469,6 +511,7 @@ export function mapFixture(
       homeScore != null && awayScore != null ? `${homeScore}–${awayScore}` : undefined,
     homeScore,
     awayScore,
+    ...(live ? { liveScore: live.score, liveBreak: live.isBreak } : {}),
     officialMatchUrl: parsed.canonicalUrl,
     matchId,
     round: str(match.round_name) || str(match.round_id) || undefined,

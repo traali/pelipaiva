@@ -71,7 +71,7 @@ export function useMatchdayLogistics({
 
   // Time & Status Calculations
   // A game with a final score from TASO is over, even if its slot has not ended.
-  const isLive = isEventLive({ startTime: event.startTime, endTime: event.endTime, score: currentScore });
+  const isLive = isEventLive({ startTime: event.startTime, endTime: event.endTime, score: currentScore, liveScore: event.liveScore });
   const isPast = new Date(event.endTime) <= new Date() || currentScore !== undefined;
 
   const formattedKickoff = new Date(event.startTime).toLocaleTimeString("fi-FI", {

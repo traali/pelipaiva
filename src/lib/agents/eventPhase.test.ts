@@ -39,8 +39,8 @@ describe('every view uses the shared live rule', () => {
     }
   });
   it('Kortit (HeroMatchCard, MatchdayCard) swap "Ottelu alkaa" for Käynnissä while live', () => {
-    expect(src('HeroMatchCard.tsx')).toContain("isLive ? '● Käynnissä · alkoi'");
-    expect(src('HeroMatchCard.tsx')).toContain("isLive ? 'Käynnissä · alkoi'");
-    expect(src('MatchdayCard.tsx')).toContain("isLive ? 'Käynnissä · alkoi'");
+    expect(src('HeroMatchCard.tsx')).toContain('isLive ? `● ${liveText(event)} · alkoi`');
+    expect(src('HeroMatchCard.tsx')).toContain('isLive ? `${liveText(event)} · alkoi`');
+    expect(src('MatchdayCard.tsx')).toContain('isLive ? `${liveText(event)} · alkoi`');
   });
 });
