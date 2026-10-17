@@ -257,7 +257,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               {isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
-              {isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {formattedKickoff} • {venue?.name || 'Kenttä'}
+              {isLive ? 'Käynnissä · alkoi' : isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {formattedKickoff} • {venue?.name || 'Kenttä'}
             </span>
           </div>
         </div>

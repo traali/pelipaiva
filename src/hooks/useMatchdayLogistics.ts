@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { isEventLive } from '../lib/agents/eventPhase';
 import type { MatchdayEvent, HomeLocation, PitchSurface, TransitPlan } from "../types/matchday";
 import type { FamilyConflict } from "../lib/agents";
 import { useDismissedConflicts, groupActiveConflicts } from "../lib/agents/conflictDismissal";
@@ -70,10 +71,7 @@ export function useMatchdayLogistics({
 
   // Time & Status Calculations
   // A game with a final score from TASO is over, even if its slot has not ended.
-  const isLive =
-    currentScore === undefined &&
-    new Date(event.startTime) <= new Date() &&
-    new Date() <= new Date(event.endTime);
+  const isLive = isEventLive({ startTime: event.startTime, endTime: event.endTime, score: currentScore });
   const isPast = new Date(event.endTime) <= new Date() || currentScore !== undefined;
 
   const formattedKickoff = new Date(event.startTime).toLocaleTimeString("fi-FI", {

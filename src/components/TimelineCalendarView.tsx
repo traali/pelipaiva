@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { startLabel } from '../lib/agents/eventPhase';
 import { motion } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -326,7 +327,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-black font-mono tracking-tight text-text-primary flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
-                          <span>{ev.isTraining ? 'Treeni alkaa' : ev.sport === 'school' ? 'Koulu' : ev.sport === 'other' ? 'Alkaa' : 'Ottelu alkaa'} klo {timeStr}</span>
+                          <span>{startLabel(ev)} klo {timeStr}</span>
                         </span>
 
                         <span

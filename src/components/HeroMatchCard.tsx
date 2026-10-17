@@ -168,7 +168,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               {event.isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
-              {event.isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {kickoff} • {event.venue?.name || 'Kenttä'}
+              {isLive ? 'Käynnissä · alkoi' : event.isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {kickoff} • {event.venue?.name || 'Kenttä'}
             </span>
           </div>
         </div>
@@ -503,7 +503,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1">
-              {event.sport === 'school' ? '🏫 Koulu alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Harjoitus alkaa' : '⏱️ Ottelu alkaa'}
+              {isLive ? '● Käynnissä · alkoi' : event.sport === 'school' ? '🏫 Koulu alkaa' : event.sport === 'other' ? '📌 Alkaa' : event.isTraining ? '🏃‍♂️ Harjoitus alkaa' : '⏱️ Ottelu alkaa'}
             </span>
             <span className="font-tabular text-xl sm:text-2xl font-black text-text-primary mt-0.5">
               {kickoff}

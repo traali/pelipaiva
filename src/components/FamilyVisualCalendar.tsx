@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { startLabel } from '../lib/agents/eventPhase';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronLeft,
@@ -763,7 +764,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black font-mono text-pitch flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{ev.isTraining ? 'Treeni alkaa' : ev.sport === 'school' ? 'Koulu' : ev.sport === 'other' ? 'Alkaa' : 'Ottelu alkaa'} klo {timeStr}</span>
+                        <span>{startLabel(ev)} klo {timeStr}</span>
                       </span>
                       <span
                         className="text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xs"
