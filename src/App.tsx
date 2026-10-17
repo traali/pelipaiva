@@ -18,6 +18,7 @@ import { HeroMatchCard } from './components/HeroMatchCard';
 import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
+import { startLiveRefresh } from './lib/live/liveRefresh';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
 import { eventDayKey, helsinkiDateISO, isFinishedGame, isPastHelsinkiDay, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
@@ -97,6 +98,9 @@ export const App: React.FC = () => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Live games: refresh their TASO score ~every 60 s while the tab is visible.
+  useEffect(() => startLiveRefresh(db), []);
 
   // Background Family Cloud Sync Loop (every 30s while document is visible)
   useEffect(() => {

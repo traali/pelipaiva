@@ -54,7 +54,14 @@ export default defineConfig({
         globIgnores: ['**/tesseract/**'],
         skipWaiting: true,
         clientsClaim: true,
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        // Federation/TASO data (live scores) always from the network, never a SW cache.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /(^|\.)torneopal\.(net|fi|com)$/.test(url.hostname),
+            handler: 'NetworkOnly'
+          }
+        ]
       }
     })
   ],

@@ -17,14 +17,23 @@ export function isEventLive(
 }
 
 /** "Käynnissä 1–0", "Käynnissä 0–1 · tauko", or plain "Käynnissä" when TASO has no running score yet. */
-export function liveText(ev: { liveScore?: string; liveBreak?: boolean }): string {
+export function liveText(ev: { liveScore?: string; liveBreak?: boolean; liveUpdatedAt?: string }): string {
   if (!ev.liveScore) return 'Käynnissä';
-  return `Käynnissä ${ev.liveScore}${ev.liveBreak ? ' · tauko' : ''}`;
+  const updated = liveUpdatedText(ev);
+  return `Käynnissä ${ev.liveScore}${ev.liveBreak ? ' · tauko' : ''}${updated ? ` (${updated})` : ''}`;
+}
+
+/** "päivitetty klo 14.23" so a stale live score is not mistaken for the current one. */
+export function liveUpdatedText(ev: { liveUpdatedAt?: string }): string | null {
+  if (!ev.liveUpdatedAt) return null;
+  const d = new Date(ev.liveUpdatedAt);
+  if (!Number.isFinite(d.getTime())) return null;
+  return `päivitetty klo ${d.toLocaleTimeString('fi-FI', { timeZone: 'Europe/Helsinki', hour: '2-digit', minute: '2-digit' })}`;
 }
 
 /** Header label for a calendar row: "Käynnissä · alkoi klo" while live, else the view's own "… alkaa klo". */
 export function startLabel(
-  ev: { startTime: string; endTime: string; score?: unknown; liveScore?: string; liveBreak?: boolean; isTraining?: boolean; sport?: string },
+  ev: { startTime: string; endTime: string; score?: unknown; liveScore?: string; liveBreak?: boolean; liveUpdatedAt?: string; isTraining?: boolean; sport?: string },
   now: Date = new Date()
 ): string {
   if (isEventLive(ev, now)) return `● ${liveText(ev)} · alkoi`;
