@@ -104,6 +104,21 @@ export async function ingestOfficialForProfile(opts: {
 
   officialData = mergeOfficialWithCupFallback(cup, officialData);
 
+  // A failed Palloliitto fetch must read as an error, never as "no games".
+  if (
+    parsedAssoc &&
+    (parsedAssoc.association === 'palloliitto' || parsedAssoc.sport === 'football') &&
+    !cup &&
+    (!officialData || (officialData.fixtures.length === 0 && !officialData.fixturesComplete))
+  ) {
+    notifyFetchError({
+      title: 'Palloliiton tietoja ei saatu juuri nyt',
+      message: `Palloliiton tulospalvelu ei vastannut (${opts.teamName}). Tallennetut pelit säilyvät; yritä myöhemmin uudelleen.`,
+      source: 'Palloliitto'
+    });
+    if (officialData) officialData = { ...officialData, fetchFailed: true };
+  }
+
   if (!officialData || officialData.fixtures.length === 0) {
     // TASO answered every call and the team has no games: earlier stored games
     // for this profile are no longer TASO's and must go. A failed or partial
