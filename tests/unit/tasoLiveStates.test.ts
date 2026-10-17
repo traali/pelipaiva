@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mapFixture, tasoLiveScore } from '../../src/lib/api/torneopalClient';
 import { isEventLive, startLabel } from '../../src/lib/agents/eventPhase';
 import type { ParsedAssociationUrl } from '../../src/types/matchday';
@@ -18,6 +18,11 @@ const asEvent = (m: Raw, teamId: string) => {
   return { ...f, endTime: f.endTime! };
 };
 
+// Mapping runs at the recording time (14:03 Helsinki), while those games were on.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-17T14:03:00+03:00'));
+});
 afterEach(() => vi.useRealTimers());
 
 describe('1. status Live before kickoff (card opened, clock not started)', () => {
