@@ -1,0 +1,98 @@
+name: Parkkis prod guard
+
+# Parkkis has no working Cloudflare token, and Cloudflare's git integration publishes
+# an EMPTY site on every push to traali/Parkkis master (e.g. the daily data commit),
+# which 404s parkkis.pages.dev. Every 20 min: if / or a venue link is not the app,
+# or prod is not serving Parkkis master, rebuild and redeploy it from this house.
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+    inputs:
+      disable_cf_git_deploys:
+        description: 'Also turn off Cloudflare git-linked auto deployments for parkkis'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: parkkis-prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe prod
+        id: probe
+        run: |
+          ok=true
+          master=$(git ls-remote https://github.com/traali/Parkkis refs/heads/master | cut -c1-7)
+          for u in "https://parkkis.pages.dev/" \
+                   "https://parkkis.pages.dev/venue/Lauttasaari%20TN%20B?lat=60.16357&lon=24.8675" \
+                   "https://parkkis.pages.dev/venue/Espoonlahti%201%20TN%20A?lat=60.1485&lon=24.653"; do
+            code=$(curl -s -o page.html -w '%{http_code}' --retry 3 --retry-delay 5 "$u")
+            js=$(grep -o '/assets/index-[^"]*\.js' page.html | head -1 || true)
+            echo "$u -> HTTP $code, bundle ${js:-none}"
+            if [ "$code" != 200 ] || ! grep -q 'id="root"' page.html || [ -z "$js" ]; then ok=false; fi
+          done
+          if [ "$ok" = true ]; then
+            curl -s "https://parkkis.pages.dev$js" -o app.js
+            served=$(grep -o 'commit:`[0-9a-f]*`' app.js | head -1 | grep -o '[0-9a-f]\{7\}' || true)
+            magic=$(curl -s https://parkkis.pages.dev/data/espoo.parquet | head -c 4)
+            echo "prod serves $served, Parkkis master $master, espoo.parquet magic '$magic'"
+            [ "$magic" = PAR1 ] || ok=false
+            [ "$served" = "$master" ] || { echo "::notice::prod is behind master"; ok=false; }
+          fi
+          echo "healthy=$ok" >> "$GITHUB_OUTPUT"
+
+      - name: Turn off Cloudflare git auto deployments
+        if: inputs.disable_cf_git_deploys
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/parkkis"
+          curl -s -H "Authorization: Bearer $CF_TOKEN" "$api" | jq '{success, errors, source: .result.source, build_config: .result.build_config}'
+          curl -s -X PATCH -H "Authorization: Bearer $CF_TOKEN" -H 'Content-Type: application/json' "$api" \
+            --data '{"source":{"config":{"deployments_enabled":false,"production_deployments_enabled":false,"preview_deployment_setting":"none"}}}' \
+            | jq '{success, errors, source: .result.source}'
+          curl -s -H "Authorization: Bearer $CF_TOKEN" "$api/deployments?per_page=12" \
+            | jq -r '.result[]? | [.created_on, .short_id, .environment, .deployment_trigger.type, (.deployment_trigger.metadata.commit_hash // "")[0:7]] | @tsv'
+
+      - uses: actions/checkout@v4
+        if: steps.probe.outputs.healthy != 'true'
+        with:
+          repository: traali/Parkkis
+          ref: master
+          path: Parkkis
+      - uses: actions/setup-node@v4
+        if: steps.probe.outputs.healthy != 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Parkkis/web/package-lock.json
+      - name: Build (fails on missing data) and refuse an empty dist
+        if: steps.probe.outputs.healthy != 'true'
+        working-directory: Parkkis/web
+        run: |
+          npm ci && npm run build
+          grep -q 'id="root"' dist/index.html && ls dist/assets/*.js && test -s dist/data/manifest.json
+      - name: Publish Parkkis
+        if: steps.probe.outputs.healthy != 'true'
+        working-directory: Parkkis/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 pages deploy dist --project-name=parkkis --branch=master --commit-dirty=true
+      - name: Verify
+        if: steps.probe.outputs.healthy != 'true'
+        run: |
+          sleep 20
+          for u in "https://parkkis.pages.dev/" "https://parkkis.pages.dev/venue/Lauttasaari%20TN%20B?lat=60.16357&lon=24.8675"; do
+            curl -fsS --retry 5 --retry-delay 10 "$u" | grep -q 'id="root"' || { echo "::error::$u still down"; exit 1; }
+          done
+          echo "prod restored"
