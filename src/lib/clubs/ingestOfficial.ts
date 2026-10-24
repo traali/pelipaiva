@@ -187,6 +187,7 @@ export async function ingestOfficialForProfile(opts: {
       tournamentName: thisCup ? fixture.leagueName || officialData.leagueName : undefined,
       stage: fixture.stage,
       matchNumber: fixture.matchNumber,
+      ...(fixture.ageClassLabel ? { ageClassLabel: fixture.ageClassLabel } : {}),
       score: fixture.score,
       venue,
       officialFixtureId: fixture.id,

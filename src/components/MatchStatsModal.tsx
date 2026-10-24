@@ -40,6 +40,7 @@ interface MatchStatsModalProps {
   score?: string;
   sport?: SportType;
   stage?: string;
+  ageClassLabel?: string;
   division?: string;
   showTacticalScout?: boolean;
   onSavePlayerLog?: (log: PlayerMatchLog, updatedScore?: string) => void;
@@ -77,6 +78,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   score,
   sport = 'football',
   stage,
+  ageClassLabel,
   division,
   showTacticalScout = false,
   onSavePlayerLog
@@ -259,6 +261,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   {(stage || stats.leagueName) ? (
                     <div className="text-[11px] font-bold text-pitch uppercase tracking-wider">
                       {stage || stats.leagueName}
+                      {ageClassLabel ? ` · ${ageClassLabel}` : ''}
                     </div>
                   ) : null}
                   {(division || stats.round) ? (
