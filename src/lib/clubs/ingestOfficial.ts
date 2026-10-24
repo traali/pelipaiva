@@ -104,17 +104,23 @@ export async function ingestOfficialForProfile(opts: {
 
   officialData = mergeOfficialWithCupFallback(cup, officialData);
 
-  // A failed Palloliitto fetch must read as an error, never as "no games".
+  // A failed Palloliitto / Salibandyliitto fetch (403, "Not allowed", timeout)
+  // must read as an error, never as "no games", and never prune stored games.
+  const fedName =
+    parsedAssoc && (parsedAssoc.association === 'palloliitto' || parsedAssoc.sport === 'football')
+      ? 'Palloliitto'
+      : parsedAssoc && (parsedAssoc.association === 'salibandy' || parsedAssoc.sport === 'floorball')
+        ? 'Salibandyliitto'
+        : null;
   if (
-    parsedAssoc &&
-    (parsedAssoc.association === 'palloliitto' || parsedAssoc.sport === 'football') &&
+    fedName &&
     !cup &&
     (!officialData || (officialData.fixtures.length === 0 && !officialData.fixturesComplete))
   ) {
     notifyFetchError({
-      title: 'Palloliiton tietoja ei saatu juuri nyt',
-      message: `Palloliiton tulospalvelu ei vastannut (${opts.teamName}). Tallennetut pelit säilyvät; yritä myöhemmin uudelleen.`,
-      source: 'Palloliitto'
+      title: `${fedName === 'Palloliitto' ? 'Palloliiton' : 'Salibandyliiton'} tietoja ei saatu juuri nyt`,
+      message: `${fedName === 'Palloliitto' ? 'Palloliiton' : 'Salibandyliiton'} tulospalvelu ei vastannut (${opts.teamName}). Tallennetut pelit säilyvät; yritä myöhemmin uudelleen.`,
+      source: fedName
     });
     if (officialData) officialData = { ...officialData, fetchFailed: true };
   }

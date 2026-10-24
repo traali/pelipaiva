@@ -8,16 +8,25 @@ const ev0 = (evs: MatchdayEvent[]) => evs[0]!;
 export const LIVE_REFRESH_MS = 60_000;
 export const LIVE_BACKOFF_MAX_MS = 10 * 60_000;
 
-/** TASO match id of a stored Palloliitto game (`palloliitto_<team>_<match>`), else null. */
-export function palloliittoMatchId(ev: Pick<MatchdayEvent, 'officialFixtureId'>): string | null {
-  const m = /^palloliitto_[^_]+_(\d+)$/.exec(ev.officialFixtureId || '');
-  return m ? m[1]! : null;
+type LiveFed = 'palloliitto' | 'salibandy';
+const FED_SPORT = { palloliitto: 'football', salibandy: 'floorball' } as const;
+
+/** TASO federation + match id of a stored football/floorball game (`<fed>_<team>_<match>`), else null. */
+export function tasoLiveRef(ev: Pick<MatchdayEvent, 'officialFixtureId'>): { fed: LiveFed; matchId: string } | null {
+  const m = /^(palloliitto|salibandy)_[^_]+_(\d+)$/.exec(ev.officialFixtureId || '');
+  return m ? { fed: m[1] as LiveFed, matchId: m[2]! } : null;
 }
 
-/** The family's Palloliitto games that are on right now. Local only: no network. */
+/** TASO match id of a stored Palloliitto game (`palloliitto_<team>_<match>`), else null. */
+export function palloliittoMatchId(ev: Pick<MatchdayEvent, 'officialFixtureId'>): string | null {
+  const r = tasoLiveRef(ev);
+  return r && r.fed === 'palloliitto' ? r.matchId : null;
+}
+
+/** The family's Palloliitto and Salibandyliitto games that are on right now. Local only: no network. */
 export async function liveOfficialGames(db: PelipaivaDB, now: Date = new Date()): Promise<MatchdayEvent[]> {
   const all = await db.events.toArray();
-  return all.filter((ev) => !ev.isTraining && palloliittoMatchId(ev) !== null && isEventLive(ev, now));
+  return all.filter((ev) => !ev.isTraining && tasoLiveRef(ev) !== null && isEventLive(ev, now));
 }
 
 interface TasoMatchPayload {
@@ -37,12 +46,14 @@ export async function refreshLiveGames(
   if (games.length === 0) return { live: 0, failed: 0 };
   const byMatch = new Map<string, MatchdayEvent[]>();
   for (const ev of games) {
-    const id = palloliittoMatchId(ev)!;
+    const r = tasoLiveRef(ev)!;
+    const id = `${r.fed}:${r.matchId}`;
     byMatch.set(id, [...(byMatch.get(id) || []), ev]);
   }
   let failed = 0;
-  for (const [matchId, evs] of byMatch) {
-    const json = await torneopalGet<TasoMatchPayload>('palloliitto', 'getMatch', { match_id: matchId }, undefined, 'football');
+  for (const [key, evs] of byMatch) {
+    const [fed, matchId] = key.split(':') as [LiveFed, string];
+    const json = await torneopalGet<TasoMatchPayload>(fed, 'getMatch', { match_id: matchId }, undefined, FED_SPORT[fed]);
     const m = json?.match;
     if (!m) {
       failed++;

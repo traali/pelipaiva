@@ -27,6 +27,13 @@ const BASKET_KEY = "df8e84j9xtdz269euy3h";
  */
 export const PALL_HASH_SALT = "ysnyp4h6e9egetkc3s3v";
 export const PALL_SIGNED_HOST = "spl.torneopal.net";
+/**
+ * Hosts whose official web app signs every call. tulospalvelu.salibandy.fi
+ * (bundle index-CkQ23erR.js, 24.10.2026) signs exactly like Palloliitto: same
+ * salt, same `<method>?<salt>&k=v…` sha256, key in `Accept: json/<key>`.
+ * Basketball and volleyball hosts still answer unsigned calls (checked 24.10.2026).
+ */
+export const TASO_SIGNED_HOSTS: ReadonlySet<string> = new Set([PALL_SIGNED_HOST, "salibandy-api.torneopal.net"]);
 
 export async function tasoHash(method: string, params: Record<string, string>): Promise<string> {
   let input = `${method}?${PALL_HASH_SALT}`;
@@ -37,10 +44,10 @@ export async function tasoHash(method: string, params: Record<string, string>): 
     .join("");
 }
 
-/** Request URL for one TASO call; Palloliitto calls carry the signature. */
+/** Request URL for one TASO call; calls to signed hosts carry `hash` last. */
 export async function tasoRequestUrl(base: string, method: string, params: Record<string, string>): Promise<string> {
   const qs = new URLSearchParams(params);
-  if (new URL(base).hostname === PALL_SIGNED_HOST) qs.append("hash", await tasoHash(method, params));
+  if (TASO_SIGNED_HOSTS.has(new URL(base).hostname)) qs.append("hash", await tasoHash(method, params));
   return `${base}/${method}?${qs.toString()}`;
 }
 
