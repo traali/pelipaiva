@@ -357,6 +357,15 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
             ? event.title
             : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
         </h2>
+        {event.ageClassLabel && (
+          <span
+            className="mt-1.5 inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/30"
+            title="Ottelun ikäluokka poikkeaa joukkueen omasta"
+            data-testid="age-class-label"
+          >
+            {event.ageClassLabel}
+          </span>
+        )}
         {(event.tournamentName || event.stage || event.matchNumber || event.score) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-text-secondary">
             {event.tournamentName && (
