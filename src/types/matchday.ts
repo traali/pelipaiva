@@ -286,6 +286,8 @@ export interface OfficialLeagueFixture {
   matchNumber?: string;
   stage?: string;
   round?: string;
+  /** TASO age class of this game, e.g. "P14 (2013)", only when it is not the team's own birth year. */
+  ageClassLabel?: string;
   fetchedAt: string; // ISO 8601 string
 }
 
@@ -507,6 +509,8 @@ export interface MatchdayEvent {
   division?: string; // e.g. "WU13 1div."
   roundInfo?: string;
   matchNumber?: string; // e.g. "227"
+  /** Floorball: game age class when it differs from the team's own, e.g. "P14 (2013)". */
+  ageClassLabel?: string;
   score?: string; // e.g. "2–12", "4–9", "7–3"
   /** Running TASO score while the game is on; never a final score. */
   liveScore?: string;

@@ -446,10 +446,40 @@ export function tasoLiveScore(m: Record<string, unknown>): { score: string; isBr
   return { score: `${Number(a)}–${Number(b)}`, isBreak };
 }
 
+/**
+ * TASO age_group ("P14", "T12", old seasons "10") gives the age class of a
+ * game. Age N in season Y/Y+1 (season starts August) means born (Y+1)-N.
+ */
+export function tasoAgeClass(
+  match: Record<string, unknown>
+): { label: string; birthYear: number } | null {
+  const raw = str(match.age_group).trim();
+  const m = /^([A-Za-zÅÄÖåäö]*)\s*(\d{1,2})$/.exec(raw);
+  const dm = /^(\d{4})-(\d{2})/.exec(str(match.date));
+  if (!m || !dm) return null;
+  const age = Number(m[2]);
+  if (age < 5 || age > 21) return null;
+  const year = Number(dm[1]);
+  const seasonEnd = Number(dm[2]) >= 8 ? year + 1 : year;
+  return { label: `${(m[1] || "").toUpperCase()}${age}`, birthYear: seasonEnd - age };
+}
+
+/** Label only when the game's age class is not the team's own birth year. */
+export function ageClassLabelFor(
+  match: Record<string, unknown>,
+  teamBirthYear?: number
+): string | undefined {
+  if (!teamBirthYear) return undefined;
+  const ac = tasoAgeClass(match);
+  if (!ac || ac.birthYear === teamBirthYear) return undefined;
+  return `${ac.label} (${ac.birthYear})`;
+}
+
 export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
-  teamName: string
+  teamName: string,
+  teamBirthYear?: number
 ): OfficialLeagueFixture | null {
   const startTime = finnishIso(str(match.date), str(match.time));
   if (!startTime) return null;
@@ -528,6 +558,10 @@ export function mapFixture(
     round: str(match.round_name) || str(match.round_id) || undefined,
     stage: str(match.stage_name) || str(match.stage) || str(match.group_name) || undefined,
     matchNumber: str(match.match_number) || undefined,
+    ...(() => {
+      const l = ageClassLabelFor(match, teamBirthYear);
+      return l ? { ageClassLabel: l } : {};
+    })(),
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -646,6 +680,8 @@ export async function fetchTorneopalTeamData(
   const categories = Array.isArray(team.categories) ? (team.categories as Record<string, unknown>[]) : [];
   const primary = (team.primary_category as Record<string, unknown> | undefined) || categories[0];
   let currentGroup = pickCurrentGroup(groups);
+  const by = Number(str(team.birthyear));
+  const teamBirthYear = by > 1990 && by < 2100 ? by : undefined;
   const keepCupIds = looksLikeCupRequest(parsed);
   const competitionId = keepCupIds && parsed.seasonId
     ? parsed.seasonId
@@ -707,7 +743,7 @@ export async function fetchTorneopalTeamData(
   }
 
   let fixtures = rawMatches
-    .map((m) => mapFixture(m, parsed, teamName))
+    .map((m) => mapFixture(m, parsed, teamName, teamBirthYear))
     .filter((f): f is NonNullable<typeof f> => Boolean(f))
     .filter((f) => new Date(f.startTime).getUTCFullYear() >= 2024);
   fixtures = clipToNextGame(fixtures);
