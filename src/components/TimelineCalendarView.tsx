@@ -368,6 +368,17 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         </span>
                       )}
                     </div>
+                    {ev.ageClassLabel && (
+                      <div className="pl-1.5">
+                        <span
+                          className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                          title="Ottelun ikäluokka poikkeaa joukkueen omasta"
+                          data-testid="age-class-label"
+                        >
+                          {ev.ageClassLabel}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Overlap & Driving Transition Warning */}
                     {(() => {
