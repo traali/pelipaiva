@@ -57,8 +57,8 @@ describe('Palloliitto TASO request signing', () => {
     }
   });
 
-  it('signs only spl.torneopal.net; floorball, basketball and volleyball hosts unchanged', async () => {
-    for (const sport of ['floorball', 'basketball', 'volleyball'] as const) {
+  it('signs spl and salibandy hosts; basketball and volleyball hosts unchanged', async () => {
+    for (const sport of ['basketball', 'volleyball'] as const) {
       const [ep] = listTorneopalAttempts('torneopal', undefined, sport);
       const url = await tasoRequestUrl(ep!.base, 'getTeam', { team_id: '1' });
       expect(url).not.toContain('hash=');

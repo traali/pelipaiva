@@ -63,7 +63,7 @@ describe('searchClubs (real getClubs payload)', () => {
     expect(res.data[0]!.displayName).toBe('Westend Indians');
     expect(res.data[0]!.city).toBe('Espoo');
     const [url, init] = fetchFn.mock.calls[0]!;
-    expect(String(url)).toBe('https://salibandy-api.torneopal.net/taso/rest/getClubs?');
+    expect(String(url)).toBe('https://salibandy-api.torneopal.net/taso/rest/getClubs?hash=b2dca13c719a860f72db86f17ca86f650f2c894e52add27b151393e8e7377d61');
     expect((init as RequestInit).headers).toMatchObject({ Accept: 'json/zsn3anknxzcfzc23k53jqdcd4pymutsf' });
   });
 
