@@ -28,7 +28,6 @@ import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
 import { arrivalPhaseLabel, clockHeadline, shouldShowKokoontuminen } from '../lib/events/eventClock';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
-import { resolveTransitPlan } from '../lib/geo/transitEngine';
 import { lookupKnownField } from '../lib/geo/sportsGeocoder';
 import { MatchSourceLinks } from './MatchSourceLinks';
 import { federationMatchLinks } from '../lib/sport/federationLinks';
@@ -411,60 +410,6 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                 <span>{typeBadge.label}</span>
               )}
             </span>
-
-            {event.volunteerDuty && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-whistle/15 text-whistle border border-whistle/25">
-                {event.volunteerDuty}
-              </span>
-            )}
-
-            {(event.isTournament || event.tournamentName || /turnaus|tournament|cup\b|memorial/i.test(`${event.title} ${event.notes || ''} ${event.roundInfo || ''}`)) && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gold/20 text-gold border border-gold/35 shadow-xs">
-                <Trophy className="w-3.5 h-3.5" />
-                <span>Turnaus</span>
-              </span>
-            )}
-
-            {/* Transit Mode Badge */}
-            {(() => {
-              const transitPlan = event.transit || resolveTransitPlan(homeLocation, event.venue?.coordinates, event.weather);
-              if (!transitPlan) return null;
-              return (
-                <button
-                  type="button"
-                  onClick={onOpenHomeModal}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
-                    transitPlan.isSelfTransit
-                      ? 'bg-pitch/15 text-pitch border-pitch/30'
-                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
-                  }`}
-                  title={`${transitPlan.transitLabel} • Klikkaa muokataksesi kotiosoitetta tai kulkutapaa`}
-                  aria-label={`Kulkutapa: ${transitPlan.transitLabel}. Klikkaa muokataksesi kotiosoitetta.`}
-                >
-                  <span>{transitPlan.transitLabel}</span>
-                </button>
-              );
-            })()}
-
-            {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
-            {(() => {
-              const sourceInfo = resolveEventSourceInfo(event, profile);
-              return (
-                <button
-                  type="button"
-                  onClick={() => setIsMergeOpen(true)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
-                    sourceInfo.isCombined
-                      ? 'bg-pitch/15 text-pitch border-pitch/30 hover:bg-pitch/25'
-                      : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
-                  }`}
-                  title={`${sourceInfo.tooltipDetails || ''} • Klikkaa hallitaksesi lähteitä tai yhdistääksesi`}
-                  aria-label={`Tietolähde: ${sourceInfo.badgeText}. Klikkaa hallitaksesi yhdistämistä.`}
-                >
-                  <span>{sourceInfo.badgeText}</span>
-                </button>
-              );
-            })()}
 
             {/* 1-Tap Attendance In/Out Button */}
             {!isOut ? (

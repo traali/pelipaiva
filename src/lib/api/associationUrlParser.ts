@@ -126,6 +126,14 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
   const pathname = parsedUrl.pathname;
   const searchParams = parsedUrl.searchParams;
 
+  const getParam = (name: string): string | undefined => {
+    const target = name.toLowerCase();
+    for (const [k, v] of searchParams.entries()) {
+      if (k.toLowerCase() === target) return v;
+    }
+    return undefined;
+  };
+
   // 0. Custom tournament SPAs (Torneopal-backed)
   if (hostname === 'espooliikkuutournament.fi' || hostname === 'www.espooliikkuutournament.fi') {
     const teamMatch = pathname.match(/^\/team\/(\d+)(?:\/.*)?$/i);
@@ -135,8 +143,8 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
         sport: 'basketball',
         association: 'basket',
         teamId,
-        seasonId: searchParams.get('turnaus') || 'esli2026',
-        leagueId: searchParams.get('sarja') || searchParams.get('category') || undefined,
+        seasonId: getParam('turnaus') || 'esli2026',
+        leagueId: getParam('sarja') || getParam('category') || undefined,
         canonicalUrl: `https://espooliikkuutournament.fi/team/${teamId}`
       };
     }
@@ -149,16 +157,17 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
     const teamMatch = pathname.match(/^\/team\/(\d+)(?:\/([a-zA-Z0-9_-]+))?(?:\/.*)?$/i);
     if (teamMatch && teamMatch[1]) {
       const teamId = teamMatch[1]!;
-      const tab = searchParams.get('tab') || (teamMatch[2] ? String(teamMatch[2]) : undefined);
-      const seasonId = searchParams.get('season') || searchParams.get('season_id') || undefined;
-      const leagueId = searchParams.get('category') || searchParams.get('category_id') || searchParams.get('league') || searchParams.get('league_id') || searchParams.get('series') || undefined;
+      const tab = getParam('tab') || (teamMatch[2] ? String(teamMatch[2]) : undefined);
+      const seasonId = getParam('season') || getParam('season_id') || undefined;
+      const leagueId = getParam('category') || getParam('category_id') || getParam('league') || getParam('league_id') || getParam('series') || undefined;
 
       const q = new URLSearchParams();
       if (seasonId) q.set('season', seasonId);
       if (leagueId) q.set('category', leagueId);
       const query = q.toString();
 
-      const isFutsal = searchParams.get('category') === 'futsal' || searchParams.get('sport') === 'futsal' || pathname.includes('/futsal');
+      const rawSearch = parsedUrl.search.toLowerCase();
+      const isFutsal = rawSearch.includes('futsal') || pathname.toLowerCase().includes('futsal');
       const sport: SportType = isFutsal ? 'futsal' : 'football';
 
       return {

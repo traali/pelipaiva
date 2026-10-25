@@ -75,7 +75,7 @@ export async function getHomeLocation(): Promise<HomeLocation | null> {
     // fall through to localStorage
   }
 
-  if (typeof localStorage !== 'undefined') {
+  if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
     return parseStoredHomeLocation(localStorage.getItem(STORAGE_KEY));
   }
   return null;
@@ -93,7 +93,7 @@ export async function saveHomeLocation(home: HomeLocation): Promise<void> {
     updatedAt: new Date().toISOString()
   };
 
-  if (typeof localStorage !== 'undefined') {
+  if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }
 

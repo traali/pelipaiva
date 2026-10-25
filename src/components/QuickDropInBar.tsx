@@ -324,7 +324,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
               setText(e.target.value);
               if (!isExpanded) setIsExpanded(true);
             }}
-            placeholder="💬 Liitä teksti WhatsAppista, MyClubista tai kirjoita oma merkintä..."
+            placeholder="Liitä viesti tai .ics-linkki"
             className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted focus:outline-none font-medium"
           />
 
