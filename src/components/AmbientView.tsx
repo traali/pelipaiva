@@ -3,6 +3,7 @@ import { MapPin, ShieldCheck, Thermometer } from 'lucide-react';
 import type { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import { calculateDepartureCountdown } from '../lib/ai/deterministicReasoner';
 import { runMissionControlGraph } from '../lib/agents';
+import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 import { sportLabelFi } from '../lib/sport/sportMeta';
 import { SportGlyph } from './SportGlyph';
 
@@ -26,6 +27,11 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
   const snapshot = useMemo(
     () => runMissionControlGraph(events, profiles, new Date(), undefined, homeLocation),
     [events, profiles, homeLocation]
+  );
+  const { isDismissed } = useDismissedConflicts();
+  const activeConflicts = useMemo(
+    () => snapshot.conflicts.filter((c) => !isDismissed(c)),
+    [snapshot.conflicts, isDismissed]
   );
 
   const cycle = useMemo(() => {
@@ -199,8 +205,8 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
             </div>
           </div>
 
-          {snapshot.conflicts.length > 0 && (
-            <p className="mt-6 text-lg text-whistle md:text-2xl">{snapshot.conflicts[0]?.message}</p>
+          {activeConflicts.length > 0 && (
+            <p className="mt-6 text-lg text-whistle md:text-2xl">{activeConflicts[0]?.message}</p>
           )}
         </div>
       ) : (

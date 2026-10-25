@@ -247,12 +247,48 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'kuortane': { name: 'Kuortaneen Urheiluopisto', lat: 62.8112, lng: 23.5112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
   'vierumäki': { name: 'Vierumäen Urheiluopisto', lat: 61.1141, lng: 26.0112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
 
-  // === MULTI-SPORT HALLS (salibandy, koripallo, lentopallo, jääkiekko) ===
-  'helsinki jäähalli': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'nordis': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'jäähalli': { name: 'Helsingin Jäähalli', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'pirkkola jäähalli': { name: 'Pirkkolan jäähalli', lat: 60.2348, lng: 24.9201, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'vantaa jäähalli': { name: 'Tikkurilan jäähalli', lat: 60.2984, lng: 25.0372, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  // === MULTI-SPORT HALLS & ICE HOCKEY ARENAS (salibandy, koripallo, lentopallo, jääkiekko) ===
+  'helsinki jäähalli': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'helsingin jäähalli': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'nordis': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'nordis jäähalli': { name: 'Helsingin Jäähalli (Nordis)', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'jäähalli': { name: 'Helsingin Jäähalli', lat: 60.1892, lng: 24.9225, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'pirkkola jäähalli': { name: 'Pirkkolan jäähalli', lat: 60.2348, lng: 24.9201, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'pirkkolan jäähalli': { name: 'Pirkkolan jäähalli', lat: 60.2348, lng: 24.9201, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'vantaa jäähalli': { name: 'Tikkurilan jäähalli', lat: 60.2984, lng: 25.0372, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'tikkurila jäähalli': { name: 'Tikkurilan jäähalli (Trio Areena)', lat: 60.2984, lng: 25.0372, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'tikkurilan jäähalli': { name: 'Tikkurilan jäähalli (Trio Areena)', lat: 60.2984, lng: 25.0372, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'trio areena': { name: 'Tikkurilan jäähalli (Trio Areena)', lat: 60.2984, lng: 25.0372, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'matinkylä jäähalli': { name: 'Matinkylän jäähalli (Ilmatar Areena)', lat: 60.1585, lng: 24.7507, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'matinkylän jäähalli': { name: 'Matinkylän jäähalli (Ilmatar Areena)', lat: 60.1585, lng: 24.7507, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'ilmatar areena': { name: 'Matinkylän jäähalli (Ilmatar Areena)', lat: 60.1585, lng: 24.7507, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'paloheinä jäähalli': { name: 'Paloheinän jäähalli', lat: 60.2530, lng: 24.9310, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'paloheinän jäähalli': { name: 'Paloheinän jäähalli', lat: 60.2530, lng: 24.9310, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'hernesaari jäähalli': { name: 'Hernesaaren jäähalli', lat: 60.1512, lng: 24.9241, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'hernesaaren jäähalli': { name: 'Hernesaaren jäähalli', lat: 60.1512, lng: 24.9241, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'malmi jäähalli': { name: 'Malmin jäähalli', lat: 60.2520, lng: 25.0120, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'malmin jäähalli': { name: 'Malmin jäähalli', lat: 60.2520, lng: 25.0120, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'kauniainen jäähalli': { name: 'Kauniaisten jäähalli', lat: 60.2115, lng: 24.7245, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'kauniaisten jäähalli': { name: 'Kauniaisten jäähalli', lat: 60.2115, lng: 24.7245, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'leppävaara jäähalli': { name: 'Leppävaaran jäähalli (Warrior Areena)', lat: 60.2220, lng: 24.8100, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'leppävaaran jäähalli': { name: 'Leppävaaran jäähalli (Warrior Areena)', lat: 60.2220, lng: 24.8100, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'warrior areena': { name: 'Leppävaaran jäähalli (Warrior Areena)', lat: 60.2220, lng: 24.8100, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'tapiola harjoitusjäähalli': { name: 'Tapiolan harjoitusjäähalli', lat: 60.1780, lng: 24.7860, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'tapiolan harjoitusjäähalli': { name: 'Tapiolan harjoitusjäähalli', lat: 60.1780, lng: 24.7860, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'tapiola harjoitusjää': { name: 'Tapiolan harjoitusjäähalli', lat: 60.1780, lng: 24.7860, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'espoonlahti jäähalli': { name: 'Espoonlahden Forum jäähalli', lat: 60.1480, lng: 24.6540, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'espoonlahden jäähalli': { name: 'Espoonlahden Forum jäähalli', lat: 60.1480, lng: 24.6540, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'forum jäähalli': { name: 'Espoonlahden Forum jäähalli', lat: 60.1480, lng: 24.6540, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'myyrmäki jäähalli': { name: 'Myyrmäen jäähalli', lat: 60.2620, lng: 24.8510, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'myyrmäen jäähalli': { name: 'Myyrmäen jäähalli', lat: 60.2620, lng: 24.8510, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'hakametsä': { name: 'Tampereen jäähalli (Hakametsä)', lat: 61.4950, lng: 23.8200, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'nokia areena': { name: 'Nokia Areena Tampere', lat: 61.4930, lng: 23.7740, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'kupittaa jäähalli': { name: 'Kupittaan jäähalli (Rajupaja Areena)', lat: 60.4420, lng: 22.2890, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'kupittaan jäähalli': { name: 'Kupittaan jäähalli (Rajupaja Areena)', lat: 60.4420, lng: 22.2890, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'rajupaja areena': { name: 'Kupittaan jäähalli (Rajupaja Areena)', lat: 60.4420, lng: 22.2890, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'raksila jäähalli': { name: 'Oulun jäähalli (Raksila)', lat: 65.0080, lng: 25.4950, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'niiralan monttu': { name: 'Kuopion jäähalli (Niiralan Monttu)', lat: 62.8940, lng: 27.6650, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'olvi areena': { name: 'Kuopion jäähalli (Olvi Areena)', lat: 62.8940, lng: 27.6650, isIndoor: true, surface: 'ice', hasFloodlights: true },
   'haagan palloiluhalli': { name: 'Haagan palloiluhalli', lat: 60.2156, lng: 24.9004, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'meilahti liikuntahalli': { name: 'Meilahden liikuntahalli', lat: 60.1908, lng: 24.9075, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'myllypuro palloiluhalli': { name: 'Myllypuron palloiluhalli', lat: 60.2238, lng: 25.0774, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
@@ -262,8 +298,8 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'tapiolan urheiluhalli': { name: 'Tapiolan urheiluhalli', lat: 60.1778, lng: 24.8062, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'leppävaara liikuntahalli': { name: 'Leppävaaran liikuntahalli', lat: 60.2194, lng: 24.8135, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'sellon salibandy': { name: 'Leppävaaran liikuntahalli', lat: 60.2194, lng: 24.8135, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'paradice': { name: 'Paradice-jäähalli Vuosaari', lat: 60.2075, lng: 25.1441, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
-  'vuosaari jäähalli': { name: 'Paradice-jäähalli Vuosaari', lat: 60.2075, lng: 25.1441, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true }
+  'paradice': { name: 'Paradice-jäähalli Vuosaari', lat: 60.2075, lng: 25.1441, isIndoor: true, surface: 'ice', hasFloodlights: true },
+  'vuosaari jäähalli': { name: 'Paradice-jäähalli Vuosaari', lat: 60.2075, lng: 25.1441, isIndoor: true, surface: 'ice', hasFloodlights: true }
 };
 
 function matchesAliasWord(text: string, alias: string): boolean {
@@ -316,19 +352,42 @@ export async function resolveSportsVenue(
     .replace(/\s+/g, ' ')
     .trim();
 
-  const indoorGuess = /halli|arena|center|sali|koulu|lukio|opisto|liikuntasali|monitoimitalo|gym|liikuntahalli/i.test(normalized);
+  const isIce = /jää|kaukalo|skate|ice\b|curling|ringette|luistinrata|luistelukenttä/i.test(normalized);
+  const isExplicitOutdoorIce =
+    /ulko|avojää|tekojää|luistelukenttä|luistinrata/i.test(normalized) &&
+    !/halli|arena|areena|keskus/i.test(normalized);
+  const indoorGuess = isIce
+    ? !isExplicitOutdoorIce
+    : /halli|arena|center|sali|koulu|lukio|opisto|liikuntasali|monitoimitalo|gym|liikuntahalli/i.test(normalized);
+
+  const resolveSurfaceGuess = (isInd: boolean): PitchSurface => {
+    if (isIce) return 'ice';
+    if (isInd) {
+      const isParquet =
+        /koulu|lukio|opisto|liikuntasali|liikuntahalli|palloiluhalli|kisahalli|sali\b/i.test(normalized);
+      return isParquet ? 'indoor_parquet' : 'indoor_synthetic';
+    }
+    if (/nurmi|luonnonnurmi/i.test(normalized) && !/tekonurmi|tn\b/i.test(normalized)) {
+      return 'natural_grass';
+    }
+    if (/hiekka/i.test(normalized)) {
+      return 'sand_artificial_turf';
+    }
+    return 'artificial_turf_3g';
+  };
 
   if (hint?.lat && hint?.lng) {
     const aliasHit = Object.entries(NATIONAL_FIELD_ALIASES)
       .sort((a, b) => b[0].length - a[0].length)
       .find(([alias]) => matchesAliasWord(normalized, alias));
+    const isInd = aliasHit?.[1].isIndoor ?? indoorGuess;
     return {
       name: aliasHit?.[1].name || rawVenueString,
       normalizedName: normalized,
       city: hint.city,
       coordinates: { lat: hint.lat, lng: hint.lng },
-      isIndoor: aliasHit?.[1].isIndoor ?? indoorGuess,
-      surface: aliasHit?.[1].surface ?? (indoorGuess ? 'indoor_parquet' : 'artificial_turf_3g'),
+      isIndoor: isInd,
+      surface: aliasHit?.[1].surface ?? resolveSurfaceGuess(isInd),
       hasFloodlights: aliasHit?.[1].hasFloodlights ?? true
     };
   }
@@ -391,7 +450,7 @@ export async function resolveSportsVenue(
                 (best.site.type as Record<string, unknown> | undefined)?.['type-code'] ||
                 ''
             ).toLowerCase();
-            const isIndoor = /halli|sali|areena/.test(typeName) || indoorGuess;
+            const isIndoor = isIce ? !isExplicitOutdoorIce : (/halli|sali|areena/.test(typeName) || indoorGuess);
             const location = best.site.location as Record<string, unknown> | undefined;
             const city = location?.city as Record<string, unknown> | undefined;
             return {
@@ -402,7 +461,7 @@ export async function resolveSportsVenue(
               postalCode: location?.['postal-code'] as string | undefined,
               coordinates: point,
               isIndoor,
-              surface: isIndoor ? 'indoor_synthetic' : 'artificial_turf_3g',
+              surface: resolveSurfaceGuess(isIndoor),
               hasFloodlights: true,
               lipasId: Number(best.site['lipas-id']) || undefined
             };
@@ -437,7 +496,7 @@ export async function resolveSportsVenue(
             address: addr?.fi,
             coordinates: { lat: Number(lat), lng: Number(lng) },
             isIndoor: indoorGuess,
-            surface: indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g',
+            surface: resolveSurfaceGuess(indoorGuess),
             hasFloodlights: true
           };
         }
@@ -455,7 +514,7 @@ export async function resolveSportsVenue(
     // instead of presenting Helsinki as fact (M-15/V21).
     isApproximateLocation: true,
     isIndoor: indoorGuess,
-    surface: indoorGuess ? 'indoor_synthetic' : 'artificial_turf_3g',
+    surface: resolveSurfaceGuess(indoorGuess),
     hasFloodlights: true
   };
 }

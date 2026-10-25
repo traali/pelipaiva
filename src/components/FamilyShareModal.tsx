@@ -148,7 +148,7 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
 
   const handleCopyRoutineCommand = async () => {
     if (!nestUrl) return;
-    const cmd = `open ${nestUrl}`;
+    const cmd = `catt -d "Keittiön näyttö" cast_site ${nestUrl}`;
     try {
       await navigator.clipboard.writeText(cmd);
       setCopiedRoutine(true);
@@ -512,43 +512,47 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                       </button>
                     </div>
 
-                    {/* Google Home Routine Guide */}
+                    {/* Nest Hub setup guide — Google Assistant routines cannot open arbitrary
+                        web pages on a Nest Hub (and Assistant does not support Finnish), so we
+                        only describe methods that actually work. */}
                     <div className="p-3.5 rounded-2xl bg-surface border border-border-strong flex flex-col gap-2.5">
-                      <div className="text-xs font-bold text-text-primary flex items-center justify-between">
-                        <span>🎙️ Google Home -automaatio (Rutiini):</span>
+                      <div className="text-xs font-bold text-text-primary">
+                        📺 Näin saat näkymän Nest Hubille:
                       </div>
                       <div className="text-[11px] text-text-secondary flex flex-col gap-2">
                         <div className="flex items-start gap-1.5">
                           <span className="font-bold text-pitch shrink-0">1.</span>
-                          <span>Avaa <strong>Google Home</strong> -sovellus puhelimellasi.</span>
+                          <span>
+                            <strong>Helpoin:</strong> avaa linkki tietokoneen Chromessa &rarr; valikko <strong>⋮ &rarr; Tallenna ja jaa &rarr; Striimaa…</strong> &rarr; valitse Nest Hub. Näkymä pysyy auki niin kauan kuin välilehti on auki.
+                          </span>
                         </div>
                         <div className="flex items-start gap-1.5">
                           <span className="font-bold text-pitch shrink-0">2.</span>
-                          <span>Mene alhaalta kohtaan <strong>Automaatiot (+ Lisää)</strong> &rarr; <strong>Kotitalous</strong>.</span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="font-bold text-pitch shrink-0">3.</span>
-                          <span><strong>Aloitus:</strong> Valitse <em>"Kun sanon Google Assistantille..."</em> &rarr; kirjoita: <code className="bg-surface-elevated px-1 py-0.5 rounded text-pitch font-mono font-bold">näytä pelit</code></span>
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <span className="font-bold text-pitch shrink-0">4.</span>
-                          <span><strong>Toiminto:</strong> Valitse <em>"Kokeile omia komentoja"</em> &rarr; liitä:</span>
+                          <span>
+                            <strong>Pysyvä näyttö (edistynyt):</strong> kotiverkon koneelta tai Home Assistantista (DashCast) voi striimata sivun suoraan ilman selainta:
+                          </span>
                         </div>
                         <div className="p-2 rounded-lg bg-surface-elevated border border-border-subtle font-mono text-[11px] text-text-primary break-all flex items-center justify-between gap-2">
-                          <span className="select-all">open {nestUrl}</span>
+                          <span className="select-all">catt -d &quot;Keittiön näyttö&quot; cast_site {nestUrl}</span>
                           <button
                             type="button"
                             onClick={handleCopyRoutineCommand}
                             title="Kopioi komento"
-                            className="shrink-0 p-1.5 rounded-md hover:bg-surface text-pitch cursor-pointer"
+                            aria-label="Kopioi catt-striimauskomento"
+                            className="shrink-0 inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-md hover:bg-surface text-pitch cursor-pointer"
                           >
                             {copiedRoutine ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                           </button>
                         </div>
-                        <div className="flex items-start gap-1.5 mt-0.5">
-                          <span className="font-bold text-pitch shrink-0">5.</span>
-                          <span><strong>Tallenna rutiini!</strong> Sano keittiössä Nestille: <em>"Hey Google, näytä pelit"</em>.</span>
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-pitch shrink-0">3.</span>
+                          <span>
+                            <strong>Ääniohjaus:</strong> tilaa perheen kalenteri Google-kalenteriin (Perhekalenteri &rarr; Tilaa Google Kalenteriin), niin Nest kertoo menot kysyttäessä (esim. <em>&quot;Hey Google, what&apos;s on my calendar tomorrow?&quot;</em>). Google Assistant ei tue suomea.
+                          </span>
                         </div>
+                        <p className="text-[10px] text-text-muted">
+                          Huom: Nest Hub voi palata kellonäkymään noin 10 minuutin jälkeen tai kun sille puhuu — striimaa tarvittaessa uudelleen.
+                        </p>
                       </div>
                     </div>
                   </>

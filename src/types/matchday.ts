@@ -27,7 +27,8 @@ export type FootwearRecommendation =
   | 'FG_FIRM_GROUND'
   | 'SG_SOFT_GROUND'
   | 'TF_TURF_SHOES'
-  | 'INDOOR_NON_MARKING';
+  | 'INDOOR_NON_MARKING'
+  | 'SKATES';
 
 export type TransitMode = 'auto' | 'walk' | 'bicycle' | 'car' | 'transit';
 

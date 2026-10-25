@@ -670,6 +670,10 @@ export function sportLabel(sport: SportType): string {
       return "Futsal";
     case "training":
       return "Harjoitus";
+    case "school":
+      return "Koulu";
+    case "other":
+      return "Muu";
     default:
       return "Ottelu";
   }

@@ -17,6 +17,7 @@ import { MatchdayEvent, PlayerProfile } from '../types/matchday';
 import type { FamilyConflict } from '../lib/agents';
 import { helsinkiDateISO, formatFiTime } from '../lib/agents/time';
 import { getContrastTextColor } from '../lib/sport/teamColors';
+import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 
 export interface FamilyVisualCalendarProps {
   events: MatchdayEvent[];
@@ -104,18 +105,27 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
     return map;
   }, [events]);
 
+  const { isDismissed, dismiss: dismissConflict } = useDismissedConflicts();
+  const activeConflicts = useMemo(
+    () => (conflicts || []).filter((c) => !isDismissed(c)),
+    [conflicts, isDismissed]
+  );
+
   // Conflict days map for instant lookup
   const conflictDateSet = useMemo(() => {
     const set = new Set<string>();
-    if (!conflicts) return set;
-    for (const c of conflicts) {
+    for (const c of activeConflicts) {
       const evA = events.find((e) => e.id === c.eventAId);
       if (evA) {
         set.add(helsinkiDateISO(new Date(evA.startTime)));
       }
+      const evB = events.find((e) => e.id === c.eventBId);
+      if (evB) {
+        set.add(helsinkiDateISO(new Date(evB.startTime)));
+      }
     }
     return set;
-  }, [conflicts, events]);
+  }, [activeConflicts, events]);
 
   // Month stats calculation
   const currentMonthStats = useMemo(() => {
@@ -617,6 +627,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                       {wDay.events.map((ev) => {
                         const prof = profileMap.get(ev.profileId);
                         const timeStr = `${formatFiTime(ev.startTime)}`;
+                        const isOut = ev.attendanceStatus === 'out';
                         return (
                           <div
                             key={ev.id}
@@ -624,15 +635,21 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                               e.stopPropagation();
                               if (onSelectEvent && !ev.isTraining) onSelectEvent(ev);
                             }}
-                            className="p-2 rounded-xl border border-border-subtle bg-surface flex flex-col gap-1 hover:border-pitch transition-all"
+                            className={`p-2 rounded-xl border flex flex-col gap-1 hover:border-pitch transition-all ${
+                              isOut
+                                ? 'opacity-60 border-dashed border-border-strong/70 bg-surface/40'
+                                : 'border-border-subtle bg-surface'
+                            }`}
                             style={{
                               borderLeft: `3px solid ${prof?.colorHex || '#10b981'}`
                             }}
                           >
-                            <div className="flex items-center justify-between text-[10px]">
-                              <span className="font-mono font-black text-pitch">{timeStr}</span>
+                            <div className="flex items-center justify-between text-[10px] gap-1">
+                              <span className="font-mono font-black text-pitch">
+                                {isOut ? `⛔ ${timeStr}` : timeStr}
+                              </span>
                               <span
-                                className="font-bold px-1.5 py-0.2 rounded"
+                                className="font-bold px-1.5 py-0.2 rounded truncate"
                                 style={{
                                   backgroundColor: prof?.colorHex || '#10b981',
                                   color: getContrastTextColor(prof?.colorHex)
@@ -701,6 +718,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
             {selectedDayEvents.map((ev) => {
               const profile = profileMap.get(ev.profileId);
               const timeStr = `${formatFiTime(ev.startTime)} – ${formatFiTime(ev.endTime)}`;
+              const isOut = ev.attendanceStatus === 'out';
 
               return (
                 <div
@@ -708,7 +726,11 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                   onClick={() => {
                     if (onSelectEvent && !ev.isTraining) onSelectEvent(ev);
                   }}
-                  className={`p-4 rounded-2xl bg-surface-elevated border border-border-strong flex flex-col gap-2.5 relative overflow-hidden transition-all ${
+                  className={`p-4 rounded-2xl border flex flex-col gap-2.5 relative overflow-hidden transition-all ${
+                    isOut
+                      ? 'opacity-65 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100'
+                      : 'bg-surface-elevated border-border-strong'
+                  } ${
                     !ev.isTraining ? 'hover:border-pitch cursor-pointer' : ''
                   }`}
                 >
@@ -719,8 +741,8 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                   />
 
                   {/* Top Bar: Time, Player Badge, Sport Badge */}
-                  <div className="flex items-center justify-between pl-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between pl-2 flex-wrap gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-black font-mono text-pitch flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
                         <span>{timeStr}</span>
@@ -734,6 +756,11 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                       >
                         {profile?.playerName}
                       </span>
+                      {isOut && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stoppage/15 text-stoppage border border-stoppage/30">
+                          ⛔ Poisjäänti
+                        </span>
+                      )}
                     </div>
 
                     <span className="text-xs font-bold text-text-secondary">
@@ -756,7 +783,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
 
                   {/* Conflict warnings */}
                   {(() => {
-                    const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
+                    const related = activeConflicts.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id);
                     if (related.length === 0) return null;
                     return (
                       <div className="pl-2 flex flex-col gap-1.5">
@@ -764,23 +791,36 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                           <div
                             key={c.id}
                             role="alert"
-                            className={`p-2 rounded-xl text-[11px] font-bold border flex items-start gap-1.5 ${
+                            className={`p-2 rounded-xl text-[11px] font-bold border flex items-center justify-between gap-2 ${
                               c.severity === 'critical'
                                 ? 'bg-stoppage/15 border-stoppage/30 text-stoppage'
                                 : 'bg-whistle/15 border-whistle/30 text-whistle'
                             }`}
                           >
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <div>
-                                {c.overlapMinutes > 0
-                                  ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                  : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
-                              </div>
-                              <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
-                                {c.message}
+                            <div className="flex items-start gap-1.5 min-w-0 flex-1">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <div>
+                                  {c.overlapMinutes > 0
+                                    ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
+                                    : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                </div>
+                                <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
+                                  {c.message}
+                                </div>
                               </div>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dismissConflict(c);
+                              }}
+                              className="px-2 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle text-[10px] font-bold shrink-0 cursor-pointer"
+                              title="Merkitse tämä huomio hoidetuksi"
+                            >
+                              ✓ Kuittaa
+                            </button>
                           </div>
                         ))}
                       </div>

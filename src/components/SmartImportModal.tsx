@@ -33,6 +33,7 @@ import {
 import { ExtractedSportsEvent } from '../lib/ai/messageParserNLP';
 import { db } from '../lib/storage/db';
 import { pickNextTeamColor } from '../lib/sport/teamColors';
+import { sportLabelFi } from '../lib/sport/sportMeta';
 import { generateStableProfileId } from '../lib/clubs/attachTeam';
 import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import { searchPopularClubs, type ClubPreset } from '../lib/clubs/popularClubsCatalog';
@@ -325,7 +326,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
           teamName:
             usable[0]?.homeTeam && usable[0].homeTeam !== 'Oma joukkue'
               ? usable[0].homeTeam
-              : `${selectedSport === 'floorball' ? 'Salibandy' : selectedSport === 'basketball' ? 'Koripallo' : 'Jalkapallo'}`,
+              : sportLabelFi(selectedSport),
           sport: selectedSport,
           primaryColor: swatch.label,
           calendarUrl: '',
@@ -513,6 +514,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                           { type: 'volleyball', label: '🏐 Lentopallo' },
                           { type: 'icehockey', label: '🏒 Jääkiekko' },
                           { type: 'futsal', label: '👟 Futsal' },
+                          { type: 'training', label: '💪 Harjoitus' },
                           { type: 'school', label: '🏫 Koulu / Wilma' },
                           { type: 'other', label: '📌 Muu / treenit' }
                         ]
@@ -531,6 +533,7 @@ export const SmartImportModal: React.FC<SmartImportModalProps> = ({
                           { type: 'volleyball', label: '🏐 Lentopallo' },
                           { type: 'icehockey', label: '🏒 Jääkiekko' },
                           { type: 'futsal', label: '👟 Futsal' },
+                          { type: 'training', label: '💪 Harjoitus' },
                           { type: 'school', label: '🏫 Koulu / Wilma' },
                           { type: 'other', label: '📌 Muu / treenit' }
                         ]

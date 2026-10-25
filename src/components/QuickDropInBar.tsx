@@ -264,7 +264,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
           teamName:
             previewEvent.homeTeam && previewEvent.homeTeam !== 'Oma joukkue'
               ? previewEvent.homeTeam
-              : `${selectedSport === 'floorball' ? 'Salibandy' : selectedSport === 'basketball' ? 'Koripallo' : 'Jalkapallo'}`,
+              : sportLabelFi(selectedSport),
           sport: selectedSport,
           primaryColor: swatch.label,
           calendarUrl: '',
@@ -311,19 +311,33 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
             type="text"
             value={text}
             onFocus={() => setIsExpanded(true)}
-            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setIsExpanded(false);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (!isExpanded) setIsExpanded(true);
+            }}
             placeholder="💬 Liitä teksti WhatsAppista, MyClubista tai kirjoita oma merkintä..."
             className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted focus:outline-none font-medium"
           />
 
-          {text && (
+          {(text || isExpanded) && (
             <button
               type="button"
+              aria-label={text ? 'Tyhjennä ja sulje pikasyöttö' : 'Sulje pikasyöttö'}
+              title={text ? 'Tyhjennä ja sulje' : 'Sulje pikasyöttö'}
               onClick={() => {
                 setText('');
                 setPreviewEvent(null);
+                setRankingResult(null);
+                setFamilyJoinCode(null);
+                setIsExpanded(false);
               }}
-              className="p-1 rounded-full text-text-muted hover:text-text-primary cursor-pointer"
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated cursor-pointer transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -450,6 +464,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                               { type: 'volleyball', label: 'Lentis', icon: '🏐' },
                               { type: 'icehockey', label: 'Lätkä', icon: '🏒' },
                               { type: 'futsal', label: 'Futsal', icon: '👟' },
+                              { type: 'training', label: 'Harjoitus', icon: '💪' },
                               { type: 'school', label: 'Koulu / Wilma', icon: '🏫' },
                               { type: 'other', label: 'Muu meno', icon: '📌' }
                             ]
@@ -468,6 +483,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                               { type: 'volleyball', label: 'Lentis', icon: '🏐' },
                               { type: 'icehockey', label: 'Lätkä', icon: '🏒' },
                               { type: 'futsal', label: 'Futsal', icon: '👟' },
+                              { type: 'training', label: 'Harjoitus', icon: '💪' },
                               { type: 'school', label: 'Koulu / Wilma', icon: '🏫' },
                               { type: 'other', label: 'Muu meno', icon: '📌' }
                             ]
@@ -495,14 +511,30 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                   </div>
                 </div>
 
-                {/* Multiline textarea if user wants to paste large text */}
-                <textarea
-                  rows={2}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Esim: Lauantaina 24.8. harkkapeli Väiskillä klo 16.30 (kokoontuminen 15.45). Mustat paidat. Maijalla kahviovuoro klo 16-18."
-                  className="w-full p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
-                />
+                {/* Multiline textarea only shown when pasting multi-line/long messages or when empty as an example hint */}
+                {(text.includes('\n') || text.length > 90) ? (
+                  <textarea
+                    rows={3}
+                    value={text}
+                    aria-label="Muokkaa monirivistä tapahtumaviestiä"
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Esim: Lauantaina 24.8. harkkapeli Väiskillä klo 16.30 (kokoontuminen 15.45). Mustat paidat. Maijalla kahviovuoro klo 16-18."
+                    className="w-full p-2.5 rounded-xl bg-surface-elevated border border-border-subtle text-text-primary text-xs focus:outline-none focus:border-pitch resize-none"
+                  />
+                ) : !text.trim() ? (
+                  <div className="px-3 py-2 rounded-xl bg-surface-elevated/60 border border-border-subtle text-[11px] text-text-muted flex items-center justify-between gap-2">
+                    <span>
+                      💡 <strong>Esimerkki:</strong> &ldquo;La 24.8. harkkapeli Väiskillä klo 16.30 (kokoontuminen 15.45). Mustat paidat.&rdquo;
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded(false)}
+                      className="text-[11px] font-bold text-text-secondary hover:text-pitch shrink-0 cursor-pointer"
+                    >
+                      Piilota ▲
+                    </button>
+                  </div>
+                ) : null}
 
                 {/* Auto-Detected Player & Sport Pills */}
                 {(rankingResult?.detectedPlayerName || rankingResult?.detectedSport) && (
@@ -718,7 +750,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
                 )}
 
                 {saveError && (
-                  <div className="p-2 rounded-xl bg-red-500/20 border border-red-500 text-red-400 text-xs font-bold flex items-center gap-1.5">
+                  <div role="alert" className="p-2 rounded-xl bg-stoppage/15 border border-stoppage/40 text-stoppage text-xs font-bold flex items-center gap-1.5">
                     <span>⚠️ {saveError}</span>
                   </div>
                 )}

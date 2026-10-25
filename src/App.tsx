@@ -31,6 +31,7 @@ import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
+import { harmonizeStartupSports } from './lib/sport/startupHarmonizer';
 
 const SmartImportModal = lazy(() =>
   import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
@@ -214,128 +215,14 @@ export const App: React.FC = () => {
       try {
         const allProfiles = await db.profiles.toArray();
         const allEvents = await db.events.toArray();
-        const officialSportByPlayer = new Map<string, SportType>();
-        for (const p of allProfiles) {
-          if ((p.associationUrl || p.teamId) && p.sport && p.sport !== 'football') {
-            officialSportByPlayer.set(p.playerName.trim().toLowerCase(), p.sport);
-          }
+
+        const { profileUpdates, eventUpdates } = harmonizeStartupSports(allProfiles, allEvents);
+
+        for (const pu of profileUpdates) {
+          await db.profiles.update(pu.id, pu.updates);
         }
-
-        for (const p of allProfiles) {
-          const pUpdates: Partial<PlayerProfile> = {};
-          if (/ppj|pallo-pojat|hjk|futis|jalkapallo|palloliitto/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'football') {
-            pUpdates.sport = 'football';
-          } else if (/indians|salibandy|säbä|sähly|oilers|ervii/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'floorball') {
-            pUpdates.sport = 'floorball';
-          } else if (/basket|topola|koris|hnmky/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'basketball') {
-            pUpdates.sport = 'basketball';
-          } else if (/lentopallo|puma|lp viesti/i.test(`${p.teamName} ${p.calendarUrl || ''} ${p.associationUrl || ''}`) && p.sport !== 'volleyball') {
-            pUpdates.sport = 'volleyball';
-          }
-
-          // Clean up corrupted calendarUrl (e.g. literal team string like "PPJ/Laru mus" or association page)
-          if (p.calendarUrl) {
-            const rawCal = p.calendarUrl.trim();
-            if (!rawCal.startsWith('http://') && !rawCal.startsWith('https://') && !rawCal.startsWith('webcal://')) {
-              pUpdates.calendarUrl = undefined;
-            } else if (
-              rawCal.includes('tulospalvelu.') ||
-              rawCal.includes('basket.fi') ||
-              rawCal.includes('torneopal.fi')
-            ) {
-              if (!p.associationUrl) {
-                pUpdates.associationUrl = rawCal;
-              }
-              pUpdates.calendarUrl = undefined;
-            }
-          }
-
-          if (Object.keys(pUpdates).length > 0) {
-            await db.profiles.update(p.id, pUpdates);
-          }
-        }
-
-        for (const ev of allEvents) {
-          const profile = allProfiles.find((p) => p.id === ev.profileId);
-          const playerName = profile?.playerName?.trim().toLowerCase() || '';
-          const targetSport = officialSportByPlayer.get(playerName);
-          const isLyk = /yhteiskoulu|lyk/i.test(ev.venue?.name || '');
-          const isSchoolGym = /lukio|yhteiskoulu|lyk|myk|phyk|syk|tyk/i.test(ev.venue?.name || '');
-
-          const isFootballContext =
-            /ppj|pallo-pojat|hjk|futis|jalkapallo|palloliitto|pyrkkä|ruukinlahti|bollis/i.test(
-              `${ev.title} ${ev.notes || ''} ${profile?.teamName || ''}`
-            ) ||
-            (profile?.sport === 'football' && !/indians|salibandy|säbä|sähly|topola|basket/i.test(ev.title));
-
-          const isFloorballContext =
-            !isFootballContext &&
-            (profile?.sport === 'floorball' ||
-            /indians|salibandy|säbä|sähly|oilers|ervii/i.test(
-              `${ev.title} ${ev.notes || ''} ${ev.profileId || ''} ${profile?.calendarUrl || ''}`
-            ));
-
-          const isBasketballContext =
-            !isFootballContext &&
-            (targetSport === 'basketball' ||
-            profile?.sport === 'basketball' ||
-            isLyk ||
-            /basket|topola|koris|hnmky/i.test(
-              `${ev.title} ${ev.notes || ''} ${ev.profileId || ''} ${profile?.calendarUrl || ''}`
-            ));
-
-          let needsUpdate = false;
-          const updates: Partial<MatchdayEvent> = {};
-
-          if (isFootballContext && ev.sport !== 'football') {
-            updates.sport = 'football';
-            needsUpdate = true;
-          } else if (isFloorballContext && ev.sport !== 'floorball') {
-            updates.sport = 'floorball';
-            needsUpdate = true;
-          } else if (isBasketballContext && ev.sport !== 'basketball') {
-            updates.sport = 'basketball';
-            needsUpdate = true;
-          }
-
-          // Check if venue is Pyrkkä or Lauttasaaren urheilupuisto
-          const isPyrkka = /pyrkkä|lauttasaaren urheilupuisto|lahnalahdentie/i.test(
-            `${ev.venue?.name || ''} ${ev.venue?.normalizedName || ''}`
-          );
-          if (
-            isPyrkka &&
-            (Math.abs((ev.venue?.coordinates?.lat || 0) - 60.16357) > 0.001 ||
-              Math.abs((ev.venue?.coordinates?.lng || 0) - 24.86750) > 0.001)
-          ) {
-            updates.venue = {
-              ...ev.venue,
-              name: 'Lauttasaaren urheilupuisto "Pyrkkä"',
-              normalizedName: 'lauttasaaren urheilupuisto pyrkkä',
-              coordinates: { lat: 60.16357, lng: 24.86750 },
-              isIndoor: false,
-              surface: 'artificial_turf_3g',
-              hasFloodlights: true
-            };
-            needsUpdate = true;
-          }
-
-          if (isSchoolGym && (!ev.venue.isIndoor || ev.venue.surface === 'artificial_turf_3g')) {
-            updates.venue = {
-              ...(updates.venue || ev.venue),
-              name: (updates.venue?.name || ev.venue.name).includes('LYK')
-                ? (updates.venue?.name || ev.venue.name)
-                : isLyk
-                ? `${(updates.venue?.name || ev.venue.name)} (LYK)`
-                : (updates.venue?.name || ev.venue.name),
-              isIndoor: true,
-              surface: 'indoor_parquet'
-            };
-            needsUpdate = true;
-          }
-
-          if (needsUpdate) {
-            await db.events.update(ev.id, updates);
-          }
+        for (const eu of eventUpdates) {
+          await db.events.update(eu.id, eu.updates);
         }
 
         // Reconcile and merge any unlinked calendar matches with bare official fixtures on the same day
@@ -1005,8 +892,8 @@ export const App: React.FC = () => {
             onClearDemo={handleClearData}
           />
         )}
-        {/* Sticky Profile Filter & View Mode Switcher Header */}
-        <div className="sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-canvas/90 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
+        {/* Sticky Profile Filter & View Mode Switcher Header (docks cleanly below MissionControlHUD) */}
+        <div className="sticky top-[53px] z-30 -mx-4 px-4 py-2.5 bg-canvas/92 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
             <div className="flex-1 min-w-0">
               <MultiProfileHeader
@@ -1080,7 +967,7 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setCategoryFilter('all')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                 categoryFilter === 'all'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
@@ -1094,7 +981,7 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setCategoryFilter(categoryFilter === 'attending' ? 'all' : 'attending')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                 categoryFilter === 'attending'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
@@ -1109,7 +996,7 @@ export const App: React.FC = () => {
             <button
               type="button"
               onClick={() => setCategoryFilter(categoryFilter === 'out' ? 'all' : 'out')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                 categoryFilter === 'out'
                   ? 'bg-stoppage text-text-inverse shadow-xs'
                   : categoryCounts.out > 0
@@ -1126,13 +1013,13 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCategoryFilter(categoryFilter === 'tournaments' ? 'all' : 'tournaments')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   categoryFilter === 'tournaments'
-                    ? 'bg-gold/30 text-gold border border-gold shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
+                    ? 'bg-whistle/20 text-whistle border border-whistle/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-whistle border border-border-subtle'
                 }`}
               >
-                <Trophy className="w-3 h-3 text-gold" />
+                <Trophy className="w-3 h-3 text-whistle" />
                 <span>Turnaukset</span>
                 <span className="text-[10px] opacity-80">({categoryCounts.tournaments})</span>
               </button>
@@ -1141,10 +1028,10 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCategoryFilter(categoryFilter === 'matches' ? 'all' : 'matches')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   categoryFilter === 'matches'
-                    ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
+                    ? 'bg-pitch/20 text-pitch border border-pitch/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
                 }`}
               >
                 <span>⚽ Sarjapelit</span>
@@ -1155,10 +1042,10 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCategoryFilter(categoryFilter === 'trainings' ? 'all' : 'trainings')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   categoryFilter === 'trainings'
-                    ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
+                    ? 'bg-radar/20 text-radar border border-radar/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-radar border border-border-subtle'
                 }`}
               >
                 <span>🏃 Treenit</span>
@@ -1169,10 +1056,10 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCategoryFilter(categoryFilter === 'other' ? 'all' : 'other')}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   categoryFilter === 'other'
-                    ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
+                    ? 'bg-whistle/20 text-whistle border border-whistle/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-secondary hover:text-whistle border border-border-subtle'
                 }`}
               >
                 <span>📋 Muu / Talkoot</span>
@@ -1283,7 +1170,19 @@ export const App: React.FC = () => {
             {categoryFilteredEvents.length > 0 ? (
               /* Cards Feed with Structured Day Containers */
               <div className="flex flex-col gap-6 pb-4">
-                {eventsGroupedByDay.map((dayGroup) => (
+                {eventsGroupedByDay.map((dayGroup) => {
+                  const allMatches = dayGroup.events.every(
+                    (e) => isMatchEvent(e) || isTournamentEvent(e)
+                  );
+                  const countUnit = allMatches
+                    ? dayGroup.events.length === 1
+                      ? 'ottelu'
+                      : 'ottelua'
+                    : dayGroup.events.length === 1
+                    ? 'tapahtuma'
+                    : 'tapahtumaa';
+
+                  return (
                   <section
                     key={dayGroup.dateStr}
                     className="rounded-3xl border border-border-strong/70 bg-surface/60 backdrop-blur-sm p-3.5 sm:p-4.5 flex flex-col gap-3.5 shadow-sm"
@@ -1299,7 +1198,7 @@ export const App: React.FC = () => {
                         </h2>
                       </div>
                       <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
-                        {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
+                        {dayGroup.events.length} {countUnit}
                       </span>
                     </div>
 
@@ -1320,6 +1219,7 @@ export const App: React.FC = () => {
                               conflicts={snapshot.conflicts}
                               homeLocation={homeLocation}
                               onOpenHomeModal={() => setIsHomeLocationOpen(true)}
+                              onResolveMismatch={handleResolveMismatch}
                               onNavigate={() => {
                                 const coords = event.parking?.coordinates || event.venue?.coordinates;
                                 const destination =
@@ -1371,7 +1271,8 @@ export const App: React.FC = () => {
                       })}
                     </div>
                   </section>
-                ))}
+                  );
+                })}
                 {pastEvents.length > 0 && (
                   <div className="pt-2 pb-6 flex flex-col items-center gap-2">
                     <button
@@ -1401,11 +1302,34 @@ export const App: React.FC = () => {
                   <CalendarIcon className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-sm font-black text-text-primary">Ei tulevia otteluita kalenterissa</h3>
+                  <h3 className="text-sm font-black text-text-primary">
+                    {categoryFilter === 'out'
+                      ? 'Ei merkittyjä poisjääntejä'
+                      : categoryFilter !== 'all' || activeProfileId !== 'all'
+                      ? 'Ei tapahtumia valitulla suodatuksella'
+                      : 'Ei tulevia otteluita kalenterissa'}
+                  </h3>
                   <p className="text-xs text-text-muted max-w-sm">
-                    Tulevia otteluita ei ole vielä julkaistu sarjajärjestelmässä tai kausi on päättynyt.
+                    {categoryFilter === 'out'
+                      ? 'Kaikkiin tuleviin tapahtumiin osallistutaan normaalisti.'
+                      : categoryFilter !== 'all' || activeProfileId !== 'all'
+                      ? 'Valitulla suodattimella ei löytynyt tulevia tapahtumia. Voit tyhjentää suodattimen nähdäksesi kaikki tapahtumat.'
+                      : 'Tulevia otteluita ei ole vielä julkaistu sarjajärjestelmässä tai kausi on päättynyt.'}
                   </p>
                 </div>
+
+                {(categoryFilter !== 'all' || activeProfileId !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryFilter('all');
+                      setActiveProfileId('all');
+                    }}
+                    className="mt-1 inline-flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-2xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 transition-all cursor-pointer shadow-xs"
+                  >
+                    <span>Näytä kaikki tapahtumat</span>
+                  </button>
+                )}
 
                 {pastEvents.length > 0 && (
                   <button
@@ -1427,9 +1351,16 @@ export const App: React.FC = () => {
               events={categoryFilteredEvents}
               profiles={profiles}
               viewMode={viewMode}
-              conflicts={snapshot.conflicts}
+              conflicts={unDismissedConflicts}
               onSelectEvent={(ev) => setSelectedStatsEvent(ev)}
-              onClearFilter={() => setActiveProfileId('all')}
+              onClearFilter={
+                activeProfileId !== 'all' || categoryFilter !== 'all'
+                  ? () => {
+                      setActiveProfileId('all');
+                      setCategoryFilter('all');
+                    }
+                  : undefined
+              }
               onNavigate={(ev) => {
                 const coords = ev.parking?.coordinates || ev.venue?.coordinates;
                 const destination =

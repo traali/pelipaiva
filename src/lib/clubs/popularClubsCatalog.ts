@@ -328,20 +328,265 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
     colorHex: '#991b1b',
     sampleTeamUrl: 'https://lentopallo.torneopal.fi/taso/joukkue.php?joukkue=30200',
     popularAgeGroups: ['C-pojat', 'D-pojat Pukkipojat']
+  },
+
+  // 🏒 Ice Hockey
+  {
+    id: 'icehockey-default',
+    name: 'Jääkiekkojoukkue (Torneopal / Leijonat)',
+    shortName: 'Jääkiekko',
+    city: 'Koko Suomi',
+    sport: 'icehockey',
+    primaryColor: 'sininen',
+    colorHex: '#1e3a8a',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40101',
+    popularAgeGroups: ['U14', 'U13', 'U12', 'U11']
+  },
+  {
+    id: 'hifk-hockey',
+    name: 'HIFK Ishockey Juniorit (HIFK)',
+    shortName: 'HIFK',
+    city: 'Helsinki',
+    sport: 'icehockey',
+    primaryColor: 'punainen',
+    colorHex: '#dc2626',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40102',
+    popularAgeGroups: ['U14 Red', 'U13 White', 'U12 Blue', 'Stadin Gimmat']
+  },
+  {
+    id: 'jokerit-hockey',
+    name: 'Jokerit Juniorit',
+    shortName: 'Jokerit',
+    city: 'Helsinki',
+    sport: 'icehockey',
+    primaryColor: 'sininen',
+    colorHex: '#1d4ed8',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40103',
+    popularAgeGroups: ['U14', 'U13', 'U12']
+  },
+  {
+    id: 'kiekko-espoo',
+    name: 'Kiekko-Espoo Juniorit (K-Espoo)',
+    shortName: 'K-Espoo',
+    city: 'Espoo',
+    sport: 'icehockey',
+    primaryColor: 'sininen',
+    colorHex: '#1e3a8a',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40101',
+    popularAgeGroups: ['U14 Blues', 'U13 EKS', 'U12 EPS', 'Naiset']
+  },
+  {
+    id: 'tappara',
+    name: 'Tappara Juniorit',
+    shortName: 'Tappara',
+    city: 'Tampere',
+    sport: 'icehockey',
+    primaryColor: 'oranssi',
+    colorHex: '#ea580c',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40200',
+    popularAgeGroups: ['U14 Sininen', 'U13 Oranssi', 'U12']
+  },
+  {
+    id: 'ilves-hockey',
+    name: 'Tampereen Ilves (Jääkiekko)',
+    shortName: 'Ilves Hockey',
+    city: 'Tampere',
+    sport: 'icehockey',
+    primaryColor: 'vihreä',
+    colorHex: '#15803d',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40201',
+    popularAgeGroups: ['U14 Keltainen', 'U13 Vihreä', 'U12']
+  },
+  {
+    id: 'tps-hockey',
+    name: 'TPS Juniorijääkiekko',
+    shortName: 'TPS Hockey',
+    city: 'Turku',
+    sport: 'icehockey',
+    primaryColor: 'mustavalkoinen',
+    colorHex: '#18181b',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40300',
+    popularAgeGroups: ['U14 Musta', 'U13 Valkoinen', 'U12']
+  },
+  {
+    id: 'karpat',
+    name: 'Oulun Kärpät 46',
+    shortName: 'Kärpät',
+    city: 'Oulu',
+    sport: 'icehockey',
+    primaryColor: 'keltainen',
+    colorHex: '#eab308',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40400',
+    popularAgeGroups: ['U14 Musta', 'U13 Keltainen', 'U12']
+  },
+  {
+    id: 'pelicans',
+    name: 'JuniorPelicans',
+    shortName: 'Pelicans',
+    city: 'Lahti',
+    sport: 'icehockey',
+    primaryColor: 'turkoosi',
+    colorHex: '#06b6d4',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40500',
+    popularAgeGroups: ['U14 Turkoosi', 'U13', 'U12']
+  },
+  {
+    id: 'kalpa',
+    name: 'Junior-KalPa',
+    shortName: 'KalPa',
+    city: 'Kuopio',
+    sport: 'icehockey',
+    primaryColor: 'keltainen',
+    colorHex: '#eab308',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40600',
+    popularAgeGroups: ['U14 Keltainen', 'U13 Musta', 'U12']
+  },
+  {
+    id: 'jyp',
+    name: 'JYP Juniorit',
+    shortName: 'JYP',
+    city: 'Jyväskylä',
+    sport: 'icehockey',
+    primaryColor: 'punainen',
+    colorHex: '#b91c1c',
+    sampleTeamUrl: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40700',
+    popularAgeGroups: ['U14 Punainen', 'U13 Musta', 'U12']
+  },
+
+  // 👟 Futsal
+  {
+    id: 'futsal-default',
+    name: 'Futsaljoukkue (Palloliitto / Torneopal)',
+    shortName: 'Futsal',
+    city: 'Koko Suomi',
+    sport: 'futsal',
+    primaryColor: 'keltainen',
+    colorHex: '#eab308',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3321',
+    popularAgeGroups: ['P14 Futsal', 'T13 Futsal', 'P12 Futsal', 'Edustus']
+  },
+  {
+    id: 'kady',
+    name: 'Kampuksen Dynamo (KaDy Futsal)',
+    shortName: 'KaDy',
+    city: 'Jyväskylä',
+    sport: 'futsal',
+    primaryColor: 'punainen',
+    colorHex: '#dc2626',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3322',
+    popularAgeGroups: ['P15', 'T14', 'P13', 'Edustus']
+  },
+  {
+    id: 'akaa-futsal',
+    name: 'Akaa Futsal',
+    shortName: 'Akaa',
+    city: 'Akaa',
+    sport: 'futsal',
+    primaryColor: 'sininen',
+    colorHex: '#2563eb',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3323',
+    popularAgeGroups: ['P14', 'P12', 'Edustus']
+  },
+  {
+    id: 'gft',
+    name: 'Golden Futsal Team (GFT)',
+    shortName: 'GFT',
+    city: 'Espoo',
+    sport: 'futsal',
+    primaryColor: 'keltainen',
+    colorHex: '#eab308',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3321',
+    popularAgeGroups: ['P14 Kulta', 'T13 Kulta', 'P12', 'Edustus']
+  },
+  {
+    id: 'mad-max',
+    name: 'Futsal Mad Max',
+    shortName: 'Mad Max',
+    city: 'Valkeakoski',
+    sport: 'futsal',
+    primaryColor: 'mustavalkoinen',
+    colorHex: '#18181b',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3324',
+    popularAgeGroups: ['P14', 'P13', 'Edustus']
+  },
+  {
+    id: 'fc-kemi',
+    name: 'FC Kemi Futsal',
+    shortName: 'FC Kemi',
+    city: 'Kemi',
+    sport: 'futsal',
+    primaryColor: 'punainen',
+    colorHex: '#b91c1c',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3325',
+    popularAgeGroups: ['P14', 'P12', 'Edustus']
+  },
+  {
+    id: 'vieska-futsal',
+    name: 'Vieska Futsal',
+    shortName: 'Vieska',
+    city: 'Ylivieska',
+    sport: 'futsal',
+    primaryColor: 'keltainen',
+    colorHex: '#ca8a04',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3326',
+    popularAgeGroups: ['P14', 'P12', 'Edustus']
+  },
+  {
+    id: 'topv',
+    name: 'Tornion Palloveikot (ToPV Futsal)',
+    shortName: 'ToPV',
+    city: 'Tornio',
+    sport: 'futsal',
+    primaryColor: 'vihreä',
+    colorHex: '#16a34a',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3327',
+    popularAgeGroups: ['P14', 'P12', 'Edustus']
+  },
+  {
+    id: 'ilves-fs',
+    name: 'Ilves FS (Futsal)',
+    shortName: 'Ilves FS',
+    city: 'Tampere',
+    sport: 'futsal',
+    primaryColor: 'vihreä',
+    colorHex: '#15803d',
+    sampleTeamUrl: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3328',
+    popularAgeGroups: ['T14', 'P13', 'Edustus']
   }
 ];
 
+const SPORT_SYNONYMS: Record<SportType, string[]> = {
+  football: ['futis', 'jalkapallo', 'football', 'soccer'],
+  floorball: ['säbä', 'sähly', 'salibandy', 'floorball'],
+  basketball: ['koris', 'koripallo', 'basket', 'basketball'],
+  volleyball: ['lentis', 'lentopallo', 'volley', 'volleyball'],
+  icehockey: ['lätkä', 'kiekko', 'jääkiekko', 'jaakiekko', 'hockey', 'icehockey'],
+  futsal: ['futsal'],
+  training: ['treeni', 'harjoitus', 'fysiikka'],
+  school: ['koulu', 'wilma'],
+  other: ['muu']
+};
+
 /**
- * Searches the popular clubs catalog by keyword or city.
+ * Searches the popular clubs catalog by keyword, city, or optional sport filter.
  */
-export function searchPopularClubs(query: string): ClubPreset[] {
-  if (!query || query.trim().length === 0) return POPULAR_FINNISH_CLUBS.slice(0, 6);
+export function searchPopularClubs(query: string, sport?: SportType): ClubPreset[] {
+  const pool = sport
+    ? POPULAR_FINNISH_CLUBS.filter((c) => c.sport === sport)
+    : POPULAR_FINNISH_CLUBS;
+
+  if (!query || query.trim().length === 0) {
+    return pool.slice(0, 6);
+  }
   const q = query.toLowerCase().trim();
-  return POPULAR_FINNISH_CLUBS.filter(
-    (club) =>
+  return pool.filter((club) => {
+    const synonyms = SPORT_SYNONYMS[club.sport] || [];
+    return (
       club.name.toLowerCase().includes(q) ||
       club.shortName.toLowerCase().includes(q) ||
       club.city.toLowerCase().includes(q) ||
-      club.sport.toLowerCase().includes(q)
-  );
+      club.sport.toLowerCase().includes(q) ||
+      synonyms.some((syn) => syn.includes(q) || q.includes(syn))
+    );
+  });
 }

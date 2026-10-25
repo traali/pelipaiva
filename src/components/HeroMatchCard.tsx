@@ -24,8 +24,9 @@ import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
 import { EventChatModal } from './EventChatModal';
 import { EventMergeModal } from './EventMergeModal';
+import { VenueCorrectionModal } from './VenueCorrectionModal';
 import { EventInlineDropIn } from './EventInlineDropIn';
-import { MoreHorizontal, FileText } from 'lucide-react';
+import { MoreHorizontal, FileText, Edit3 } from 'lucide-react';
 import { db } from '../lib/storage/db';
 import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 
@@ -39,6 +40,7 @@ interface HeroMatchCardProps {
   onNavigate?: () => void;
   onOpenStats?: () => void;
   onOpenHomeModal?: () => void;
+  onResolveMismatch?: (eventId: string, decision: 'use_official' | 'keep_calendar' | 'unlink') => void;
   onEventUpdated?: (updatedEvent: MatchdayEvent) => void;
   onEventMerged?: (mergedTarget: MatchdayEvent, deletedId: string) => void;
   onEventDeleted?: (deletedId: string) => void;
@@ -55,6 +57,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   onNavigate,
   onOpenStats,
   onOpenHomeModal,
+  onResolveMismatch,
   onEventUpdated,
   onEventMerged,
   onEventDeleted,
@@ -63,6 +66,9 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
   const [showKit, setShowKit] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [isVenueModalOpen, setIsVenueModalOpen] = useState(false);
+  const [localVenue, setLocalVenue] = useState(event.venue);
+  const venue = isVenueModalOpen ? localVenue : event.venue;
 
   const stats: FullMatchStats | null = useMemo(() => {
     if (event.isTraining) return null;
@@ -180,6 +186,44 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           </div>
         )}
 
+        {/* Schedule / Venue Mismatch Warning & 1-Tap Resolution Banner */}
+        {event.mismatchFlags && (event.mismatchFlags.timeMismatch || event.mismatchFlags.venueMismatch) && (
+          <div className="mb-3.5 p-3 rounded-2xl bg-whistle/15 border border-whistle/30 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-whistle text-xs font-bold">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                {event.mismatchFlags.timeMismatch
+                  ? `Aikataulumuutos: Kalenteri ${event.mismatchFlags.calendarStartTime || ''} ➔ Liitto ${event.mismatchFlags.officialStartTime || ''} (${event.mismatchFlags.timeDiffMinutes || 0} min ero)`
+                  : `Kenttämuutos: Kalenteri ${event.mismatchFlags.calendarVenueName || ''} ➔ Liitto ${event.mismatchFlags.officialVenueName || ''}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onResolveMismatch?.(event.id, 'use_official')}
+                className="px-2.5 py-1 rounded-lg bg-pitch text-text-inverse text-[11px] font-bold shadow-sm shadow-pitch/20 hover:brightness-110 cursor-pointer"
+              >
+                Päivitä liiton tietoon
+              </button>
+              <button
+                type="button"
+                onClick={() => onResolveMismatch?.(event.id, 'keep_calendar')}
+                className="px-2.5 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-text-primary text-[11px] font-medium border border-border-subtle cursor-pointer"
+              >
+                Säilytä oma merkintä
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Lightning Danger Alert Banner */}
+        {event.lightning && event.lightning.status === 'danger' && (
+          <div className="mb-3.5 flex items-center gap-2 p-3 rounded-xl bg-stoppage/20 border border-stoppage/40 text-stoppage text-xs font-bold animate-pulse">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{event.lightning.alertMessage}</span>
+          </div>
+        )}
+
         {/* Top Meta: Profile, Sport, Date, and Data Source Provenance */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-text-secondary">
           <div className="flex flex-wrap items-center gap-2">
@@ -220,36 +264,31 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               </button>
             )}
 
-            {/* Data Source Provenance Badge */}
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+            {/* Data Source Provenance Badge (Clickable to manage / merge / unmerge) */}
+            <button
+              type="button"
+              onClick={() => setIsMergeOpen(true)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all cursor-pointer hover:brightness-110 active:scale-95 ${
                 sourceInfo.isCombined
-                  ? 'bg-pitch/15 text-pitch border-pitch/30'
-                  : 'bg-surface-elevated text-text-secondary border-border-subtle'
+                  ? 'bg-pitch/15 text-pitch border-pitch/30 hover:bg-pitch/25'
+                  : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
               }`}
-              title={sourceInfo.tooltipDetails}
+              title={`${sourceInfo.tooltipDetails || ''} • Klikkaa hallitaksesi lähteitä tai yhdistääksesi`}
+              aria-label={`Tietolähde: ${sourceInfo.badgeText}. Klikkaa hallitaksesi yhdistämistä.`}
             >
               <span>{sourceInfo.badgeText}</span>
-            </span>
+            </button>
 
-            {/* 1-Tap Attendance In/Out Button */}
-            {!isOut ? (
+            {/* 1-Tap Attendance In/Out Button (when attending; when OUT, top banner handles restore) */}
+            {!isOut && (
               <button
                 type="button"
                 onClick={() => handleToggleAttendance('out')}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
                 title={`Merkitse poisjäänti: ${profile?.playerName || 'Pelaaja'} ei mene`}
                 aria-label={`Merkitse poisjäänti: ${profile?.playerName || 'Pelaaja'} ei mene`}
               >
                 <span>⛔ {profile?.playerName || 'Pelaaja'} ei mene</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleToggleAttendance('in')}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-stoppage/15 text-stoppage border border-stoppage/30 hover:bg-pitch hover:text-text-inverse cursor-pointer transition-all active:scale-95"
-              >
-                <span>⛔ Poisjäänti (OUT) • Palauta</span>
               </button>
             )}
           </div>
@@ -292,12 +331,25 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         )}
         
         {/* Venue Info */}
-        <div className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">
+        <div className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary flex-wrap">
           <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
-          <span className="truncate font-medium">{event.venue.name}</span>
-          <span className="text-xs text-text-muted">
-            • {event.venue.isIndoor ? 'Sisätila' : 'Ulkokenttä'}
+          <span className="truncate font-medium">
+            {venue.name}
+            {venue.isApproximateLocation && (
+              <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti arvioitu)</span>
+            )}
           </span>
+          <span className="text-xs text-text-muted">
+            • {venue.isIndoor ? 'Sisätila' : 'Ulkokenttä'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsVenueModalOpen(true)}
+            aria-label={`Korjaa kentän tietoja: ${venue.name}`}
+            className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center -my-1 rounded-md text-text-muted hover:text-pitch hover:bg-surface-elevated cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-pitch"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* 3-PHASE TIMING STEPPER (Lähde kotoa -> Paikalla/Alkulämpö -> Kickoff) */}
@@ -342,7 +394,13 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
               {kickoff}
             </span>
             <span className="text-[10px] text-text-muted mt-0.5">
-              Ottelu
+              {event.sport === 'school' || event.eventType === 'school'
+                ? 'Koulu'
+                : event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting'
+                ? 'Tapahtuma'
+                : event.isTraining || event.eventType === 'training'
+                ? 'Harjoitus'
+                : 'Ottelu'}
             </span>
           </div>
         </div>
@@ -696,6 +754,15 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           onEventHidden={(hiddenId) => {
             onEventHidden?.(hiddenId);
           }}
+        />
+
+        {/* 1-Tap Venue Pin & Correction Modal */}
+        <VenueCorrectionModal
+          isOpen={isVenueModalOpen}
+          onClose={() => setIsVenueModalOpen(false)}
+          currentVenue={localVenue}
+          eventId={event.id}
+          onSaved={(updated) => setLocalVenue(updated)}
         />
       </div>
     </article>

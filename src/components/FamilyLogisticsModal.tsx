@@ -133,7 +133,7 @@ export const FamilyLogisticsModal: React.FC<FamilyLogisticsModalProps> = ({
 
             {/* Conflict Warning Banner if needed */}
             {plan.hasConflicts && (
-              <div className="mb-4 p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex flex-col gap-1.5 text-amber-500">
+              <div className="mb-4 p-3.5 rounded-2xl bg-whistle/15 border border-whistle/35 flex flex-col gap-1.5 text-whistle">
                 <div className="flex items-center gap-2 font-bold text-xs">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>Päällekkäisyys havaittu perheen otteluissa!</span>

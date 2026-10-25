@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { springTactile } from '../lib/motion/springs';
 import { ThemeToggle } from './ThemeToggle';
 import type { MissionControlSnapshot } from '../lib/agents';
+import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 
 interface MissionControlHUDProps {
   snapshot: MissionControlSnapshot;
@@ -48,7 +49,9 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const conflictCount = snapshot.conflicts.length;
+  const { isDismissed } = useDismissedConflicts();
+  const activeConflicts = snapshot.conflicts.filter((c) => !isDismissed(c));
+  const conflictCount = activeConflicts.length;
   const leaveBy = snapshot.leaveBy;
   const child = snapshot.nextPlayer?.playerName;
 
@@ -125,7 +128,7 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                 >
                 <MenuItem
                   icon={<RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />}
-                  label="Päivitä sää"
+                  label="Päivitä tiedot & sää"
                   onClick={() => {
                     onRefresh();
                     setMenuOpen(false);

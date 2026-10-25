@@ -7,7 +7,8 @@ const FOOTWEAR_FI: Record<FootwearRecommendation, string> = {
   FG_FIRM_GROUND: 'FG-nappikset',
   SG_SOFT_GROUND: 'SG-rautatapit',
   TF_TURF_SHOES: 'TF turf-kengät',
-  INDOOR_NON_MARKING: 'Non-marking sisäpelikengät'
+  INDOOR_NON_MARKING: 'Non-marking sisäpelikengät',
+  SKATES: 'Luistimet'
 };
 
 function item(id: string, label: string, why: string, required = true, weatherDriven = false): KitItem {
@@ -42,6 +43,7 @@ function sportCore(sport: SportType, isTraining: boolean): KitItem[] {
       return [
         item('luistimet', 'Luistimet (teroitus kunnossa)', 'Aamujää: terät tarkistetaan illalla.'),
         item('kypärä', 'Kypärä + ristikko/visiiri', 'Pakollinen junioreilla.'),
+        item('kaulasuoja', 'Kaulasuoja (pakollinen)', 'Jääkiekkoliitto: pakollinen turvavaruste kaikille junioreille.'),
         item('hanskat', 'Hanskat, säärisuojat, housut, hartiat', 'Täysi varustus joka vuorolle.'),
         item('maila', 'Maila + teippi', 'Varamaila jos mahtuu.'),
         item('juoma', 'Juomapullo (ei lasia)', 'Kopissa, ei laidalla lasia.')
@@ -52,6 +54,25 @@ function sportCore(sport: SportType, isTraining: boolean): KitItem[] {
         item('saary', 'Säärystimet', 'Futsalissa säärisuojat ovat sääntö.'),
         item('paita', isTraining ? 'Treenipaita' : 'Pelipaita', 'Ykkönen tai vieras.'),
         item('juoma', 'Juomapullo', 'Lyhyet vaihdot, paljon juoksua.')
+      ];
+    case 'school':
+      return [
+        item('reppu', 'Koulureppu & oppikirjat', 'Päivän oppituntien materiaalit.'),
+        item('penaali', 'Penaali ja kynät', 'Muistiinpanovälineet.'),
+        item('juoma', 'Juomapullo', 'Vesipullo koulupäivään.'),
+        item('kengat', 'Säänmukaiset kengät / sisätossut', 'Koulu- ja välituntikäyttöön.')
+      ];
+    case 'training':
+      return [
+        item('paita', 'Treenivaatteet (t-paita / shortsit / trikoot)', 'Mukava joustava asu.'),
+        item('kengat', 'Treenikengät / lenkkarit', 'Harjoitteluun sopivat jalkineet.'),
+        item('juoma', 'Juomapullo', 'Nesteytys treenin aikana.'),
+        item('pyyhe', 'Pieni pyyhe', 'Hikitreenin varuste.')
+      ];
+    case 'other':
+      return [
+        item('varusteet', 'Säänmukaiset varusteet ja asu', 'Tapahtuman luonteen mukainen pukeutuminen.'),
+        item('juoma', 'Juomapullo', 'Vesipullo mukaan.')
       ];
     case 'football':
     default:
@@ -93,6 +114,17 @@ function weatherExtras(event: MatchdayEvent): KitItem[] {
 
 function spectatorExtras(event: MatchdayEvent): KitItem[] {
   const items: KitItem[] = [item('katsomo', 'Säänmukainen katsomovarustus', 'Vanhempi seisoo 90 min.', true, false)];
+  const isIceVenue = event.venue.surface === 'ice' || event.sport === 'icehockey';
+
+  if (isIceVenue) {
+    items.push(
+      item('toppatakki', 'Lämmin toppatakki / talvivaatetus', 'Jäähallissa on kylmä (+4...+8 °C).', true, true),
+      item('istuin', 'Istuinalusta ja käsineet', 'Kylmät penkit tai metallikatsomot hohkaavat kylmää.', true, false),
+      item('termos', 'Termospullo (lämmintä juomaa)', 'Katsomossa viileä ilma kangistaa.', false, false)
+    );
+    return items;
+  }
+
   if (event.venue.isIndoor) {
     items.push(item('sisakenka', 'Sisäkengät halliin', 'Nappikset / ulkokengät jäävät aulaan.', true, false));
     return items;
@@ -118,7 +150,8 @@ export function buildSportKitPlan(event: MatchdayEvent, profile?: PlayerProfile)
     event.venue.surface,
     event.weather?.isForecastLongRange ? 12 : event.weather?.temperatureC ?? 12,
     event.weather?.isForecastLongRange ? 0 : event.weather?.precipitationMmh ?? 0,
-    event.venue.isIndoor
+    event.venue.isIndoor,
+    event.sport
   );
   const kitSet: SportKitPlan['kitSet'] = event.isTraining
     ? 'treeni'

@@ -45,6 +45,7 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -58,6 +59,7 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
       setMaxBike(currentHome.maxCyclingDistanceKm ?? 5.0);
       setPreferredMode(currentHome.defaultTransitMode || 'auto');
       setSearchQuery('');
+      setIsSaving(false);
       setSaveSuccess(false);
       setErrorMessage('');
     }
@@ -122,33 +124,59 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
   };
 
   const handleSave = async () => {
-    let finalCoords = coords;
-    if (address.trim()) {
-      const hit = await geocodeAddress(address.trim());
-      if (hit) {
-        finalCoords = hit;
-      }
-    }
-
-    const updated: HomeLocation = {
-      name: name.trim() || 'Kotiosoite',
-      address: address.trim() || `${finalCoords.lat.toFixed(4)}, ${finalCoords.lng.toFixed(4)}`,
-      coordinates: finalCoords,
-      maxWalkingDistanceKm: maxWalk,
-      maxCyclingDistanceKm: maxBike,
-      defaultTransitMode: preferredMode,
-      updatedAt: new Date().toISOString()
-    };
+    if (isSaving) return;
+    setIsSaving(true);
+    setErrorMessage('');
 
     try {
+      let finalCoords = coords;
+      let finalAddress = address.trim();
+      let finalName = name.trim();
+      const pendingQuery = searchQuery.trim();
+      const isCoordString = (s: string) => /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(s);
+
+      if (pendingQuery) {
+        const hit = await geocodeAddress(pendingQuery);
+        if (hit) {
+          finalCoords = hit;
+          finalAddress = pendingQuery;
+          finalName = pendingQuery.split(',')[0]?.trim() || 'Koti';
+          setCoords(hit);
+          setAddress(finalAddress);
+          setName(finalName);
+          setSearchQuery('');
+        } else {
+          setErrorMessage('Osoitetta ei löytynyt kartalta. Tarkista kirjoitusasu tai valitse alue alta.');
+          setIsSaving(false);
+          return;
+        }
+      } else if (finalAddress && !isCoordString(finalAddress) && finalAddress !== currentHome.address) {
+        const hit = await geocodeAddress(finalAddress);
+        if (hit) {
+          finalCoords = hit;
+        }
+      }
+
+      const updated: HomeLocation = {
+        name: finalName || 'Kotiosoite',
+        address: finalAddress || `${finalCoords.lat.toFixed(4)}, ${finalCoords.lng.toFixed(4)}`,
+        coordinates: finalCoords,
+        maxWalkingDistanceKm: maxWalk,
+        maxCyclingDistanceKm: maxBike,
+        defaultTransitMode: preferredMode,
+        updatedAt: new Date().toISOString()
+      };
+
       await onSaveHome(updated);
       setSaveSuccess(true);
       setTimeout(() => {
         setSaveSuccess(false);
+        setIsSaving(false);
         onClose();
       }, 900);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Tallennus epäonnistui');
+      setIsSaving(false);
     }
   };
 
@@ -395,7 +423,7 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
 
           {/* Error Message */}
           {errorMessage && (
-            <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-bold">
+            <div role="alert" className="p-2.5 rounded-xl bg-stoppage/15 border border-stoppage/30 text-stoppage text-xs font-bold">
               ⚠️ {errorMessage}
             </div>
           )}
@@ -413,17 +441,28 @@ export const HomeLocationModal: React.FC<HomeLocationModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary text-xs font-bold cursor-pointer"
+              disabled={isSaving}
+              className="py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong text-text-secondary hover:text-text-primary text-xs font-bold cursor-pointer disabled:opacity-50"
             >
               Peruuta
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="py-2.5 px-5 rounded-xl bg-pitch text-text-inverse text-xs font-black hover:brightness-110 cursor-pointer shadow-md shadow-pitch/20 flex items-center gap-1.5"
+              disabled={isSaving || isGeocoding || isGpsLoading}
+              className="py-2.5 px-5 rounded-xl bg-pitch text-text-inverse text-xs font-black hover:brightness-110 cursor-pointer shadow-md shadow-pitch/20 flex items-center gap-1.5 disabled:opacity-60"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Tallenna kotiosoite</span>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Tallennetaan...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Tallenna kotiosoite</span>
+                </>
+              )}
             </button>
           </div>
         </motion.div>

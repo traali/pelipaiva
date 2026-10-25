@@ -6,6 +6,7 @@ import {
   MatchdayBriefing,
   MatchdayEvent,
   PitchSurface,
+  SportType,
   TransitPlan
 } from '../../types/matchday';
 import { resolveTransitPlan } from '../geo/transitEngine';
@@ -14,12 +15,34 @@ export function determineFootwear(
   surface: PitchSurface,
   tempC: number,
   precipMmh: number,
-  isIndoor: boolean
+  isIndoor: boolean,
+  sport?: SportType
 ): { footwear: FootwearRecommendation; reason: string } {
+  if (surface === 'ice' || sport === 'icehockey') {
+    return {
+      footwear: 'SKATES',
+      reason: isIndoor
+        ? 'Jäähalli / jääalusta: Luistimet (varmista terien teroitus ja teräsuojat).'
+        : 'Ulkojää: Luistimet (huomioi pakkasen purevuus ja käytä teräsuojia siirtymissä).'
+    };
+  }
+
   if (isIndoor) {
+    let reason = 'Sisähalli: Vaaleapohjaiset tai Non-Marking sisäpelikengät.';
+    if (sport === 'floorball') {
+      reason = 'Sisähalli: Vaaleapohjaiset tai Non-Marking sisäpelikengät (salibandy).';
+    } else if (sport === 'basketball') {
+      reason = 'Sisähalli: Sisäkoripallokengät hyvällä nilkkatuella ja pidolla.';
+    } else if (sport === 'volleyball') {
+      reason = 'Sisähalli: Vaimentavat non-marking lentopallokengät.';
+    } else if (sport === 'futsal') {
+      reason = 'Sisähalli: Futsal-kengät (tasainen pitävä salipohja / non-marking).';
+    } else if (sport === 'school') {
+      reason = 'Sisäliikunta: Koulun sisäpelikengät / vaaleapohjaiset tossut.';
+    }
     return {
       footwear: 'INDOOR_NON_MARKING',
-      reason: 'Sisähalli: Vaaleapohjaiset tai Non-Marking sisäpelikengät.'
+      reason
     };
   }
 
@@ -207,10 +230,13 @@ export function generateMatchdayBriefing(
       venue.surface,
       temp,
       rain,
-      venue.isIndoor
+      venue.isIndoor,
+      event.sport
     );
     footwear = footRes.footwear;
     footwearReason = footRes.reason;
+
+    const isIceVenue = venue.surface === 'ice' || event.sport === 'icehockey';
 
     if (isOutdoor) {
       if (temp < 6) {
@@ -225,8 +251,30 @@ export function generateMatchdayBriefing(
       if (rain > 0.5) {
         spectatorGear += ' 🌧️ Muista sateenvarjo ja vedenpitävät kengät.';
       }
+    } else if (isIceVenue) {
+      clothingAdvice =
+        'Täysi jääkiekkovarustus (kypärä ristikolla, kaulasuoja, suojat, hanskat) + tekninen alusasu ja juomapullo.';
+      spectatorGear =
+        'Kylmä jäähalli (+4...+8 °C)! Pukeudu lämpimästi: toppatakki, lämpimät kengät, istuinalusta ja pipo/hanskat.';
     } else {
-      clothingAdvice = 'Normaali sisäpelivarustus + juomapullo ja suojalasit (säbä).';
+      if (event.sport === 'floorball') {
+        clothingAdvice = 'Normaali sisäpelivarustus + juomapullo ja suojalasit (säbä).';
+      } else if (event.sport === 'basketball') {
+        clothingAdvice =
+          'Koripallovarustus (pelipaita + shortsit), sisäpelikengät nilkkatuella ja juomapullo.';
+      } else if (event.sport === 'volleyball') {
+        clothingAdvice =
+          'Lentopallovarustus (peliasu, polvisuojat), vaimentavat sisäpelikengät ja juomapullo.';
+      } else if (event.sport === 'futsal') {
+        clothingAdvice =
+          'Futsal-varustus (pelipaita, säärisuojat), salipohjaiset futsalkengät ja juomapullo.';
+      } else if (event.sport === 'football') {
+        clothingAdvice = 'Peliasu, säärisuojat, sisäpelikengät/turf-kengät ja juomapullo.';
+      } else if (event.sport === 'training') {
+        clothingAdvice = 'Treenivaatteet, sisäpelikengät ja juomapullo.';
+      } else {
+        clothingAdvice = 'Normaali sisäpelivarustus + juomapullo.';
+      }
       spectatorGear = 'Sisähallissa tarkenee kevyemmällä vaatetuksella.';
     }
   }
@@ -249,7 +297,19 @@ export function generateMatchdayBriefing(
     ? `📌 Muistutus: ${event.title} klo ${startTimeFormatted} (${venue.name}).`
     : `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}. Seuraava peli: [PVM].`;
 
-  const emoji = isSchool ? '🏫' : isOther ? '📌' : '⚽';
+  const SPORT_EMOJIS: Record<SportType, string> = {
+    football: '⚽',
+    floorball: '🏑',
+    basketball: '🏀',
+    volleyball: '🏐',
+    icehockey: '🏒',
+    futsal: '⚽',
+    training: '🏋️',
+    school: '🏫',
+    other: '📌'
+  };
+  // eventType (school/meeting) can override a profile's sport, e.g. a Wilma event on a football profile
+  const emoji = isSchool ? '🏫' : isOther ? '📌' : SPORT_EMOJIS[event.sport] || '⚽';
 
   return {
     scoutSummary: `${emoji} ${event.title} @ ${venue.name}${venue.surface && venue.surface !== 'indoor_parquet' ? ` (${venue.surface.replace(/_/g, ' ')})` : ''}.`,

@@ -101,6 +101,22 @@ const PRESET_TORNEOPAL_TEAMS: Array<{
     association: 'Basket.fi',
     colorHex: '#f59e0b'
   },
+  {
+    name: 'Jääkiekko · Kiekko-Espoo Juniorit',
+    teamName: 'Kiekko-Espoo',
+    sport: 'icehockey',
+    url: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40101',
+    association: 'Leijonat / Torneopal',
+    colorHex: '#1e3a8a'
+  },
+  {
+    name: 'Futsal · GFT Espoo',
+    teamName: 'GFT Futsal',
+    sport: 'futsal',
+    url: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3321',
+    association: 'Palloliitto Futsal',
+    colorHex: '#eab308'
+  },
   ...EXAMPLE_TOURNAMENTS.map((cup) => ({
     name: `${cup.name} · ${cup.teamName}`,
     teamName: cup.teamName,
@@ -757,11 +773,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             onChange={(e) => setCustomSport(e.target.value as SportType)}
                             className="px-2.5 py-1.5 rounded-xl bg-surface-elevated border border-border-subtle text-xs font-bold text-text-primary"
                           >
-                            <option value="football">Jalkapallo</option>
-                            <option value="floorball">Salibandy</option>
-                            <option value="basketball">Koripallo</option>
-                            <option value="volleyball">Lentopallo</option>
-                            <option value="icehockey">Jääkiekko</option>
+                            <option value="football">⚽ Jalkapallo</option>
+                            <option value="floorball">🏑 Salibandy</option>
+                            <option value="basketball">🏀 Koripallo</option>
+                            <option value="volleyball">🏐 Lentopallo</option>
+                            <option value="icehockey">🏒 Jääkiekko</option>
+                            <option value="futsal">👟 Futsal</option>
+                            <option value="school">🏫 Koulu / Wilma</option>
+                            <option value="other">📌 Muu / treenit</option>
                           </select>
 
                           <button

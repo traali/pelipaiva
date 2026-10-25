@@ -35,6 +35,11 @@ const FOOTWEAR_LABELS: Record<
     title: 'Sisäpelikengät',
     badge: 'Salipohja',
     color: 'text-text-primary border-border-strong bg-surface-elevated'
+  },
+  SKATES: {
+    title: 'Luistimet',
+    badge: 'Jää',
+    color: 'text-cyan-400 border-cyan-400/30 bg-cyan-400/10'
   }
 };
 

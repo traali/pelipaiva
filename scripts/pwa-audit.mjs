@@ -43,7 +43,7 @@ assert(fs.existsSync(manifestPath), 'manifest.webmanifest exists');
 
 if (fs.existsSync(manifestPath)) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  assert(manifest.name && manifest.name.includes('Pelipäivä'), `Manifest has app name: "${manifest.name}"`);
+  assert(manifest.name && (manifest.name.includes('Pelipäivä') || manifest.name.includes('FamDay')), `Manifest has app name: "${manifest.name}"`);
   assert(manifest.short_name, `Manifest has short_name: "${manifest.short_name}"`);
   assert(manifest.display === 'standalone', `Manifest display is standalone ("${manifest.display}")`);
   assert(manifest.start_url, `Manifest has start_url: "${manifest.start_url}"`);

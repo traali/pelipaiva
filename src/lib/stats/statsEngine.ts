@@ -183,8 +183,10 @@ export function parseAssociationUrl(rawUrl: string): ParsedAssociationUrl | null
       if (leagueId) q.set('category', leagueId);
       const query = q.toString();
 
+      const isFutsal = /futsal/i.test(`${pathname} ${searchParams.toString()}`);
+
       return {
-        sport: 'football',
+        sport: isFutsal ? 'futsal' : 'football',
         association: 'palloliitto',
         teamId,
         tab,

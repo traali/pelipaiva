@@ -15,6 +15,7 @@ import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { FamilyVisualCalendar } from './FamilyVisualCalendar';
+import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
@@ -60,6 +61,12 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   onSelectEvent,
   onClearFilter
 }) => {
+  const { isDismissed, dismiss: dismissConflict } = useDismissedConflicts();
+  const activeConflicts = useMemo(
+    () => (conflicts || []).filter((c) => !isDismissed(c)),
+    [conflicts, isDismissed]
+  );
+
   const profileMap = useMemo(() => {
     const map = new Map<string, PlayerProfile>();
     for (const p of profiles) {
@@ -119,10 +126,29 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   if (viewMode === 'timeline') {
     return (
       <div className="flex flex-col gap-5 pb-8">
-        {groupedByDay.map((dayGroup) => (
+        {groupedByDay.map((dayGroup) => {
+          const allMatches = dayGroup.events.every(
+            (e) =>
+              !e.isTraining &&
+              e.sport !== 'school' &&
+              e.sport !== 'other' &&
+              e.eventType !== 'training' &&
+              e.eventType !== 'school' &&
+              e.eventType !== 'other' &&
+              e.eventType !== 'meeting'
+          );
+          const countUnit = allMatches
+            ? dayGroup.events.length === 1
+              ? 'ottelu'
+              : 'ottelua'
+            : dayGroup.events.length === 1
+            ? 'tapahtuma'
+            : 'tapahtumaa';
+
+          return (
           <div key={dayGroup.dateStr} className="flex flex-col gap-2">
-            {/* Sticky Day Section Header */}
-            <div className="sticky top-12 z-10 -mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
+            {/* Day Section Header */}
+            <div className="-mx-4 px-4 py-2 bg-canvas/95 backdrop-blur-md border-y border-border-subtle/80 flex items-center justify-between shadow-xs">
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded-md bg-pitch/15 text-pitch">
                   <CalendarIcon className="w-3.5 h-3.5" />
@@ -132,7 +158,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 </span>
               </div>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-surface-elevated text-text-secondary border border-border-subtle">
-                {dayGroup.events.length} {dayGroup.events.length === 1 ? 'ottelu' : 'ottelua'}
+                {dayGroup.events.length} {countUnit}
               </span>
             </div>
 
@@ -146,6 +172,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 const timeStr = `${start.toLocaleTimeString('fi-FI', tz)} – ${end.toLocaleTimeString('fi-FI', tz)}`;
 
                 const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
+                const isOut = ev.attendanceStatus === 'out';
                 // Honest affordance (M-44): only matches/tournaments open stats —
                 // trainings must not present as clickable. Interactive rows are
                 // keyboard-operable (role=button + Enter/Space).
@@ -170,7 +197,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                           }
                         : undefined
                     }
-                    className={`p-3.5 rounded-2xl bg-surface-elevated border border-border-subtle hover:border-pitch/40 transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${isInteractive ? 'cursor-pointer' : ''}`}
+                    className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${
+                      isOut
+                        ? 'opacity-65 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100'
+                        : 'bg-surface-elevated border-border-subtle hover:border-pitch/40'
+                    } ${isInteractive ? 'cursor-pointer' : ''}`}
                   >
                     {/* Left color bar indicator for child */}
                     <div
@@ -179,8 +210,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                     />
 
                     {/* Top Row: Time + Player + Badges */}
-                    <div className="flex items-center justify-between gap-2 pl-1.5">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2 pl-1.5 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-black font-mono tracking-tight text-text-primary flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
                           {timeStr}
@@ -195,6 +226,12 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         >
                           <span>{profile?.playerName || 'Pelaaja'}</span>
                         </span>
+
+                        {isOut && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stoppage/15 text-stoppage border border-stoppage/30">
+                            ⛔ Poisjäänti
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
@@ -222,7 +259,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     {/* Overlap & Driving Transition Warning */}
                     {(() => {
-                      const related = conflicts?.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id) || [];
+                      const related = activeConflicts.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id);
                       if (related.length === 0) return null;
                       return (
                         <div className="pl-1.5 flex flex-col gap-1.5">
@@ -230,23 +267,36 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                             <div
                               key={c.id}
                               role="alert"
-                              className={`p-2 rounded-xl text-[11px] font-bold border flex items-start gap-1.5 ${
+                              className={`p-2 rounded-xl text-[11px] font-bold border flex items-center justify-between gap-2 ${
                                 c.severity === 'critical'
                                   ? 'bg-stoppage/15 border-stoppage/30 text-stoppage'
                                   : 'bg-whistle/15 border-whistle/30 text-whistle'
                               }`}
                             >
-                              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                              <div className="flex-1 min-w-0">
-                                <div>
-                                  {c.overlapMinutes > 0
-                                    ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                    : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
-                                </div>
-                                <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
-                                  {c.message}
+                              <div className="flex items-start gap-1.5 min-w-0 flex-1">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                  <div>
+                                    {c.overlapMinutes > 0
+                                      ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
+                                      : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                  </div>
+                                  <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
+                                    {c.message}
+                                  </div>
                                 </div>
                               </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dismissConflict(c);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle text-[10px] font-bold shrink-0 cursor-pointer"
+                                title="Merkitse tämä huomio hoidetuksi"
+                              >
+                                ✓ Kuittaa
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -301,7 +351,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
               })}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     );
   }
@@ -311,7 +362,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     <FamilyVisualCalendar
       events={events}
       profiles={profiles}
-      conflicts={conflicts}
+      conflicts={activeConflicts}
       onSelectEvent={onSelectEvent}
       onNavigate={onNavigate}
       onClearFilter={onClearFilter}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseICSFeed, isTrainingEvent, extractFeedCategories } from './icsParser';
+import { parseICSFeed, isTrainingEvent, classifyCalendarEvent, extractFeedCategories } from './icsParser';
 
 const SAMPLE_ICS = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -38,6 +38,15 @@ describe('ICS Calendar Parser', () => {
     expect(isTrainingEvent('Lajiharjoitukset: Puotila')).toBe(true);
     expect(isTrainingEvent('Fysiikkatreenit')).toBe(true);
     expect(isTrainingEvent('HJK T13 vs EPS Valkoinen')).toBe(false);
+  });
+
+  it('correctly classifies school events and does not confuse exams with training', () => {
+    expect(classifyCalendarEvent('Matematiikan koe')).toBe('school');
+    expect(classifyCalendarEvent('Ruotsin oppitunti')).toBe('school');
+    expect(classifyCalendarEvent('Wilma: Läksyt tekemättä')).toBe('school');
+    expect(classifyCalendarEvent('Fysiikan koe')).toBe('school');
+    expect(classifyCalendarEvent('Koulupäivä 8-14')).toBe('school');
+    expect(isTrainingEvent('Fysiikan koe')).toBe(false);
   });
 
   it('correctly parses matches, teams, and venue from .ics feed', async () => {

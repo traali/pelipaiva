@@ -370,21 +370,17 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               );
             })()}
 
-            {/* 1-Tap Attendance In/Out Button */}
-            {!isOut ? (
+            {/* 1-Tap Attendance In/Out Button (when attending; when OUT, top banner handles restore) */}
+            {!isOut && (
               <button
                 type="button"
                 onClick={() => handleToggleAttendance('out')}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-surface-elevated text-text-secondary hover:text-stoppage hover:border-stoppage/40 border border-border-subtle transition-all cursor-pointer hover:brightness-110 active:scale-95"
                 title={`Merkitse poisjäänti: ${playerName || 'Pelaaja'} ei mene`}
                 aria-label={`Merkitse poisjäänti: ${playerName || 'Pelaaja'} ei mene`}
               >
                 <span>⛔ {playerName || 'Pelaaja'} ei mene</span>
               </button>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-stoppage/15 text-stoppage border border-stoppage/30">
-                <span>⛔ Poisjäänti (OUT)</span>
-              </span>
             )}
           </div>
 

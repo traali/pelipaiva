@@ -162,6 +162,30 @@ describe('Sports Association URL Parser', () => {
         teamId: '3512345'
       });
     });
+
+    it('parses Palloliitto futsal URLs with category or query parameters as futsal', () => {
+      const resultWithCategory = parseAssociationUrl('https://tulospalvelu.palloliitto.fi/team/185085?category=futsal-liiga');
+      expect(resultWithCategory).toMatchObject({
+        sport: 'futsal',
+        association: 'palloliitto',
+        teamId: '185085',
+        leagueId: 'futsal-liiga'
+      });
+
+      const resultWithFutsalTab = parseAssociationUrl('https://tulospalvelu.palloliitto.fi/team/185085/futsal');
+      expect(resultWithFutsalTab).toMatchObject({
+        sport: 'futsal',
+        association: 'palloliitto',
+        teamId: '185085'
+      });
+
+      const resultWithFutsalParam = parseAssociationUrl('https://tulospalvelu.palloliitto.fi/team/185085?season=2026&series=P15-futsal');
+      expect(resultWithFutsalParam).toMatchObject({
+        sport: 'futsal',
+        association: 'palloliitto',
+        teamId: '185085'
+      });
+    });
   });
 
   describe('🏑 Floorball (Salibandyliitto)', () => {

@@ -1,9 +1,10 @@
 import { db, PelipaivaDB } from '../storage/db';
 import { PlayerProfile, SportType } from '../../types/matchday';
-import { generateStableProfileId } from '../clubs/attachTeam';
+import { generateStableProfileId, slugPlayerName } from '../clubs/attachTeam';
 import { ingestSourceForProfile } from '../clubs/ingestOfficial';
 import { swatchForHex } from '../sport/teamColors';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
+import { detectSportFromText } from '../ai/eventCandidateRanker';
 
 export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
@@ -148,6 +149,34 @@ export function rosterFingerprint(
 }
 
 /**
+ * Resolves a unique, deterministic stable profile ID.
+ * Avoids colliding on empty URLs for same-named siblings by incorporating sport and team slug,
+ * and regenerates incomplete legacy IDs ending in ':'.
+ */
+export function getStableProfileId(p: {
+  id: string;
+  playerName: string;
+  calendarUrl?: string;
+  associationUrl?: string;
+  sport?: SportType;
+  teamName?: string;
+}): string {
+  // If the profile already has a valid, fully qualified stable ID (not ending with empty key ':'), preserve it
+  if (p.id && p.id.startsWith('p:') && p.id !== 'p:' && !p.id.endsWith(':')) {
+    return p.id;
+  }
+  const url = (p.calendarUrl || p.associationUrl || '').trim();
+  if (url) {
+    return generateStableProfileId(p.playerName, url);
+  }
+  // Fallback for manual / non-URL profiles: differentiate by sport and teamName
+  const sport = p.sport || 'football';
+  const teamPart = p.teamName ? `:${slugPlayerName(p.teamName)}` : '';
+  const fallbackSource = `manual:${sport}${teamPart}`;
+  return generateStableProfileId(p.playerName, fallbackSource);
+}
+
+/**
  * Merges local profiles and remote roster, respecting tombstones and stable IDs.
  */
 export function mergeRosters(
@@ -198,32 +227,75 @@ export function mergeRosters(
     }
   }
 
-  // 2. Add or update with local profiles (if not tombstoned)
+  // 2. Add or update with local profiles (if not tombstoned), preventing same-named sibling overwrites
+  const localAssignedIds = new Set<string>();
   for (const lp of localProfiles) {
-    const stableId = lp.id.startsWith('p:')
-      ? lp.id
-      : generateStableProfileId(lp.playerName, lp.calendarUrl || lp.associationUrl || '');
+    const stableId = getStableProfileId(lp);
     if (tombstoneMap.has(stableId) || tombstoneMap.has(lp.id)) continue;
 
-    profileMap.set(stableId, {
+    let targetId = stableId;
+    if (localAssignedIds.has(targetId)) {
+      // Collision between distinct local profiles: disambiguate ID to protect data
+      targetId = `${stableId}:${slugPlayerName(lp.id || Math.random().toString(36).slice(2, 6))}`;
+    }
+    localAssignedIds.add(targetId);
+
+    profileMap.set(targetId, {
       ...lp,
-      id: stableId
+      id: targetId
     });
   }
 
-  // Harmonize child sport across profiles if the child has an official association sport (e.g. basketball, floorball, volleyball)
-  const officialSportByPlayer = new Map<string, SportType>();
+  // 3. Multi-sport profile harmonization: collect ALL official sports per player (Map<string, Set<SportType>>)
+  const officialSportsByPlayer = new Map<string, Set<SportType>>();
   for (const p of profileMap.values()) {
     if (p.associationUrl || p.teamId) {
-      if (p.sport && p.sport !== 'football') {
-        officialSportByPlayer.set(p.playerName.trim().toLowerCase(), p.sport);
+      if (p.sport) {
+        const norm = p.playerName.trim().toLowerCase();
+        let set = officialSportsByPlayer.get(norm);
+        if (!set) {
+          set = new Set<SportType>();
+          officialSportsByPlayer.set(norm, set);
+        }
+        set.add(p.sport);
       }
     }
   }
+
   for (const p of profileMap.values()) {
-    const offSport = officialSportByPlayer.get(p.playerName.trim().toLowerCase());
-    if (offSport && p.sport === 'football' && !p.associationUrl) {
-      p.sport = offSport;
+    const norm = p.playerName.trim().toLowerCase();
+    const playerOfficialSports = officialSportsByPlayer.get(norm);
+    const profileText = `${p.teamName || ''} ${p.calendarUrl || ''} ${p.associationUrl || ''}`.trim();
+    const detectedSport = detectSportFromText(profileText);
+
+    if (!p.sport) {
+      if (detectedSport) {
+        p.sport = detectedSport;
+      } else if (playerOfficialSports && playerOfficialSports.size === 1) {
+        p.sport = Array.from(playerOfficialSports)[0] ?? p.sport;
+      }
+    } else if (p.sport === 'football' && !p.associationUrl) {
+      const isActuallyFootball = /ppj|pallo-pojat|hjk|futis|jalkapallo|palloliitto|fcfj|käpa|gnistan|vjs/i.test(profileText);
+      if (!isActuallyFootball) {
+        if (detectedSport && detectedSport !== 'football') {
+          p.sport = detectedSport;
+        } else if (playerOfficialSports) {
+          for (const offSport of playerOfficialSports) {
+            if (offSport === 'football') continue;
+            const matchesOffSport =
+              (offSport === 'floorball' && /indians|salibandy|säbä|sähly|oilers|ervii|eräviikingit|hawks|tiikerit|classic|spv/i.test(profileText)) ||
+              (offSport === 'basketball' && /basket|topola|koris|hnmky|namika|honka/i.test(profileText)) ||
+              (offSport === 'volleyball' && /lentopallo|puma|lp viesti|valepa|lentis|puijo/i.test(profileText)) ||
+              (offSport === 'icehockey' && /jokerit|hifk|kiekko|lätkä|tappara|jäähalli|kärpät|pelicans|lukko|ässät|saipa|jyp|hpk/i.test(profileText)) ||
+              (offSport === 'futsal' && /futsal|kady|gft|mad max|ilves fs/i.test(profileText));
+
+            if (matchesOffSport) {
+              p.sport = offSport;
+              break;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -372,9 +444,7 @@ async function executeSyncFamilyRosterCycle(
 
     const tombstoneIds = new Set(tombstones.map((t) => t.id));
     for (const lp of localProfiles) {
-      const stableId = lp.id.startsWith('p:')
-        ? lp.id
-        : generateStableProfileId(lp.playerName, lp.calendarUrl || lp.associationUrl || '');
+      const stableId = getStableProfileId(lp);
       if (tombstoneIds.has(lp.id) || tombstoneIds.has(stableId)) {
         await databaseInstance.profiles.delete(lp.id);
         const events = await databaseInstance.events.where('profileId').equals(lp.id).toArray();
@@ -387,6 +457,13 @@ async function executeSyncFamilyRosterCycle(
           for (const ev of more) {
             await databaseInstance.events.delete(ev.id);
           }
+        }
+      } else if (stableId !== lp.id) {
+        // Clean migration of legacy local profile IDs: delete old ID and repoint events
+        await databaseInstance.profiles.delete(lp.id);
+        const legacyEvents = await databaseInstance.events.where('profileId').equals(lp.id).toArray();
+        for (const ev of legacyEvents) {
+          await databaseInstance.events.update(ev.id, { profileId: stableId });
         }
       }
     }

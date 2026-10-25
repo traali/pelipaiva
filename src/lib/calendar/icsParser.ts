@@ -10,6 +10,57 @@ import { geocodeSportsVenue } from '../geo/sportsGeocoder';
 import { detectSportFromText } from '../ai/eventCandidateRanker';
 
 /**
+ * Checks if a calendar event is an academic school event, Wilma notification, exam, or lesson.
+ */
+export function isSchoolEvent(title: string, description: string = ''): boolean {
+  const text = `${title} ${description}`.toLowerCase();
+
+  // 1. Explicit school keywords and platform names
+  if (
+    text.includes('wilma') ||
+    text.includes('oppitunti') ||
+    text.includes('läksyt') ||
+    text.includes('koulupäivä') ||
+    text.includes('koulukuvaus') ||
+    text.includes('vanhempainvartti') ||
+    text.includes('todistusten jako') ||
+    text.includes('todistustenjako') ||
+    text.includes('laboratoriotyö') ||
+    text.includes('labratyö')
+  ) {
+    return true;
+  }
+
+  // 2. High school / secondary course codes (e.g. FY01, ENA03, RUB12, MAA05, KE02)
+  if (/\b(?:yMA|MAA|MAB|ÄI|ENA|RUB|FY|KE|BI|GE|HI|YH|UE|ET|FF|PS|TE)\d{1,2}\b/i.test(`${title} ${description}`)) {
+    return true;
+  }
+
+  // 3. Exams: root 'koe', 'kokeet', inflections, and compound words ending in *koe/*kokeet (e.g. fysiikkakoe, kertauskoe, uusintakoe, sanakoe, yo-koe, välikoe)
+  if (/(?:^|[^a-zäöå0-9_-])(?:[a-zäöå0-9_-]*(?:koe|kokeet|kokeen|kokeita|kokeisiin|kokeessa)|koeviik[a-zäöå0-9_]*|koepäiv[a-zäöå0-9_]*|koetilaisuus[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(text)) {
+    return true;
+  }
+
+  // 4. Lessons: generic lesson compounds or school subject + tunti (e.g. Ruotsin tunti, Fysiikan tunti, Matematiikan tunti)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:oppitunti[a-zäöå0-9_]*|koulutunti[a-zäöå0-9_]*|kaksoistunti[a-zäöå0-9_]*|tukitunti[a-zäöå0-9_]*|tukiopetus[a-zäöå0-9_]*|palkkitunti[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(text) ||
+    /(?:ruotsin?|englannin?|äidinkiel[a-zäöå0-9_]*|suomen?|saksan?|ranskan?|espanjan?|venäjän?|matemat[a-zäöå0-9_]*|matikan?|fysiik[a-zäöå0-9_]*|kemian?|biologian?|maantied[a-zäöå0-9_]*|historian?|yhteiskuntaop[a-zäöå0-9_]*|uskonnon?|elämänkatsomus[a-zäöå0-9_]*|filosofian?|psykologian?|terveystied[a-zäöå0-9_]*|kotitalou[a-zäöå0-9_]*|köksän?|käsityö[a-zäöå0-9_]*|kässä[a-zäöå0-9_]*|kuvataite[a-zäöå0-9_]*|kuvis[a-zäöå0-9_]*|musiikin?|liikunnan?)\s+(?:oppi)?tunti[a-zäöå0-9_]*/i.test(text) ||
+    /(?:ruotsin|englannin|äidinkielen|matikan|fysiikan|kemian|biologian|historian|kuvis|köksä|kässä|musiikin|liikunta)tunti[a-zäöå0-9_]*/i.test(text)
+  ) {
+    return true;
+  }
+
+  // 5. School activities, trips, ceremonies, daycare, and school keywords
+  if (
+    /(?:^|[^a-zäöå0-9])(?:koulu[a-zäöå0-9_]*|koululla|koulussa|koulun|luokka|luokassa|opettaja[a-zäöå0-9_]*|rehtori[a-zäöå0-9_]*|luokkaretki[a-zäöå0-9_]*|kouluretki[a-zäöå0-9_]*|leirikoulu[a-zäöå0-9_]*|esikoulu[a-zäöå0-9_]*|eskari[a-zäöå0-9_]*|päiväkoti[a-zäöå0-9_]*|iltapäiväkerho[a-zäöå0-9_]*|ip-kerho[a-zäöå0-9_]*|kehityskeskustelu[a-zäöå0-9_]*|päättäjäiset[a-zäöå0-9_]*|kevätjuhla[a-zäöå0-9_]*|joulujuhla[a-zäöå0-9_]*|syysjuhla[a-zäöå0-9_]*|lakkiaiset[a-zäöå0-9_]*|penkkarit[a-zäöå0-9_]*|vanhojentanssit[a-zäöå0-9_]*|kotitehtäv[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(text)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Checks if an event is a training session, practice, or non-match exercise.
  */
 export function isTrainingEvent(title: string, description: string = ''): boolean {
@@ -37,6 +88,11 @@ export function isTrainingEvent(title: string, description: string = ''): boolea
 
   // If explicit "vs" or " v " with another team, it's a match unless specified as internal drill
   if ((text.includes(' vs ') || text.includes(' v ')) && !text.includes('sisäinen')) {
+    return false;
+  }
+
+  // If school event, it's not sports training
+  if (isSchoolEvent(title, description)) {
     return false;
   }
 
@@ -72,6 +128,10 @@ export function classifyCalendarEvent(title: string, description: string = ''): 
     text.includes('turnauspeli')
   ) {
     return 'tournament';
+  }
+
+  if (isSchoolEvent(title, description)) {
+    return 'school';
   }
 
   if (isTrainingEvent(title, description)) {
@@ -153,7 +213,7 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
   let awayTeam = '';
   let isHomeMatch = true;
 
-  if (eventType !== 'training' && eventType !== 'meeting') {
+  if (eventType !== 'training' && eventType !== 'meeting' && eventType !== 'school') {
     // Check "@ Opponent" or "@ Venue vs Opponent"
     if (text.startsWith('@') || text.includes(' @ ')) {
       const parts = text.split(/\s*@\s*/);
@@ -757,7 +817,11 @@ export async function parseICSFeed(
               id: instanceId,
               profileId,
               sport: eventSport,
-              eventType: parsedTitle.eventType,
+              eventType:
+                parsedTitle.eventType === 'other' &&
+                (eventSport === 'school' || resolvedSport === 'school')
+                  ? 'school'
+                  : parsedTitle.eventType,
               isTraining,
               title,
               homeTeam: parsedTitle.homeTeam,
@@ -796,7 +860,11 @@ export async function parseICSFeed(
           id: event.uid || generateDeterministicEventId(title, kickoffTime.toISOString(), location),
           profileId,
           sport: eventSport,
-          eventType: parsedTitle.eventType,
+          eventType:
+            parsedTitle.eventType === 'other' &&
+            (eventSport === 'school' || resolvedSport === 'school')
+              ? 'school'
+              : parsedTitle.eventType,
           isTraining,
           title,
           homeTeam: parsedTitle.homeTeam,

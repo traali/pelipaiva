@@ -24,31 +24,120 @@ export interface CandidateRankingResult {
  * Detects the sport from text keywords.
  */
 export function detectSportFromText(text: string): SportType | undefined {
-  const norm = text.toLowerCase();
-  if (/\b(?:koulu|koulupäivä|oppitunti|koe|matematiikka|kotitalous|äidinkieli|ruotsi|englanti|fysiikka|kemia|historia|uskonto|tiedonhallinta|wilma|läksyt|opettaja|luokka|luokassa|koululla|vanhempainilta|kehityskeskustelu|kouluretki|luokkaretki|esikoulu|eskari|päiväkoti)\b/i.test(norm) || /\byMA\d|\bÄI\d|\bENA\d|\bRUB\d|\bFY\d|\bKE\d/i.test(text)) {
+  if (!text || typeof text !== 'string') return undefined;
+  const lowered = text.toLowerCase();
+  // School *venue* locatives ("säbätreenit koululla", "koulun salissa") describe
+  // where a sport happens, not a school event. Strip them for the primary
+  // classification and only use them as a last-resort school signal below.
+  const SCHOOL_VENUE_LOCATIVE = /(?:^|[^a-zäöå0-9])[a-zäöå0-9_-]*koulu(?:lla|ssa|lle|lta|n)(?=$|[^a-zäöå0-9])/gi;
+  const hasSchoolVenueLocative = new RegExp(SCHOOL_VENUE_LOCATIVE.source, 'i').test(lowered);
+  const norm = lowered.replace(SCHOOL_VENUE_LOCATIVE, ' ');
+
+  // 1. School (Wilma, exams, classes, school subjects, daycare)
+  if (
+    norm.includes('wilma') ||
+    norm.includes('oppitunti') ||
+    norm.includes('läksyt') ||
+    norm.includes('koulupäivä') ||
+    norm.includes('koulukuvaus') ||
+    norm.includes('vanhempainvartti') ||
+    norm.includes('todistusten jako') ||
+    norm.includes('todistustenjako') ||
+    norm.includes('laboratoriotyö') ||
+    norm.includes('labratyö') ||
+    /\b(?:yMA|MAA|MAB|ÄI|ENA|RUB|FY|KE|BI|GE|HI|YH|UE|ET|FF|PS|TE)\d{1,2}\b/i.test(text) ||
+    /(?:^|[^a-zäöå0-9_-])(?:[a-zäöå0-9_-]*(?:koe|kokeet|kokeen|kokeita|kokeisiin|kokeessa)|koeviik[a-zäöå0-9_]*|koepäiv[a-zäöå0-9_]*|koetilaisuus[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    /(?:^|[^a-zäöå0-9])(?:oppitunti[a-zäöå0-9_]*|koulutunti[a-zäöå0-9_]*|kaksoistunti[a-zäöå0-9_]*|tukitunti[a-zäöå0-9_]*|tukiopetus[a-zäöå0-9_]*|palkkitunti[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    /(?:ruotsin?|englannin?|äidinkiel[a-zäöå0-9_]*|suomen?|saksan?|ranskan?|espanjan?|venäjän?|matemat[a-zäöå0-9_]*|matikan?|fysiik[a-zäöå0-9_]*|kemian?|biologian?|maantied[a-zäöå0-9_]*|historian?|yhteiskuntaop[a-zäöå0-9_]*|uskonnon?|elämänkatsomus[a-zäöå0-9_]*|filosofian?|psykologian?|terveystied[a-zäöå0-9_]*|kotitalou[a-zäöå0-9_]*|köksän?|käsityö[a-zäöå0-9_]*|kässä[a-zäöå0-9_]*|kuvataite[a-zäöå0-9_]*|kuvis[a-zäöå0-9_]*|musiikin?|liikunnan?)\s+(?:oppi)?tunti[a-zäöå0-9_]*/i.test(norm) ||
+    /(?:ruotsin|englannin|äidinkielen|matikan|fysiikan|kemian|biologian|historian|kuvis|köksä|kässä|musiikin|liikunta)tunti[a-zäöå0-9_]*/i.test(norm) ||
+    /(?:^|[^a-zäöå0-9])(?:koulu[a-zäöå0-9_]*|koululla|koulussa|koulun|luokka|luokassa|opettaja[a-zäöå0-9_]*|rehtori[a-zäöå0-9_]*|matematiikka|kotitalous|äidinkieli|ruotsi|englanti|fysiikka|kemia|historia|uskonto|tiedonhallinta|luokkaretki[a-zäöå0-9_]*|kouluretki[a-zäöå0-9_]*|leirikoulu[a-zäöå0-9_]*|esikoulu[a-zäöå0-9_]*|eskari[a-zäöå0-9_]*|päiväkoti[a-zäöå0-9_]*|iltapäiväkerho[a-zäöå0-9_]*|ip-kerho[a-zäöå0-9_]*|kehityskeskustelu[a-zäöå0-9_]*|vanhempainilta[a-zäöå0-9_]*|päättäjäiset[a-zäöå0-9_]*|kevätjuhla[a-zäöå0-9_]*|joulujuhla[a-zäöå0-9_]*|syysjuhla[a-zäöå0-9_]*|lakkiaiset[a-zäöå0-9_]*|penkkarit[a-zäöå0-9_]*|vanhojentanssit[a-zäöå0-9_]*|kotitehtäv[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(norm)
+  ) {
     return 'school';
   }
-  if (/\b(?:hammaslääkäri|lääkäri|neuvola|terveydenhoitaja|optikko|partio|soittotunti|pianotunti|kitaratunti|viulutunti|bänditreenit|kuoro|synttärit|syntymäpäivä|kerho|sirkus|tanssitunti|baletti|ratsastus|uimakoulu)\b/i.test(norm)) {
+
+  // 2. Other non-sport / personal appointments
+  if (
+    /(?:^|[^a-zäöå0-9])(?:hammaslääkäri[a-zäöå0-9_]*|lääkäri[a-zäöå0-9_]*|neuvola[a-zäöå0-9_]*|terveydenhoitaja[a-zäöå0-9_]*|optikko[a-zäöå0-9_]*|partio[a-zäöå0-9_]*|soittotunti[a-zäöå0-9_]*|pianotunti[a-zäöå0-9_]*|kitaratunti[a-zäöå0-9_]*|viulutunti[a-zäöå0-9_]*|bänditreeni[a-zäöå0-9_]*|kuoro[a-zäöå0-9_]*|synttäri[a-zäöå0-9_]*|syntymäpäivä[a-zäöå0-9_]*|kerho[a-zäöå0-9_]*|sirkus[a-zäöå0-9_]*|tanssitunti[a-zäöå0-9_]*|baletti[a-zäöå0-9_]*|ratsastus[a-zäöå0-9_]*|uimakoulu[a-zäöå0-9_]*|muskari[a-zäöå0-9_]*|elokuvat|teatteri[a-zäöå0-9_]*)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('hammaslääkäri') ||
+    norm.includes('pianotunti') ||
+    norm.includes('soittotunti') ||
+    norm.includes('syntymäpäivä') ||
+    norm.includes('partio')
+  ) {
     return 'other';
   }
-  if (/\b(?:salibandy|säbä|sähly|floorball|reikäpallo|suojalasit|fliiga|indians|westend indians|ervii|eräviikingit|tiikerit|hawks|blackbirds|oilers)\b/i.test(norm)) {
-    return 'floorball';
-  }
-  if (/\b(?:koripallo|koris|basket|korisliiga|donkki|topola|hnmky|namika|honka basket|wartti|puhu|pantterit|lepy|tikka basket|toppari)\b/i.test(norm)) {
-    return 'basketball';
-  }
-  if (/\b(?:lentopallo|lentis|volley|hihalyönti|sormilyönti|mestaruusliiga|puijo|valepa|vaasan kiisto)\b/i.test(norm)) {
-    return 'volleyball';
-  }
-  if (/\b(?:jääkiekko|lätkä|kiekko|hockey|luistimet|kypärä|leijonat)\b/i.test(norm)) {
-    return 'icehockey';
-  }
-  if (/\b(?:futsal)\b/i.test(norm)) {
+
+  // 3. Futsal (check before football because Palloliitto organizes both)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:futsal[a-zäöå0-9_]*|kady|gft|mad max|akaa futsal|ilves fs|vieska futsal|sovo|riemu)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('futsal')
+  ) {
     return 'futsal';
   }
-  if (/\b(?:futis|jalkapallo|ppj|pallo-pojat|hjk|honka|vjs|pk-35|gnistan|käpa|fcfj|eps|ebk|palloliitto|piirisarja|11vs11|8vs8|5vs5|nappikset|säärisuojat|viheriö|nurmi|tekonurmi|bollis|spl)\b/i.test(norm)) {
+
+  // 4. Floorball (Salibandy / Säbä)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:salibandy[a-zäöå0-9_]*|säbä[a-zäöå0-9_]*|sähly[a-zäöå0-9_]*|floorball[a-zäöå0-9_]*|reikäpallo[a-zäöå0-9_]*|suojalasit|fliiga|f-liiga|indians|westend indians|ervii|eräviikingit|tiikerit|hawks|blackbirds|oilers|classic|spv|nokian krp)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('salibandy') ||
+    norm.includes('säbä') ||
+    norm.includes('sähly')
+  ) {
+    return 'floorball';
+  }
+
+  // 5. Basketball (Koripallo / Koris)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:koripallo[a-zäöå0-9_]*|koris[a-zäöå0-9_]*|basket[a-zäöå0-9_]*|donkki[a-zäöå0-9_]*|korisliiga|topo|topola|torpan pojat|hnmky|namika|honka basket|tapiolan honka|wartti|puhu|pantterit|lepy|tikka basket|toppari)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('koripallo') ||
+    norm.includes('koris')
+  ) {
+    return 'basketball';
+  }
+
+  // 6. Volleyball (Lentopallo / Lentis)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:lentopallo[a-zäöå0-9_]*|lentis[a-zäöå0-9_]*|volley[a-zäöå0-9_]*|hihalyönti[a-zäöå0-9_]*|sormilyönti[a-zäöå0-9_]*|mestaruusliiga|puijo|puijo wolley|valepa|lp viesti|puma-volley|hurrikaani|akaa-volley|vampula|vaasan kiisto)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('lentopallo') ||
+    norm.includes('lentis')
+  ) {
+    return 'volleyball';
+  }
+
+  // 7. Ice Hockey (Jääkiekko / Lätkä)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:jääkiekko[a-zäöå0-9_]*|lätkä[a-zäöå0-9_]*|kiekko[a-zäöå0-9_]*|hockey[a-zäöå0-9_]*|luistimet|luistelu[a-zäöå0-9_]*|kaulasuoja[a-zäöå0-9_]*|jäähalli[a-zäöå0-9_]*|kaukalo[a-zäöå0-9_]*|tekojää[a-zäöå0-9_]*|aamujää[a-zäöå0-9_]*|jäätreeni[a-zäöå0-9_]*|leijonat|hifk|jokerit|tappara|kiekko-espoo|kärpät|lukko|ässät|kalpa|pelicans|saipa|jyp|hpk|kookoo|jukurit|mestis|sm-liiga)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('jääkiekko') ||
+    norm.includes('lätkä') ||
+    norm.includes('jäähalli')
+  ) {
+    return 'icehockey';
+  }
+
+  // 8. Football (Jalkapallo / Futis)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:jalkapallo[a-zäöå0-9_]*|futis[a-zäöå0-9_]*|nappikset[a-zäöå0-9_]*|säärisuojat[a-zäöå0-9_]*|viheriö|nurmi|tekonurmi|bollis|spl|ppj|pallo-pojat|hjk|honka|vjs|pk-35|gnistan|käpa|fcfj|eps|ebk|palloliitto|piirisarja|veikkausliiga|ykkösliiga|ykkönen|11vs11|8vs8|5vs5)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('jalkapallo') ||
+    norm.includes('futis')
+  ) {
     return 'football';
   }
+
+  // 9. Training (General conditioning / Gym / Physical workout)
+  if (
+    /(?:^|[^a-zäöå0-9])(?:fysiikkatreeni[a-zäöå0-9_]*|fysiikka[a-zäöå0-9_]*|kuntosali[a-zäöå0-9_]*|punttisali[a-zäöå0-9_]*|puntti[a-zäöå0-9_]*|juoksutreeni[a-zäöå0-9_]*|juoksulenkki[a-zäöå0-9_]*|oheisharjoitus[a-zäöå0-9_]*|oheistreeni[a-zäöå0-9_]*|oheiset|kehonhuolto[a-zäöå0-9_]*|venyttely[a-zäöå0-9_]*|kuntopiiri[a-zäöå0-9_]*|lenkki[a-zäöå0-9_]*|lenkille)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    norm.includes('fysiikkatreenit') ||
+    norm.includes('kuntosali') ||
+    norm.includes('punttisali') ||
+    norm.includes('oheisharjoitus')
+  ) {
+    return 'training';
+  }
+
+  // 10. Last resort: a bare school venue ("Juhla koululla") is still a school event
+  if (hasSchoolVenueLocative) {
+    return 'school';
+  }
+
   return undefined;
 }
 
