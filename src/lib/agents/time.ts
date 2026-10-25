@@ -10,6 +10,36 @@ export function helsinkiDateISO(d: Date = new Date()): string {
   }).format(d);
 }
 
+/** Calendar day in Helsinki, even when the stored timestamp is UTC. */
+export function eventDayKey(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return helsinkiDateISO(d);
+}
+
+/**
+ * True once the game's Helsinki calendar day is over. Today's games, played or
+ * not, stay with the current games until Helsinki midnight; only then do they
+ * move to "aiemmat". Uses the end time (a game past midnight belongs to the day
+ * it ends), else the start time. Unknown times never hide a game.
+ */
+export function isPastHelsinkiDay(
+  event: { startTime?: string; endTime?: string },
+  now: Date = new Date()
+): boolean {
+  const ref = [event.endTime, event.startTime].find((iso) => iso && !Number.isNaN(new Date(iso).getTime()));
+  if (!ref) return false;
+  return eventDayKey(ref) < helsinkiDateISO(now);
+}
+
+/** Finished: TASO has a final score, or the reserved slot has ended. */
+export function isFinishedGame(event: { endTime?: string; score?: string }, now: Date = new Date()): boolean {
+  if (event.score) return true;
+  const end = event.endTime ? new Date(event.endTime).getTime() : NaN;
+  return Number.isFinite(end) && end <= now.getTime();
+}
+
 export function formatFiTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('fi-FI', {
     hour: '2-digit',
@@ -27,6 +57,30 @@ export function helsinkiOffsetForDateISO(dateISO: string): string {
   if (!y || !m || !d) return '+03:00';
   // Probe midday UTC of that local date — safely inside either offset regime.
   return getFinnishTimezoneOffset(new Date(Date.UTC(y, m - 1, d, 12, 0, 0)));
+}
+
+/**
+ * Parses a Helsinki wall-clock string ("HH:MM" or "HH.MM") on the same
+ * local date as a base event ISO timestamp and returns a UTC ISO timestamp.
+ */
+export function parseHelsinkiClockOnEventDate(baseEventIso: string, clockText?: string): string | undefined {
+  if (!clockText) return undefined;
+  const baseDate = new Date(baseEventIso);
+  if (Number.isNaN(baseDate.getTime())) return undefined;
+  const match = clockText.trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!match) return undefined;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return undefined;
+  }
+  const dateISO = helsinkiDateISO(baseDate);
+  const offset = helsinkiOffsetForDateISO(dateISO);
+  const hh = String(hour).padStart(2, '0');
+  const mm = String(minute).padStart(2, '0');
+  const parsed = new Date(`${dateISO}T${hh}:${mm}:00${offset}`);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
 }
 
 function helsinkiWall(isoDate: string, time = '12:00:00'): Date {
@@ -104,26 +158,4 @@ export function overlapMinutes(aStart: string, aEnd: string, bStart: string, bEn
   const s = Math.max(new Date(aStart).getTime(), new Date(bStart).getTime());
   const e = Math.min(new Date(aEnd).getTime(), new Date(bEnd).getTime());
   return Math.max(0, Math.round((e - s) / 60000));
-}
-
-export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/** Urban Helsinki driving estimate: ~2.1 min/km + 8 min parkki. */
-export function estimateDriveMinutes(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const km = haversineKm(lat1, lng1, lat2, lng2);
-  if (km < 0.25) return 4;
-  return Math.round(km * 2.1 + 8);
 }

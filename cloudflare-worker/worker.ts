@@ -1,6 +1,6 @@
 export interface Env {
   MATCHDAY_KV: KVNamespace;
-  /** Comma-separated issued Crockford codes. Empty = no family slots. Never commit values. */
+  /** Comma-separated issued Crockford codes. Empty = first-PUT claim (max FAMILY_SLOT_CAP). Never commit values. */
   FAMILY_CODES?: string;
 }
 
@@ -24,6 +24,36 @@ export interface FamilyRosterV1 {
   tombstones: Array<{ id: string; deletedAt: string }>;
 }
 
+export interface FamilyManualEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime?: string;
+  allDay?: boolean;
+  profileIds: string[];
+  notes?: string;
+  authorDeviceId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface AttendanceOverrideRecord {
+  eventId: string;
+  status: 'in' | 'out' | 'maybe';
+  updatedAt: string;
+}
+
+export interface FamilyEventsV1 {
+  v: 1;
+  rev: number;
+  updatedAt: string;
+  events: FamilyManualEvent[];
+  attendanceOverrides?: AttendanceOverrideRecord[];
+}
+
+
+
 async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
   const set = new Set<string>();
   if (!raw) return set;
@@ -35,6 +65,42 @@ async function parseIssuedFamilyCodes(raw?: string): Promise<Set<string>> {
     if (codeRegex.test(code)) set.add(code);
   }
   return set;
+}
+
+const FAMILY_CODE_REGEX = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
+/** Max claimed `family:` KV slots. Any valid Crockford code may claim one. */
+const FAMILY_SLOT_CAP = 10;
+
+async function countClaimedFamilies(kv: KVNamespace): Promise<number> {
+  const listed = await kv.list({ prefix: 'family:' });
+  return listed.keys.filter((k) => FAMILY_CODE_REGEX.test(k.name.slice('family:'.length))).length;
+}
+
+/**
+ * Any valid Crockford code may claim a slot (max FAMILY_SLOT_CAP).
+ * Already-claimed KV rows always stay reachable. FAMILY_CODES is unused as a deny list.
+ * Returns a Response to send, or null if the request may proceed.
+ */
+async function denyUnknownFamily(
+  env: Env,
+  code: string,
+  method: string,
+  corsHeaders: Record<string, string>
+): Promise<Response | null> {
+  const existing = await env.MATCHDAY_KV.get(`family:${code}`);
+  if (existing) return null;
+
+  if (method === 'PUT') {
+    const n = await countClaimedFamilies(env.MATCHDAY_KV);
+    if (n >= FAMILY_SLOT_CAP) {
+      return new Response(JSON.stringify({ error: 'family_slots_full' }), {
+        status: 403,
+        headers: corsHeaders
+      });
+    }
+  }
+
+  return null;
 }
 
 const FAMILY_RATE_WINDOW_SEC = 900;
@@ -158,9 +224,19 @@ function prefixVeventSummary(block: string, playerName?: string): string {
   });
 }
 
-async function collectRosterIcsEvents(roster: FamilyRosterV1 | null): Promise<string[]> {
+async function collectRosterIcsEvents(
+  roster: FamilyRosterV1 | null,
+  attendanceOverrides?: AttendanceOverrideRecord[]
+): Promise<string[]> {
   if (!roster?.profiles?.length) return [];
   const out: string[] = [];
+  const outSet = new Set<string>();
+  if (Array.isArray(attendanceOverrides)) {
+    for (const ov of attendanceOverrides) {
+      if (ov.status === 'out') outSet.add(ov.eventId);
+    }
+  }
+
   for (const p of roster.profiles.slice(0, 10)) {
     const raw = String(p.calendarUrl || '').trim();
     if (!raw || !isIcsCalendarUrl(raw)) continue;
@@ -181,7 +257,16 @@ async function collectRosterIcsEvents(roster: FamilyRosterV1 | null): Promise<st
       const text = await feedRes.text();
       if (!/BEGIN:VCALENDAR/i.test(text)) continue;
       for (const block of extractVeventBlocks(text)) {
-        out.push(prefixVeventSummary(block, p.playerName));
+        // Check UID in block to see if marked out
+        const uidMatch = /^UID:(.*)$/m.exec(block);
+        const uid = uidMatch ? uidMatch[1].trim() : '';
+        if (uid && outSet.has(uid)) {
+          // If marked OUT, prefix with [EI OSALLISTU] so calendar subscriber sees attendance state
+          const modified = block.replace(/^SUMMARY:(.*)$/m, 'SUMMARY:[EI OSALLISTU] $1');
+          out.push(prefixVeventSummary(modified, p.playerName));
+        } else {
+          out.push(prefixVeventSummary(block, p.playerName));
+        }
       }
     } catch {
       // Skip unreachable club calendars; still emit the rest of the family feed.
@@ -191,7 +276,7 @@ async function collectRosterIcsEvents(roster: FamilyRosterV1 | null): Promise<st
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Origin-scoped CORS (M-12): echo only known first-party origins. The
@@ -201,13 +286,14 @@ export default {
       'https://pelipaiva.pages.dev',
       'https://pelipaiva.fi',
       'https://www.pelipaiva.fi',
+      'https://football-stats-agk.pages.dev',
       'http://localhost:5173',
       'http://127.0.0.1:5173'
     ]);
     const requestOrigin = request.headers.get('Origin');
     const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, If-Match, X-Pelipaiva-Rev',
+      'Access-Control-Allow-Headers': 'Content-Type, If-Match',
       'Content-Type': 'application/json'
     };
     if (requestOrigin && allowedOrigins.has(requestOrigin)) {
@@ -219,9 +305,16 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // 0. Family Sync Roster API (/api/family/:code)
+    // 0. Family Sync API (/api/family/:code and /api/family/:code/events)
     if (url.pathname.startsWith('/api/family/')) {
-      const rawCode = url.pathname.replace('/api/family/', '').trim().toUpperCase();
+      // Parse: /api/family/SB6EV-2  → code=SB6EV-2, subPath=''
+      //        /api/family/SB6EV-2/events → code=SB6EV-2, subPath='events'
+      const afterPrefix = url.pathname.slice('/api/family/'.length);
+      const slashIdx = afterPrefix.indexOf('/');
+      const rawCode = slashIdx === -1
+        ? afterPrefix.trim().toUpperCase()
+        : afterPrefix.slice(0, slashIdx).trim().toUpperCase();
+      const subPath = slashIdx === -1 ? '' : afterPrefix.slice(slashIdx + 1);
       const code = rawCode.includes('-')
         ? rawCode
         : rawCode.length === 6
@@ -229,8 +322,7 @@ export default {
         : rawCode;
 
       // Keep in sync with src/lib/sync/familyCode.ts FAMILY_CODE_REGEX (Crockford-32, no I/L/O/U)
-      const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
-      if (!codeRegex.test(code)) {
+      if (!FAMILY_CODE_REGEX.test(code)) {
         return new Response(JSON.stringify({ error: 'invalid_code_format' }), {
           status: 400,
           headers: corsHeaders
@@ -240,14 +332,117 @@ export default {
       const limited = await rateLimitFamily(request, request.method, corsHeaders);
       if (limited) return limited;
 
-      const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
-      if (issued.size === 0 || !issued.has(code)) {
-        return new Response(JSON.stringify({ error: 'unknown_family' }), {
-          status: 403,
-          headers: corsHeaders
-        });
+      const denied = await denyUnknownFamily(env, code, request.method, corsHeaders);
+      if (denied) return denied;
+
+      // ---------------------------------------------------------------
+      // /api/family/:code/events — Manual freeform family event sync
+      // KV key: fam_events:{code}  TTL: 30 days
+      // ---------------------------------------------------------------
+      if (subPath === 'events') {
+        const eventsKvKey = `fam_events:${code}`;
+
+        if (request.method === 'GET') {
+          const dataStr = await env.MATCHDAY_KV.get(eventsKvKey);
+          if (!dataStr) {
+            return new Response(JSON.stringify({ v: 1, rev: 0, updatedAt: new Date().toISOString(), events: [] }), {
+              headers: { ...corsHeaders, 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+            });
+          }
+          let data: FamilyEventsV1;
+          try {
+            data = JSON.parse(dataStr) as FamilyEventsV1;
+          } catch {
+            return new Response(JSON.stringify({ error: 'corrupt_data' }), { status: 500, headers: corsHeaders });
+          }
+          return new Response(dataStr, {
+            headers: { ...corsHeaders, ETag: `"${data.rev}"`, 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+          });
+        }
+
+        if (request.method === 'PUT') {
+          // Size guard: reject payloads > 64 KB (≈130 events at 500 bytes each)
+          const contentLength = parseInt(request.headers.get('Content-Length') || '0', 10);
+          if (contentLength > 65536) {
+            return new Response(JSON.stringify({ error: 'payload_too_large' }), { status: 413, headers: corsHeaders });
+          }
+
+          let body: FamilyEventsV1;
+          try {
+            body = (await request.json()) as FamilyEventsV1;
+          } catch {
+            return new Response(JSON.stringify({ error: 'invalid_json' }), { status: 400, headers: corsHeaders });
+          }
+          if (!body || body.v !== 1 || !Array.isArray(body.events)) {
+            return new Response(JSON.stringify({ error: 'invalid_events_schema' }), { status: 400, headers: corsHeaders });
+          }
+
+          // Validate and sanitize events
+          const sanitized: FamilyManualEvent[] = [];
+          for (const ev of body.events) {
+            if (!ev?.id || !ev.title || !ev.startTime || !ev.authorDeviceId) continue;
+            sanitized.push({
+              id: String(ev.id).slice(0, 64),
+              title: String(ev.title).slice(0, 200),
+              startTime: String(ev.startTime).slice(0, 32),
+              endTime: ev.endTime ? String(ev.endTime).slice(0, 32) : undefined,
+              allDay: Boolean(ev.allDay),
+              profileIds: Array.isArray(ev.profileIds) ? ev.profileIds.map((p) => String(p).slice(0, 64)) : [],
+              notes: ev.notes ? String(ev.notes).slice(0, 500) : undefined,
+              authorDeviceId: String(ev.authorDeviceId).slice(0, 64),
+              createdAt: String(ev.createdAt || new Date().toISOString()).slice(0, 32),
+              updatedAt: String(ev.updatedAt || new Date().toISOString()).slice(0, 32),
+              deletedAt: ev.deletedAt ? String(ev.deletedAt).slice(0, 32) : undefined
+            });
+          }
+
+          // Validate and sanitize attendance overrides
+          const sanitizedOverrides: AttendanceOverrideRecord[] = [];
+          if (Array.isArray(body.attendanceOverrides)) {
+            for (const ov of body.attendanceOverrides) {
+              if (!ov?.eventId || !ov.status) continue;
+              const status = ov.status === 'out' ? 'out' : ov.status === 'maybe' ? 'maybe' : 'in';
+              sanitizedOverrides.push({
+                eventId: String(ov.eventId).slice(0, 100),
+                status,
+                updatedAt: String(ov.updatedAt || new Date().toISOString()).slice(0, 32)
+              });
+            }
+          }
+
+          // Optimistic concurrency via If-Match
+          const existingStr = await env.MATCHDAY_KV.get(eventsKvKey);
+          let currentRev = 0;
+          if (existingStr) {
+            try {
+              currentRev = (JSON.parse(existingStr) as FamilyEventsV1).rev || 0;
+            } catch { /* treat as rev 0 */ }
+            const ifMatch = request.headers.get('If-Match')?.replace(/"/g, '');
+            if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
+              return new Response(JSON.stringify({ error: 'rev_conflict', currentRev }), { status: 409, headers: corsHeaders });
+            }
+          }
+
+          const nextRev = Math.max(body.rev || 0, currentRev + 1);
+          const toStore: FamilyEventsV1 = {
+            v: 1,
+            rev: nextRev,
+            updatedAt: new Date().toISOString(),
+            events: sanitized,
+            attendanceOverrides: sanitizedOverrides
+          };
+          await env.MATCHDAY_KV.put(eventsKvKey, JSON.stringify(toStore), { expirationTtl: 2592000 }); // 30 days
+          return new Response(JSON.stringify({ success: true, rev: nextRev, updatedAt: toStore.updatedAt }), {
+            headers: { ...corsHeaders, ETag: `"${nextRev}"` }
+          });
+        }
+
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
       }
 
+      // ---------------------------------------------------------------
+      // /api/family/:code — Roster (original logic unchanged)
+      // ---------------------------------------------------------------
       const kvKey = `family:${code}`;
 
       // GET /api/family/:code
@@ -273,7 +468,6 @@ export default {
           headers: {
             ...corsHeaders,
             ETag: `"${data.rev}"`,
-            'X-Pelipaiva-Rev': String(data.rev),
             'Cache-Control': 'no-cache, no-store, must-revalidate'
           }
         });
@@ -319,9 +513,7 @@ export default {
           }
           if (existing) {
             currentRev = existing.rev || 0;
-            const ifMatch =
-              request.headers.get('If-Match')?.replace(/"/g, '') ||
-              request.headers.get('X-Pelipaiva-Rev');
+            const ifMatch = request.headers.get('If-Match')?.replace(/"/g, '');
 
             // Existing key: missing or stale If-Match → 409 (never silent overwrite)
             if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
@@ -363,7 +555,7 @@ export default {
         };
 
         await env.MATCHDAY_KV.put(kvKey, JSON.stringify(toStore), {
-          expirationTtl: 604800 // 7 days sliding TTL
+          expirationTtl: 2592000 // 30 days sliding TTL (30 * 24 * 3600)
         });
 
         return new Response(
@@ -371,8 +563,7 @@ export default {
           {
             headers: {
               ...corsHeaders,
-              ETag: `"${nextRev}"`,
-              'X-Pelipaiva-Rev': String(nextRev)
+              ETag: `"${nextRev}"`
             }
           }
         );
@@ -389,9 +580,7 @@ export default {
           } catch {
             currentRev = 0;
           }
-          const ifMatch =
-            request.headers.get('If-Match')?.replace(/"/g, '') ||
-            request.headers.get('X-Pelipaiva-Rev');
+          const ifMatch = request.headers.get('If-Match')?.replace(/"/g, '');
           if (!ifMatch || parseInt(ifMatch, 10) !== currentRev) {
             return new Response(JSON.stringify({ error: 'rev_conflict', currentRev }), {
               status: 409,
@@ -433,25 +622,18 @@ export default {
         ? `${cleanCode.slice(0, 5)}-${cleanCode.slice(5)}`
         : cleanCode;
 
-      const codeRegex = /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$/;
-      if (!codeRegex.test(familyCode)) {
+      if (!FAMILY_CODE_REGEX.test(familyCode)) {
         return new Response(JSON.stringify({ error: 'invalid_family_code' }), {
           status: 400,
           headers: corsHeaders
         });
       }
 
-      const issued = await parseIssuedFamilyCodes(env.FAMILY_CODES);
-      if (issued.size > 0 && !issued.has(familyCode)) {
-        return new Response(JSON.stringify({ error: 'unknown_family' }), {
-          status: 403,
-          headers: corsHeaders
-        });
-      }
+      const claimedCal = await env.MATCHDAY_KV.get(`family:${familyCode}`);
 
       // Read family roster from KV
       const kvKey = `family:${familyCode}`;
-      const existingStr = await env.MATCHDAY_KV.get(kvKey);
+      const existingStr = claimedCal;
       let roster: FamilyRosterV1 | null = null;
       if (existingStr) {
         try {
@@ -462,12 +644,42 @@ export default {
       }
 
       // Read customized family events / notes from KV
-      const eventsKey = `fam_events_${familyCode}`;
-      const existingEventsStr = await env.MATCHDAY_KV.get(eventsKey);
-      let customEvents: any[] = [];
+      const eventsKey = `fam_events:${familyCode}`;
+      let existingEventsStr = await env.MATCHDAY_KV.get(eventsKey);
+      if (!existingEventsStr) {
+        existingEventsStr = await env.MATCHDAY_KV.get(`fam_events_${familyCode}`);
+      }
+
+      // Sliding TTL refresh: Calendar subscribers (Google Calendar, Apple Calendar)
+      // poll every 8-24 hours. Refreshing KV expirationTtl keeps active family feeds
+      // alive indefinitely in Cloudflare KV without requiring manual webapp visits.
+      if (existingStr && ctx?.waitUntil) {
+        ctx.waitUntil(
+          env.MATCHDAY_KV.put(kvKey, existingStr, {
+            expirationTtl: 2592000 // 30 days sliding TTL
+          })
+        );
+      }
+      if (existingEventsStr && ctx?.waitUntil) {
+        ctx.waitUntil(
+          env.MATCHDAY_KV.put(eventsKey, existingEventsStr, {
+            expirationTtl: 2592000 // 30 days sliding TTL
+          })
+        );
+      }
+
+      let customEvents: FamilyManualEvent[] = [];
+      let attendanceOverrides: AttendanceOverrideRecord[] = [];
+
       if (existingEventsStr) {
         try {
-          customEvents = JSON.parse(existingEventsStr) || [];
+          const parsed = JSON.parse(existingEventsStr);
+          if (parsed && parsed.v === 1 && Array.isArray(parsed.events)) {
+            customEvents = (parsed.events as FamilyManualEvent[]).filter((e) => !e.deletedAt);
+            attendanceOverrides = parsed.attendanceOverrides || [];
+          } else if (Array.isArray(parsed)) {
+            customEvents = parsed;
+          }
         } catch {
           customEvents = [];
         }
@@ -491,16 +703,12 @@ export default {
         if (!ev.startTime || !ev.title) continue;
         const uid = `famday-${ev.id || Math.random().toString(36).slice(2)}@famday.app`;
         const startUtc = new Date(ev.startTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        let endUtc = ev.endTime
+        const endUtc = ev.endTime
           ? new Date(ev.endTime).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
           : new Date(new Date(ev.startTime).getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
         const descLines: string[] = [];
-        if (ev.isTraining) descLines.push('🏃 HARJOITUKSET');
-        if (ev.eventType === 'school') descLines.push('📚 KOULU / WILMA');
-        if (ev.notes) descLines.push(`📝 Huomiot & Kyydit: ${ev.notes}`);
-        if (ev.volunteerDuty) descLines.push(`☕ Talkoovuoro: ${ev.volunteerDuty}`);
-        if (ev.kitAdvice) descLines.push(`👕 Peliasu: ${ev.kitAdvice.primaryJerseyColor || ''}`);
+        if (ev.notes) descLines.push(`📝 Huomiot: ${ev.notes}`);
         descLines.push(`FamDay: https://pelipaiva.pages.dev/?perhe=${familyCode}`);
 
         lines.push('BEGIN:VEVENT');
@@ -509,13 +717,12 @@ export default {
         lines.push(`DTSTART:${startUtc}`);
         lines.push(`DTEND:${endUtc}`);
         lines.push(`SUMMARY:${(ev.title || 'Tapahtuma').replace(/,/g, '\\,')}`);
-        if (ev.venue?.name) lines.push(`LOCATION:${(ev.venue.name).replace(/,/g, '\\,')}`);
         lines.push(`DESCRIPTION:${descLines.join('\\n')}`);
         lines.push('STATUS:CONFIRMED');
         lines.push('END:VEVENT');
       }
 
-      const rosterEvents = await collectRosterIcsEvents(roster);
+      const rosterEvents = await collectRosterIcsEvents(roster, attendanceOverrides);
       for (const block of rosterEvents) {
         lines.push(block);
       }
@@ -531,6 +738,29 @@ export default {
           'Content-Disposition': `inline; filename="famday-${familyCode}.ics"`,
           'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360'
         }
+      });
+    }
+
+    // fudisturnaus.com public tournament JSON (no CORS upstream). GET only, path-scoped.
+    const fudisMatch = url.pathname.match(/^\/api\/fudis\/([A-Za-z0-9-]{8,200})$/);
+    if (fudisMatch) {
+      if (request.method !== 'GET') {
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
+      }
+      const target = `https://www.fudisturnaus.com/api/v1/public/tournaments/${fudisMatch[1]}`;
+      let up: Response;
+      try {
+        up = await fetch(target, {
+          headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Pelipaiva tournament viewer)' },
+          cf: { cacheTtl: 30, cacheEverything: true }
+        } as RequestInit);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: 'upstream_fetch_failed', detail: String(e) }), { status: 502, headers: corsHeaders });
+      }
+      const body = await up.text();
+      return new Response(body, {
+        status: up.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': up.ok ? 'public, max-age=30' : 'no-store' }
       });
     }
 

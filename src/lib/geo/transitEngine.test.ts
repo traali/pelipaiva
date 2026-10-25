@@ -129,6 +129,41 @@ describe('transitEngine', () => {
     expect(plan.weatherWarning).toContain('Sadesää');
   });
 
+  it('recommends cycling for Lauttasaari to Otaniemi in dry fair weather (4.3 km)', () => {
+    // Otahalli Otaniemi coords ~4.3 km from Lauttasaari
+    const otaniemiCoords = { lat: 60.184, lng: 24.832 };
+    const dryFairWeather: WeatherCondition = {
+      temperatureC: 18,
+      feelsLikeC: 18,
+      windSpeedMs: 3,
+      windGustMs: 6,
+      precipitationMmh: 0,
+      rainTimeline: [],
+      turfCondition: 'dry'
+    };
+    const plan = resolveTransitPlan(mockHome, otaniemiCoords, dryFairWeather);
+    expect(plan.mode).toBe('bicycle');
+    expect(plan.isSelfTransit).toBe(true);
+    expect(plan.transitLabel).toContain('Pyöräily');
+  });
+
+  it('discourages cycling for Lauttasaari to Otaniemi in rain or high sea gusts (downgrades to car)', () => {
+    const otaniemiCoords = { lat: 60.184, lng: 24.832 };
+    const rainyWindyWeather: WeatherCondition = {
+      temperatureC: 11,
+      feelsLikeC: 8,
+      windSpeedMs: 9,
+      windGustMs: 15,
+      precipitationMmh: 1.5,
+      rainTimeline: [],
+      turfCondition: 'slick'
+    };
+    const plan = resolveTransitPlan(mockHome, otaniemiCoords, rainyWindyWeather);
+    expect(plan.mode).toBe('car');
+    expect(plan.isSelfTransit).toBe(false);
+    expect(plan.weatherWarning).toContain('Sadesää');
+  });
+
   it('supports explicit manual transit mode override', () => {
     const vainamoinenCoords = { lat: 60.1745, lng: 24.9180 };
     const walkPlan = resolveTransitPlan(mockHome, vainamoinenCoords, undefined, 'walk');
@@ -150,6 +185,24 @@ describe('transitEngine', () => {
     const plan = resolveTransitPlan(carHome, nearby);
     expect(plan.mode).toBe('car');
     expect(plan.isSelfTransit).toBe(false);
+  });
+
+  it('safely handles unknown venue location (0,0 or missing) without computing absurd distance', () => {
+    const nullIsland = { lat: 0, lng: 0 };
+    const plan = resolveTransitPlan(mockHome, nullIsland);
+    expect(plan.isUnknownLocation).toBe(true);
+    expect(plan.distanceKm).toBe(0);
+    expect(plan.travelMinutes).toBe(0);
+    expect(plan.transitLabel).toBe('📍 Sijainti tuntematon');
+    expect(plan.transitLabel).not.toMatch(/8779|14052|km/);
+  });
+
+  it('safely handles missing venue coordinates without computing absurd distance', () => {
+    const plan = resolveTransitPlan(mockHome, null);
+    expect(plan.isUnknownLocation).toBe(true);
+    expect(plan.distanceKm).toBe(0);
+    expect(plan.travelMinutes).toBe(0);
+    expect(plan.transitLabel).toBe('📍 Sijainti tuntematon');
   });
 });
 

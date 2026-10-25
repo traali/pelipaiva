@@ -8,6 +8,7 @@ import {
 } from '../../types/matchday';
 import { geocodeSportsVenue } from '../geo/sportsGeocoder';
 import { detectSportFromText } from '../ai/eventCandidateRanker';
+import { eventDayKey } from '../agents/time';
 
 /**
  * Checks if a calendar event is an academic school event, Wilma notification, exam, or lesson.
@@ -85,6 +86,11 @@ export function isTrainingEvent(title: string, description: string = ''): boolea
     'kokoontuminen',
     'träning'
   ];
+
+  // Tournaments and cups are competition matches/events, never training sessions
+  if (/turnaus|tournament|pelitapahtuma|lopputurnaus|kutsuturnaus|cup-turnaus|vastuuturnaus/i.test(text)) {
+    return false;
+  }
 
   // If explicit "vs" or " v " with another team, it's a match unless specified as internal drill
   if ((text.includes(' vs ') || text.includes(' v ')) && !text.includes('sisäinen')) {
@@ -203,11 +209,49 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
     }
   }
 
-  // Strip prefixes like "Ottelu:", "Peli:", "Sarjapeli:", "Seriematch:", "Match:"
+  // Strip prefixes like "Ottelu:", "Peli:", "Sarjapeli:", "Seriematch:", "Match:", "Sarjaottelu:"
   text = text.replace(/^(?:peli|ottelu|sarjapeli|sarjaottelu|seriematch|match|sarja):\s*/i, '');
 
   // Strip suffix " peli" or " ottelu", e.g. "HJK-EPS peli" -> "HJK-EPS"
   text = text.replace(/\s+(?:peli|ottelu|match)$/i, '');
+
+  let stage: string | undefined;
+  let division: string | undefined;
+  let calendarOwnerTeam: string | undefined;
+
+  // Check for calendar team prefix with colon:
+  // e.g. "Tytöt 2014-15 joukkue (kausi 2026-27): WU13 1div. LePy vs. ToPoLa"
+  // or "PPJ Laru 2013: Piirisarja - ORANSSI"
+  if (text.includes(':')) {
+    const colonIdx = text.indexOf(':');
+    const prefix = text.slice(0, colonIdx).trim();
+    const rest = text.slice(colonIdx + 1).trim();
+
+    // Check if rest contains match delimiters or match patterns
+    const hasMatchPattern =
+      /\bvs\.?\b/i.test(rest) ||
+      /\s+-\s+/.test(rest) ||
+      /\bv\.?\b/i.test(rest);
+
+    if (hasMatchPattern) {
+      calendarOwnerTeam = prefix;
+      text = rest;
+    }
+  }
+
+  // Check for division / stage prefix in remaining text, e.g.:
+  // "WU13 1div. LePy vs. ToPoLa" -> division = "WU13 1div.", text = "LePy vs. ToPoLa"
+  // "P14 Haastaja: HJK vs Honka"
+  const divMatch = text.match(
+    /^((?:[A-Za-z]{1,4}\d{1,2}(?:\s+\d+\.?\s*(?:div|divisioona)?)?|piirisarja|aluesarja|ykkönen|kakkonen|kolmonen|mestaruussarja|liiga|haastaja|kilpa|harraste)(?:\s+Lohko\s+[A-Z0-9]+)?)\s*[.:-]\s*(.+)$/i
+  );
+  if (divMatch && divMatch[1] && divMatch[2]) {
+    if (/\bvs\.?\b/i.test(divMatch[2]) || /\s+-\s+/.test(divMatch[2])) {
+      division = divMatch[1].trim();
+      stage = division;
+      text = divMatch[2].trim();
+    }
+  }
 
   let homeTeam = text;
   let awayTeam = '';
@@ -221,8 +265,8 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
         const left = parts[0]?.trim() || '';
         const right = parts[1]?.trim() || '';
 
-        if (right.includes(' vs ')) {
-          const vsParts = right.split(' vs ');
+        if (/\s+vs\.?\s+/i.test(right)) {
+          const vsParts = right.split(/\s+vs\.?\s+/i);
           homeTeam = vsParts[0]?.trim() || '';
           awayTeam = vsParts[1]?.trim() || '';
         } else if (left.length > 0 && !left.toLowerCase().includes('peli')) {
@@ -231,55 +275,118 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
           isHomeMatch = false;
         } else {
           homeTeam = right;
-          awayTeam = defaultTeamName || '';
+          awayTeam = defaultTeamName || calendarOwnerTeam || '';
           isHomeMatch = false;
         }
       }
     } else {
-      // Split on standard delimiters: " vs ", " - ", " v "
-      const delimiters = [' vs ', ' - ', ' v ', '-'];
-      for (const delim of delimiters) {
-        if (text.includes(delim)) {
-          const parts = text.split(delim);
-          if (parts.length >= 2) {
-            const candidateHome = (parts[0] || '').trim();
-            const candidateAway = (parts[1] || '').trim();
-            const isSquadTag = /^(?:musta|mus|oranssi|ora|or|valkoinen|valk|sininen|sin|keltainen|kelt|punainen|pun|vihreä|vihr|raita|kilpa|haastaja|haaste|harraste|edustus|akatemia|black|white|blue|red|yellow|green|orange)$/i.test(
-              candidateAway
-            );
-            if (isSquadTag && delim !== ' vs ') {
-              homeTeam = `${candidateHome} ${candidateAway}`.trim();
-              awayTeam = '';
-            } else {
-              homeTeam = candidateHome;
-              awayTeam = candidateAway;
+      // Split on standard delimiters: " vs. ", " vs ", " - ", " v. ", " v "
+      const vsMatch = text.match(/^(.+?)\s+(?:vs\.?|v\.?)\s+(.+)$/i);
+      if (vsMatch && vsMatch[1] && vsMatch[2]) {
+        homeTeam = vsMatch[1].trim();
+        awayTeam = vsMatch[2].trim();
+      } else {
+        const dashMatch = text.match(/^(.+?)\s+-\s+(.+)$/);
+        if (dashMatch && dashMatch[1] && dashMatch[2]) {
+          const candidateHome = dashMatch[1].trim();
+          const candidateAway = dashMatch[2].trim();
+          const isSquadTag = /^(?:musta|mus|oranssi|ora|or|valkoinen|valk|sininen|sin|keltainen|kelt|punainen|pun|vihreä|vihr|raita|kilpa|haastaja|haaste|harraste|edustus|akatemia|black|white|blue|red|yellow|green|orange)$/i.test(
+            candidateAway
+          );
+          if (isSquadTag) {
+            homeTeam = `${calendarOwnerTeam || candidateHome} ${candidateAway}`.trim();
+            awayTeam = '';
+          } else {
+            homeTeam = candidateHome;
+            awayTeam = candidateAway;
+          }
+        } else {
+          // Bare hyphen between non-digits only, e.g. "HJK-EPS" (never "2014-15" or "2026-27")
+          const wordDashMatch = text.match(
+            /^([a-zA-ZåäöÅÄÖ0-9]+(?:\s+[a-zA-ZåäöÅÄÖ0-9]+)?)-([a-zA-ZåäöÅÄÖ0-9]+(?:\s+[a-zA-ZåäöÅÄÖ0-9]+)?)$/
+          );
+          if (wordDashMatch && wordDashMatch[1] && wordDashMatch[2]) {
+            const isYearOrRange = /^\d+$/.test(wordDashMatch[1]) && /^\d+$/.test(wordDashMatch[2]);
+            if (!isYearOrRange) {
+              homeTeam = wordDashMatch[1].trim();
+              awayTeam = wordDashMatch[2].trim();
             }
-            break;
           }
         }
       }
     }
   }
 
-  // Determine isHomeMatch if defaultTeamName is provided
-  if (defaultTeamName && awayTeam) {
-    const defaultLower = defaultTeamName.toLowerCase();
-    if (awayTeam.toLowerCase().includes(defaultLower)) {
+  // Determine isHomeMatch if defaultTeamName or calendarOwnerTeam is provided
+  const homeRef = (defaultTeamName || calendarOwnerTeam || '').toLowerCase();
+  if (homeRef && awayTeam) {
+    if (
+      awayTeam.toLowerCase().includes(homeRef) ||
+      (homeRef.includes('topola') && awayTeam.toLowerCase().includes('topola'))
+    ) {
       isHomeMatch = false;
-    } else if (homeTeam.toLowerCase().includes(defaultLower)) {
+    } else if (
+      homeTeam.toLowerCase().includes(homeRef) ||
+      (homeRef.includes('topola') && homeTeam.toLowerCase().includes('topola'))
+    ) {
       isHomeMatch = true;
     }
   }
 
   return {
     eventType,
-    homeTeam: homeTeam || defaultTeamName || 'Oma Joukkue',
+    homeTeam: homeTeam || defaultTeamName || calendarOwnerTeam || 'Oma Joukkue',
     awayTeam,
     isHomeMatch,
     embeddedVenueHint,
     roundInfo,
+    stage,
+    division,
     isFriendly: isFriendly || undefined
   };
+}
+
+/**
+ * Constructs a Date object given a base Date and Helsinki wall-clock hour/minute.
+ * Invariant against host local timezone (e.g. UTC in CI/Cloudflare environments).
+ */
+function makeHelsinkiDate(baseDate: Date, hour: number, minute: number): Date {
+  if (isNaN(baseDate.getTime())) {
+    return new Date(NaN);
+  }
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(baseDate);
+  const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
+  const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
+  const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
+
+  // Probe midday UTC on that local date to get exact Europe/Helsinki offset (EET +2 / EEST +3)
+  const noonUtc = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const helsinkiParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Helsinki',
+    hour: 'numeric',
+    hourCycle: 'h23'
+  }).formatToParts(noonUtc);
+  const helsinkiHour = parseInt(helsinkiParts.find((p) => p.type === 'hour')?.value ?? '12', 10);
+  const offsetHours = helsinkiHour - 12; // +2 EET, +3 EEST
+
+  return new Date(Date.UTC(y, m - 1, d, hour - offsetHours, minute, 0));
+}
+
+function resolveCandidateDate(baseDate: Date, hour: number, minute: number, targetRefDate: Date): Date {
+  const localCandidate = new Date(baseDate);
+  localCandidate.setHours(hour, minute, 0, 0);
+
+  const helsinkiCandidate = makeHelsinkiDate(baseDate, hour, minute);
+
+  const diffLocal = isNaN(localCandidate.getTime()) ? Infinity : Math.abs(localCandidate.getTime() - targetRefDate.getTime());
+  const diffHelsinki = isNaN(helsinkiCandidate.getTime()) ? Infinity : Math.abs(helsinkiCandidate.getTime() - targetRefDate.getTime());
+
+  return diffHelsinki < diffLocal ? helsinkiCandidate : localCandidate;
 }
 
 /**
@@ -292,14 +399,19 @@ export function resolveEventTimes(
   description: string = '',
   isTraining: boolean = false,
   defaultWarmupOffsetMins?: number
-): { kickoffTime: Date; warmupTime: Date; endTime: Date } {
+): { kickoffTime: Date; warmupTime: Date; endTime: Date; warmupIsEstimate: boolean } {
   const text = `${title} ${description}`;
+  const isTournamentEvent = /turnaus|tournament|cup\b|memorial|pelitapahtuma|vastuuturnaus/i.test(text);
   const defaultOffset = defaultWarmupOffsetMins !== undefined
     ? defaultWarmupOffsetMins
     : (isTraining ? 15 : 45);
 
   let kickoffTime = new Date(dtStart.getTime());
-  let warmupTime = new Date(dtStart.getTime() - defaultOffset * 60 * 1000);
+  // Nimenhuuto/MyClub DTSTART for a turnaus is kokoontuminen, not first-game kickoff.
+  let warmupTime = isTournamentEvent
+    ? new Date(dtStart.getTime())
+    : new Date(dtStart.getTime() - defaultOffset * 60 * 1000);
+  let warmupIsEstimate = !isTournamentEvent;
   let endTime = new Date(dtEnd.getTime());
 
   // Look for explicit kickoff / match start times in description:
@@ -316,18 +428,19 @@ export function resolveEventTimes(
     const kHour = parseInt(kickoffMatch[1], 10);
     const kMin = parseInt(kickoffMatch[2], 10);
     
-    // Construct new kickoff date using same day/year as dtStart
-    const explicitKickoff = new Date(dtStart);
-    explicitKickoff.setHours(kHour, kMin, 0, 0);
+    // Choose the candidate (local vs Europe/Helsinki) that best aligns with dtStart (within 3 hours)
+    const explicitKickoff = resolveCandidateDate(dtStart, kHour, kMin, dtStart);
 
     // If dtStart was the gathering time, dtStart is the warmup time!
-    if (Math.abs(explicitKickoff.getTime() - dtStart.getTime()) <= 3 * 3600 * 1000) {
+    if (!isNaN(explicitKickoff.getTime()) && Math.abs(explicitKickoff.getTime() - dtStart.getTime()) <= 3 * 3600 * 1000) {
       if (explicitKickoff.getTime() >= dtStart.getTime()) {
         kickoffTime = explicitKickoff;
         warmupTime = dtStart;
+        warmupIsEstimate = false;
       } else {
         kickoffTime = explicitKickoff;
         warmupTime = new Date(kickoffTime.getTime() - defaultOffset * 60 * 1000);
+        warmupIsEstimate = true;
       }
     }
   }
@@ -335,17 +448,19 @@ export function resolveEventTimes(
   if (warmupMatch && warmupMatch[1] && warmupMatch[2]) {
     const wHour = parseInt(warmupMatch[1], 10);
     const wMin = parseInt(warmupMatch[2], 10);
-    const explicitWarmup = new Date(dtStart);
-    explicitWarmup.setHours(wHour, wMin, 0, 0);
+    const explicitWarmup = resolveCandidateDate(dtStart, wHour, wMin, kickoffTime);
 
-    if (Math.abs(explicitWarmup.getTime() - kickoffTime.getTime()) <= 3 * 3600 * 1000) {
+    if (!isNaN(explicitWarmup.getTime()) && Math.abs(explicitWarmup.getTime() - kickoffTime.getTime()) <= 3 * 3600 * 1000) {
       warmupTime = explicitWarmup;
+      warmupIsEstimate = false;
     }
   }
 
-  // Ensure warmup is strictly before kickoff
-  if (warmupTime.getTime() >= kickoffTime.getTime()) {
+  // League matches: warmup must be before kickoff. Tournaments: DTSTART is meetup;
+  // do not invent a 45 min earlier kokoontuminen.
+  if (!isTournamentEvent && warmupTime.getTime() >= kickoffTime.getTime()) {
     warmupTime = new Date(kickoffTime.getTime() - defaultOffset * 60 * 1000);
+    warmupIsEstimate = true;
   }
 
   // Ensure endTime is after kickoff
@@ -356,7 +471,8 @@ export function resolveEventTimes(
   return {
     kickoffTime,
     warmupTime,
-    endTime
+    endTime,
+    warmupIsEstimate
   };
 }
 
@@ -543,10 +659,10 @@ export function extractFeedCategories(icsContent: string): FeedCategory[] {
       const fullText = `${summary} ${description}`;
 
       // Match [Kilpa], [Haastaja], (Kilpa), (Haastaja), [Sininen], [Valkoinen], etc.
-      const bracketMatches = fullText.match(/\[([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\]|\(([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\)/g);
+      const bracketMatches = fullText.match(/\[([A-Za-z0-9äöåÄÖÅ\s-]{2,25})\]|\(([A-Za-z0-9äöåÄÖÅ\s-]{2,25})\)/g);
       if (bracketMatches) {
         for (const bm of bracketMatches) {
-          const inner = bm.replace(/[\[\]\(\)]/g, '').trim();
+          const inner = bm.replace(/[[\]()]/g, '').trim();
           if (
             /kilpa|haastaja|harraste|edustus|musta|valkoinen|sininen|keltainen|punainen|oranssi|treenit|pelit|turnaus/i.test(
               inner
@@ -765,11 +881,16 @@ export async function parseICSFeed(
         }
       }
 
-      const isTraining =
-        category.toLowerCase().includes('treenit') ||
-        category.toLowerCase().includes('harjoitus') ||
-        isTrainingEvent(title, description);
       const parsedTitle = parseMatchTitle(title, defaultTeamName);
+      const isTournament =
+        parsedTitle.eventType === 'tournament' ||
+        /turnaus|tournament|cup\b|memorial|pelitapahtuma/i.test(`${title} ${description} ${category}`);
+
+      const isTraining =
+        !isTournament &&
+        (category.toLowerCase().includes('treenit') ||
+          category.toLowerCase().includes('harjoitus') ||
+          isTrainingEvent(title, description));
       const eventSport = detectSportFromText(`${title} ${category} ${description}`) || resolvedSport;
 
       // Volunteer duty detection (Talkoovahti)
@@ -802,7 +923,7 @@ export async function parseICSFeed(
             if (instanceStartDate > maxDate) break;
             const instanceEndDate = new Date(instanceStartDate.getTime() + durationMs);
 
-            const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
+            const { kickoffTime, warmupTime, endTime, warmupIsEstimate } = resolveEventTimes(
               instanceStartDate,
               instanceEndDate,
               title,
@@ -811,7 +932,7 @@ export async function parseICSFeed(
             );
 
             const baseUid = event.uid || generateDeterministicEventId(title, kickoffTime.toISOString(), location);
-            const instanceId = `${baseUid}-${kickoffTime.toISOString().slice(0, 10)}`;
+            const instanceId = `${baseUid}-${eventDayKey(kickoffTime.toISOString())}`;
 
             events.push({
               id: instanceId,
@@ -822,14 +943,17 @@ export async function parseICSFeed(
                 (eventSport === 'school' || resolvedSport === 'school')
                   ? 'school'
                   : parsedTitle.eventType,
+              isTournament,
               isTraining,
               title,
               homeTeam: parsedTitle.homeTeam,
               awayTeam: parsedTitle.awayTeam,
+              stage: parsedTitle.stage || parsedTitle.division,
               isHomeMatch: parsedTitle.isHomeMatch,
               startTime: kickoffTime.toISOString(),
               endTime: endTime.toISOString(),
               warmupTime: warmupTime.toISOString(),
+              warmupIsEstimate,
               venue,
               volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined,
               attendanceStatus
@@ -848,7 +972,7 @@ export async function parseICSFeed(
           ? event.endDate.toJSDate()
           : new Date(startDate.getTime() + 90 * 60 * 1000);
 
-        const { kickoffTime, warmupTime, endTime } = resolveEventTimes(
+        const { kickoffTime, warmupTime, endTime, warmupIsEstimate } = resolveEventTimes(
           startDate,
           endDate,
           title,
@@ -865,14 +989,17 @@ export async function parseICSFeed(
             (eventSport === 'school' || resolvedSport === 'school')
               ? 'school'
               : parsedTitle.eventType,
+          isTournament,
           isTraining,
           title,
           homeTeam: parsedTitle.homeTeam,
           awayTeam: parsedTitle.awayTeam,
+          stage: parsedTitle.stage || parsedTitle.division,
           isHomeMatch: parsedTitle.isHomeMatch,
           startTime: kickoffTime.toISOString(),
           endTime: endTime.toISOString(),
           warmupTime: warmupTime.toISOString(),
+          warmupIsEstimate,
           venue,
           volunteerDuty: dutyResult ? dutyResult.dutyTag : undefined,
           attendanceStatus

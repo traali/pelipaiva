@@ -57,7 +57,7 @@ export async function extractTextFromImage(
 export async function parseScheduleImage(
   imageSource: File | Blob | string,
   sport: SportType = 'football',
-  defaultPlayer = 'Maija',
+  defaultPlayer = '',
   onProgress?: OcrProgressCallback
 ): Promise<{
   rawText: string;

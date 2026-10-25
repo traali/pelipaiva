@@ -1,0 +1,363 @@
+{
+ "call": {
+  "parameters": {},
+  "logged_in": false,
+  "copyright": "Data Copyright Suomen Salibandyliitto ry",
+  "method": "getClubs",
+  "status": "ok",
+  "result_count": 8,
+  "result_time": 0.186,
+  "apilevel": "1",
+  "time_stamp": 1791431640
+ },
+ "clubs": [
+  {
+   "club_id": "801",
+   "club_sport_id": "10207204",
+   "name": "# EI SEURAA TIEDOSSA",
+   "abbrevation": "# EI SEURAA TIEDOSSA",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/801x.png",
+   "sub_title": "",
+   "region": "12",
+   "city_id": "0",
+   "city_name": "",
+   "home_venue_id": "",
+   "home_venue_name": null,
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [
+    {
+     "sport_id": "salibandy",
+     "sport_name_fi": "salibandy"
+    }
+   ],
+   "team_categories": [
+    {
+     "fi": "Miehet",
+     "en": "Men",
+     "se": "Herrar"
+    },
+    {
+     "fi": "Naiset",
+     "en": "Women",
+     "se": "Damer"
+    },
+    {
+     "fi": "Pojat",
+     "en": "Boys",
+     "se": "Pojkar"
+    },
+    {
+     "fi": "Tytöt",
+     "en": "Girls",
+     "se": "Flickor"
+    }
+   ],
+   "team_age_groups": []
+  },
+  {
+   "club_id": "371",
+   "club_sport_id": "",
+   "name": "3vs3 joukkueet",
+   "abbrevation": "3vs3 joukkueet",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/371x.png",
+   "sub_title": "",
+   "region": "12",
+   "city_id": "0",
+   "city_name": "",
+   "home_venue_id": "",
+   "home_venue_name": null,
+   "association_member": "0",
+   "information": "",
+   "club_type": "hobby",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [
+    {
+     "sport_id": "salibandy",
+     "sport_name_fi": "salibandy"
+    }
+   ],
+   "team_categories": [],
+   "team_age_groups": []
+  },
+  {
+   "club_id": "4480",
+   "club_sport_id": "50024173",
+   "name": "AIK YLIKYLÄ",
+   "abbrevation": "AIK YLIKYLÄ",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/4480x.png",
+   "sub_title": "",
+   "region": "7",
+   "city_id": "698",
+   "city_name": "Rovaniemi           ",
+   "home_venue_id": "999944932-1",
+   "home_venue_name": "Ounasrinne",
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [],
+   "team_categories": [
+    {
+     "fi": "Miehet",
+     "en": "Men",
+     "se": "Herrar"
+    },
+    {
+     "fi": "Naiset",
+     "en": "Women",
+     "se": "Damer"
+    }
+   ],
+   "team_age_groups": []
+  },
+  {
+   "club_id": "24",
+   "club_sport_id": "10423389",
+   "name": "BK-BÄRS",
+   "abbrevation": "BK-Bärs",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/24x.png",
+   "sub_title": "",
+   "region": "1",
+   "city_id": "91",
+   "city_name": "Helsinki            ",
+   "home_venue_id": "",
+   "home_venue_name": null,
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [],
+   "team_categories": [],
+   "team_age_groups": []
+  },
+  {
+   "club_id": "60",
+   "club_sport_id": "10186480",
+   "name": "ETU-TÖÖLÖN KARHUT",
+   "abbrevation": "E-T Karhut",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/60x.png",
+   "sub_title": "",
+   "region": "1",
+   "city_id": "91",
+   "city_name": "Helsinki            ",
+   "home_venue_id": "999944468-1",
+   "home_venue_name": "Esport Areena kenttä 1",
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [],
+   "team_categories": [
+    {
+     "fi": "Miehet",
+     "en": "Men",
+     "se": "Herrar"
+    }
+   ],
+   "team_age_groups": []
+  },
+  {
+   "club_id": "989",
+   "club_sport_id": "50013110",
+   "name": "FBC ÅLAND",
+   "abbrevation": "FBC Åland",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/989x.png",
+   "sub_title": "",
+   "region": "2",
+   "city_id": "170",
+   "city_name": "Jomala              ",
+   "home_venue_id": "",
+   "home_venue_name": null,
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [],
+   "team_categories": [],
+   "team_age_groups": []
+  },
+  {
+   "club_id": "757",
+   "club_sport_id": "10185740",
+   "name": "WESTEND INDIANS",
+   "abbrevation": "Westend Indians",
+   "www": "https://www.westendindians.fi",
+   "club_country": "FI",
+   "www_join_club": "https://www.westendindians.fi",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/757x.png",
+   "sub_title": "",
+   "region": "1",
+   "city_id": "49",
+   "city_name": "Espoo               ",
+   "home_venue_id": "865716195-1",
+   "home_venue_name": "Otahalli Espoo",
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [
+    {
+     "sport_id": "salibandy",
+     "sport_name_fi": "salibandy"
+    }
+   ],
+   "team_categories": [
+    {
+     "fi": "Miehet",
+     "en": "Men",
+     "se": "Herrar"
+    },
+    {
+     "fi": "Naiset",
+     "en": "Women",
+     "se": "Damer"
+    },
+    {
+     "fi": "Pojat",
+     "en": "Boys",
+     "se": "Pojkar"
+    },
+    {
+     "fi": "Tytöt",
+     "en": "Girls",
+     "se": "Flickor"
+    }
+   ],
+   "team_age_groups": [
+    {
+     "gender": "boys",
+     "age_group": "10",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "11",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "12",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "13",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "14",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "15",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "16",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "17",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "22",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "8",
+     "sport": "football"
+    },
+    {
+     "gender": "boys",
+     "age_group": "9",
+     "sport": "football"
+    },
+    {
+     "gender": "girls",
+     "age_group": "10",
+     "sport": "football"
+    },
+    {
+     "gender": "girls",
+     "age_group": "12",
+     "sport": "football"
+    },
+    {
+     "gender": "girls",
+     "age_group": "14",
+     "sport": "football"
+    },
+    {
+     "gender": "",
+     "age_group": "12/U11",
+     "sport": "football"
+    }
+   ]
+  },
+  {
+   "club_id": "29",
+   "club_sport_id": "50001576",
+   "name": "BÄRBÄR UNITED",
+   "abbrevation": "BBU",
+   "www": "",
+   "club_country": "FI",
+   "www_join_club": "",
+   "crest": "https://cdn.torneopal.net/logo/salibandy/29x.png",
+   "sub_title": "",
+   "region": "5",
+   "city_id": "297",
+   "city_name": "Kuopio              ",
+   "home_venue_id": "999945045-1",
+   "home_venue_name": "Lippumäki",
+   "association_member": "1",
+   "information": "",
+   "club_type": "official",
+   "archived": "0",
+   "team_count": "0",
+   "sports": [],
+   "team_categories": [
+    {
+     "fi": "Miehet",
+     "en": "Men",
+     "se": "Herrar"
+    }
+   ],
+   "team_age_groups": []
+  }
+ ]
+}

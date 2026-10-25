@@ -2,7 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { registerPelipaivaWebMCP } from './lib/agents/webMcpRegistry';
 import './index.css';
+
+// Register WebMCP browser tools for AI agents
+registerPelipaivaWebMCP().catch((err) => console.warn('[WebMCP] Boot failed', err));
 
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[PELIPAIVA:UNHANDLED]', e.reason);
@@ -13,14 +17,14 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then((registration) => {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        registration.update().catch(() => {});
+        registration.update().catch((err) => console.warn('[SW] Registration update failed:', err));
       }
     });
     // Check for new version every 30 minutes
     setInterval(() => {
-      registration.update().catch(() => {});
+      registration.update().catch((err) => console.warn('[SW] Registration update failed:', err));
     }, 30 * 60 * 1000);
-  }).catch(() => {});
+  }).catch((err) => console.warn('[SW] ready failed:', err));
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

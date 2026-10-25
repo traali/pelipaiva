@@ -12,8 +12,10 @@ import {
   MismatchFlags,
   UserOverrideDecision,
   LeagueStandingsRecord,
-  TeamRosterRecord
+  TeamRosterRecord,
+  FamilyManualEvent
 } from '../../types/matchday';
+
 
 export interface CustomVenuePin {
   normalizedQuery: string;
@@ -49,6 +51,7 @@ export class PelipaivaDB extends Dexie {
   venuePins!: Table<CustomVenuePin, string>;
   customAliases!: Table<CustomAliasRecord, string>;
   syncState!: Table<SyncStateRecord, string>;
+  manualEvents!: Table<FamilyManualEvent, string>;
 
   constructor(databaseName = 'PelipaivaDB', options?: DexieOptions) {
     super(databaseName, options);
@@ -61,7 +64,7 @@ export class PelipaivaDB extends Dexie {
       syncState: 'key, syncKey'
     });
 
-    // Schema Version 2 (Multi-sport official fixtures, standings, rosters, arrival rules, customAliases, compound indexes)
+    // Schema Version 2 (Multi-sport official fixtures, standings, rosters, arrival rules, customAliases, manualEvents, compound indexes)
     this.version(2).stores({
       profiles: 'id, teamName, sport, associationUrl, teamId, associationType',
       events: 'id, profileId, sport, startTime, officialFixtureId, reconciliationStatus, [profileId+startTime]',
@@ -71,7 +74,8 @@ export class PelipaivaDB extends Dexie {
       arrivalRules: 'profileId, defaultSport',
       venuePins: 'normalizedQuery, venueName',
       customAliases: 'pattern, canonicalClub, createdAt',
-      syncState: 'key, syncKey'
+      syncState: 'key, syncKey',
+      manualEvents: 'id, startTime, deletedAt'
     }).upgrade(async (tx) => {
       await tx.table('events').toCollection().modify((event: MatchdayEvent) => {
         if (!event.reconciliationStatus) {

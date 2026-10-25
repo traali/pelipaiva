@@ -49,6 +49,13 @@ export function setOnDeviceLlmChoice(choice: OnDeviceLlmChoice): void {
   if (choice === 'off') {
     write(ONDEVICE_LLM_LOADED_KEY, null);
   }
+  if (typeof window !== 'undefined' && (window as any).FamdayNativeAi?.syncChoice) {
+    try {
+      (window as any).FamdayNativeAi.syncChoice(choice);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /** True only when the user opted in. Missing key = off. */

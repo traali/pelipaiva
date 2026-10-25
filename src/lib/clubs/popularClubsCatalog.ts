@@ -15,39 +15,6 @@ export interface ClubPreset {
 export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
   // ⚽ Football
   {
-    id: 'football-default-185085',
-    name: 'Jalkapallojoukkue (Palloliitto 185085)',
-    shortName: 'Jalkapallo 1',
-    city: 'Helsinki / Uusimaa',
-    sport: 'football',
-    primaryColor: 'sininen',
-    colorHex: '#003580',
-    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
-    popularAgeGroups: ['T13 Sininen', 'P12 Sininen', 'Kilpa', 'Edustus']
-  },
-  {
-    id: 'football-default-185083',
-    name: 'Jalkapallojoukkue (Palloliitto 185083)',
-    shortName: 'Jalkapallo 2',
-    city: 'Helsinki / Uusimaa',
-    sport: 'football',
-    primaryColor: 'valkoinen',
-    colorHex: '#059669',
-    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-    popularAgeGroups: ['T13 Valkoinen', 'P12 Valkoinen', 'Haaste']
-  },
-  {
-    id: 'football-default-185086',
-    name: 'Jalkapallojoukkue (Palloliitto 185086)',
-    shortName: 'Jalkapallo 3',
-    city: 'Helsinki / Uusimaa',
-    sport: 'football',
-    primaryColor: 'musta',
-    colorHex: '#18181b',
-    sampleTeamUrl: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
-    popularAgeGroups: ['P11 Musta', 'T12 Musta', 'Akatemia']
-  },
-  {
     id: 'hjk',
     name: 'Helsingin Jalkapalloklubi (HJK)',
     shortName: 'HJK',
@@ -160,17 +127,6 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
 
   // 🏑 Floorball
   {
-    id: 'floorball-default',
-    name: 'Salibandyjoukkue (Salibandyliitto)',
-    shortName: 'Salibandy',
-    city: 'Helsinki / Espoo / Vantaa',
-    sport: 'floorball',
-    primaryColor: 'sininen',
-    colorHex: '#2563eb',
-    sampleTeamUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info',
-    popularAgeGroups: ['P13 Pohjoinen', 'T12 Edustus', 'KW Memorial']
-  },
-  {
     id: 'ervi',
     name: 'EräViikingit (ErVi)',
     shortName: 'ErVi',
@@ -229,17 +185,6 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
 
   // 🏀 Basketball
   {
-    id: 'basket-default',
-    name: 'Koripallojoukkue (Basket.fi)',
-    shortName: 'Koripallo',
-    city: 'Helsinki / Espoo',
-    sport: 'basketball',
-    primaryColor: 'oranssi',
-    colorHex: '#f59e0b',
-    sampleTeamUrl: 'https://tulospalvelu.basket.fi/team/5756346/info',
-    popularAgeGroups: ['U14 Pojat', 'U13 Tytöt', 'U12 Pojat', 'Edustus']
-  },
-  {
     id: 'topola',
     name: 'Touhun Pojat Lauttasaari (TOPOLA)',
     shortName: 'TOPOLA',
@@ -296,17 +241,6 @@ export const POPULAR_FINNISH_CLUBS: ClubPreset[] = [
   },
 
   // 🏐 Volleyball
-  {
-    id: 'volleyball-default',
-    name: 'Lentopallojoukkue (Lentopalloliitto)',
-    shortName: 'Lentopallo',
-    city: 'Koko Suomi',
-    sport: 'volleyball',
-    primaryColor: 'violetti',
-    colorHex: '#8b5cf6',
-    sampleTeamUrl: 'https://tulospalvelu.lentopallo.fi/team/57672/info',
-    popularAgeGroups: ['C-tytöt', 'C-pojat', 'D-tytöt', 'B-tytöt']
-  },
   {
     id: 'puma-volley',
     name: 'PuMa-Volley',

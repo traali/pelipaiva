@@ -4,7 +4,16 @@ import {
   calculateDepartureCountdown,
   generateMatchdayBriefing
 } from '../../../src/lib/ai/deterministicReasoner';
-import { ArrivalRules, MatchdayEvent } from '../../../src/types/matchday';
+import { ArrivalRules, HomeLocation, MatchdayEvent } from '../../../src/types/matchday';
+
+const HOME: HomeLocation = {
+  name: 'Koti',
+  address: 'Testikatu 1',
+  coordinates: { lat: 60.2, lng: 24.9 },
+  maxWalkingDistanceKm: 1.5,
+  maxCyclingDistanceKm: 5,
+  defaultTransitMode: 'car'
+};
 
 describe('Tier 2 Boundary: Arrival Rules, Countdown Reasoning & Weather Edge Cases', () => {
   const createMockEvent = (overrides: Partial<MatchdayEvent> = {}): MatchdayEvent => ({
@@ -28,12 +37,6 @@ describe('Tier 2 Boundary: Arrival Rules, Countdown Reasoning & Weather Edge Cas
       surface: 'artificial_turf_3g',
       hasFloodlights: true
     },
-    parking: {
-      name: 'Töölön parkki',
-      walkingTimeMinutes: 3,
-      costType: 'paid',
-      spacesEstimate: 50
-    },
     ...overrides
   });
 
@@ -53,10 +56,11 @@ describe('Tier 2 Boundary: Arrival Rules, Countdown Reasoning & Weather Edge Cas
       defaultDrivingEstimateMinutes: 0
     };
 
-    const result = calculateDepartureCountdown(event, rules);
+    const result = calculateDepartureCountdown(event, rules, HOME);
     const kickoffTime = new Date(event.startTime).getTime();
-    // walkingTime = 3 min, duty = 0
-    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - 3 * 60 * 1000);
+    // only the real drive from the saved home remains, duty = 0
+    expect(result.transitPlan.travelMinutes).toBeGreaterThan(0);
+    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - result.transitPlan.travelMinutes * 60 * 1000);
   });
 
   it('should handle large offsets (e.g. 180 min warmup, 60 min driving, 30 min buffer) safely', () => {
@@ -74,38 +78,38 @@ describe('Tier 2 Boundary: Arrival Rules, Countdown Reasoning & Weather Edge Cas
       defaultDrivingEstimateMinutes: 60
     };
 
-    const result = calculateDepartureCountdown(event, rules);
+    const result = calculateDepartureCountdown(event, rules, HOME);
     const kickoffTime = new Date(event.startTime).getTime();
-    // Total offset = 180 + 60 + 30 + 3 = 273 minutes
-    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - 273 * 60 * 1000);
+    // Total offset = 180 + real drive + 30 (defaultDrivingEstimateMinutes is not a guess we use)
+    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - (180 + result.transitPlan.travelMinutes + 30) * 60 * 1000);
   });
 
   // 2. Missing or undefined arrival rules fallback
-  it('should fallback to default values (home 45m, driving 20m, buffer 10m, walk 3m = 78m total) when rules are undefined', () => {
+  it('should fallback to default values (home 45m + real drive + buffer 10m) when rules are undefined', () => {
     const event = createMockEvent({ isHomeMatch: true });
-    const result = calculateDepartureCountdown(event, undefined);
+    const result = calculateDepartureCountdown(event, undefined, HOME);
     const kickoffTime = new Date(event.startTime).getTime();
 
-    // Default: 45 + 20 + 10 + 3 = 78 min
-    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - 78 * 60 * 1000);
+    // Default: 45 + drive + 10
+    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - (45 + result.transitPlan.travelMinutes + 10) * 60 * 1000);
   });
 
   it('should use 60 min warmup default for away matches when rules are undefined', () => {
     const event = createMockEvent({ isHomeMatch: false });
-    const result = calculateDepartureCountdown(event, undefined);
+    const result = calculateDepartureCountdown(event, undefined, HOME);
     const kickoffTime = new Date(event.startTime).getTime();
 
-    // Default away: 60 + 20 + 10 + 3 = 93 min
-    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - 93 * 60 * 1000);
+    // Default away: 60 + drive + 10
+    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - (60 + result.transitPlan.travelMinutes + 10) * 60 * 1000);
   });
 
   it('should use 15 min warmup default for training sessions when rules are undefined', () => {
     const event = createMockEvent({ isTraining: true, eventType: 'training' });
-    const result = calculateDepartureCountdown(event, undefined);
+    const result = calculateDepartureCountdown(event, undefined, HOME);
     const kickoffTime = new Date(event.startTime).getTime();
 
-    // Default training: 15 + 20 + 10 + 3 = 48 min
-    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - 48 * 60 * 1000);
+    // Default training: 15 + drive + 10
+    expect(result.leaveHomeDate.getTime()).toBe(kickoffTime - (15 + result.transitPlan.travelMinutes + 10) * 60 * 1000);
   });
 
   // 3. Volunteer duty buffer addition
@@ -119,8 +123,8 @@ describe('Tier 2 Boundary: Arrival Rules, Countdown Reasoning & Weather Edge Cas
       volunteerDutyArrivalBufferMinutes: 20
     };
 
-    const res1 = calculateDepartureCountdown(eventWithoutDuty, rules);
-    const res2 = calculateDepartureCountdown(eventWithDuty, rules);
+    const res1 = calculateDepartureCountdown(eventWithoutDuty, rules, HOME);
+    const res2 = calculateDepartureCountdown(eventWithDuty, rules, HOME);
 
     // Difference between leaving home with duty vs without duty should be exactly 20 mins
     expect(res1.leaveHomeDate.getTime() - res2.leaveHomeDate.getTime()).toBe(20 * 60 * 1000);

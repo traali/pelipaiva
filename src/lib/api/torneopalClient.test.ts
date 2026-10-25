@@ -5,7 +5,9 @@ import {
   listTorneopalAttempts,
   looksLikeCupRequest,
   mapFixture,
-  shouldTryAssociationEndpoint
+  shouldTryAssociationEndpoint,
+  tasoHash,
+  tasoRequestUrl
 } from './torneopalClient';
 import type { ParsedAssociationUrl } from '../../types/matchday';
 
@@ -35,6 +37,11 @@ const kw: ParsedAssociationUrl = {
 };
 
 describe('torneopal match params', () => {
+  it('sends a lentopallo team to the volleyball API', () => {
+    const attempts = listTorneopalAttempts('torneopal', undefined, 'volleyball');
+    expect(attempts[0]?.base).toBe('https://lentopallo-api.torneopal.net/taso/rest');
+    expect(attempts[0]?.referer).toBe('https://tulospalvelu.lentopallo.fi/');
+  });
   it('does not send cup subdomain team ids to tupa (ids collide across federations)', () => {
     expect(shouldTryAssociationEndpoint('kwmemorialcup26')).toBe(false);
     expect(shouldTryAssociationEndpoint('spl')).toBe(true);
@@ -118,5 +125,53 @@ describe('torneopal match params', () => {
     expect(fixture?.stage).toBe('alku');
     expect(fixture?.score).toBe('9–45');
     expect(fixture?.isHome).toBe(false);
+  });
+
+  it('correctly associates Salibandy Tulospalvelu URLs with Torneopal Floorball engine', () => {
+    const salibandyUrl: ParsedAssociationUrl = {
+      sport: 'floorball',
+      association: 'salibandy',
+      teamId: '25301',
+      canonicalUrl: 'https://tulospalvelu.salibandy.fi/team/25301/info'
+    };
+
+    const attempts = listTorneopalAttempts('salibandy', undefined, 'floorball');
+    expect(attempts[0]?.base).toBe('https://salibandy-api.torneopal.net/taso/rest');
+    expect(attempts[0]?.referer).toBe('https://tulospalvelu.salibandy.fi/');
+
+    const fixture = mapFixture(
+      {
+        team_A_name: 'SB-Pro Valkoinen',
+        team_B_name: 'Westend Indians Yellow',
+        status: 'Played',
+        fs_A: '3',
+        fs_B: '15',
+        date: '2026-04-12',
+        time: '15:00:00',
+        venue_name: 'Otahalli Espoo',
+        venue_lat: '60.185',
+        venue_lon: '24.832',
+        match_id: '913481',
+        match_number: '227',
+        category_name: 'U14 Pojat VALK B ES'
+      },
+      salibandyUrl,
+      'Westend Indians Yellow'
+    );
+
+    expect(fixture?.isHome).toBe(false);
+    expect(fixture?.score).toBe('3–15');
+    expect(fixture?.venueName).toBe('Otahalli Espoo');
+    expect(fixture?.sport).toBe('floorball');
+  });
+});
+
+
+describe('TASO signing for basketball and volleyball', () => {
+  it.each(['koripallo-api', 'lentopallo-api'])('signs %s calls with hash last', async (host) => {
+    const url = await tasoRequestUrl(`https://${host}.torneopal.net/taso/rest`, 'getMatch', { match_id: '816603' });
+    expect(url).toContain('match_id=816603&hash=');
+    // Known-good: lentopallo-api answered 200 to this hash on 25.10.2026.
+    expect(url.endsWith('hash=' + (await tasoHash('getMatch', { match_id: '816603' })))).toBe(true);
   });
 });

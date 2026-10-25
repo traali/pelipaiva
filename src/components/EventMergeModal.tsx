@@ -15,6 +15,8 @@ import {
 import type { MatchdayEvent } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
 import { db } from '../lib/storage/db';
+import { eventDayKey } from '../lib/agents/time';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
 interface EventMergeModalProps {
   isOpen: boolean;
@@ -42,13 +44,13 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
   // Candidate events to merge into (exclude the source event itself and hidden ones)
   const candidateEvents = useMemo(() => {
     if (!sourceEvent || !sourceEvent.startTime) return [];
-    const sourceDateStr = sourceEvent.startTime.split('T')[0];
+    const sourceDateStr = eventDayKey(sourceEvent.startTime);
     return (allEvents || [])
       .filter((e) => e && e.id !== sourceEvent.id && !e.isHidden)
       .sort((a, b) => {
         // Prioritize events on the exact same date
-        const aDate = a.startTime.split('T')[0];
-        const bDate = b.startTime.split('T')[0];
+        const aDate = eventDayKey(a.startTime);
+        const bDate = eventDayKey(b.startTime);
         if (aDate === sourceDateStr && bDate !== sourceDateStr) return -1;
         if (bDate === sourceDateStr && aDate !== sourceDateStr) return 1;
         return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
@@ -263,7 +265,8 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      await db.events.update(sourceEvent.id, { attendanceStatus: 'in' });
+                      const sync = await db.syncState.get('family').catch(() => null);
+                      await recordAttendanceOverride(sync?.syncKey || '', sourceEvent.id, 'in', db);
                       onEventMerged?.({ ...sourceEvent, attendanceStatus: 'in' }, '');
                       setSuccessMessage('Merkitty: Osallistuu (IN)');
                       setTimeout(() => onClose(), 800);
@@ -280,7 +283,8 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      await db.events.update(sourceEvent.id, { attendanceStatus: 'out' });
+                      const sync = await db.syncState.get('family').catch(() => null);
+                      await recordAttendanceOverride(sync?.syncKey || '', sourceEvent.id, 'out', db);
                       onEventMerged?.({ ...sourceEvent, attendanceStatus: 'out' }, '');
                       setSuccessMessage('Merkitty: Ei osallistu (OUT)');
                       setTimeout(() => onClose(), 800);
@@ -321,7 +325,7 @@ export const EventMergeModal: React.FC<EventMergeModalProps> = ({
                         day: 'numeric',
                         month: 'numeric'
                       });
-                      const isSameDay = cand.startTime.split('T')[0] === sourceEvent.startTime.split('T')[0];
+                      const isSameDay = eventDayKey(cand.startTime) === eventDayKey(sourceEvent.startTime);
 
                       return (
                         <button

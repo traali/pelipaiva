@@ -19,8 +19,8 @@ Constitution: [SUPER_PROMPT.md](./SUPER_PROMPT.md) + [FAMILY_SYNC_FINAL.md](../F
 
 | ID | Task | Owner | Status | Done when |
 |---|---|---|---|---|
-| F-6 | Mac Xcode WKWebView app per `native/ios/README.md`. Load pages.dev. Inject user script + `famdayAi` handler. | Human+Agent | OPEN | TestFlight on an Intelligence phone |
-| F-7 | Auto-mirror `localStorage.pelipaiva_ondevice_llm` → `UserDefaults` on every navigation. Bridge already fail-closes on `off`. | Agent | OPEN | Toggle in PWA flips native availability without a rebuild |
+| F-6 | Mac Xcode WKWebView app per `native/ios/README.md`. Load pages.dev. Inject user script + `famdayAi` handler. | Human+Agent | READY | TestFlight on an Intelligence phone |
+| F-7 | Auto-mirror `localStorage.pelipaiva_ondevice_llm` → `UserDefaults` on every navigation. Bridge already fail-closes on `off`. | Agent | ✅ DONE | Toggle in PWA flips native availability without a rebuild |
 | F-8 | Only if AFM 3 Core Finnish JSON F1 is poor: official Qwen3 0.6B `.aimodel` via Background Assets. Wi‑Fi Lataa. Never in the IPA. No PCC. | Human | OPEN | A/B on real WhatsApp dumps (Simo P13, volleyball, ETEK) |
 | F-9 | Cup ingest: if federation returns 0 cup matches, show “ei julkaistu” — do not write `officialFromExampleCup` rows. | Agent | ✅ DONE (`ff43add`) | KW Memorial / Espoo Liikkuu: live or empty, never canned HJK/KäPa |
 
@@ -28,12 +28,12 @@ Constitution: [SUPER_PROMPT.md](./SUPER_PROMPT.md) + [FAMILY_SYNC_FINAL.md](../F
 
 | ID | Task | Status | Done when |
 |---|---|---|---|
-| F-10 | Drop legacy `X-Pelipaiva-Rev`; If-Match only | OPEN | Worker 409 without it |
-| F-11 | Unknown venue: no Töölö pin; require LIPAS or user pin | OPEN | `isApproximateLocation` never draws a marker |
-| F-12 | Replace or isolate `xlsx`; prefer pasted TSV | OPEN | Advisory gone or parser in Worker |
+| F-10 | Drop legacy `X-Pelipaiva-Rev`; If-Match only | ✅ DONE | Worker 409 without it; If-Match only in worker & familyCloud |
+| F-11 | Unknown venue: no Töölö pin; require LIPAS or user pin | ✅ DONE | `isApproximateLocation` never draws a marker or fake Helsinki pin |
+| F-12 | Replace or isolate `xlsx`; prefer pasted TSV | ✅ DONE | `xlsx` dependency removed; 430 kB bundle reduced; zero-dependency parser |
 | F-13 | Single `NeuralEngineId` type | ✅ DONE (`ff43add`) | Unified in `onDeviceLlm.ts` and re-exported |
-| F-14 | `PROJECT.md` milestones → SHIPPED; point at this pack | OPEN | no IN_PROGRESS ghosts |
-| F-15 | Ice hockey / remaining federation HTML only if an official JSON path exists | no HTML SPA scrape |
+| F-14 | `PROJECT.md` milestones → SHIPPED; point at this pack | ✅ DONE | Milestones SHIPPED; no IN_PROGRESS ghosts |
+| F-15 | Ice hockey / remaining federation HTML only if an official JSON path exists | ✅ GUARDRAIL | No HTML SPA scrape |
 
 ## Explicitly not doing
 

@@ -7,6 +7,7 @@ import {
   MessageSquarePlus,
   MoreHorizontal,
   RefreshCw,
+  Settings,
   Share2,
   Trash2,
   Tv,
@@ -28,7 +29,11 @@ interface MissionControlHUDProps {
   onAmbient: () => void;
   onLogistics: () => void;
   onImport: () => void;
+  showConflictWarnings?: boolean;
+  onToggleConflictWarnings?: () => void;
+  showCopilot?: boolean;
   onOpenHomeLocation?: () => void;
+  onSettings?: () => void;
   onAsk?: () => void;
   onClear: () => void;
 }
@@ -38,6 +43,10 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
   isOffline,
   isSyncing,
   isDemo,
+  showConflictWarnings = false,
+  onToggleConflictWarnings,
+  showCopilot = false,
+  onSettings,
   onRefresh,
   onShare,
   onAmbient,
@@ -73,12 +82,22 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                 Lähde klo {leaveBy}
               </span>
             </p>
+          ) : !snapshot.homeLocation && snapshot.nextEvent && onOpenHomeLocation ? (
+            // No home, no leave time. One tap to set it.
+            <button
+              type="button"
+              onClick={onOpenHomeLocation}
+              data-testid="hud-add-home"
+              className="touch-target -my-2 inline-flex min-h-[44px] max-w-full items-center gap-1 truncate text-left text-xs font-semibold text-floodlight underline-offset-2 hover:underline"
+            >
+              🏠 Lisää kotiosoite, niin näet lähtöajan
+            </button>
           ) : (
             <p className="text-xs text-text-muted">{snapshot.summary || snapshot.weekendLabel}</p>
           )}
         </div>
 
-        {conflictCount > 0 && (
+        {showConflictWarnings && conflictCount > 0 && (
           <button
             type="button"
             onClick={onLogistics}
@@ -176,13 +195,32 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                     setMenuOpen(false);
                   }}
                 />
-                {onAsk && (
+                {showCopilot && onAsk && (
                   <MenuItem
                     icon={<MessageSquarePlus className="h-4 w-4" />}
                     label="Kysy aikataulusta"
                     onClick={() => {
                       onAsk();
                       setMenuOpen(false);
+                    }}
+                  />
+                )}
+                {onSettings && (
+                  <MenuItem
+                    icon={<Settings className="h-4 w-4" />}
+                    label="Asetukset & Älytoiminnot"
+                    onClick={() => {
+                      onSettings();
+                      setMenuOpen(false);
+                    }}
+                  />
+                )}
+                {onToggleConflictWarnings && (
+                  <MenuItem
+                    icon={<AlertTriangle className={`h-4 w-4 ${showConflictWarnings ? 'text-whistle' : 'text-text-muted'}`} />}
+                    label={showConflictWarnings ? 'Varoitukset: Päällä' : 'Varoitukset: Piilotettu'}
+                    onClick={() => {
+                      onToggleConflictWarnings();
                     }}
                   />
                 )}
@@ -206,6 +244,10 @@ export const MissionControlHUD: React.FC<MissionControlHUDProps> = ({
                     }}
                   />
                 )}
+                <div className="px-3 py-1.5 text-[10px] font-mono text-text-muted border-t border-border-subtle bg-surface-elevated/40 flex items-center justify-between">
+                  <span>v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'}</span>
+                  <span>git:{typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'}</span>
+                </div>
               </motion.div>
               </React.Fragment>
             )}

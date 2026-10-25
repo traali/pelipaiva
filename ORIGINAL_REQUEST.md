@@ -62,3 +62,40 @@ Allow users to configure per-calendar and per-team arrival rules: default sport,
 - [ ] 100% pass rate on all automated unit and integration tests (npm test).
 - [ ] 0 errors on TypeScript strict verification (npx tsc --noEmit).
 - [ ] Production build succeeds and deploys to Cloudflare Pages (HTTP 200 OK).
+
+## Follow-up — 2026-09-09T18:02:37Z
+
+Exhaustively verify, audit, and benchmark cross-source event reconciliation, stitching, and deduplication across real Finnish family fixtures (Torneopal official league games, MyClub team feeds, and Nimenhuuto multi-squad calendars), ensuring zero duplicate cards, strict kickoff vs. warmup synchronization, and clean Google Calendar / Nest export.
+
+Working directory: c:\compdev\pelipaiva
+Integrity mode: development
+
+## Requirements
+
+### R1. Authentic Multi-Source Event Ingestion & Normalization
+Feed real-world calendar payloads from all three primary Finnish youth sports systems:
+- Official association fixtures from **Torneopal** (Palloliitto SPL football, Salibandyliitto SSBL floorball)
+- Team calendar feeds from **MyClub** (e.g. EräViikingit, PPJ, Westend Indians with warmup offsets, attendance tags `X-MYCLUB-STATUS`, talkoo duties)
+- Multi-squad calendar feeds from **Nimenhuuto** (e.g. HJK T13 Sininen & Valkoinen with `CATEGORIES` tags and shared team practices)
+
+### R2. Complete Reconciliation & Stitching Invariant Verification
+Execute `stitchCalendarEventsWithFixtures()` across all imported fixtures and assert non-negotiable invariants:
+1. **Deduplication Cardinality**: For every real match present in both Torneopal and MyClub/Nimenhuuto, exactly ONE unified event card is returned. Bare fixtures are suppressed.
+2. **Kickoff vs. Warmup Timing**: The match card strictly sets the official kickoff time (e.g. 10:00) as `startTime`, while preserving the coach gathering/warmup time (e.g. 09:15) as `warmupTime`.
+3. **Metadata Enriched**: Preserves MyClub attendance status (`in`/`out`), talkoovahti volunteer duties, and jersey color guidance.
+4. **Authoritative Venue**: Adopts Torneopal official venue while recording non-breaking mismatch diagnostics if the private calendar used a colloquial nickname.
+
+### R3. Google Calendar & Google Nest Feed Export Verification
+Run `generateIcsCalendarFeed()` on the stitched results and verify that the exported RFC 5545 feed:
+- Formats `DTSTART` strictly to the match kickoff time for voice assistant query accuracy.
+- Embeds gathering time, kit advice, departure time, and venue clearly in `DESCRIPTION`.
+- Formats `SUMMARY` with player name and fixture (e.g. `Tuomas: Westend Indians vs Oilers`).
+
+## Acceptance Criteria
+
+### Stitching & Deduplication
+- [ ] 100% of paired Torneopal and MyClub/Nimenhuuto events merge into exactly 1 event card with zero orphaned duplicates.
+- [ ] Kickoff time is strictly sourced from Torneopal, and warmup time is strictly preserved from MyClub/Nimenhuuto.
+- [ ] Multi-squad separation correctly prevents cross-squad false merges (e.g. Sininen fixture never merges with Valkoinen calendar event).
+- [ ] All 61 existing test suites (518+ tests) in `pelipaiva` continue to pass with zero regressions.
+

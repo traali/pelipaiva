@@ -17,9 +17,47 @@ import { helsinkiDateISO, addHelsinkiDays } from "../agents/time";
 const TUPA_KEY = "tpqgz8ddy2rt9w8xuyxr";
 const PALL_KEY = "4h7dznqdxwtp3hsfdyf5r793uahfxy7x";
 const SALIBANDY_KEY = "zsn3anknxzcfzc23k53jqdcd4pymutsf";
+const BASKET_KEY = "df8e84j9xtdz269euy3h";
+
+/**
+ * Since Oct 2026 Palloliitto's TASO host (spl.torneopal.net) answers an empty
+ * HTTP 403 to any call without a `hash` query param. tulospalvelu.palloliitto.fi
+ * signs each call as sha256 hex of `<method>?<salt>&k1=v1&k2=v2…` (raw values,
+ * query order) and sends `hash` last. Same scheme as traali/football-stats#18.
+ */
+export const PALL_HASH_SALT = "ysnyp4h6e9egetkc3s3v";
+export const PALL_SIGNED_HOST = "spl.torneopal.net";
+/**
+ * Hosts whose official web app signs every call. tulospalvelu.salibandy.fi
+ * (bundle index-CkQ23erR.js, 24.10.2026) signs exactly like Palloliitto: same
+ * salt, same `<method>?<salt>&k=v…` sha256, key in `Accept: json/<key>`.
+ * Since 25.10.2026 koripallo-api and lentopallo-api also 403 unsigned calls; same scheme.
+ */
+export const TASO_SIGNED_HOSTS: ReadonlySet<string> = new Set([
+  PALL_SIGNED_HOST,
+  "salibandy-api.torneopal.net",
+  "koripallo-api.torneopal.net",
+  "lentopallo-api.torneopal.net",
+]);
+
+export async function tasoHash(method: string, params: Record<string, string>): Promise<string> {
+  let input = `${method}?${PALL_HASH_SALT}`;
+  for (const [k, v] of Object.entries(params)) input += `&${k}=${v}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Request URL for one TASO call; calls to signed hosts carry `hash` last. */
+export async function tasoRequestUrl(base: string, method: string, params: Record<string, string>): Promise<string> {
+  const qs = new URLSearchParams(params);
+  if (TASO_SIGNED_HOSTS.has(new URL(base).hostname)) qs.append("hash", await tasoHash(method, params));
+  return `${base}/${method}?${qs.toString()}`;
+}
 
 const ENDPOINTS: Partial<
-  Record<AssociationType, { base: string; apiKey: string; referer: string }>
+  Record<AssociationType | "volleyball", { base: string; apiKey: string; referer: string }>
 > = {
   palloliitto: {
     base: "https://spl.torneopal.net/taso/rest",
@@ -33,8 +71,13 @@ const ENDPOINTS: Partial<
   },
   basket: {
     base: "https://koripallo-api.torneopal.net/taso/rest",
-    apiKey: TUPA_KEY,
+    apiKey: BASKET_KEY,
     referer: "https://tulospalvelu.basket.fi/",
+  },
+  volleyball: {
+    base: "https://lentopallo-api.torneopal.net/taso/rest",
+    apiKey: BASKET_KEY,
+    referer: "https://tulospalvelu.lentopallo.fi/",
   },
   torneopal: {
     base: "https://tupa.api.torneopal.com/taso/rest",
@@ -63,6 +106,43 @@ function namesMatch(a: string, b: string): boolean {
   const nb = n(b);
   if (!na || !nb) return false;
   return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function normTeamName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[./_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Does a raw TASO match (from a group / series listing) involve this team?
+ * Decided by team_A_id / team_B_id whenever TASO sends ids. Only when a match
+ * carries no team ids at all do we fall back to an exact normalized name match
+ * (never a substring: "PPJ" must not claim "PPJ/Eira Oranssi").
+ */
+export function isOwnTeamMatch(
+  match: Record<string, unknown>,
+  teamId: string,
+  teamName: string
+): boolean {
+  const idA = str(match.team_A_id);
+  const idB = str(match.team_B_id);
+  const hasId = (v: string) => v !== "" && v !== "0";
+  if (hasId(idA) || hasId(idB)) return idA === teamId || idB === teamId;
+  const own = normTeamName(teamName);
+  if (!own) return false;
+  return normTeamName(str(match.team_A_name)) === own || normTeamName(str(match.team_B_name)) === own;
+}
+
+/** Keep only the team's own games from a group / series match list. */
+export function keepOwnTeamMatches(
+  matches: Record<string, unknown>[],
+  teamId: string,
+  teamName: string
+): Record<string, unknown>[] {
+  return matches.filter((m) => isOwnTeamMatch(m, teamId, teamName));
 }
 
 function finnishIso(dateStr: string, timeStr: string): string | null {
@@ -126,6 +206,7 @@ function federationEndpoint(
   if (association === "salibandy" || sport === "floorball") return ENDPOINTS.salibandy;
   if (association === "palloliitto" || sport === "football") return ENDPOINTS.palloliitto;
   if (association === "basket" || sport === "basketball") return ENDPOINTS.basket;
+  if (sport === "volleyball") return ENDPOINTS.volleyball;
   return ENDPOINTS.torneopal;
 }
 
@@ -159,6 +240,8 @@ export function listTorneopalAttempts(
       push({ base, apiKey: PALL_KEY, referer });
       push({ base, apiKey: TUPA_KEY, referer });
       push({ base, apiKey: SALIBANDY_KEY, referer });
+    } else if (sport === "volleyball") {
+      push({ base, apiKey: BASKET_KEY, referer });
     } else {
       push({ base, apiKey: TUPA_KEY, referer });
       push({ base, apiKey: SALIBANDY_KEY, referer });
@@ -169,7 +252,8 @@ export function listTorneopalAttempts(
   return attempts;
 }
 
-async function torneopalGet<T>(
+/** One TASO REST call with the app's federation keys, deadline and error handling. Null on any failure. */
+export async function torneopalGet<T>(
   association: AssociationType,
   method: string,
   params: Record<string, string>,
@@ -190,8 +274,7 @@ async function torneopalGet<T>(
   for (const ep of attempts) {
     const remaining = deadline - Date.now();
     if (remaining <= 500) break;
-    const search = new URLSearchParams(clean);
-    const url = `${ep.base}/${method}?${search.toString()}`;
+    const url = await tasoRequestUrl(ep.base, method, clean);
 
     try {
       const res = await fetch(url, {
@@ -202,6 +285,8 @@ async function torneopalGet<T>(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         },
         referrerPolicy: "origin",
+        // Live scores must never come from the HTTP cache.
+        cache: "no-store",
         signal: AbortSignal.timeout(Math.min(10000, remaining)),
       });
       if (!res.ok) continue;
@@ -299,31 +384,148 @@ function pickCurrentGroup(groups: Record<string, unknown>[]): Record<string, unk
   );
 }
 
+/**
+ * TASO often sends time_end as a flat start + 2 h, even for tournament games
+ * that run every 45 min. A team cannot still be playing when its next game
+ * starts, so end each game no later than the team's next kickoff that day.
+ * Without this, a tournament shows two games "Käynnissä" at once and a
+ * false clash between a kid's own back-to-back games.
+ */
+export function clipToNextGame<T extends { startTime: string; endTime?: string }>(fixtures: T[]): T[] {
+  const sorted = [...fixtures].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
+  const helsinkiDay = (iso: string) =>
+    new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Helsinki' });
+  return sorted.map((f, i) => {
+    if (!f.endTime) return f;
+    const start = new Date(f.startTime).getTime();
+    const end = new Date(f.endTime).getTime();
+    const next = sorted
+      .slice(i + 1)
+      .find((n) => new Date(n.startTime).getTime() > start);
+    if (!next || helsinkiDay(next.startTime) !== helsinkiDay(f.startTime)) return f;
+    const nextStart = new Date(next.startTime).getTime();
+    return nextStart < end ? { ...f, endTime: new Date(nextStart).toISOString() } : f;
+  });
+}
+
+const numericStr = (v: unknown): boolean => /^\d+$/.test(str(v));
+
+/**
+ * Proof the whistle has blown (football-stats#19): a running clock, a played
+ * minute, a finished period or a goal. TASO sets status "Live" as soon as the
+ * match card is opened, before kickoff, so status alone is not proof.
+ */
+export function tasoHasStarted(m: Record<string, unknown>): boolean {
+  if (str(m.time).includes("'")) return true;
+  const start = str(m.live_timer_start);
+  if (num(m.live_timer_on) === 1 && /^\d{4}-\d{2}-\d{2}/.test(start) && !start.startsWith("0000")) return true;
+  const mmss = str(m.live_time_mmss);
+  if (mmss && mmss !== "00:00") return true;
+  const lt = str(m.live_time);
+  if (lt && !/^0{1,2}(:00){0,2}$/.test(lt)) return true;
+  if (num(m.periods_played) > 0) return true;
+  return false;
+}
+
+/**
+ * Running score of a game TASO reports as on (Live, or Break = half-time).
+ * getMatch carries it in live_A/live_B; getMatches/getGroup rows leave those
+ * empty and carry it in fs_A/fs_B (football-stats#19/#20). A 0–0 before the
+ * whistle (card opened early) is not a score.
+ */
+export function tasoLiveScore(m: Record<string, unknown>): { score: string; isBreak: boolean } | null {
+  const status = str(m.status).toLowerCase();
+  const isBreak = status === "break";
+  if (status !== "live" && !isBreak) return null;
+  let a: string, b: string;
+  if (numericStr(m.live_A) && numericStr(m.live_B)) {
+    a = str(m.live_A); b = str(m.live_B);
+  } else if (str(m.live_A) === "" && str(m.live_B) === "" && numericStr(m.fs_A) && numericStr(m.fs_B)) {
+    a = str(m.fs_A); b = str(m.fs_B);
+  } else {
+    return null;
+  }
+  if (!isBreak && !tasoHasStarted(m) && Number(a) + Number(b) === 0) return null;
+  return { score: `${Number(a)}–${Number(b)}`, isBreak };
+}
+
+/**
+ * TASO age_group ("P14", "T12", old seasons "10") gives the age class of a
+ * game. Age N in season Y/Y+1 (season starts August) means born (Y+1)-N.
+ */
+export function tasoAgeClass(
+  match: Record<string, unknown>
+): { label: string; birthYear: number } | null {
+  const raw = str(match.age_group).trim();
+  const m = /^([A-Za-zÅÄÖåäö]*)\s*(\d{1,2})$/.exec(raw);
+  const dm = /^(\d{4})-(\d{2})/.exec(str(match.date));
+  if (!m || !dm) return null;
+  const age = Number(m[2]);
+  if (age < 5 || age > 21) return null;
+  const year = Number(dm[1]);
+  const seasonEnd = Number(dm[2]) >= 8 ? year + 1 : year;
+  return { label: `${(m[1] || "").toUpperCase()}${age}`, birthYear: seasonEnd - age };
+}
+
+/** Label only when the game's age class is not the team's own birth year. */
+export function ageClassLabelFor(
+  match: Record<string, unknown>,
+  teamBirthYear?: number
+): string | undefined {
+  if (!teamBirthYear) return undefined;
+  const ac = tasoAgeClass(match);
+  if (!ac || ac.birthYear === teamBirthYear) return undefined;
+  return `${ac.label} (${ac.birthYear})`;
+}
+
 export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
-  teamName: string
+  teamName: string,
+  teamBirthYear?: number
 ): OfficialLeagueFixture | null {
   const startTime = finnishIso(str(match.date), str(match.time));
   if (!startTime) return null;
   const home = str(match.team_A_name);
   const away = str(match.team_B_name);
   const statusRaw = str(match.status).toLowerCase();
+  // TASO sends "Forfeited" for a walkover. It is a result (e.g. 3–0) that the
+  // league table counts, not a cancelled or upcoming game.
+  const isWalkover = statusRaw === "forfeited" || statusRaw === "forfeit" || statusRaw === "walkover";
   const status: OfficialLeagueFixture["status"] =
-    statusRaw === "played"
+    statusRaw === "played" || isWalkover
       ? "played"
-      : statusRaw === "cancelled" || statusRaw === "forfeit"
+      : statusRaw === "cancelled"
         ? "cancelled"
         : statusRaw === "postponed"
           ? "postponed"
           : "upcoming";
-  const homeScore = str(match.fs_A) === "" ? undefined : num(match.fs_A);
-  const awayScore = str(match.fs_B) === "" ? undefined : num(match.fs_B);
+  // getMatch sends fs_A/fs_B = "0" for games that have not been played, and
+  // stale past "Fixture" rows keep that 0–0. A score is only real once TASO
+  // says the game was played (or forfeited).
+  const homeScore = status === "played" && str(match.fs_A) !== "" ? num(match.fs_A) : undefined;
+  const awayScore = status === "played" && str(match.fs_B) !== "" ? num(match.fs_B) : undefined;
   const lat = num(match.venue_lat);
   const lng = num(match.venue_lon);
+  // End = the slot TASO reserved (time_end). A game is "Käynnissä" until then,
+  // so it must not be cut short by a guessed length. Fall back to playing time,
+  // then 90 min, only when TASO sends no end.
   const durationMin = num(match.playing_time_min) || 90;
-  const endTime = new Date(new Date(startTime).getTime() + durationMin * 60 * 1000).toISOString();
+  const startMs = new Date(startTime).getTime();
+  let endMs = startMs + durationMin * 60 * 1000;
+  const reservedEnd = finnishIso(str(match.date), str(match.time_end));
+  if (reservedEnd && str(match.time_end) !== "00:00:00") {
+    let reservedMs = new Date(reservedEnd).getTime();
+    if (reservedMs <= startMs) reservedMs += 24 * 60 * 60 * 1000; // slot runs past midnight
+    endMs = Math.max(endMs, reservedMs);
+  }
+  const endTime = new Date(endMs).toISOString();
   const matchId = str(match.match_id);
+  // TASO leaves some old games on "Live" forever (e.g. SISU/Valkoinen 2025:
+  // 3891605, 3891623). A game whose slot has ended is not running.
+  const live = status === "upcoming" && Date.now() < endMs ? tasoLiveScore(match) : null;
 
   return {
     id: `${parsed.association}_${parsed.teamId}_${matchId || str(match.date)}`,
@@ -333,7 +535,13 @@ export function mapFixture(
     leagueName: str(match.competition_name) || [str(match.category_name), str(match.group_name)].filter(Boolean).join(" · "),
     homeTeam: home,
     awayTeam: away,
-    isHome: namesMatch(home, teamName) || str(match.team_A_id) === parsed.teamId,
+    // Ids decide home/away when TASO sends them; names only as a last resort.
+    isHome:
+      str(match.team_A_id) === parsed.teamId
+        ? true
+        : str(match.team_B_id) === parsed.teamId
+          ? false
+          : namesMatch(home, teamName),
     startTime,
     endTime,
     venueName: str(match.venue_name) || "Kenttä ilmoitetaan",
@@ -344,15 +552,21 @@ export function mapFixture(
     categoryId: str(match.category_id) || undefined,
     groupId: str(match.group_id) || undefined,
     status,
+    ...(isWalkover ? { isWalkover: true } : {}),
     score:
       homeScore != null && awayScore != null ? `${homeScore}–${awayScore}` : undefined,
     homeScore,
     awayScore,
+    ...(live ? { liveScore: live.score, liveBreak: live.isBreak } : {}),
     officialMatchUrl: parsed.canonicalUrl,
     matchId,
     round: str(match.round_name) || str(match.round_id) || undefined,
     stage: str(match.stage_name) || str(match.stage) || str(match.group_name) || undefined,
     matchNumber: str(match.match_number) || undefined,
+    ...(() => {
+      const l = ageClassLabelFor(match, teamBirthYear);
+      return l ? { ageClassLabel: l } : {};
+    })(),
     fetchedAt: new Date().toISOString(),
   };
 }
@@ -413,7 +627,7 @@ async function collectCupGroupMatches(
   competitionId: string,
   categoryId: string,
   teamName: string
-): Promise<Record<string, unknown>[]> {
+): Promise<{ rows: Record<string, unknown>[]; complete: boolean }> {
   const groupsJson = await torneopalGet<TorneopalGroupsPayload>(
     parsed.association,
     "getGroups",
@@ -423,6 +637,7 @@ async function collectCupGroupMatches(
   );
   const groups = Array.isArray(groupsJson?.groups) ? groupsJson!.groups : [];
   const rows: Record<string, unknown>[] = [];
+  let complete = groupsJson !== null;
   const chunks: Record<string, unknown>[][] = [];
   for (let i = 0; i < groups.length; i += 4) chunks.push(groups.slice(i, i + 4));
   for (const chunk of chunks) {
@@ -443,21 +658,13 @@ async function collectCupGroupMatches(
       )
     );
     for (const full of found) {
+      if (full === null) complete = false;
       const matches = full?.group?.matches;
       if (!Array.isArray(matches)) continue;
-      for (const m of matches as Record<string, unknown>[]) {
-        if (
-          namesMatch(str(m.team_A_name), teamName) ||
-          namesMatch(str(m.team_B_name), teamName) ||
-          str(m.team_A_id) === parsed.teamId ||
-          str(m.team_B_id) === parsed.teamId
-        ) {
-          rows.push(m);
-        }
-      }
+      rows.push(...keepOwnTeamMatches(matches as Record<string, unknown>[], parsed.teamId, teamName));
     }
   }
-  return rows;
+  return { rows, complete };
 }
 
 export async function fetchTorneopalTeamData(
@@ -478,6 +685,8 @@ export async function fetchTorneopalTeamData(
   const categories = Array.isArray(team.categories) ? (team.categories as Record<string, unknown>[]) : [];
   const primary = (team.primary_category as Record<string, unknown> | undefined) || categories[0];
   let currentGroup = pickCurrentGroup(groups);
+  const by = Number(str(team.birthyear));
+  const teamBirthYear = by > 1990 && by < 2100 ? by : undefined;
   const keepCupIds = looksLikeCupRequest(parsed);
   const competitionId = keepCupIds && parsed.seasonId
     ? parsed.seasonId
@@ -511,6 +720,9 @@ export async function fetchTorneopalTeamData(
   ]);
 
   let rawMatches = Array.isArray(matchesJson?.matches) ? matchesJson!.matches : [];
+  // True only when every TASO call the fixture list depends on answered, so an
+  // empty list means "no games" rather than "network hiccup".
+  let fixturesComplete = matchesJson !== null;
   const claimedTotal = num(
     (matchesJson as { call?: { total_result_count?: unknown } } | null)?.call?.total_result_count
   );
@@ -522,15 +734,24 @@ export async function fetchTorneopalTeamData(
     categoryId &&
     (looksLikeCupRequest(parsed) || claimedTotal > 0)
   ) {
-    rawMatches = await collectCupGroupMatches(parsed, competitionId, categoryId, teamName);
-  } else if (Array.isArray(groupJson?.group?.matches) && rawMatches.length === 0) {
-    rawMatches = groupJson!.group!.matches as Record<string, unknown>[];
+    const cupRows = await collectCupGroupMatches(parsed, competitionId, categoryId, teamName);
+    rawMatches = cupRows.rows;
+    fixturesComplete = fixturesComplete && cupRows.complete;
+  } else if (rawMatches.length === 0 && currentGroup) {
+    // A group lists every team's games. Only this team's own games are ours.
+    const groupMatches = groupJson?.group?.matches;
+    if (Array.isArray(groupMatches)) {
+      rawMatches = keepOwnTeamMatches(groupMatches as Record<string, unknown>[], parsed.teamId, teamName);
+    } else {
+      fixturesComplete = false;
+    }
   }
 
   let fixtures = rawMatches
-    .map((m) => mapFixture(m, parsed, teamName))
+    .map((m) => mapFixture(m, parsed, teamName, teamBirthYear))
     .filter((f): f is NonNullable<typeof f> => Boolean(f))
     .filter((f) => new Date(f.startTime).getUTCFullYear() >= 2024);
+  fixtures = clipToNextGame(fixtures);
   if (looksLikeCupRequest(parsed)) {
     const cupRows = fixtures.filter((f) => /turnaus|tournament|cup|memorial/i.test(f.leagueName));
     if (cupRows.length) fixtures = cupRows;
@@ -565,6 +786,7 @@ export async function fetchTorneopalTeamData(
     groupId: str(currentGroup?.group_id) || undefined,
     sourceUrl: parsed.canonicalUrl,
     fetchedAt: new Date().toISOString(),
+    fixturesComplete,
   };
 }
 
@@ -601,13 +823,14 @@ export function buildMatchStatsFromOfficial(
     awayScore: f.awayScore ?? 0,
   }));
 
-  const hasScore = fixture.homeScore != null && fixture.awayScore != null;
+  const hasScore =
+    fixture.status === "played" && fixture.homeScore != null && fixture.awayScore != null;
   const liveScore = hasScore
     ? {
         home: fixture.homeScore as number,
         away: fixture.awayScore as number,
         isLive: false,
-        period: fixture.status === "played" ? "Pelattu" : "Tulos",
+        period: fixture.isWalkover ? "Luovutus" : "Pelattu",
       }
     : undefined;
 
@@ -621,7 +844,7 @@ export function buildMatchStatsFromOfficial(
   if (!hasAnything) return undefined;
 
   return {
-    leagueName: fixture.leagueName || data.leagueName || "Sarja",
+    leagueName: fixture.leagueName || data.leagueName || "",
     round: fixture.round,
     scoreType: data.sport === "volleyball" ? "sets" : data.sport === "basketball" ? "points" : "goals",
     liveScore,

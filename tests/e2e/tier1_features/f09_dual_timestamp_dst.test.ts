@@ -42,6 +42,20 @@ describe('Feature 9: Dual Timestamp & Daylight Saving Time Disentanglement', () 
     expect(matchTimes.warmupTime.getTime()).toBe(start.getTime() - 45 * 60000);
   });
 
+  it('treats Nimenhuuto turnaus DTSTART as kokoontuminen, not kickoff-minus-45', () => {
+    const start = new Date('2026-09-13T12:00:00.000Z'); // 15:00 Helsinki
+    const end = new Date('2026-09-13T16:00:00.000Z');
+    const times = resolveEventTimes(
+      start,
+      end,
+      'Westend Indians P14: Turnaus Yellow',
+      'Tuusulan Salibandyhalli',
+      false
+    );
+    expect(times.warmupTime.getTime()).toBe(start.getTime());
+    expect(times.kickoffTime.getTime()).toBe(start.getTime());
+  });
+
   it('should parse real-world DST transition ICS feed across Spring (EEST) and Fall (EET) cleanly', async () => {
     const icsContent = loadIcsFixture('dst_fall_spring_transitions.ics');
     const events = await parseICSFeed(icsContent, 'profile-dst-test', 'football');

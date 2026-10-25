@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { startLabel } from '../lib/agents/eventPhase';
 import { motion } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -16,15 +17,50 @@ import { springTactile } from '../lib/motion/springs';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { FamilyVisualCalendar } from './FamilyVisualCalendar';
 import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
+import { db } from '../lib/storage/db';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
+import { MatchSourceLinks } from './MatchSourceLinks';
+import { federationMatchLinks } from '../lib/sport/federationLinks';
 
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
   viewMode: 'timeline' | 'calendar';
   conflicts?: FamilyConflict[];
+  showConflictWarnings?: boolean;
   onNavigate?: (event: MatchdayEvent) => void;
   onSelectEvent?: (event: MatchdayEvent) => void;
   onClearFilter?: () => void;
+}
+
+type TimelineDayGroup = { date: Date; dateStr: string; label: string; events: MatchdayEvent[] };
+
+export function nextTimelineEventDayKeys(dayKeys: string[], todayKey: string, limit = 6): string[] {
+  return dayKeys.filter((key) => key > todayKey).slice(0, limit);
+}
+
+export function formatTimelineDayChipLabel(date: Date): string {
+  const parts = new Intl.DateTimeFormat('fi-FI', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'numeric',
+    timeZone: 'Europe/Helsinki'
+  }).formatToParts(date);
+  const weekday = (parts.find((part) => part.type === 'weekday')?.value || 'pv').replace('.', '');
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${day}.${month}`;
+}
+
+export function filterVisibleTimelineDays<T extends { dateStr: string }>(
+  groupedByDay: T[],
+  selectedTimelineDay: string,
+  todayKey: string
+): T[] {
+  if (selectedTimelineDay === 'all') return groupedByDay;
+  if (selectedTimelineDay === 'upcoming') return groupedByDay.filter((group) => group.dateStr > todayKey);
+  const selectedDay = selectedTimelineDay === 'today' ? todayKey : selectedTimelineDay;
+  return groupedByDay.filter((group) => group.dateStr === selectedDay);
 }
 
 function surfaceLabel(surface?: string, indoor?: boolean): string | null {
@@ -57,6 +93,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   profiles,
   viewMode,
   conflicts,
+  showConflictWarnings = false,
   onNavigate,
   onSelectEvent,
   onClearFilter
@@ -75,9 +112,30 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return map;
   }, [profiles]);
 
+  const [todayKey, setTodayKey] = useState<string>(() => helsinkiDateISO(new Date()));
+  const [selectedTimelineDay, setSelectedTimelineDay] = useState<string>('today');
+  const previousTodayKeyRef = useRef(todayKey);
+
+  useEffect(() => {
+    const tick = () => {
+      const nextToday = helsinkiDateISO(new Date());
+      setTodayKey((prev) => (prev === nextToday ? prev : nextToday));
+    };
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const previousTodayKey = previousTodayKeyRef.current;
+    if (previousTodayKey !== todayKey) {
+      setSelectedTimelineDay((prev) => (prev === previousTodayKey ? 'today' : prev));
+      previousTodayKeyRef.current = todayKey;
+    }
+  }, [todayKey]);
+
   // Group events by YYYY-MM-DD
   const groupedByDay = useMemo(() => {
-    const map = new Map<string, { date: Date; dateStr: string; label: string; events: MatchdayEvent[] }>();
+    const map = new Map<string, TimelineDayGroup>();
     const sorted = [...events].sort(
       (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
@@ -105,6 +163,24 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     return Array.from(map.values());
   }, [events]);
 
+  const groupedByDayMap = useMemo(
+    () => new Map(groupedByDay.map((group) => [group.dateStr, group])),
+    [groupedByDay]
+  );
+
+  const futureDayKeys = useMemo(
+    () => nextTimelineEventDayKeys(groupedByDay.map((group) => group.dateStr), todayKey),
+    [groupedByDay, todayKey]
+  );
+
+  const visibleDayGroups = useMemo(
+    () => filterVisibleTimelineDays(groupedByDay, selectedTimelineDay, todayKey),
+    [groupedByDay, selectedTimelineDay, todayKey]
+  );
+
+  const todayGroup = groupedByDayMap.get(todayKey);
+  const hasTodayEvents = Boolean(todayGroup && todayGroup.events.length > 0);
+
   if (events.length === 0) {
     return (
       <div className="p-8 text-center text-text-muted text-xs bg-surface-elevated/50 rounded-2xl border border-border-subtle flex flex-col items-center gap-3 my-4">
@@ -126,7 +202,70 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
   if (viewMode === 'timeline') {
     return (
       <div className="flex flex-col gap-5 pb-8">
-        {groupedByDay.map((dayGroup) => {
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedTimelineDay('today')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              selectedTimelineDay === 'today'
+                ? 'bg-pitch text-text-inverse border-pitch'
+                : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+            }`}
+          >
+            Tänään
+          </button>
+          {futureDayKeys.map((dayKey) => {
+            const dayGroup = groupedByDayMap.get(dayKey);
+            if (!dayGroup) return null;
+            return (
+              <button
+                key={dayGroup.dateStr}
+                type="button"
+                onClick={() => setSelectedTimelineDay(dayGroup.dateStr)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  selectedTimelineDay === dayGroup.dateStr
+                    ? 'bg-pitch text-text-inverse border-pitch'
+                    : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+                }`}
+              >
+                {formatTimelineDayChipLabel(dayGroup.date)}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setSelectedTimelineDay('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              selectedTimelineDay === 'all'
+                ? 'bg-pitch text-text-inverse border-pitch'
+                : 'bg-surface-elevated text-text-secondary border-border-subtle hover:text-text-primary'
+            }`}
+          >
+            Kaikki päivät
+          </button>
+        </div>
+
+        {selectedTimelineDay === 'today' && !hasTodayEvents && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="p-4 rounded-2xl border border-border-subtle bg-surface-elevated/50 text-text-secondary text-xs flex flex-wrap items-center gap-2"
+          >
+            <span>Ei otteluita tänään</span>
+            <button
+              type="button"
+              disabled={futureDayKeys.length === 0}
+              onClick={() => {
+                setSelectedTimelineDay(futureDayKeys.length > 0 ? 'upcoming' : 'all');
+              }}
+              className="px-3 py-1.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Näytä seuraavat päivät
+            </button>
+          </div>
+        )}
+
+        {visibleDayGroups.map((dayGroup) => {
           const allMatches = dayGroup.events.every(
             (e) =>
               !e.isTraining &&
@@ -171,8 +310,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                 const tz = { hour: '2-digit' as const, minute: '2-digit' as const, timeZone: 'Europe/Helsinki' };
                 const timeStr = `${start.toLocaleTimeString('fi-FI', tz)} – ${end.toLocaleTimeString('fi-FI', tz)}`;
 
-                const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
                 const isOut = ev.attendanceStatus === 'out';
+                const isTournament = ev.eventType === 'tournament' || Boolean(ev.tournamentName);
                 // Honest affordance (M-44): only matches/tournaments open stats —
                 // trainings must not present as clickable. Interactive rows are
                 // keyboard-operable (role=button + Enter/Space).
@@ -197,11 +336,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                           }
                         : undefined
                     }
-                    className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${
+                    className={`p-3.5 rounded-2xl ${
                       isOut
-                        ? 'opacity-65 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100'
-                        : 'bg-surface-elevated border-border-subtle hover:border-pitch/40'
-                    } ${isInteractive ? 'cursor-pointer' : ''}`}
+                        ? 'bg-surface/40 border-dashed border-border-strong/60 opacity-65 grayscale-20'
+                        : 'bg-surface-elevated border border-border-subtle hover:border-pitch/40'
+                    } transition-all flex flex-col gap-2.5 relative overflow-hidden shadow-xs ${isInteractive ? 'cursor-pointer' : ''}`}
                   >
                     {/* Left color bar indicator for child */}
                     <div
@@ -214,7 +353,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-black font-mono tracking-tight text-text-primary flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5 text-pitch shrink-0" />
-                          {timeStr}
+                          <span>{startLabel(ev)} klo {timeStr}</span>
                         </span>
 
                         <span
@@ -235,6 +374,11 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
+                        {isOut && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-stoppage/15 text-stoppage flex items-center gap-0.5">
+                            ⛔ Poisjäänti
+                          </span>
+                        )}
                         {isTournament && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-pitch/15 text-pitch flex items-center gap-0.5">
                             <Trophy className="w-3 h-3" />
@@ -247,7 +391,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
                     {/* Middle Row: Match Title & Opponent */}
                     <div className="pl-1.5 flex items-baseline justify-between gap-2">
-                      <div className="text-sm font-bold text-text-primary line-clamp-2 break-words leading-snug">
+                      <div className={`text-sm font-bold ${isOut ? 'line-through text-text-muted' : 'text-text-primary'} line-clamp-2 break-words leading-snug`}>
                         {ev.title}
                       </div>
                       {ev.isHomeMatch !== undefined && (
@@ -256,10 +400,23 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         </span>
                       )}
                     </div>
+                    {ev.ageClassLabel && (
+                      <div className="pl-1.5">
+                        <span
+                          className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                          title="Ottelun ikäluokka poikkeaa joukkueen omasta"
+                          data-testid="age-class-label"
+                        >
+                          {ev.ageClassLabel}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Overlap & Driving Transition Warning */}
                     {(() => {
-                      const related = activeConflicts.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id);
+                      const related = (!isOut && showConflictWarnings)
+                        ? activeConflicts.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id)
+                        : [];
                       if (related.length === 0) return null;
                       return (
                         <div className="pl-1.5 flex flex-col gap-1.5">
@@ -279,7 +436,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                                   <div>
                                     {c.overlapMinutes > 0
                                       ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                      : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                      : `⏱️ Peräkkäin eri kentillä (väli ${c.gapMinutes} min)`}
                                   </div>
                                   <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
                                     {c.message}
@@ -303,8 +460,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       );
                     })()}
 
-                    {/* Bottom Row: Venue, Nappisvahti & Navigation / Result */}
-                    <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2">
+                    {/* Bottom Row: Venue, Nappisvahti & Navigation / Result / Attendance */}
+                    <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2 flex-wrap sm:flex-nowrap">
                       <div className="flex items-center gap-1.5 truncate min-w-0">
                         <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
                         <span className="truncate font-medium">{ev.venue.name}</span>
@@ -315,37 +472,101 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         )}
                       </div>
 
-                      {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="min-h-[36px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Attendance Toggle Button (Osallistuu / Poisjäänti) */}
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const nextStatus = isOut ? 'in' : 'out';
+                            await db.events.update(ev.id, { attendanceStatus: nextStatus });
+                            const sync = await db.syncState.get('family').catch(() => null);
+                            await recordAttendanceOverride(sync?.syncKey || '', ev.id, nextStatus, db);
+                          }}
+                          className={`touch-target min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border shadow-2xs ${
+                            isOut
+                              ? 'bg-pitch text-text-inverse border-pitch hover:brightness-110'
+                              : 'bg-surface-elevated text-stoppage hover:bg-stoppage/15 border-border-strong hover:border-stoppage/40'
+                          }`}
+                          title={
+                            isOut
+                              ? 'Pelaaja on merkitty poisjääneeksi — klikkaa merkitäksesi osallistuvaksi'
+                              : 'Merkitse poisjäänti tähän tapahtumaan'
+                          }
+                        >
+                          <span>{isOut ? '↩️ Osallistuu' : '⛔ Ei osallistu'}</span>
+                        </button>
+
+                        {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
+                          <span className="min-h-[44px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
                             <Trophy className="w-3.5 h-3.5 text-pitch" />
                             <span>{ev.score ? `Tulos: ${ev.score}` : 'Päättynyt'}</span>
                           </span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          aria-label={`Navigoi kentälle ${ev.venue.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onNavigate) {
-                              onNavigate(ev);
-                            } else {
-                              const coords = ev.parking?.coordinates || ev.venue.coordinates;
-                              window.open(
-                                `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                                '_blank',
-                                'noopener,noreferrer'
-                              );
-                            }
-                          }}
-                          className="min-h-[44px] px-3 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
-                        >
-                          <Navigation className="w-3.5 h-3.5" />
-                          <span>Reitti</span>
-                        </button>
-                      )}
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`Navigoi kentälle ${ev.venue.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onNavigate) {
+                                onNavigate(ev);
+                              } else {
+                                const isApprox = ev.venue?.isApproximateLocation;
+                                const coords = (!isApprox ? ev.venue.coordinates : undefined);
+                                const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                                const destination =
+                                  hasValidCoords
+                                    ? `${coords.lat},${coords.lng}`
+                                    : encodeURIComponent(ev.venue?.name || 'Kenttä');
+                                window.open(
+                                  `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+                                  '_blank',
+                                  'noopener,noreferrer'
+                                );
+                              }
+                            }}
+                            className="min-h-[44px] px-3.5 rounded-xl bg-pitch/15 text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
+                          >
+                            <Navigation className="w-3.5 h-3.5" />
+                            <span>Reitti</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Exact match: own sport app first, federation page second (real TASO match_id only) */}
+                    {(() => {
+                      const sourceUrl = profileMap.get(ev.profileId)?.associationUrl;
+                      const games = ev.officialGameTimes || [];
+                      if (games.length > 1) {
+                        const rows = games
+                          .map((g, gi) => ({
+                            gi,
+                            links: federationMatchLinks(
+                              { officialFixtureId: g.officialFixtureId, sport: ev.sport },
+                              { associationUrl: sourceUrl }
+                            )
+                          }))
+                          .filter((r) => r.links);
+                        if (rows.length === 0) return null;
+                        return (
+                          <div className="pl-1.5 pt-1.5 space-y-0.5">
+                            {rows.map((r) => (
+                              <div key={r.gi} className="flex items-center gap-2 text-xs">
+                                <span className="text-[10px] font-bold text-text-muted w-4">{r.gi + 1}.</span>
+                                <MatchSourceLinks dense links={r.links} />
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+                      return (
+                        <MatchSourceLinks
+                          className="pl-1.5 pt-2"
+                          links={federationMatchLinks(ev, { associationUrl: sourceUrl })}
+                        />
+                      );
+                    })()}
                   </motion.div>
                 );
               })}
@@ -362,7 +583,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     <FamilyVisualCalendar
       events={events}
       profiles={profiles}
-      conflicts={activeConflicts}
+      conflicts={conflicts}
+      showConflictWarnings={showConflictWarnings}
       onSelectEvent={onSelectEvent}
       onNavigate={onNavigate}
       onClearFilter={onClearFilter}

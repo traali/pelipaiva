@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { helsinkiDateISO } from '../lib/agents/time';
 import {
+  DEFAULT_CALENDAR_GRANULARITY,
+  getDefaultCalendarLanding,
   WEEKDAYS_FI,
   MONTH_NAMES_FI,
   getMondayOfWeek,
@@ -39,5 +42,23 @@ describe('FamilyVisualCalendar logic helpers', () => {
   it('formats Date to YYYY-MM-DD local format cleanly', () => {
     const d = new Date(2026, 7, 15); // 15.8.2026
     expect(formatDateKey(d)).toBe('2026-08-15');
+  });
+
+  it('defaults calendar granularity to day view', () => {
+    expect(DEFAULT_CALENDAR_GRANULARITY).toBe('day');
+  });
+
+  it('uses today and day granularity as default landing state', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-13T09:00:00.000Z'));
+    try {
+      const todayISO = helsinkiDateISO(new Date());
+      expect(getDefaultCalendarLanding(todayISO)).toEqual({
+        selectedDateISO: '2026-09-13',
+        granularity: 'day'
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

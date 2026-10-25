@@ -166,6 +166,10 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'otaniemi tn': { name: 'Otaniemen Tekonurmi (Otaranta)', lat: 60.1841, lng: 24.8312, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'laaksolahti tn': { name: 'Laaksolahden Tekonurmi', lat: 60.2412, lng: 24.7612, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'karakallio tn': { name: 'Karakallion Tekonurmi', lat: 60.2351, lng: 24.7741, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'karakallion koulu': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'karakallio koulu': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'kotkakuja 5': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'karakallio': { name: 'Karakallion koulu', lat: 60.2356, lng: 24.7735, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'kivenlahti tn': { name: 'Kivenlahden Tekonurmi', lat: 60.1512, lng: 24.6412, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'grani tn': { name: 'Kauniaisten Keskuskenttä TN (Grani)', lat: 60.2112, lng: 24.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'kauniainen tn': { name: 'Kauniaisten Keskuskenttä TN', lat: 60.2112, lng: 24.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
@@ -181,6 +185,9 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'peakfin areena': { name: 'Peakfin Areena Vantaa', lat: 60.2812, lng: 24.8641, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
   'jokivarsi tn': { name: 'Jokivarren Tekonurmi', lat: 60.3612, lng: 25.1241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'hiekkaharju tn': { name: 'Hiekkaharjun Tekonurmi', lat: 60.3012, lng: 25.0512, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'tuusulan salibandyhalli': { name: 'Tuusulan Salibandyhalli', lat: 60.4042, lng: 25.0275, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'tuusula salibandyhalli': { name: 'Tuusulan Salibandyhalli', lat: 60.4042, lng: 25.0275, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'kilpailukuja 4': { name: 'Tuusulan Salibandyhalli', lat: 60.4042, lng: 25.0275, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
 
   // === TAMPERE & PIRKANMAA ===
   'kauppi tn 1': { name: 'Tampereen Kaupin Urheilupuisto TN 1', lat: 61.5034, lng: 23.8052, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
@@ -239,6 +246,20 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'suskun tn': { name: 'Rovaniemen Keskuskenttä (Suskun TN)', lat: 66.4981, lng: 25.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'rovaniemi keskuskenttä': { name: 'Rovaniemen Keskuskenttä', lat: 66.4981, lng: 25.7241, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
   'ounashalli': { name: 'Ounashalli Rovaniemi', lat: 66.5141, lng: 25.7612, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
+
+  // === KOUVOLA & KYMENLAAKSO ===
+  'utti-halli': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'utti halli': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'lennostontie 2': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'utti': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'kouvola utti': { name: 'Utti-halli Kouvola', lat: 60.8941, lng: 26.9158, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'jatke areena': { name: 'Lumon Areena / Jatke Areena Kouvola', lat: 60.8695, lng: 26.7112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'lumon areena': { name: 'Lumon Areena Kouvola', lat: 60.8695, lng: 26.7112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
+  'kouvolan keskusurheilukenttä': { name: 'Kouvolan Keskuskenttä', lat: 60.8712, lng: 26.7052, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'kuusankosken urheilupuisto': { name: 'Kuusankosken Urheilupuisto', lat: 60.9082, lng: 26.6212, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'lehtomäki tn': { name: 'Lehtomäen Tekonurmi Kouvola', lat: 60.8841, lng: 26.7321, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'sarkola tn': { name: 'Sarkolan Tekonurmi Kouvola', lat: 60.8612, lng: 26.6912, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
+  'koria monitoimitalo': { name: 'Korian Monitoimitalo', lat: 60.8541, lng: 26.6112, isIndoor: true, surface: 'indoor_synthetic', hasFloodlights: true },
 
   // === NATIONAL SPORTS INSTITUTES ===
   'eerikkilä': { name: 'Eerikkilän Urheiluopisto', lat: 60.7785, lng: 23.7541, isIndoor: false, surface: 'artificial_turf_3g', hasFloodlights: true },
@@ -303,11 +324,26 @@ export const NATIONAL_FIELD_ALIASES: Record<
 };
 
 function matchesAliasWord(text: string, alias: string): boolean {
+  if (!text || !alias) return false;
   if (text === alias) return true;
-  // Whole phrase/word match with boundary spaces or string start/end
   const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
-  return regex.test(text);
+  if (regex.test(text)) return true;
+  // Long hall names survive extra address tokens ("Tuusulan Salibandyhalli, Kilpailukuja 4")
+  if (alias.length >= 10 && text.includes(alias)) return true;
+  return false;
+}
+
+export function lookupKnownField(rawVenueString: string) {
+  const normalized = (rawVenueString || '')
+    .toLowerCase()
+    .replace(/[.,\-/()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const aliasHit = Object.entries(NATIONAL_FIELD_ALIASES)
+    .sort((a, b) => b[0].length - a[0].length)
+    .find(([alias]) => matchesAliasWord(normalized, alias));
+  return aliasHit?.[1] ?? null;
 }
 
 export interface VenueResolveHint {
@@ -348,7 +384,7 @@ export async function resolveSportsVenue(
 ): Promise<VenueInfo> {
   const normalized = (rawVenueString || '')
     .toLowerCase()
-    .replace(/[\.,\-\/\(\)]/g, ' ')
+    .replace(/[.,\-/()]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -381,8 +417,14 @@ export async function resolveSportsVenue(
       .sort((a, b) => b[0].length - a[0].length)
       .find(([alias]) => matchesAliasWord(normalized, alias));
     const isInd = aliasHit?.[1].isIndoor ?? indoorGuess;
+    const court = rawVenueString.match(/kenttä\s*\d+/i)?.[0];
+    const aliasName = aliasHit?.[1].name;
+    const name =
+      aliasName && court && !/kenttä\s*\d+/i.test(aliasName)
+        ? `${aliasName} (${court})`
+        : aliasName || rawVenueString;
     return {
-      name: aliasHit?.[1].name || rawVenueString,
+      name,
       normalizedName: normalized,
       city: hint.city,
       coordinates: { lat: hint.lat, lng: hint.lng },
@@ -415,8 +457,10 @@ export async function resolveSportsVenue(
 
   for (const [alias, data] of sortedAliases) {
     if (matchesAliasWord(normalized, alias)) {
+      const court = rawVenueString.match(/kenttä\s*\d+/i)?.[0];
+      const name = court && !/kenttä\s*\d+/i.test(data.name) ? `${data.name} (${court})` : data.name;
       return {
-        name: data.name,
+        name,
         normalizedName: normalized,
         coordinates: { lat: data.lat, lng: data.lng },
         isIndoor: data.isIndoor,
@@ -509,9 +553,9 @@ export async function resolveSportsVenue(
   return {
     name: rawVenueString || 'Tuntematon kenttä',
     normalizedName: normalized,
-    coordinates: { lat: 60.1872, lng: 24.9248 },
-    // Flag the unverifiable fallback so UI can show "Sijainti arvioitu"
-    // instead of presenting Helsinki as fact (M-15/V21).
+    coordinates: { lat: 0, lng: 0 },
+    // Flag the unverifiable fallback so UI can show "Sijainti tuntematon"
+    // instead of presenting Helsinki as fact (M-15/G-06/F-11).
     isApproximateLocation: true,
     isIndoor: indoorGuess,
     surface: resolveSurfaceGuess(indoorGuess),

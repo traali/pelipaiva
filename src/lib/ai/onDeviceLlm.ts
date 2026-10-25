@@ -384,7 +384,7 @@ export function turnOffOnDeviceLlm(): void {
   setOnDeviceLlmChoice('off');
   markOnDeviceLlmLoaded('none');
   if (hasNativeAiBridge()) {
-    callNative('unload').catch(() => undefined);
+    callNative('unload').catch((err) => console.debug('[LLM] Unload failed (non-critical):', err));
   }
 }
 

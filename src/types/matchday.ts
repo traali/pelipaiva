@@ -48,6 +48,8 @@ export interface TransitPlan {
   travelMinutes: number;
   transitLabel: string;
   isSelfTransit: boolean; // true for walk/bicycle (independent transit, no parent driver needed)
+  isUnknownLocation?: boolean; // true when venue coordinates are missing, approximate, or (0,0)
+  needsHome?: boolean; // true when no home location is set: no travel time, no leave time
   weatherWarning?: string;
 }
 
@@ -89,66 +91,21 @@ export interface WeatherCondition {
   turfCondition: 'dry' | 'slick' | 'frozen' | 'snowy';
   uvIndex?: number;
   isForecastLongRange?: boolean;
+  turfConditionLabelFi?: string;
+  windAdvisoryBadge?: string;
+  rainOnsetLabel?: string;
+  isCacheFallback?: boolean;
+  lightningSafety?: LightningSafetyAlert;
 }
 
 export interface LightningSafetyAlert {
-  status: 'clear' | 'watch' | 'danger';
+  status: 'clear' | 'watch' | 'danger' | 'unknown';
   nearestStrikeKm?: number;
   strikesWithin30kmCount: number;
   suspendMatchRecommended: boolean;
   resumeCountdownMinutes?: number; // 30-30 Rule
   downpourWarning: boolean;
   alertMessage?: string;
-}
-
-export interface ParkingZoneSpot {
-  id: string;
-  name: string;
-  type: 'standard' | 'accessible' | 'ev' | 'street' | 'no_parking';
-  typeLabel: string;
-  capacityEstimated?: number;
-  restrictionText: string;
-  discRequired: boolean;
-  maxHours?: number;
-  walkingTimeMinutes: number;
-  isRecommended?: boolean;
-}
-
-export interface TrafficSignInfo {
-  code: string; // e.g. 'E2 (Pysäköintipaikka)', 'C38 (Pysäköintikieltoalue)', 'H12.1 (Pysäköintikiekko 4h)', 'H18 (Maksullinen)'
-  name: string;
-  description: string;
-  iconType: 'p_sign' | 'no_parking' | 'disc' | 'payment' | 'ev' | 'warning';
-}
-
-export interface FineRiskInfo {
-  riskLevel: 'low' | 'moderate' | 'high';
-  riskLabel: string; // e.g. '🔴 Korkea valvontariski', '🟡 Kohtalainen valvontariski'
-  riskRating1to10?: number; // 1 (safest) to 10 (highest trap/fine risk)
-  standardFineAmountEur: number; // e.g. 60 or 80
-  fineType: string; // e.g. 'Kunnallinen pysäköintivirhemaksu (80 €) / Valvontamaksu'
-  criticalPitfalls: string[];
-  preventionChecklist: string[];
-}
-
-export interface ParkingInfo {
-  easeScore: 'easy' | 'moderate' | 'tight';
-  easeScoreValue: number; // 1 to 100
-  lotName: string;
-  coordinates: Coordinates;
-  feeZone: string;
-  parkingDiscRequired: boolean;
-  maxParkingHours?: number;
-  walkingTimeMinutes: number;
-  walkingDistanceMeters: number;
-  warnings: string[];
-  mapsNavigationUrl: string;
-  // Rich Parking App features (Spots, Signs, Fine Risk):
-  spots?: ParkingZoneSpot[];
-  trafficSigns?: TrafficSignInfo[];
-  fineRisk?: FineRiskInfo;
-  easyParkZoneCode?: string;
-  parkManZoneCode?: string;
 }
 
 export interface MatchGoal {
@@ -315,7 +272,13 @@ export interface OfficialLeagueFixture {
   categoryId?: string;
   groupId?: string;
   status: 'upcoming' | 'played' | 'cancelled' | 'postponed';
+  /** TASO "Forfeited": a walkover result, counted by the league table. */
+  isWalkover?: boolean;
   score?: string;
+  /** Running score while TASO says the game is on (status Live/Break and the whistle has blown). Not a final score. */
+  liveScore?: string;
+  /** TASO "Break" = half-time. */
+  liveBreak?: boolean;
   homeScore?: number;
   awayScore?: number;
   setScores?: string[];
@@ -324,6 +287,8 @@ export interface OfficialLeagueFixture {
   matchNumber?: string;
   stage?: string;
   round?: string;
+  /** TASO age class of this game, e.g. "P14 (2013)", only when it is not the team's own birth year. */
+  ageClassLabel?: string;
   fetchedAt: string; // ISO 8601 string
 }
 
@@ -358,6 +323,13 @@ export interface OfficialTeamData {
   groupId?: string;
   sourceUrl?: string;
   fetchedAt?: string;
+  /**
+   * True when TASO answered every call the fixture list depends on. Only then
+   * may an empty fixture list prune previously stored games.
+   */
+  fixturesComplete?: boolean;
+  /** True when the federation fetch failed; fixtures is then not authoritative. */
+  fetchFailed?: boolean;
 }
 
 // ============================================================================
@@ -467,6 +439,8 @@ export interface ParsedTitleResult {
   isHomeMatch: boolean;
   embeddedVenueHint?: string;
   roundInfo?: string;
+  stage?: string;
+  division?: string;
   isFriendly?: boolean;
 }
 
@@ -528,17 +502,26 @@ export interface MatchdayEvent {
   startTime: string; // ISO 8601
   endTime: string;
   warmupTime: string; // ISO 8601
+  /** True when warmupTime is an app default, not a time a person wrote. */
+  warmupIsEstimate?: boolean;
   isTournament?: boolean;
   tournamentName?: string;
   stage?: string; // e.g. "P14 Haastaja Lohko B" or "Jatko-ottelut"
+  division?: string; // e.g. "WU13 1div."
   roundInfo?: string;
   matchNumber?: string; // e.g. "227"
+  /** Floorball: game age class when it differs from the team's own, e.g. "P14 (2013)". */
+  ageClassLabel?: string;
   score?: string; // e.g. "2–12", "4–9", "7–3"
+  /** Running TASO score while the game is on; never a final score. */
+  liveScore?: string;
+  liveBreak?: boolean;
+  /** When the live score was last read from TASO (ISO). */
+  liveUpdatedAt?: string;
   venue: VenueInfo;
   volunteerDuty?: string; // e.g. "☕ Kahviovuoro (klo 11:30 - 13:00)"
   weather?: WeatherCondition;
   lightning?: LightningSafetyAlert;
-  parking?: ParkingInfo;
   transit?: TransitPlan;
   stats?: FullMatchStats;
   playerLog?: PlayerMatchLog;
@@ -559,6 +542,15 @@ export interface MatchdayEvent {
 
   // Milestone 1 & 3 additions:
   officialFixtureId?: string;
+  /** TASO/Torneopal games under a Nimenhuuto/MyClub tournament card (ISO kickoffs). */
+  officialGameTimes?: Array<{
+    startTime: string;
+    title: string;
+    officialFixtureId?: string;
+    score?: string;
+    /** Torneopal venue_name, including court (kenttä 4). */
+    venueName?: string;
+  }>;
   reconciliationStatus?: ReconciliationStatus;
   confidenceScore?: number;
   mismatchFlags?: MismatchFlags;
@@ -567,3 +559,45 @@ export interface MatchdayEvent {
 
 
 
+
+// ---------------------------------------------------------------------------
+// Manual (family-authored) events — cross-device sync via Cloudflare KV
+// ---------------------------------------------------------------------------
+
+/**
+ * A freeform event added by a parent, not from any sports ICS feed.
+ * Examples: vanhempainilta, hammaslääkäri, 'muista shortsit', extra practice.
+ * These are synced to all devices sharing the same family code.
+ */
+export interface FamilyManualEvent {
+  /** Stable ID: me-{authorDeviceId}-{timestamp} */
+  id: string;
+  title: string;
+  startTime: string;
+  endTime?: string;
+  allDay?: boolean;
+  profileIds: string[];
+  notes?: string;
+  authorDeviceId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface AttendanceOverrideRecord {
+  eventId: string;
+  status: 'in' | 'out' | 'maybe';
+  updatedAt: string;
+}
+
+/**
+ * KV envelope for the family calendar events & attendance overrides collection.
+ * Stored at key `fam_events:{familyCode}` with 30-day rolling TTL.
+ */
+export interface FamilyEventsV1 {
+  v: 1;
+  rev: number;
+  updatedAt: string;
+  events: FamilyManualEvent[];
+  attendanceOverrides?: AttendanceOverrideRecord[];
+}

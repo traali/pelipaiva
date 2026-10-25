@@ -14,13 +14,13 @@ import {
   extractVenueAndField,
   normalizePlayerPosition,
   parseTorneopalHtml,
-  generateSyntheticOfficialTeamData,
   inferSportFromSubdomain,
   normalizeUrlString,
   cleanHtmlText,
   parseHtmlTableRows,
   extractOfficialTeamData
 } from './statsEngine';
+import { generateSyntheticOfficialTeamData } from '../testing/syntheticMockFactory';
 import {
   PelipaivaDB,
   saveOfficialTeamData,
@@ -597,6 +597,9 @@ describe('Association Extractor & Parser', () => {
       expect(f1.score).toBe('3 - 1');
       expect(f1.venueName).toBe('Töölö PK 1 TN');
       expect(f1.fieldNumber).toBe('Kenttä 1');
+      // HTML gives the match number, not TASO's match_id: id must not look like one.
+      expect(f1.id).not.toMatch(/_\d+$/);
+      expect(data.fixtures.every((f) => !/_\d+$/.test(f.id))).toBe(true);
 
       const f2 = data.fixtures[1]!;
       expect(f2.homeTeam).toBe('FC Honka Musta');
@@ -648,8 +651,10 @@ describe('Association Extractor & Parser', () => {
       expect(synthetic.standings?.length).toBeGreaterThanOrEqual(6);
       expect(synthetic.roster?.players.length).toBeGreaterThanOrEqual(5);
 
+      // Production never falls back to invented data, even if a caller asks.
       const extracted = await extractOfficialTeamData(parsedUrl, { fallbackToSynthetic: true });
       expect(extracted.teamId).toBe('1289');
+      expect(extracted.fixtures).toHaveLength(0);
     });
   });
 });

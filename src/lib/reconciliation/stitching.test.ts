@@ -1,0 +1,622 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { stitchCalendarEventsWithFixtures, fixtureInvolvesOwnTeam, isKickoffAfterKokoontuminen, applyResolutionDecision } from './reconciliationEngine';
+import { parseICSFeed } from '../calendar/icsParser';
+import { generateIcsCalendarFeed } from '../calendar/calendarFeedGenerator';
+import { MatchdayEvent, OfficialLeagueFixture, PlayerProfile } from '../../types/matchday';
+
+const defaultVenue = {
+  name: 'Väinämöinen tn',
+  normalizedName: 'vainamoinen tn',
+  coordinates: { lat: 60.1742, lng: 24.9189 },
+  isIndoor: false,
+  surface: 'artificial_turf_3g' as const,
+  hasFloodlights: true,
+};
+
+function mockEvent(partial: Partial<MatchdayEvent>): MatchdayEvent {
+  return {
+    id: 'ev-test',
+    profileId: 'profile-tuomas',
+    sport: 'football',
+    eventType: 'match',
+    isTraining: false,
+    title: 'Test Match',
+    homeTeam: 'PPJ Laru Sininen',
+    awayTeam: 'EPS Valkoinen',
+    isHomeMatch: true,
+    startTime: '2026-09-12T07:00:00.000Z',
+    endTime: '2026-09-12T08:30:00.000Z',
+    warmupTime: '2026-09-12T06:15:00.000Z',
+    venue: defaultVenue,
+    ...partial,
+  };
+}
+
+// parseICSFeed resolves venues over the network (LIPAS, Helsinki servicemap). These
+// tests are about calendar parsing, so they run offline: same assertions, no live
+// API latency (CI hit the 5 s timeout on slow responses).
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    throw new TypeError('offline in tests');
+  }));
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('Torneopal & MyClub Reconciliation & Stitching Engine', () => {
+  const profile: PlayerProfile = {
+    id: 'profile-tuomas',
+    playerName: 'Tuomas',
+    teamName: 'PPJ Laru Sininen',
+    sport: 'football',
+    primaryColor: 'sininen',
+    colorHex: '#0055a5',
+    calendarUrl: 'https://id.myclub.fi/flow/calendar_subscriptions/9577.ics',
+  };
+
+  it('correctly parses real MyClub iCal feed and stitches with official Torneopal fixture', async () => {
+    // 1. Real-world MyClub iCal feed entry
+    const REAL_MYCLUB_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//myClub//myClub Calendar//FI
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:myclub-event-9577-44812@myclub.fi
+DTSTART:20260912T061500Z
+DTEND:20260912T083000Z
+SUMMARY:Peli: PPJ Laru Sininen vs EPS Valkoinen
+LOCATION:Väinämöisen kenttä tn, Helsinki
+DESCRIPTION:Sarja: P13 Kakkonen\\nKokoontuminen klo 09:15, peli alkaa klo 10:00.\\nPelipaita: Sininen (vara keltainen).\\nValmentaja: 040-1234567
+CATEGORIES:Pelit, P13 Sininen
+X-MYCLUB-STATUS:IN
+END:VEVENT
+END:VCALENDAR`;
+
+    const parsedEvents = await parseICSFeed(REAL_MYCLUB_ICS, profile.id, 'football');
+    expect(parsedEvents).toHaveLength(1);
+    const myClubEvent = parsedEvents[0]!;
+
+    expect(myClubEvent.id).toBe('myclub-event-9577-44812@myclub.fi');
+    expect(myClubEvent.title).toContain('PPJ Laru Sininen vs EPS Valkoinen');
+    expect(myClubEvent.attendanceStatus).toBe('in');
+    expect(myClubEvent.venue?.name).toBe('Väinämöisen kenttä tn, Helsinki');
+
+    // 2. Real-world Torneopal official fixture (e.g. from Palloliitto SPL TASO API)
+    const torneopalFixture = mockEvent({
+      id: 'fixture-spl-109283',
+      profileId: profile.id,
+      officialFixtureId: 'spl_109283',
+      sport: 'football',
+      eventType: 'match',
+      isTraining: false,
+      title: 'PPJ/Laru Sininen vs EPS/Valkoinen',
+      homeTeam: 'PPJ/Laru Sininen',
+      awayTeam: 'EPS/Valkoinen',
+      startTime: '2026-09-12T07:00:00.000Z', // 10:00 local kickoff (EEST)
+      endTime: '2026-09-12T08:30:00.000Z',
+      tournamentName: 'P13 Kakkonen Syksy',
+      venue: {
+        name: 'Väinämöinen tn',
+        normalizedName: 'vainamoinen tn',
+        coordinates: { lat: 60.1742, lng: 24.9189 },
+        isIndoor: false,
+        surface: 'artificial_turf_3g',
+        hasFloodlights: true,
+      },
+    });
+
+    // 3. Perform the dynamic stitch
+    const rawEvents = [myClubEvent, torneopalFixture];
+    const stitched = stitchCalendarEventsWithFixtures(rawEvents);
+
+    // INVARIANT 1: Exactly 1 event returned (bare Torneopal fixture suppressed, zero card duplicates)
+    expect(stitched).toHaveLength(1);
+    const card = stitched[0]!;
+
+    // INVARIANT 2: Official fixture link and reconciliation status
+    expect(card.id).toBe('myclub-event-9577-44812@myclub.fi');
+    expect(card.officialFixtureId).toBe('spl_109283');
+    expect(card.reconciliationStatus).toBe('auto_matched');
+    expect(card.tournamentName).toBe('P13 Kakkonen Syksy');
+
+    // INVARIANT 3: Official kickoff (10:00) vs coach warmup gathering (09:15)
+    expect(card.startTime).toBe('2026-09-12T07:00:00.000Z'); // 10:00 EEST match kickoff
+    expect(card.warmupTime).toBe('2026-09-12T06:15:00.000Z'); // 09:15 EEST coach gathering
+
+    // INVARIANT 4: MyClub attendance preserved
+    expect(card.attendanceStatus).toBe('in');
+
+    // INVARIANT 5: Authoritative Torneopal venue adopted and venue mismatch diagnostics recorded
+    expect(card.venue?.name).toBe('Väinämöinen tn');
+    expect(card.mismatchFlags?.venueMismatch).toBe(true);
+    expect(card.mismatchFlags?.calendarVenueName).toBe('Väinämöisen kenttä tn, Helsinki');
+    expect(card.mismatchFlags?.officialVenueName).toBe('Väinämöinen tn');
+
+    // 4. Verification: Feed generation for Google Calendar & Google Nest
+    const icsFeed = generateIcsCalendarFeed(stitched, [profile], {
+      familyCode: 'TEST99',
+      calendarTitle: 'FamDay Kalenteri',
+    });
+
+    // In Google Calendar / Nest, the event summary and details must be clean and spoken clearly
+    expect(icsFeed).toContain('BEGIN:VCALENDAR');
+    expect(icsFeed).toContain('SUMMARY:Tuomas: PPJ/Laru Sininen vs EPS/Valkoinen');
+    expect(icsFeed).toContain('DTSTART:20260912T070000Z'); // 10:00 match start for voice assistants
+    expect(icsFeed).toContain('Kokoontuminen: klo 09:15'); // Mentioned in description
+    expect(icsFeed).toContain('Pelipaikka: Väinämöinen tn'); // Embedded in description
+    expect(icsFeed).toContain('LOCATION:Väinämöinen tn');
+    expect(icsFeed).toContain('END:VCALENDAR');
+  });
+
+  it('stitches squad-only MyClub title (e.g. PPJ Laru 2013: PIIRISARJA - SININEN) with Torneopal fixture', () => {
+    const myClubEvent = mockEvent({
+      id: 'myclub-squad-only',
+      profileId: profile.id,
+      title: 'PPJ Laru 2013: PIIRISARJA - SININEN',
+      homeTeam: 'PPJ Laru 2013: PIIRISARJA',
+      awayTeam: 'SININEN',
+      startTime: '2026-09-12T06:15:00.000Z',
+      endTime: '2026-09-12T08:30:00.000Z',
+      warmupTime: '2026-09-12T06:15:00.000Z',
+      attendanceStatus: 'in',
+    });
+
+    const torneopalFixture = mockEvent({
+      id: 'fixture-spl-99881',
+      profileId: profile.id,
+      officialFixtureId: 'spl_99881',
+      title: 'PPJ/Laru Sininen vs HooGee/Sininen',
+      homeTeam: 'PPJ/Laru Sininen',
+      awayTeam: 'HooGee/Sininen',
+      startTime: '2026-09-12T07:00:00.000Z',
+      endTime: '2026-09-12T08:30:00.000Z',
+      tournamentName: 'P13 Kakkonen Syksy',
+    });
+
+    const stitched = stitchCalendarEventsWithFixtures([myClubEvent, torneopalFixture]);
+    expect(stitched).toHaveLength(1);
+    const card = stitched[0]!;
+
+    expect(card.title).toBe('PPJ/Laru Sininen vs HooGee/Sininen');
+    expect(card.officialFixtureId).toBe('spl_99881');
+    expect(card.startTime).toBe('2026-09-12T07:00:00.000Z');
+    expect(card.warmupTime).toBe('2026-09-12T06:15:00.000Z');
+  });
+
+  it('stitches Floorball Torneopal game with MyClub event without duplicate cards', () => {
+    const myClubFloorball = mockEvent({
+      id: 'myclub-salibandy-101',
+      sport: 'floorball',
+      title: 'Salibandyottelu: Indians vs Oilers',
+      homeTeam: 'Westend Indians',
+      awayTeam: 'Oilers',
+      startTime: '2026-09-12T06:30:00.000Z', // 09:30 gathering
+      endTime: '2026-09-12T08:30:00.000Z',
+      warmupTime: '2026-09-12T06:30:00.000Z',
+      attendanceStatus: 'in',
+      venue: {
+        name: 'Otahalli sali 1',
+        normalizedName: 'otahalli sali 1',
+        coordinates: { lat: 60.1834, lng: 24.8312 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true,
+      },
+    });
+
+    const torneopalFloorball = mockEvent({
+      id: 'fixture-ssbl-77665',
+      officialFixtureId: 'ssbl_77665',
+      sport: 'floorball',
+      title: 'Westend Indians vs Oilers Black',
+      homeTeam: 'Westend Indians',
+      awayTeam: 'Oilers Black',
+      startTime: '2026-09-12T07:00:00.000Z', // 10:00 match start
+      endTime: '2026-09-12T08:30:00.000Z',
+      warmupTime: '2026-09-12T06:30:00.000Z',
+      venue: {
+        name: 'Otahalli',
+        normalizedName: 'otahalli',
+        coordinates: { lat: 60.1834, lng: 24.8312 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true,
+      },
+    });
+
+    const stitched = stitchCalendarEventsWithFixtures([myClubFloorball, torneopalFloorball]);
+    expect(stitched).toHaveLength(1);
+    const card = stitched[0]!;
+
+    expect(card.title).toBe('Westend Indians vs Oilers Black');
+    expect(card.officialFixtureId).toBe('ssbl_77665');
+    expect(card.startTime).toBe('2026-09-12T07:00:00.000Z'); // 10:00 kickoff
+    expect(card.warmupTime).toBe('2026-09-12T06:30:00.000Z'); // 09:30 gathering
+    expect(card.attendanceStatus).toBe('in');
+  });
+
+  it('keeps Nimenhuuto tournament title and lists Torneopal game times; meetup stays calendar DTSTART', () => {
+    const nimenhuuto = mockEvent({
+      id: 'nh-turnaus',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'Westend Indians P14: Turnaus Yellow',
+      homeTeam: 'Westend Indians P14',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z', // 15:00 FI meetup
+      warmupTime: '2026-09-13T11:15:00.000Z', // invented 45 min
+      venue: {
+        name: 'Tuusulan Salibandyhalli, Kilpailukuja 4, Tuusula',
+        normalizedName: 'tuusulan salibandyhalli',
+        coordinates: { lat: 60.4042, lng: 25.0275 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-1',
+      officialFixtureId: 'ssbl_1',
+      sport: 'floorball',
+      title: 'Westend Indians vs SB Vantaa',
+      homeTeam: 'Westend Indians',
+      awayTeam: 'SB Vantaa',
+      startTime: '2026-09-13T12:30:00.000Z',
+      venue: nimenhuuto.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-2',
+      officialFixtureId: 'ssbl_2',
+      sport: 'floorball',
+      title: 'Westend Indians vs Oilers',
+      homeTeam: 'Westend Indians',
+      awayTeam: 'Oilers',
+      startTime: '2026-09-13T13:30:00.000Z',
+      venue: nimenhuuto.venue
+    });
+    const stitched = stitchCalendarEventsWithFixtures([nimenhuuto, g1, g2]);
+    expect(stitched).toHaveLength(1);
+    const card = stitched[0]!;
+    expect(card.title).toBe('Westend Indians P14: Turnaus Yellow');
+    expect(card.warmupTime).toBe('2026-09-13T12:00:00.000Z');
+    expect(card.startTime).toBe('2026-09-13T12:30:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.title)).toEqual([
+      'Westend Indians vs SB Vantaa',
+      'Westend Indians vs Oilers'
+    ]);
+  });
+
+  it('always lists same-day TASO games on one card even without the word turnaus', () => {
+    const cal = mockEvent({
+      id: 'nh-yellow',
+      sport: 'floorball',
+      title: 'Westend Indians P14 Yellow',
+      homeTeam: 'Westend Indians P14 Yellow',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z',
+      venue: {
+        name: 'Tuusulan Salibandyhalli',
+        normalizedName: 'tuusulan salibandyhalli',
+        coordinates: { lat: 60.4042, lng: 25.0275 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-1',
+      officialFixtureId: 'ssbl_1',
+      sport: 'floorball',
+      title: 'SB Vantaa Orange vs Westend Indians Yellow',
+      homeTeam: 'SB Vantaa Orange',
+      awayTeam: 'Westend Indians Yellow',
+      startTime: '2026-09-13T13:00:00.000Z',
+      venue: cal.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-2',
+      officialFixtureId: 'ssbl_2',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Oilers',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Oilers',
+      startTime: '2026-09-13T14:45:00.000Z',
+      venue: cal.venue
+    });
+    const stitched = stitchCalendarEventsWithFixtures([cal, g1, g2]);
+    expect(stitched).toHaveLength(1);
+    expect(stitched[0]!.officialGameTimes).toHaveLength(2);
+    expect(stitched[0]!.title).toBe('Westend Indians P14 Yellow');
+  });
+
+  it('moves a Nimenhuuto Sunday tournament onto the Saturday TASO day and keeps the 09:00 clock', () => {
+    const sunday = mockEvent({
+      id: 'nh-sun',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'Westend Indians Yellow turnaus',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: '',
+      startTime: '2026-09-27T06:00:00.000Z', // su 27.9. 09:00 EEST
+      warmupTime: '2026-09-27T06:00:00.000Z',
+      venue: {
+        name: 'AC Myllypuro kenttä 4',
+        normalizedName: 'ac myllypuro kentta 4',
+        coordinates: { lat: 60.23, lng: 25.07 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-hawks',
+      officialFixtureId: 'ssbl_949672',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Hawks',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Hawks',
+      startTime: '2026-09-26T07:00:00.000Z', // la 26.9. 10:00
+      venue: sunday.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-aif',
+      officialFixtureId: 'ssbl_949675',
+      sport: 'floorball',
+      title: 'ÅIF Blå vs Westend Indians Yellow',
+      homeTeam: 'ÅIF Blå',
+      awayTeam: 'Westend Indians Yellow',
+      startTime: '2026-09-26T10:45:00.000Z', // la 26.9. 13:45
+      venue: sunday.venue
+    });
+    const card = stitchCalendarEventsWithFixtures([sunday, g1, g2]).find((e) => e.id === 'nh-sun')!;
+    expect(card.startTime).toBe('2026-09-26T07:00:00.000Z');
+    expect(card.warmupTime).toBe('2026-09-26T06:00:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_949672', 'ssbl_949675']);
+    expect(card.officialGameTimes?.map((g) => g.venueName)).toEqual([
+      'AC Myllypuro kenttä 4',
+      'AC Myllypuro kenttä 4'
+    ]);
+    expect(stitchCalendarEventsWithFixtures([sunday, g1, g2])).toHaveLength(1);
+  });
+
+  it('a saved Hawks-only Sunday card still picks up the Saturday 13:45 game', () => {
+    const saved = mockEvent({
+      id: 'nh-saved',
+      sport: 'floorball',
+      eventType: 'match',
+      title: 'Westend Indians Yellow vs Hawks',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Hawks',
+      officialFixtureId: 'ssbl_949672',
+      startTime: '2026-09-27T07:00:00.000Z',
+      warmupTime: '2026-09-27T06:00:00.000Z',
+      venue: {
+        name: 'AC Myllypuro kenttä 4',
+        normalizedName: 'ac myllypuro kentta 4',
+        coordinates: { lat: 60.23, lng: 25.07 },
+        isIndoor: true,
+        surface: 'indoor_synthetic',
+        hasFloodlights: true
+      }
+    });
+    const g1 = mockEvent({
+      id: 'fixture-ssbl-hawks',
+      officialFixtureId: 'ssbl_949672',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Hawks',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Hawks',
+      startTime: '2026-09-26T07:00:00.000Z',
+      endTime: '2026-09-26T08:30:00.000Z',
+      venue: saved.venue
+    });
+    const g2 = mockEvent({
+      id: 'fixture-ssbl-aif',
+      officialFixtureId: 'ssbl_949675',
+      sport: 'floorball',
+      title: 'ÅIF Blå vs Westend Indians Yellow',
+      homeTeam: 'ÅIF Blå',
+      awayTeam: 'Westend Indians Yellow',
+      startTime: '2026-09-26T10:45:00.000Z',
+      endTime: '2026-09-26T12:15:00.000Z',
+      venue: saved.venue
+    });
+    const card = stitchCalendarEventsWithFixtures([saved, g1, g2]).find((e) => e.id === 'nh-saved')!;
+    expect(new Date(card.startTime).toISOString()).toBe('2026-09-26T07:00:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.title)).toEqual([
+      'Westend Indians Yellow vs Hawks',
+      'ÅIF Blå vs Westend Indians Yellow'
+    ]);
+    expect(card.endTime).toBe('2026-09-26T12:15:00.000Z');
+    expect(stitchCalendarEventsWithFixtures([saved, g1, g2])).toHaveLength(1);
+  });
+
+  it('lists both own-team TASO games on a Nimenhuuto day; clock stays the game after meetup', () => {
+    const cal = mockEvent({
+      id: 'nh-15',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'Westend Indians P14: Turnaus Yellow',
+      homeTeam: 'Westend Indians P14 Yellow',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z',
+      warmupTime: '2026-09-13T12:00:00.000Z'
+    });
+    const morning = mockEvent({
+      id: 'fixture-ssbl-morning',
+      officialFixtureId: 'ssbl_morning',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs SB Vantaa',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'SB Vantaa',
+      score: '3-2',
+      startTime: '2026-09-13T09:00:00.000Z'
+    });
+    const after = mockEvent({
+      id: 'fixture-ssbl-after',
+      officialFixtureId: 'ssbl_after',
+      sport: 'floorball',
+      title: 'Westend Indians Yellow vs Oilers',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Oilers',
+      score: '7-1',
+      startTime: '2026-09-13T13:00:00.000Z'
+    });
+    const stitched = stitchCalendarEventsWithFixtures([cal, morning, after]);
+    const card = stitched.find((e) => e.id === 'nh-15')!;
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_morning', 'ssbl_after']);
+    expect(card.startTime).toBe('2026-09-13T13:00:00.000Z');
+    expect(card.warmupTime).toBe('2026-09-13T12:00:00.000Z');
+    expect(card.officialGameTimes?.map((g) => g.score)).toEqual(['3-2', '7-1']);
+  });
+
+  it('already-linked Nimenhuuto card still lists a leftover same-day own-team game', () => {
+    const cal = mockEvent({
+      id: 'nh-linked',
+      sport: 'floorball',
+      eventType: 'tournament',
+      isTournament: true,
+      title: 'SB Vantaa Orange vs Westend Indians Yellow',
+      homeTeam: 'SB Vantaa Orange',
+      awayTeam: 'Westend Indians Yellow',
+      officialFixtureId: 'ssbl_after',
+      score: '7-1',
+      startTime: '2026-09-13T13:00:00.000Z',
+      warmupTime: '2026-09-13T12:00:00.000Z'
+    });
+    const earlier = mockEvent({
+      id: 'fixture-ssbl-early',
+      officialFixtureId: 'ssbl_early',
+      sport: 'floorball',
+      homeTeam: 'Westend Indians Yellow',
+      awayTeam: 'Oilers',
+      title: 'Westend Indians Yellow vs Oilers',
+      score: '4-4',
+      startTime: '2026-09-13T09:30:00.000Z'
+    });
+    const stitched = stitchCalendarEventsWithFixtures([cal, earlier]);
+    const card = stitched.find((e) => e.id === 'nh-linked')!;
+    expect(card.officialGameTimes?.map((g) => g.officialFixtureId)).toEqual(['ssbl_early', 'ssbl_after']);
+    expect(stitched).toHaveLength(1);
+  });
+
+  it('does not attach another squad or a pool game the child is not in', () => {
+    const cal = mockEvent({
+      id: 'nh-yellow',
+      sport: 'floorball',
+      eventType: 'tournament',
+      title: 'Westend Indians P14 Yellow',
+      homeTeam: 'Westend Indians P14 Yellow',
+      awayTeam: '',
+      startTime: '2026-09-13T12:00:00.000Z'
+    });
+    const black = mockEvent({
+      id: 'fixture-ssbl-black',
+      officialFixtureId: 'ssbl_black',
+      sport: 'floorball',
+      homeTeam: 'Westend Indians Black',
+      awayTeam: 'Oilers',
+      title: 'Westend Indians Black vs Oilers',
+      startTime: '2026-09-13T13:00:00.000Z'
+    });
+    const pool = mockEvent({
+      id: 'fixture-ssbl-pool',
+      officialFixtureId: 'ssbl_pool',
+      sport: 'floorball',
+      homeTeam: 'SB Vantaa Orange',
+      awayTeam: 'Oilers White',
+      title: 'SB Vantaa Orange vs Oilers White',
+      startTime: '2026-09-13T13:15:00.000Z'
+    });
+    const own = mockEvent({
+      id: 'fixture-ssbl-own',
+      officialFixtureId: 'ssbl_own',
+      sport: 'floorball',
+      homeTeam: 'SB Vantaa',
+      awayTeam: 'Westend Indians Yellow',
+      title: 'SB Vantaa vs Westend Indians Yellow',
+      startTime: '2026-09-13T13:30:00.000Z'
+    });
+    expect(fixtureInvolvesOwnTeam(cal, black)).toBe(false);
+    expect(fixtureInvolvesOwnTeam(cal, pool)).toBe(false);
+    expect(fixtureInvolvesOwnTeam(cal, own)).toBe(true);
+    expect(isKickoffAfterKokoontuminen(cal, own.startTime)).toBe(true);
+
+    const stitched = stitchCalendarEventsWithFixtures([cal, black, pool, own]);
+    const card = stitched.find((e) => e.id === 'nh-yellow')!;
+    expect(card.officialFixtureId).toBe('ssbl_own');
+    expect(card.officialGameTimes?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
+  it('clears mismatch flags for all applyResolutionDecision outcomes', () => {
+    const event = mockEvent({
+      id: 'resolve-base',
+      officialFixtureId: 'spl_old',
+      mismatchFlags: {
+        timeMismatch: true,
+        timeDiffMinutes: 45,
+        calendarStartTime: '09.15',
+        officialStartTime: '10.00'
+      }
+    });
+    const fixture: OfficialLeagueFixture = {
+      id: 'spl_445566',
+      teamId: 'team-1',
+      association: 'palloliitto',
+      sport: 'football',
+      leagueName: 'P13 Kakkonen',
+      homeTeam: 'PPJ',
+      awayTeam: 'EPS',
+      isHome: true,
+      startTime: '2026-09-12T07:00:00.000Z',
+      venueName: 'Väinämöinen tn',
+      status: 'upcoming',
+      fetchedAt: '2026-09-01T08:00:00.000Z'
+    };
+
+    expect(applyResolutionDecision(event, fixture, 'use_official').mismatchFlags).toBeUndefined();
+    expect(applyResolutionDecision(event, fixture, 'keep_calendar').mismatchFlags).toBeUndefined();
+    expect(applyResolutionDecision(event, fixture, 'unlink').mismatchFlags).toBeUndefined();
+  });
+
+  it('suppresses mismatch flags for stitched events with user overrides', () => {
+    const cal = mockEvent({
+      id: 'myclub-override',
+      title: 'PPJ Laru Sininen vs EPS Valkoinen',
+      homeTeam: 'PPJ Laru Sininen',
+      awayTeam: 'EPS Valkoinen',
+      startTime: '2026-09-12T06:15:00.000Z',
+      venue: {
+        ...defaultVenue,
+        name: 'Väinämöisen kenttä tn, Helsinki'
+      },
+      mismatchFlags: {
+        venueMismatch: true,
+        calendarVenueName: 'Väinämöisen kenttä tn, Helsinki',
+        officialVenueName: 'Väinämöinen tn'
+      },
+      userOverride: {
+        action: 'keep_calendar',
+        appliedAt: '2026-09-12T06:20:00.000Z',
+        notes: 'User chose calendar details'
+      }
+    });
+    const fix = mockEvent({
+      id: 'fixture-spl-override',
+      title: 'PPJ/Laru Sininen vs EPS/Valkoinen',
+      homeTeam: 'PPJ/Laru Sininen',
+      awayTeam: 'EPS/Valkoinen',
+      officialFixtureId: 'spl_override',
+      startTime: '2026-09-12T07:00:00.000Z',
+      venue: defaultVenue
+    });
+
+    const stitched = stitchCalendarEventsWithFixtures([cal, fix]);
+    const card = stitched.find((e) => e.id === 'myclub-override');
+    expect(card?.mismatchFlags).toBeUndefined();
+  });
+});

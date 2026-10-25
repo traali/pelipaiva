@@ -15,7 +15,6 @@ import {
   cleanHtmlText,
   parseHtmlTableRows,
   parseTorneopalHtml,
-  generateSyntheticOfficialTeamData,
   extractOfficialTeamData,
   DEFAULT_PROXY_URL,
   type ExtractorOptions
@@ -29,7 +28,6 @@ export {
   cleanHtmlText,
   parseHtmlTableRows,
   parseTorneopalHtml,
-  generateSyntheticOfficialTeamData,
   extractOfficialTeamData,
   DEFAULT_PROXY_URL,
   type ExtractorOptions
@@ -174,6 +172,7 @@ export function extractFixturesFromHtml(
     const isHome = myTeamLower ? homeTeam.toLowerCase().includes(myTeamLower) : true;
 
     const startTime = parseFinnishDateTime(dateStr, timeStr);
+    if (!startTime) continue; // no date/time, no event
     const { fieldNumber } = extractVenueAndField(venueName);
 
     const fixture: OfficialLeagueFixture = {
@@ -181,7 +180,7 @@ export function extractFixturesFromHtml(
       teamId: parsedUrl.teamId,
       association: parsedUrl.association,
       sport: parsedUrl.sport,
-      leagueName: headerTeamName ? `${headerTeamName} Sarja` : 'Virallinen Sarja',
+      leagueName: '', // the page names no competition; do not invent one
       homeTeam,
       awayTeam,
       isHome,

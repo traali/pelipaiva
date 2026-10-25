@@ -117,3 +117,113 @@ export function useDismissedConflicts() {
 
   return { dismissedKeys, dismiss, restore, restoreAll, isDismissed };
 }
+
+export interface ConsolidatedConflictGroup {
+  id: string;
+  conflicts: FamilyConflict[];
+  severity: 'critical' | 'warn' | 'info';
+  maxOverlap: number;
+  /** Shortest gap (min) between back-to-back games in the group; 0 when none. */
+  minGap: number;
+  childA: string;
+  childB: string;
+  isSameChild: boolean;
+  title: string;
+  message: string;
+  suggestedFix: string;
+  subItems: Array<{ overlap: number; gap: number; venueA: string; venueB: string }>;
+}
+
+export function groupActiveConflicts(conflicts: FamilyConflict[]): ConsolidatedConflictGroup[] {
+  if (!conflicts || conflicts.length === 0) return [];
+
+  // Group by counterpart child and venue pair
+  const groupsMap = new Map<string, FamilyConflict[]>();
+  for (const c of conflicts) {
+    const isSameChild = c.childA.toLowerCase() === c.childB.toLowerCase();
+    const key = isSameChild
+      ? `same-${c.childA.toLowerCase()}`
+      : `pair-${c.childA.toLowerCase()}-${c.childB.toLowerCase()}`;
+    if (!groupsMap.has(key)) groupsMap.set(key, []);
+    groupsMap.get(key)!.push(c);
+  }
+
+  const result: ConsolidatedConflictGroup[] = [];
+  for (const [key, groupList] of groupsMap.entries()) {
+    if (groupList.length === 1) {
+      const c = groupList[0]!;
+      result.push({
+        id: c.id,
+        conflicts: [c],
+        severity: c.severity,
+        maxOverlap: c.overlapMinutes,
+        minGap: c.gapMinutes,
+        childA: c.childA,
+        childB: c.childB,
+        isSameChild: c.childA.toLowerCase() === c.childB.toLowerCase(),
+        title: c.severity === 'info'
+          ? 'Omatoiminen kulku'
+          : c.overlapMinutes > 0
+            ? `Päällekkäisyys (${c.overlapMinutes} min)`
+            : `Peräkkäiset pelit eri kentillä (väli ${c.gapMinutes} min)`,
+        message: c.message,
+        suggestedFix: c.suggestedFix,
+        subItems: []
+      });
+    } else {
+      const isSameChild = groupList[0]!.childA.toLowerCase() === groupList[0]!.childB.toLowerCase();
+      const maxOverlap = Math.max(...groupList.map((c) => c.overlapMinutes));
+      const tightGaps = groupList.filter((c) => c.overlapMinutes === 0).map((c) => c.gapMinutes);
+      const minGap = tightGaps.length ? Math.min(...tightGaps) : 0;
+      const hasCritical = groupList.some((c) => c.severity === 'critical');
+      const childName = groupList[0]!.childA;
+
+      const subItems = groupList.map((c) => ({
+        overlap: c.overlapMinutes,
+        gap: c.gapMinutes,
+        venueA: c.venueA,
+        venueB: c.venueB
+      }));
+
+      const hasOverlap = maxOverlap > 0;
+      const title = isSameChild
+        ? hasOverlap
+          ? `Päällekkäisyys: ${groupList.length} päällekkäistä peliaikaa (max ${maxOverlap} min)`
+          : `Peräkkäiset pelit eri kentillä: ${groupList.length} tapahtumaa`
+        : hasOverlap
+          ? `Päällekkäisyys: ${groupList.length} aikatauluristeystä (${groupList[0]!.childA} & ${groupList[0]!.childB})`
+          : `Peräkkäiset pelit eri kentillä: ${groupList.length} tapahtumaa (${groupList[0]!.childA} & ${groupList[0]!.childB})`;
+
+      const message = isSameChild
+        ? hasOverlap
+          ? `${childName} on merkitty ${groupList.length} päällekkäiseen tapahtumaan samana päivänä.`
+          : `${childName} on merkitty ${groupList.length} peräkkäiseen tapahtumaan eri kentillä samana päivänä.`
+        : hasOverlap
+          ? `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat samaan aikaan ${groupList.length} ottelussa.`
+          : `${groupList[0]!.childA} ja ${groupList[0]!.childB} pelaavat peräkkäin eri kentillä samana päivänä.`;
+
+      const suggestedFix = isSameChild
+        ? hasOverlap
+          ? `Ilmoita valmentajille valinta mihin tapahtumiin ${childName} osallistuu.`
+          : `Kysy valmentajilta, ehtiikö ${childName} peleihin ajoissa.`
+        : 'Sovi kuskijako ja kyydit etukäteen turnauspäivälle.';
+
+      result.push({
+        id: `group-${key}`,
+        conflicts: groupList,
+        severity: hasCritical ? 'critical' : 'warn',
+        maxOverlap,
+        minGap,
+        childA: groupList[0]!.childA,
+        childB: groupList[0]!.childB,
+        isSameChild,
+        title,
+        message,
+        suggestedFix,
+        subItems
+      });
+    }
+  }
+
+  return result;
+}

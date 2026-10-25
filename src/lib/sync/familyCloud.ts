@@ -6,7 +6,7 @@ import { swatchForHex } from '../sport/teamColors';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 import { detectSportFromText } from '../ai/eventCandidateRanker';
 
-export { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
+export { isValidFamilyCode, normalizeFamilyCode, mintFamilyCode } from './familyCode';
 export const WORKER_BASE_URL = 'https://pelipaiva-edge.sakkoja.workers.dev';
 
 export interface FamilyRosterRow {
@@ -94,7 +94,6 @@ export async function pushFamilyRoster(
     };
     if (ifMatchRev !== undefined) {
       headers['If-Match'] = `"${ifMatchRev}"`;
-      headers['X-Pelipaiva-Rev'] = String(ifMatchRev);
     }
 
     const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}`, {
@@ -115,7 +114,12 @@ export async function pushFamilyRoster(
     }
 
     if (res.status === 403) {
-      return { success: false, error: 'unknown_family' };
+      const errJson = await res.json().catch(() => ({}));
+      const codeErr = (errJson as { error?: string }).error;
+      return {
+        success: false,
+        error: codeErr === 'family_slots_full' ? 'family_slots_full' : 'unknown_family'
+      };
     }
 
     if (!res.ok) {
@@ -128,9 +132,10 @@ export async function pushFamilyRoster(
       rev: data.rev || (ifMatchRev !== undefined ? ifMatchRev + 1 : 1),
       updatedAt: data.updatedAt || new Date().toISOString()
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.warn('[FAMILY_CLOUD] Push failed:', err);
-    return { success: false, error: err?.message || 'Network error' };
+    return { success: false, error: msg || 'Network error' };
   }
 }
 
@@ -429,8 +434,15 @@ async function executeSyncFamilyRosterCycle(
       (p) => !isDemoProfileId(p.id)
     );
     const syncRecord = await databaseInstance.syncState.get('family');
-    const localTombstonesStr = localStorage.getItem(`pelipaiva_tombstones_${cleanCode}`);
-    const localTombstones: TombstoneRecord[] = localTombstonesStr ? JSON.parse(localTombstonesStr) : [];
+    let localTombstones: TombstoneRecord[] = [];
+    try {
+      const localTombstonesStr = localStorage.getItem(`pelipaiva_tombstones_${cleanCode}`);
+      if (localTombstonesStr) {
+        localTombstones = JSON.parse(localTombstonesStr);
+      }
+    } catch {
+      localTombstones = [];
+    }
 
     const remote = await fetchFamilyRoster(cleanCode, baseUrl);
 
@@ -440,7 +452,11 @@ async function executeSyncFamilyRosterCycle(
       localTombstones
     );
 
-    localStorage.setItem(`pelipaiva_tombstones_${cleanCode}`, JSON.stringify(tombstones));
+    try {
+      localStorage.setItem(`pelipaiva_tombstones_${cleanCode}`, JSON.stringify(tombstones));
+    } catch {
+      // Ignore quota / private browsing storage restrictions
+    }
 
     const tombstoneIds = new Set(tombstones.map((t) => t.id));
     for (const lp of localProfiles) {
@@ -535,12 +551,316 @@ async function executeSyncFamilyRosterCycle(
       success: pushRes.success,
       roster: rosterToPush
     };
-  } catch (err: any) {
-    if (err?.message === 'unknown_family') {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'unknown_family') {
       console.warn(`[FAMILY_CLOUD] Family code ${cleanCode} is operating in local mode (not registered on edge).`);
     } else {
       console.warn('[FAMILY_CLOUD] Sync cycle warning:', err);
     }
-    return { success: false, error: err?.message || 'Sync failed' };
+    return { success: false, error: msg || 'Sync failed' };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Manual Events Sync — cross-device freeform event sharing
+// KV key: fam_events:{familyCode}  TTL: 30 days rolling
+// ---------------------------------------------------------------------------
+
+import type { FamilyManualEvent, FamilyEventsV1, AttendanceOverrideRecord } from '../../types/matchday';
+
+/** GET /api/family/:code/events — returns null on 404 (first device, no events yet) */
+export async function fetchFamilyEvents(
+  code: string,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<FamilyEventsV1 | null> {
+  const cleanCode = normalizeFamilyCode(code);
+  try {
+    const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}/events`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000)
+    });
+    if (res.status === 404) return null;
+    if (res.status === 403) throw new Error('unknown_family');
+    if (!res.ok) throw new Error(`Worker events GET failed: ${res.status}`);
+    const data = (await res.json()) as FamilyEventsV1;
+    if (!data || data.v !== 1 || !Array.isArray(data.events)) throw new Error('invalid_events_schema');
+    return data;
+  } catch (err: unknown) {
+    console.warn('[FAMILY_CLOUD] fetchFamilyEvents failed:', err);
+    return null;
+  }
+}
+
+export type PushEventsResult =
+  | { success: true; rev: number; updatedAt: string }
+  | { success: false; error: 'rev_conflict'; currentRev: number }
+  | { success: false; error: string };
+
+/** PUT /api/family/:code/events — uploads merged event list with If-Match concurrency */
+export async function pushFamilyEvents(
+  code: string,
+  payload: FamilyEventsV1,
+  ifMatchRev?: number,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<PushEventsResult> {
+  const cleanCode = normalizeFamilyCode(code);
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (ifMatchRev !== undefined) headers['If-Match'] = `"${ifMatchRev}"`;
+
+    const res = await fetch(`${baseUrl}/api/family/${encodeURIComponent(cleanCode)}/events`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000)
+    });
+
+    if (res.status === 409) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: 'rev_conflict', currentRev: (err as any).currentRev || 0 };
+    }
+    if (res.status === 403) return { success: false, error: 'unknown_family' };
+    if (!res.ok) return { success: false, error: `Worker error ${res.status}` };
+
+    const data = await res.json();
+    return { success: true, rev: data.rev, updatedAt: data.updatedAt };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg || 'Network error' };
+  }
+}
+
+/**
+ * Merge local and remote manual event lists.
+ * Strategy: last-write-wins per event ID; tombstone (deletedAt) always beats live.
+ * Prunes tombstones older than 30 days to keep payload compact.
+ */
+export function mergeFamilyEvents(
+  local: FamilyManualEvent[],
+  remote: FamilyManualEvent[]
+): FamilyManualEvent[] {
+  const map = new Map<string, FamilyManualEvent>();
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  for (const ev of [...remote, ...local]) {
+    const existing = map.get(ev.id);
+    // Tombstone always wins; among live events, later updatedAt wins
+    if (!existing) {
+      map.set(ev.id, ev);
+    } else if (ev.deletedAt && !existing.deletedAt) {
+      map.set(ev.id, ev);
+    } else if (!ev.deletedAt && existing.deletedAt) {
+      // keep tombstone
+    } else if (ev.updatedAt > existing.updatedAt) {
+      map.set(ev.id, ev);
+    }
+  }
+
+  // Prune tombstones older than 30 days — they've served their purpose
+  return [...map.values()].filter(
+    (ev) => !ev.deletedAt || ev.deletedAt > thirtyDaysAgo
+  );
+}
+
+/**
+ * Merge local and remote attendance override lists.
+ * Strategy: last-write-wins per eventId based on updatedAt.
+ */
+export function mergeAttendanceOverrides(
+  local: AttendanceOverrideRecord[],
+  remote: AttendanceOverrideRecord[]
+): AttendanceOverrideRecord[] {
+  const map = new Map<string, AttendanceOverrideRecord>();
+  for (const ov of [...remote, ...local]) {
+    const existing = map.get(ov.eventId);
+    if (!existing || ov.updatedAt > existing.updatedAt) {
+      map.set(ov.eventId, ov);
+    }
+  }
+  return [...map.values()];
+}
+
+/**
+ * Full sync cycle for family calendar data: fetch remote events & attendance overrides,
+ * merge with local Dexie, apply overrides to local events, and push any local updates.
+ */
+export async function syncManualEvents(
+  code: string,
+  databaseInstance: import('../storage/db').PelipaivaDB,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<{ events: FamilyManualEvent[]; overrides: AttendanceOverrideRecord[]; success: boolean }> {
+  const cleanCode = normalizeFamilyCode(code);
+
+  try {
+    // 1. Load local events
+    const localAll = await databaseInstance.manualEvents.toArray();
+
+    // 2. Fetch remote
+    const remote = await fetchFamilyEvents(cleanCode, baseUrl);
+    const remoteEvents = remote?.events ?? [];
+    const remoteOverrides = remote?.attendanceOverrides ?? [];
+
+    // 3. Merge manual events & attendance overrides
+    const mergedEvents = mergeFamilyEvents(localAll, remoteEvents);
+
+    // 4. Write merged manual events back to Dexie
+    if (mergedEvents.length > 0) {
+      await databaseInstance.manualEvents.bulkPut(mergedEvents);
+    }
+
+    // 5. Apply remote attendance overrides to local Dexie events table
+    for (const ov of remoteOverrides) {
+      try {
+        const ev = await databaseInstance.events.get(ov.eventId);
+        if (ev && ev.attendanceStatus !== ov.status) {
+          await databaseInstance.events.update(ov.eventId, { attendanceStatus: ov.status });
+        }
+      } catch {
+        // Continue if event doesn't exist locally yet
+      }
+    }
+
+    // 6. Check if local has newer events or overrides to push
+    const localHasChanges = localAll.some((ev) => {
+      const remoteEv = remoteEvents.find((r) => r.id === ev.id);
+      return !remoteEv || ev.updatedAt > remoteEv.updatedAt;
+    });
+
+    if (localHasChanges) {
+      const payload: FamilyEventsV1 = {
+        v: 1,
+        rev: (remote?.rev ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+        events: mergedEvents,
+        attendanceOverrides: remoteOverrides
+      };
+      const pushRes = await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
+
+      if (!pushRes.success && pushRes.error === 'rev_conflict') {
+        const fresh = await fetchFamilyEvents(cleanCode, baseUrl);
+        const freshMerged = mergeFamilyEvents(mergedEvents, fresh?.events ?? []);
+        const freshOverrides = mergeAttendanceOverrides(remoteOverrides, fresh?.attendanceOverrides ?? []);
+        await databaseInstance.manualEvents.bulkPut(freshMerged);
+        const retryPayload: FamilyEventsV1 = {
+          v: 1,
+          rev: (fresh?.rev ?? 0) + 1,
+          updatedAt: new Date().toISOString(),
+          events: freshMerged,
+          attendanceOverrides: freshOverrides
+        };
+        await pushFamilyEvents(cleanCode, retryPayload, fresh?.rev, baseUrl);
+        return {
+          events: freshMerged.filter((e) => !e.deletedAt),
+          overrides: freshOverrides,
+          success: true
+        };
+      }
+    }
+
+    return {
+      events: mergedEvents.filter((e) => !e.deletedAt),
+      overrides: remoteOverrides,
+      success: true
+    };
+  } catch (err: unknown) {
+    console.warn('[FAMILY_CLOUD] syncManualEvents failed:', err);
+    const localLive = await databaseInstance.manualEvents
+      .filter((e) => !e.deletedAt)
+      .toArray();
+    return { events: localLive, overrides: [], success: false };
+  }
+}
+
+/**
+ * Record an attendance override (IN / OUT) locally and push to Cloudflare KV in background.
+ */
+export async function recordAttendanceOverride(
+  code: string,
+  eventId: string,
+  status: 'in' | 'out' | 'maybe',
+  databaseInstance: import('../storage/db').PelipaivaDB,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<void> {
+  // 1. Update local database immediately
+  try {
+    await databaseInstance.events.update(eventId, { attendanceStatus: status });
+  } catch (e) {
+    console.warn('[FAMILY_CLOUD] Failed to update local event attendance:', e);
+  }
+
+  // If no family code, local update is sufficient
+  if (!code || code === 'local') return;
+
+  // 2. Non-blocking background sync to Cloudflare KV
+  (async () => {
+    try {
+      const cleanCode = normalizeFamilyCode(code);
+      const remote = await fetchFamilyEvents(cleanCode, baseUrl);
+      const remoteOverrides = remote?.attendanceOverrides ?? [];
+      const remoteEvents = remote?.events ?? [];
+
+      const newOverride: AttendanceOverrideRecord = {
+        eventId,
+        status,
+        updatedAt: new Date().toISOString()
+      };
+
+      const mergedOverrides = mergeAttendanceOverrides([newOverride], remoteOverrides);
+      const payload: FamilyEventsV1 = {
+        v: 1,
+        rev: (remote?.rev ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+        events: remoteEvents,
+        attendanceOverrides: mergedOverrides
+      };
+
+      await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
+    } catch (err) {
+      console.warn('[FAMILY_CLOUD] Background attendance push failed:', err);
+    }
+  })();
+}
+
+/**
+ * Record an added/imported manual family event locally and push to Cloudflare KV.
+ */
+export async function recordManualFamilyEvent(
+  code: string,
+  event: FamilyManualEvent,
+  databaseInstance: import('../storage/db').PelipaivaDB,
+  baseUrl: string = WORKER_BASE_URL
+): Promise<void> {
+  // 1. Save to local database
+  try {
+    await databaseInstance.manualEvents.put(event);
+  } catch (e) {
+    console.warn('[FAMILY_CLOUD] Failed to save manual event locally:', e);
+  }
+
+  if (!code || code === 'local') return;
+
+  // 2. Non-blocking background sync to Cloudflare KV
+  (async () => {
+    try {
+      const cleanCode = normalizeFamilyCode(code);
+      const remote = await fetchFamilyEvents(cleanCode, baseUrl);
+      const remoteOverrides = remote?.attendanceOverrides ?? [];
+      const remoteEvents = remote?.events ?? [];
+
+      const mergedEvents = mergeFamilyEvents([event], remoteEvents);
+      const payload: FamilyEventsV1 = {
+        v: 1,
+        rev: (remote?.rev ?? 0) + 1,
+        updatedAt: new Date().toISOString(),
+        events: mergedEvents,
+        attendanceOverrides: remoteOverrides
+      };
+
+      await pushFamilyEvents(cleanCode, payload, remote?.rev, baseUrl);
+    } catch (err) {
+      console.warn('[FAMILY_CLOUD] Background event push failed:', err);
+    }
+  })();
 }

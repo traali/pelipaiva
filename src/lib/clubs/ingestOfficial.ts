@@ -11,14 +11,14 @@ import {
 } from '../storage/db';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
-import { calculateParkingEase } from '../parking/parkingEaseEngine';
 import { generateMatchdayBriefing } from '../ai/deterministicReasoner';
 import { buildMatchStatsFromOfficial, hasRenderableStats } from '../api/torneopalClient';
 import { parseICSFeed } from '../calendar/icsParser';
 import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
 import {
   reconcileCalendarWithOfficial,
-  computeMismatchDiagnostics
+  computeMismatchDiagnostics,
+  applyOfficialKickoffKeepCalendarArrival
 } from '../reconciliation/reconciliationEngine';
 import {
   exampleTournamentFromUrl,
@@ -26,6 +26,7 @@ import {
   mergeOfficialWithCupFallback,
   isUglyTeamName
 } from './exampleTournaments';
+import { notifyFetchError } from '../notifications/notificationStore';
 
 async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   if (items.length === 0) return [];
@@ -39,6 +40,36 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
   });
   await Promise.all(workers);
   return out;
+}
+
+/**
+ * Drop this profile's official game events whose fixture TASO no longer lists
+ * (e.g. other teams' games an older build stored from a group listing), and the
+ * team's cached official fixtures likewise. Only events this ingest creates
+ * (`fixture-<profileId>-…`) are candidates; calendar, manual and other
+ * user-created events are never deleted here.
+ */
+export async function pruneStaleOfficialData(
+  database: PelipaivaDB,
+  profileId: string,
+  keepEventFixtureIds: Set<string>,
+  team?: { teamId: string; keepFixtureIds: Set<string> }
+): Promise<{ events: number; fixtures: number }> {
+  const prefix = `fixture-${profileId}-`;
+  const existing = await database.events.where('profileId').equals(profileId).toArray();
+  const staleEvents = existing
+    .filter((e) => e.id.startsWith(prefix))
+    .filter((e) => !keepEventFixtureIds.has(e.officialFixtureId || e.id.slice(prefix.length)))
+    .map((e) => e.id);
+  if (staleEvents.length > 0) await database.events.bulkDelete(staleEvents);
+
+  let staleFixtures: string[] = [];
+  if (team?.teamId) {
+    const cached = await database.officialFixtures.where('teamId').equals(team.teamId).toArray();
+    staleFixtures = cached.filter((f) => !team.keepFixtureIds.has(f.id)).map((f) => f.id);
+    if (staleFixtures.length > 0) await database.officialFixtures.bulkDelete(staleFixtures);
+  }
+  return { events: staleEvents.length, fixtures: staleFixtures.length };
 }
 
 export async function ingestOfficialForProfile(opts: {
@@ -61,12 +92,49 @@ export async function ingestOfficialForProfile(opts: {
     officialData = await extractOfficialTeamData(parsedAssoc, {
       customTeamName: cup?.teamName || opts.teamName,
       fallbackToSynthetic: false
-    }).catch(() => null);
+    }).catch(() => {
+      notifyFetchError({
+        title: 'Sarjatietojen haku epäonnistui',
+        message: `Yhteys tulospalveluun katkesi (${opts.teamName}). Käytetään tallennettua välimuistia.`,
+        source: 'Torneopal'
+      });
+      return null;
+    });
   }
 
   officialData = mergeOfficialWithCupFallback(cup, officialData);
 
+  // A failed Palloliitto / Salibandyliitto fetch (403, "Not allowed", timeout)
+  // must read as an error, never as "no games", and never prune stored games.
+  const fedName =
+    parsedAssoc && (parsedAssoc.association === 'palloliitto' || parsedAssoc.sport === 'football')
+      ? 'Palloliitto'
+      : parsedAssoc && (parsedAssoc.association === 'salibandy' || parsedAssoc.sport === 'floorball')
+        ? 'Salibandyliitto'
+        : null;
+  if (
+    fedName &&
+    !cup &&
+    (!officialData || (officialData.fixtures.length === 0 && !officialData.fixturesComplete))
+  ) {
+    notifyFetchError({
+      title: `${fedName === 'Palloliitto' ? 'Palloliiton' : 'Salibandyliiton'} tietoja ei saatu juuri nyt`,
+      message: `${fedName === 'Palloliitto' ? 'Palloliiton' : 'Salibandyliiton'} tulospalvelu ei vastannut (${opts.teamName}). Tallennetut pelit säilyvät; yritä myöhemmin uudelleen.`,
+      source: fedName
+    });
+    if (officialData) officialData = { ...officialData, fetchFailed: true };
+  }
+
   if (!officialData || officialData.fixtures.length === 0) {
+    // TASO answered every call and the team has no games: earlier stored games
+    // for this profile are no longer TASO's and must go. A failed or partial
+    // fetch keeps the offline cache.
+    if (officialData?.fixturesComplete) {
+      await pruneStaleOfficialData(database, opts.profileId, new Set(), {
+        teamId: officialData.teamId,
+        keepFixtureIds: new Set()
+      });
+    }
     // No synthetic or canned fallback: if federation returned 0 matches,
     // return null and let caller show "ei julkaistu".
     return { official: officialData, resolvedTeamName: cup?.teamName || opts.teamName };
@@ -115,22 +183,23 @@ export async function ingestOfficialForProfile(opts: {
       startTime,
       endTime,
       warmupTime,
+      warmupIsEstimate: true,
       tournamentName: thisCup ? fixture.leagueName || officialData.leagueName : undefined,
       stage: fixture.stage,
       matchNumber: fixture.matchNumber,
+      ...(fixture.ageClassLabel ? { ageClassLabel: fixture.ageClassLabel } : {}),
       score: fixture.score,
       venue,
       officialFixtureId: fixture.id,
+      ...(fixture.liveScore ? { liveScore: fixture.liveScore, liveBreak: fixture.liveBreak, liveUpdatedAt: fixture.fetchedAt } : {}),
       reconciliationStatus: 'auto_matched',
       confidenceScore: 1.0,
       stats: hasRenderableStats(officialStats) ? officialStats : undefined
     };
 
     if (opts.includeWeather !== false) {
-      const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
-      const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
+      const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime, DEFAULT_PROXY_URL);
       if (weather) matchEvent.weather = weather;
-      matchEvent.parking = parking;
     }
     return matchEvent;
   });
@@ -140,12 +209,13 @@ export async function ingestOfficialForProfile(opts: {
   }
 
   if (events.length > 0) {
-    const keep = new Set(events.map((e) => e.id));
-    const existing = await database.events.where("profileId").equals(opts.profileId).toArray();
-    const stale = existing
-      .filter((e) => e.id.startsWith(`fixture-${opts.profileId}-`) && !keep.has(e.id))
-      .map((e) => e.id);
-    if (stale.length > 0) await database.events.bulkDelete(stale);
+    // Re-ingest replaces this profile's official games with exactly the fetched set.
+    await pruneStaleOfficialData(
+      database,
+      opts.profileId,
+      new Set(fixtures.map((f) => f.id)),
+      { teamId: officialData.teamId, keepFixtureIds: new Set(officialData.fixtures.map((f) => f.id)) }
+    );
     await database.events.bulkPut(events);
   }
 
@@ -185,7 +255,14 @@ export async function fetchRawIcsFeed(url: string): Promise<string | null> {
   const target = `${DEFAULT_PROXY_URL}?url=${encodeURIComponent(raw)}`;
   try {
     const res = await fetch(target, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      notifyFetchError({
+        title: 'Kalenterin haku epäonnistui',
+        message: `Palvelin palautti virheen (${res.status}). Käytetään tallennettua välimuistia.`,
+        source: 'Kalenteri-iCal'
+      });
+      return null;
+    }
     const text = await res.text();
     if (!text || text.length < 20) return null;
     const trimmed = text.trim();
@@ -194,6 +271,11 @@ export async function fetchRawIcsFeed(url: string): Promise<string | null> {
     }
     return text;
   } catch {
+    notifyFetchError({
+      title: 'Kalenterin haku aikakatkaistiin',
+      message: 'Yhteys kalenteripalvelimeen katkesi tai aikakatkaistiin. Käytetään tallennettua välimuistia.',
+      source: 'Kalenteri-iCal'
+    });
     return null;
   }
 }
@@ -218,9 +300,8 @@ export async function ingestIcsForProfile(opts: {
   );
   const withMeta: MatchdayEvent[] = [];
   for (const ev of parsed) {
-    const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime);
-    const parking = calculateParkingEase(ev.venue.name, ev.venue.coordinates, new Date(ev.startTime));
-    const fullEv: MatchdayEvent = { ...ev, parking };
+    const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime, DEFAULT_PROXY_URL);
+    const fullEv: MatchdayEvent = { ...ev };
     if (weather) fullEv.weather = weather;
     fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);
     withMeta.push(fullEv);
@@ -275,29 +356,42 @@ export async function ingestIcsForProfile(opts: {
             }
           }
 
-          const diag = computeMismatchDiagnostics(ev, result.officialFixture);
-          if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
-            ev.mismatchFlags = {
-              timeMismatch: diag.hasKickoffMismatch,
-              timeDiffMinutes: diag.timeDiffMinutes,
-              calendarStartTime: diag.calendarStartTime,
-              officialStartTime: diag.officialStartTime,
-              officialStartTimeIso: result.officialFixture.startTime,
-              venueMismatch: diag.hasVenueMismatch,
-              calendarVenueName: diag.calendarVenueName,
-              officialVenueName: diag.officialVenueName,
-              opponentMismatch: diag.hasOpponentMismatch,
-              calendarOpponent: diag.calendarOpponent,
-              officialOpponent: diag.officialOpponent
-            };
+          const originalCalStart = ev.startTime;
+          if (result.officialFixture.startTime) {
+            applyOfficialKickoffKeepCalendarArrival(ev, result.officialFixture);
           }
+
+          if (ev.userOverride) {
+            ev.mismatchFlags = undefined;
+          } else {
+            const diag = result.mismatches || computeMismatchDiagnostics({ ...ev, startTime: originalCalStart }, result.officialFixture);
+            if (diag.hasKickoffMismatch || diag.hasVenueMismatch || diag.hasOpponentMismatch) {
+              ev.mismatchFlags = {
+                timeMismatch: diag.hasKickoffMismatch,
+                timeDiffMinutes: diag.timeDiffMinutes,
+                calendarStartTime: diag.calendarStartTime,
+                officialStartTime: diag.officialStartTime,
+                officialStartTimeIso: result.officialFixture.startTime,
+                venueMismatch: diag.hasVenueMismatch,
+                calendarVenueName: diag.calendarVenueName,
+                officialVenueName: diag.officialVenueName,
+                opponentMismatch: diag.hasOpponentMismatch,
+                calendarOpponent: diag.calendarOpponent,
+                officialOpponent: diag.officialOpponent
+              };
+            }
+          }
+
+          // Recalculate briefing so departure timing, WhatsApp brief and spectator advice
+          // reflect the enriched official kickoff and preserved coach gathering time.
+          ev.briefing = generateMatchdayBriefing(ev, withMeta);
 
           // Mark corresponding bare fixture event for deletion to avoid duplicates
           duplicateFixtureIdsToDelete.push(`fixture-${opts.profileId}-${result.officialFixture.id}`);
         }
 
         if (duplicateFixtureIdsToDelete.length > 0) {
-          await database.events.bulkDelete(duplicateFixtureIdsToDelete).catch(() => {});
+          await database.events.bulkDelete(duplicateFixtureIdsToDelete).catch((err) => console.error('[DB] bulkDelete duplicates failed:', err));
         }
       }
     }

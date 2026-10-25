@@ -28,18 +28,27 @@ export const POPULAR_HOME_PRESETS: HomePreset[] = [
   { id: 'lahti-keskusta', name: 'Lahti Keskusta', address: 'Aleksanterinkatu 15, 15110 Lahti', city: 'Lahti', coordinates: { lat: 60.9827, lng: 25.6615 } }
 ];
 
-export const DEFAULT_HOME_LOCATION: HomeLocation = {
-  name: 'Lauttasaari',
-  address: 'Isokaari 1, 00200 Helsinki',
-  coordinates: { lat: 60.1585, lng: 24.8770 },
-  maxWalkingDistanceKm: 1.5,
-  maxCyclingDistanceKm: 5.0,
-  defaultTransitMode: 'auto',
-  updatedAt: new Date().toISOString()
-};
+/** Walk / bike limits used until the family changes them. Not a location. */
+export const DEFAULT_WALKING_DISTANCE_KM = 1.5;
+export const DEFAULT_CYCLING_DISTANCE_KM = 5.0;
+
+/** A stored home is only usable with real numeric coordinates. */
+export function parseStoredHomeLocation(raw: string | null | undefined): HomeLocation | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as HomeLocation;
+    const c = parsed?.coordinates;
+    if (c && typeof c.lat === 'number' && typeof c.lng === 'number' && Number.isFinite(c.lat) && Number.isFinite(c.lng)) {
+      return parsed;
+    }
+  } catch {
+    // not a home
+  }
+  return null;
+}
 
 export function formatHomeTransitSummary(home?: HomeLocation | null): string {
-  if (!home) return 'Lähikentille kävellen / pyörällä — aseta koti';
+  if (!home) return 'Kotiosoitetta ei ole asetettu';
   const walk = (home.maxWalkingDistanceKm ?? 1.5).toString().replace('.', ',');
   const bike = (home.maxCyclingDistanceKm ?? 5.0).toString().replace('.', ',');
   const mode = home.defaultTransitMode || 'auto';
@@ -50,40 +59,26 @@ export function formatHomeTransitSummary(home?: HomeLocation | null): string {
   return `Kävely ≤ ${walk} km · pyörä ≤ ${bike} km · muuten auto`;
 }
 
-const STORAGE_KEY = 'pelipaiva_home_location';
+export const HOME_STORAGE_KEY = 'pelipaiva_home_location';
+const STORAGE_KEY = HOME_STORAGE_KEY;
 
 /**
- * Retrieves the configured family home location.
- * Falls back to Dexie syncState, localStorage, or Lauttasaari default.
+ * Retrieves the family home location from Dexie syncState or localStorage.
+ * Returns null when no home is set: there is no default home.
  */
-export async function getHomeLocation(): Promise<HomeLocation> {
+export async function getHomeLocation(): Promise<HomeLocation | null> {
   try {
     const sync = await db.syncState.get('home_location');
-    if (sync && sync.syncKey) {
-      const parsed = JSON.parse(sync.syncKey) as HomeLocation;
-      if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
-        return parsed;
-      }
-    }
+    const fromDb = parseStoredHomeLocation(sync?.syncKey);
+    if (fromDb) return fromDb;
   } catch {
-    // fallback
+    // fall through to localStorage
   }
 
   if (typeof localStorage !== 'undefined') {
-    const local = localStorage.getItem(STORAGE_KEY);
-    if (local) {
-      try {
-        const parsed = JSON.parse(local) as HomeLocation;
-        if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
-          return parsed;
-        }
-      } catch {
-        // fallback
-      }
-    }
+    return parseStoredHomeLocation(localStorage.getItem(STORAGE_KEY));
   }
-
-  return DEFAULT_HOME_LOCATION;
+  return null;
 }
 
 /**
@@ -92,8 +87,8 @@ export async function getHomeLocation(): Promise<HomeLocation> {
 export async function saveHomeLocation(home: HomeLocation): Promise<void> {
   const payload: HomeLocation = {
     ...home,
-    maxWalkingDistanceKm: home.maxWalkingDistanceKm ?? 1.5,
-    maxCyclingDistanceKm: home.maxCyclingDistanceKm ?? 5.0,
+    maxWalkingDistanceKm: home.maxWalkingDistanceKm ?? DEFAULT_WALKING_DISTANCE_KM,
+    maxCyclingDistanceKm: home.maxCyclingDistanceKm ?? DEFAULT_CYCLING_DISTANCE_KM,
     defaultTransitMode: home.defaultTransitMode ?? 'auto',
     updatedAt: new Date().toISOString()
   };

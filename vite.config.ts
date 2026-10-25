@@ -2,8 +2,23 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execSync } from 'child_process';
+
+const commitHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'prod';
+  }
+})();
+const buildTime = new Date().toISOString();
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify('1.0.0'),
+    __COMMIT_HASH__: JSON.stringify(commitHash),
+    __BUILD_TIME__: JSON.stringify(buildTime)
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -39,30 +54,45 @@ export default defineConfig({
         globIgnores: ['**/tesseract/**'],
         skipWaiting: true,
         clientsClaim: true,
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        // Federation/TASO data (live scores) always from the network, never a SW cache.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /(^|\.)torneopal\.(net|fi|com)$/.test(url.hostname),
+            handler: 'NetworkOnly'
+          }
+        ]
       }
     })
   ],
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-ui': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-tooltip',
-            'clsx',
-            'tailwind-merge'
-          ],
-          'vendor-icons': ['lucide-react'],
-          'vendor-motion': ['motion'],
-          'vendor-calendar': ['ical.js'],
-          'vendor-db': ['dexie', 'dexie-react-hooks'],
-          'vendor-geo': ['@turf/distance', 'fast-xml-parser'],
-          'vendor-xlsx': ['xlsx'],
-          'vendor-ocr': ['tesseract.js']
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/scheduler')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/@radix-ui') || id.includes('node_modules/clsx') || id.includes('node_modules/tailwind-merge')) {
+            return 'vendor-ui';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('node_modules/motion')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('node_modules/ical.js')) {
+            return 'vendor-calendar';
+          }
+          if (id.includes('node_modules/dexie')) {
+            return 'vendor-db';
+          }
+          if (id.includes('node_modules/@turf') || id.includes('node_modules/fast-xml-parser')) {
+            return 'vendor-geo';
+          }
+          if (id.includes('node_modules/tesseract.js')) {
+            return 'vendor-ocr';
+          }
         }
       }
     },

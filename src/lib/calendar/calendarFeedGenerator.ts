@@ -1,4 +1,25 @@
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import { isInventedWarmup } from '../events/eventClock';
+
+const helsinkiTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'Europe/Helsinki'
+});
+
+/**
+ * Formats an ISO datetime string into a 24h clock string (HH:MM) in Europe/Helsinki time.
+ * Invariant against host local timezone (e.g. UTC in Cloudflare / CI runners).
+ */
+export function formatHelsinkiClock(isoString: string): string {
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const parts = helsinkiTimeFormatter.formatToParts(d);
+  const hour = parts.find((p) => p.type === 'hour')?.value ?? '00';
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return `${hour}:${minute}`;
+}
 
 /**
  * Formats a Date object or ISO string into iCalendar UTC timestamp: YYYYMMDDTHHMMSSZ
@@ -73,13 +94,19 @@ export function generateIcsCalendarFeed(
     let dtEnd = ev.endTime ? formatIcsDateUtc(ev.endTime) : '';
     if (!dtEnd || dtEnd === dtStart) {
       const startMs = new Date(ev.startTime).getTime();
-      dtEnd = formatIcsDateUtc(new Date(startMs + 60 * 60 * 1000).toISOString());
+      dtEnd = isNaN(startMs)
+        ? '19700101T010000Z'
+        : formatIcsDateUtc(new Date(startMs + 60 * 60 * 1000).toISOString());
     }
 
-    // Build rich summary
+    // Build rich summary with player prefix (avoiding duplicate prefixes and substring collisions)
     let summary = ev.title;
-    if (playerName && !summary.toLowerCase().includes(playerName.toLowerCase())) {
-      summary = `${playerName}: ${summary}`;
+    if (playerName) {
+      const escapedName = playerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const nameRegex = new RegExp(`(^|[^\\p{L}\\p{N}])${escapedName}([^\\p{L}\\p{N}]|$)`, 'iu');
+      if (!nameRegex.test(summary)) {
+        summary = `${playerName}: ${summary}`;
+      }
     }
 
     // Build rich description
@@ -90,16 +117,15 @@ export function generateIcsCalendarFeed(
     if (ev.stage) descParts.push(`Sarja / Lohko: ${ev.stage}`);
 
     if (ev.warmupTime) {
-      const warmupD = new Date(ev.warmupTime);
-      const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-      descParts.push(`⏰ Kokoontuminen: klo ${pad(warmupD.getHours())}:${pad(warmupD.getMinutes())}`);
+      const clock = formatHelsinkiClock(ev.warmupTime);
+      if (clock) {
+        const label = isInventedWarmup(ev) ? 'Alkulämpö (arvio)' : 'Kokoontuminen';
+        descParts.push(`⏰ ${label}: klo ${clock}`);
+      }
     }
 
-    if (ev.briefing?.recommendedDepartureTime) {
-      const leaveD = new Date(ev.briefing.recommendedDepartureTime);
-      const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-      descParts.push(`🚗 Kotoalähtöaika: klo ${pad(leaveD.getHours())}:${pad(leaveD.getMinutes())}`);
-    }
+    // No leave-home time here: the stored briefing was computed without the
+    // family's home, so any time would be a guess.
 
     const kitAdvice = (ev as any).kitAdvice;
     if (kitAdvice) {
@@ -122,11 +148,15 @@ export function generateIcsCalendarFeed(
       descParts.push(`⚽ Lopputulos: ${ev.score}`);
     }
 
-    descParts.push('—\nFamDay: https://pelipaiva.pages.dev');
-
     const location = ev.venue?.address
       ? `${ev.venue.name}, ${ev.venue.address}`
       : ev.venue?.name || '';
+
+    if (location) {
+      descParts.push(`📍 Pelipaikka: ${location}`);
+    }
+
+    descParts.push('—\nFamDay: https://pelipaiva.pages.dev');
 
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${uid}`);

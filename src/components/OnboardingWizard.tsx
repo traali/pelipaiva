@@ -16,10 +16,9 @@ import {
   Loader2
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
-import { EXAMPLE_TOURNAMENTS } from '../lib/clubs/exampleTournaments';
 import type { SportType } from '../types/matchday';
 import { db } from '../lib/storage/db';
-import { syncFamilyRosterCycle, hydrateRosterProfiles, normalizeFamilyCode } from '../lib/sync/familyCloud';
+import { syncFamilyRosterCycle, hydrateRosterProfiles, normalizeFamilyCode, isValidFamilyCode, mintFamilyCode } from '../lib/sync/familyCloud';
 
 interface AddedSource {
   id: string;
@@ -30,8 +29,24 @@ interface AddedSource {
   url?: string;
 }
 
+/** A team already saved for a player (from IndexedDB profiles). */
+export interface OnboardingExistingTeam {
+  id: string;
+  playerName: string;
+  teamName: string;
+  sport: SportType;
+  url?: string;
+}
+
+const NO_EXISTING_TEAMS: OnboardingExistingTeam[] = [];
+
 interface OnboardingWizardProps {
-  onOpenImportModal?: (initialSport?: SportType, initialTeamUrl?: string, initialTeamName?: string) => void;
+  onOpenImportModal?: (
+    initialSport?: SportType,
+    initialTeamUrl?: string,
+    initialTeamName?: string,
+    playerName?: string
+  ) => void;
   onOpenFamilyShare?: () => void;
   onOpenSmartImport?: () => void;
   onQuickAddTeam: (
@@ -43,98 +58,20 @@ interface OnboardingWizardProps {
   onRemoveTeam?: (playerName: string, url?: string) => Promise<void>;
   onFinishOnboarding?: () => void;
   existingProfilesCount?: number;
+  /** Saved teams, so imports done in the search modal show up under the right child. */
+  existingTeams?: OnboardingExistingTeam[];
 }
-
-const PRESET_TORNEOPAL_TEAMS: Array<{
-  name: string;
-  teamName: string;
-  sport: SportType;
-  url: string;
-  association: string;
-  colorHex: string;
-}> = [
-  {
-    name: 'PPJ/Laru sin · P13 Kolmonen',
-    teamName: 'PPJ/Laru sin',
-    sport: 'football',
-    url: 'https://tulospalvelu.palloliitto.fi/team/185085/info',
-    association: 'Palloliitto',
-    colorHex: '#3b82f6'
-  },
-  {
-    name: 'PPJ/Laru mus · P13 Vitonen',
-    teamName: 'PPJ/Laru mus',
-    sport: 'football',
-    url: 'https://tulospalvelu.palloliitto.fi/team/185083/info',
-    association: 'Palloliitto',
-    colorHex: '#64748b'
-  },
-  {
-    name: 'PPJ/Laru oran · P13 Vitonen',
-    teamName: 'PPJ/Laru oran',
-    sport: 'football',
-    url: 'https://tulospalvelu.palloliitto.fi/team/185086/info',
-    association: 'Palloliitto',
-    colorHex: '#f97316'
-  },
-  {
-    name: 'Salibandy · Tulospalvelu (tiimi 25301)',
-    teamName: 'ErVi Salibandy',
-    sport: 'floorball',
-    url: 'https://tulospalvelu.salibandy.fi/team/25301/info',
-    association: 'Salibandy.fi',
-    colorHex: '#0284c7'
-  },
-  {
-    name: 'Lentopallo · Tulospalvelu (tiimi 57672)',
-    teamName: 'PuMa Lentopallo',
-    sport: 'volleyball',
-    url: 'https://tulospalvelu.lentopallo.fi/team/57672/info',
-    association: 'Lentopallo.fi',
-    colorHex: '#8b5cf6'
-  },
-  {
-    name: 'Koripallo · Tulospalvelu (tiimi 5756346)',
-    teamName: 'Koripallojoukkue',
-    sport: 'basketball',
-    url: 'https://tulospalvelu.basket.fi/team/5756346/info',
-    association: 'Basket.fi',
-    colorHex: '#f59e0b'
-  },
-  {
-    name: 'Jääkiekko · Kiekko-Espoo Juniorit',
-    teamName: 'Kiekko-Espoo',
-    sport: 'icehockey',
-    url: 'https://hockey.torneopal.fi/taso/joukkue.php?joukkue=40101',
-    association: 'Leijonat / Torneopal',
-    colorHex: '#1e3a8a'
-  },
-  {
-    name: 'Futsal · GFT Espoo',
-    teamName: 'GFT Futsal',
-    sport: 'futsal',
-    url: 'https://futsal.torneopal.fi/taso/joukkue.php?joukkue=3321',
-    association: 'Palloliitto Futsal',
-    colorHex: '#eab308'
-  },
-  ...EXAMPLE_TOURNAMENTS.map((cup) => ({
-    name: `${cup.name} · ${cup.teamName}`,
-    teamName: cup.teamName,
-    sport: cup.sport,
-    url: cup.url,
-    association: cup.name,
-    colorHex: cup.colorHex
-  }))
-];
 
 type OnboardingMode = 'choice' | 'local' | 'family_create' | 'family_join';
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
+  onOpenImportModal,
   onOpenSmartImport,
   onQuickAddTeam,
   onRemoveTeam,
   onFinishOnboarding,
-  existingProfilesCount = 0
+  existingProfilesCount = 0,
+  existingTeams = NO_EXISTING_TEAMS
 }) => {
   // Mode selection state: choice (initial) vs local vs family_create vs family_join
   const [onboardingMode, setOnboardingMode] = useState<OnboardingMode>('choice');
@@ -155,17 +92,39 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Sources added here plus teams saved via the import modal, once each.
+  const allSources = React.useMemo(() => {
+    const key = (s: { playerName: string; url?: string; name: string }) =>
+      `${s.playerName.trim().toLowerCase()}|${(s.url || s.name).trim()}`;
+    const out = [...addedSources];
+    const seen = new Set(out.map(key));
+    for (const team of existingTeams) {
+      const src: AddedSource = {
+        id: `profile-${team.id}`,
+        playerName: team.playerName,
+        sourceType: /\.ics|webcal:/i.test(team.url || '') ? 'ics' : 'torneopal',
+        name: team.teamName,
+        sport: team.sport,
+        url: team.url
+      };
+      if (seen.has(key(src))) continue;
+      seen.add(key(src));
+      out.push(src);
+    }
+    return out;
+  }, [addedSources, existingTeams]);
+
   // Group added sources by player name
   const playerGroups = React.useMemo(() => {
     const map = new Map<string, AddedSource[]>();
-    for (const src of addedSources) {
+    for (const src of allSources) {
       if (!map.has(src.playerName)) map.set(src.playerName, []);
       map.get(src.playerName)!.push(src);
     }
     return Array.from(map.entries());
-  }, [addedSources]);
+  }, [allSources]);
 
-  const currentPlayerSources = addedSources.filter(
+  const currentPlayerSources = allSources.filter(
     (s) => s.playerName.toLowerCase() === activePlayerName.trim().toLowerCase()
   );
 
@@ -176,34 +135,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setErrorMessage('');
     setActivePlayerName(trimmed);
     setIsNamingStep(false);
-  };
-
-  const handleAddPresetTorneopal = async (team: (typeof PRESET_TORNEOPAL_TEAMS)[0]) => {
-    if (!activePlayerName) return;
-    setIsLoading(true);
-    setErrorMessage('');
-    try {
-      const res = await onQuickAddTeam(activePlayerName, team.name, team.sport, team.url);
-      if (res && res.success === false) {
-        setErrorMessage(res.error || 'Otteluiden haku epäonnistui. Tarkista verkko.');
-        return;
-      }
-      setAddedSources((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-${Math.random()}`,
-          playerName: activePlayerName,
-          sourceType: 'torneopal',
-          name: team.name,
-          sport: team.sport,
-          url: team.url
-        }
-      ]);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Lisäys epäonnistui');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleAddCustomIcs = async () => {
@@ -232,8 +163,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       ]);
       setCustomIcsUrl('');
       setShowCustomIcsInput(false);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Lisäys epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Lisäys epäonnistui');
     } finally {
       setIsLoading(false);
     }
@@ -245,8 +177,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         await onRemoveTeam(playerName, url);
       }
       setAddedSources((prev) => prev.filter((s) => s.id !== sourceId));
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Poisto epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Poisto epäonnistui');
     }
   };
 
@@ -269,8 +202,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleJoinFamilySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = normalizeFamilyCode(familyCodeInput);
-    if (!cleanCode) {
-      setErrorMessage('Syötä perhekoodi (esim. PERHE-1 tai PERHE-2)');
+    if (!isValidFamilyCode(cleanCode)) {
+      setErrorMessage('Koodin muoto on XXXXX-X (ei kirjaimia I, L, O, U)');
       return;
     }
 
@@ -294,33 +227,63 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
       localStorage.setItem('pelipaiva_onboarding_done', 'true');
       onFinishOnboarding?.();
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Liittyminen epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(msg || 'Liittyminen epäonnistui');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Create Family Key Flow
+  // Create / activate any valid Crockford code (new mint or old phone code)
   const handleCreateFamilySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = normalizeFamilyCode(familyCodeInput);
-    if (!cleanCode) {
-      setErrorMessage('Syötä myönnetty perheavain (esim. PERHE-1 tai PERHE-2)');
+    if (!isValidFamilyCode(cleanCode)) {
+      setErrorMessage('Koodin muoto on XXXXX-X (ei kirjaimia I, L, O, U)');
       return;
     }
 
-    await db.syncState.put({
-      key: 'family',
-      syncKey: cleanCode,
-      lastSyncedAt: new Date().toISOString()
-    });
-
-    setOnboardingMode('local');
-    setIsNamingStep(true);
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await db.syncState.put({
+        key: 'family',
+        syncKey: cleanCode,
+        lastSyncedAt: new Date().toISOString()
+      });
+      const syncRes = await syncFamilyRosterCycle(cleanCode, db);
+      if (!syncRes.success && syncRes.error === 'family_slots_full') {
+        setErrorMessage('Perhepaikat täynnä (max 10).');
+        return;
+      }
+      setOnboardingMode('local');
+      setIsNamingStep(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const totalSourcesCount = addedSources.length || existingProfilesCount;
+  const handleMintNewFamily = async () => {
+    const minted = mintFamilyCode();
+    setFamilyCodeInput(minted);
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      await db.syncState.put({
+        key: 'family',
+        syncKey: minted,
+        lastSyncedAt: new Date().toISOString()
+      });
+      await syncFamilyRosterCycle(minted, db);
+      setOnboardingMode('local');
+      setIsNamingStep(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const totalSourcesCount = allSources.length || existingProfilesCount;
 
   return (
     <div className="min-h-screen bg-canvas text-text-primary px-4 py-6 pt-[max(1.5rem,env(safe-area-inset-top))] md:py-10 flex flex-col justify-between">
@@ -329,11 +292,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-9 w-9 rounded-2xl bg-pitch text-text-inverse flex items-center justify-center font-black text-sm shadow-sm shadow-pitch/20">
-              FD
+              PP
             </div>
             <div>
               <h1 className="text-base font-black tracking-tight text-text-primary">
-                FamDay
+                Pelipäivä
               </h1>
               <p className="text-[11px] text-text-muted">
                 Perheen arjen ja pelipäivien hermokeskus
@@ -354,7 +317,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           >
             <div>
               <h2 className="text-base font-bold text-text-primary mb-1">
-                Miten haluat käyttää FamDayta?
+                Miten haluat käyttää Pelipäivää?
               </h2>
               <p className="text-xs text-text-muted">
                 Valitse perheellesi sopiva käyttötapa. Voit muuttaa asetusta myöhemmin milloin vain.
@@ -395,13 +358,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-text-primary">Luo perhe (Pilvisynkronointi)</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pitch text-text-inverse">
-                      Suositus ⭐
+                    <span className="font-bold text-sm text-text-primary">Luo tai aktivoi perhe</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base text-text-secondary border border-border-subtle">
+                      Useampi puhelin
                     </span>
                   </div>
                   <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                    Synkronoi pelit, kuskiringit ja Wilman perheen puhelimiin ja elävään Apple/Google-kalenteriin. Vaatii perheavaimen.
+                    Synkronoi pelit perheen puhelimiin. Luo uusi koodi tai aktivoi vanha (mikä tahansa XXXXX-X).
                   </p>
                 </div>
               </button>
@@ -451,11 +414,28 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
             <div>
               <h2 className="text-base font-bold text-text-primary mb-1">
-                Määritä perheavain
+                Luo uusi tai aktivoi vanha
               </h2>
               <p className="text-xs text-text-muted">
-                Syötä myönnetty perheavain (esim. <code className="font-mono font-bold text-pitch">PERHE-1</code> tai <code className="font-mono font-bold text-pitch">PERHE-2</code>):
+                Mikä tahansa muotoa <code className="font-mono font-bold text-pitch">XXXXX-X</code> oleva koodi käy.
+                Luo uusi, tai kirjoita vanha koodi tältä puhelimelta (esim. se joka on jo Dexiessä).
               </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleMintNewFamily}
+              disabled={isLoading}
+              className="w-full py-3 rounded-2xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-sm shadow-pitch/20 transition-all disabled:opacity-50"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span>Luo uusi perhekoodi</span>
+            </button>
+
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+              <span className="flex-1 h-px bg-border-subtle" />
+              <span>tai aktivoi vanha</span>
+              <span className="flex-1 h-px bg-border-subtle" />
             </div>
 
             <form onSubmit={handleCreateFamilySubmit} className="space-y-4">
@@ -465,7 +445,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   autoFocus
                   value={familyCodeInput}
                   onChange={(e) => setFamilyCodeInput(e.target.value.toUpperCase())}
-                  placeholder="esim. PERHE-1"
+                  placeholder="esim. ABCDE-2"
                   className="w-full px-4 py-3 rounded-2xl bg-surface-base border border-border-strong text-sm font-mono font-bold text-text-primary tracking-wider uppercase focus-visible:ring-2 focus-visible:ring-pitch"
                 />
               </div>
@@ -478,9 +458,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-pitch text-text-inverse text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-sm shadow-pitch/20 transition-all"
+                disabled={isLoading}
+                className="w-full py-3 rounded-2xl bg-surface-elevated border border-pitch/40 text-text-primary text-xs font-bold flex items-center justify-center gap-2 hover:border-pitch cursor-pointer transition-all disabled:opacity-50"
               >
-                <span>Tallenna ja jatka joukkueisiin</span>
+                <span>Aktivoi tämä koodi ja jatka</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -623,7 +604,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                         autoFocus
                         value={nameInputDraft}
                         onChange={(e) => setNameInputDraft(e.target.value)}
-                        placeholder="Esim. Simo, Eemil, Aada..."
+                        placeholder="Lapsen etunimi"
                         className="flex-1 px-4 py-3 rounded-2xl bg-surface-base border border-border-strong text-sm font-bold text-text-primary focus-visible:ring-2 focus-visible:ring-pitch"
                       />
                       <button
@@ -638,7 +619,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   </div>
                 </form>
               ) : (
-                /* STEP 2: SELECT PRESET OR ADD TEAMS FOR ACTIVE PLAYER */
+                /* STEP 2: ADD REAL TEAMS FOR ACTIVE PLAYER */
                 <div className="space-y-5">
                   <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
                     <div className="flex items-center gap-2">
@@ -693,67 +674,37 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                     </div>
                   )}
 
-                  {/* PRESET QUICK ATTACH BUTTONS */}
-                  <div className="space-y-2.5">
-                    <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-pitch" />
-                      <span>Valitse joukkue tai turnaus suoraan listasta:</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {PRESET_TORNEOPAL_TEAMS.map((team) => {
-                        const isAdded = currentPlayerSources.some(
-                          (s) => s.url === team.url
-                        );
-                        return (
-                          <button
-                            key={team.url}
-                            type="button"
-                            disabled={isAdded || isLoading}
-                            onClick={() => handleAddPresetTorneopal(team)}
-                            className={`p-3 rounded-2xl border text-left flex items-center justify-between text-xs font-bold transition-all cursor-pointer ${
-                              isAdded
-                                ? 'bg-pitch/15 border-pitch/40 text-pitch opacity-80 cursor-default'
-                                : 'bg-surface-elevated hover:bg-surface-base border-border-subtle text-text-primary hover:border-pitch/40'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ background: team.colorHex }}
-                              />
-                              <span className="truncate">{team.name}</span>
-                            </div>
-                            {isAdded ? (
-                              <CheckCircle2 className="w-4 h-4 text-pitch shrink-0" />
-                            ) : (
-                              <Plus className="w-4 h-4 text-text-muted shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* CUSTOM ICS LINK OR SMART IMPORT */}
+                  {/* ADD A REAL TEAM: club search or pasted link. No ready-made demo teams. */}
                   <div className="pt-2 border-t border-border-subtle flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-text-secondary">
+                      Lisää {activePlayerName ? `pelaajan ${activePlayerName}` : 'pelaajan'} joukkue
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onOpenImportModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenImportModal(undefined, undefined, undefined, activePlayerName)}
+                          className="px-3.5 py-2 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer"
+                        >
+                          Hae seura tai joukkue
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowCustomIcsInput((v) => !v)}
+                        aria-expanded={showCustomIcsInput}
                         className="text-xs font-bold text-pitch hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Link className="w-3.5 h-3.5" />
-                        <span>{showCustomIcsInput ? 'Piilota oma .ics -linkki' : '+ Lisää oma MyClub / Nimenhuuto .ics'}</span>
+                        <span>{showCustomIcsInput ? 'Piilota linkki' : 'Liitä tulospalvelu- tai kalenterilinkki'}</span>
                       </button>
-
                       {onOpenSmartImport && (
                         <button
                           type="button"
                           onClick={onOpenSmartImport}
                           className="text-xs font-bold text-text-secondary hover:text-text-primary underline cursor-pointer"
                         >
-                          Tekoälytuonti ➔
+                          Liitä WhatsApp-viesti
                         </button>
                       )}
                     </div>
@@ -764,7 +715,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                           type="url"
                           value={customIcsUrl}
                           onChange={(e) => setCustomIcsUrl(e.target.value)}
-                          placeholder="https://nimenhuuto.com/team.ics"
+                          placeholder="https://tulospalvelu.palloliitto.fi/team/… tai .ics-linkki"
                           className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-border-subtle text-xs text-text-primary font-mono focus-visible:ring-2 focus-visible:ring-pitch"
                         />
                         <div className="flex items-center justify-between">
@@ -789,7 +740,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                             onClick={handleAddCustomIcs}
                             className="px-3.5 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 disabled:opacity-40 cursor-pointer"
                           >
-                            Lisää kalenteri
+                            Lisää joukkue
                           </button>
                         </div>
                       </div>
@@ -816,11 +767,23 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             onClick={onFinishOnboarding}
             className="w-full py-3.5 rounded-2xl bg-pitch text-text-inverse font-black text-sm flex items-center justify-center gap-2 hover:brightness-110 cursor-pointer shadow-lg shadow-pitch/25 transition-all"
           >
-            <span>Siirry FamDay-ottelukeskukseen</span>
+            <span>Siirry ottelukeskukseen</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       )}
+
+      {/* Global Version Badge Landmark */}
+      <div className="mt-8 pb-4 flex items-center justify-center gap-2 text-[11px] text-text-muted">
+        <span className="font-bold text-text-secondary">PELIPÄIVÄ</span>
+        <span>•</span>
+        <span
+          data-testid="app-version-badge"
+          className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-subtle font-mono text-[10px] text-text-secondary"
+        >
+          v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'} (git:{typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'})
+        </span>
+      </div>
     </div>
   );
 };

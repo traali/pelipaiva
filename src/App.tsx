@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteOfficialTeamData, ensureStoragePersistence, clearAllDatabaseData } from './lib/storage/db';
 import { MatchdayCard } from './components/MatchdayCard';
@@ -9,7 +9,6 @@ import { MatchdayEvent, SportType, PlayerProfile, HomeLocation } from './types/m
 import { LayoutList, Calendar as CalendarIcon, TableProperties, History as HistoryIcon, Trophy } from 'lucide-react';
 import { QuickDropInBar } from './components/QuickDropInBar';
 import { TimelineCalendarView } from './components/TimelineCalendarView';
-import { MatchStatsModal } from './components/MatchStatsModal';
 import { unpackSharePayload } from './lib/sync/familyShare';
 import { MissionControlHUD } from './components/MissionControlHUD';
 import { DifficultDayAlert } from './components/DifficultDayAlert';
@@ -19,52 +18,40 @@ import { HeroMatchCard } from './components/HeroMatchCard';
 import { TalkooBoard } from './components/TalkooBoard';
 import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
+import { startLiveRefresh } from './lib/live/liveRefresh';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { helsinkiDateISO } from './lib/agents/time';
+import { eventDayKey, helsinkiDateISO, isFinishedGame, isPastHelsinkiDay, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
-import { syncFamilyRosterCycle, hydrateRosterProfiles } from './lib/sync/familyCloud';
-import { DEFAULT_HOME_LOCATION, saveHomeLocation } from './lib/storage/homeLocation';
+import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
+import { HOME_STORAGE_KEY, parseStoredHomeLocation, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
+import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 import { harmonizeStartupSports } from './lib/sport/startupHarmonizer';
+import { LiveMatchToast } from './components/LiveMatchToast';
+import { NotificationToastContainer } from './components/ui/NotificationToastContainer';
+import {
+  notifyFetchError,
+  notifyWarning,
+  notifySuccess
+} from './lib/notifications/notificationStore';
+import { useModalStore } from './lib/modals/useModalStore';
+import { GlobalModalHost } from './components/modals';
+import { useAppSettings } from './lib/settings/useAppSettings';
+import { activePlayerNameForSelection, filterEventsByActiveProfileId } from './lib/profiles/activeProfileSelection';
 
-const SmartImportModal = lazy(() =>
-  import('./components/SmartImportModal').then((m) => ({ default: m.SmartImportModal }))
-);
-const FamilyLogisticsModal = lazy(() =>
-  import('./components/FamilyLogisticsModal').then((m) => ({ default: m.FamilyLogisticsModal }))
-);
-const AskCopilotModal = lazy(() =>
-  import('./components/AskCopilotModal').then((m) => ({ default: m.AskCopilotModal }))
-);
-const FamilyShareModal = lazy(() =>
-  import('./components/FamilyShareModal').then((m) => ({ default: m.FamilyShareModal }))
-);
-const FamilyManageModal = lazy(() =>
-  import('./components/FamilyManageModal').then((m) => ({ default: m.FamilyManageModal }))
-);
-const FamilyCalendarModal = lazy(() =>
-  import('./components/FamilyCalendarModal').then((m) => ({ default: m.FamilyCalendarModal }))
-);
-const HomeLocationModal = lazy(() =>
-  import('./components/HomeLocationModal').then((m) => ({ default: m.HomeLocationModal }))
-);
+
+
+export const DEFAULT_VIEW_MODE: 'cards' | 'timeline' | 'calendar' = 'timeline';
 
 export const App: React.FC = () => {
   const [activeProfileId, setActiveProfileId] = useState<string>('all');
-  const [isSmartImportOpen, setIsSmartImportOpen] = useState<boolean>(false);
-  const [isLogisticsOpen, setIsLogisticsOpen] = useState<boolean>(false);
-  const [isHomeLocationOpen, setIsHomeLocationOpen] = useState<boolean>(false);
-  const [isAskCopilotOpen, setIsAskCopilotOpen] = useState<boolean>(false);
-  const [isFamilyShareOpen, setIsFamilyShareOpen] = useState<boolean>(false);
-  const [isFamilyManageOpen, setIsFamilyManageOpen] = useState<boolean>(false);
-  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState<boolean>(false);
-  const [selectedStatsEvent, setSelectedStatsEvent] = useState<MatchdayEvent | null>(null);
+  const modalStore = useModalStore();
   const [isAmbientMode, setIsAmbientMode] = useState<boolean>(false);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
@@ -74,28 +61,35 @@ export const App: React.FC = () => {
     return true;
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>('cards');
-  const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
-  const [categoryFilter, setCategoryFilter] = useState<
-    'all' | 'attending' | 'out' | 'tournaments' | 'matches' | 'trainings' | 'other'
+  const [viewMode, setViewMode] = useState<'cards' | 'timeline' | 'calendar'>(DEFAULT_VIEW_MODE);
+  const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'in' | 'out'>('all');
+  const [eventTypeFilter, setEventTypeFilter] = useState<
+    'all' | 'tournaments' | 'matches' | 'trainings' | 'other'
   >('all');
-  const [importDefaults, setImportDefaults] = useState<{
-    sport?: SportType;
-    url?: string;
-    name?: string;
-    playerName?: string;
-    colorHex?: string;
-    squadFilters?: string[];
-    profileId?: string;
-  }>({});
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
+  const [showPastEvents, setShowPastEvents] = useState<boolean>(false);
+  const {
+    settings,
+    updateSetting,
+    toggleConflictWarnings
+  } = useAppSettings();
 
   // Listen to network status changes & background family sync
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => {
+      setIsOffline(false);
+      notifySuccess('Verkkoyhteys palautui', 'Tiedot ja synkronointi ovat taas ajan tasalla.');
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      notifyWarning(
+        'Ei verkkoyhteyttä',
+        'Verkkoyhteys katkesi — käytetään tallennettua välimuistia.',
+        'Verkkotila'
+      );
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -106,6 +100,9 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Live games: refresh their TASO score ~every 60 s while the tab is visible.
+  useEffect(() => startLiveRefresh(db), []);
+
   // Background Family Cloud Sync Loop (every 30s while document is visible)
   useEffect(() => {
     let syncTimer: any;
@@ -114,6 +111,7 @@ export const App: React.FC = () => {
       const sync = await db.syncState.get('family');
       if (sync && sync.syncKey) {
         await syncFamilyRosterCycle(sync.syncKey, db);
+        await syncManualEvents(sync.syncKey, db);
       }
     };
 
@@ -161,11 +159,13 @@ export const App: React.FC = () => {
       // Handle ?perhe=PERHE-2 deep link join
       const perheCode = params.get('perhe');
       if (perheCode) {
-        (async () => {
+        const attemptJoin = async () => {
           const res = await syncFamilyRosterCycle(perheCode, db);
           if (res.success) {
+            await syncManualEvents(perheCode, db);
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);
+            notifySuccess('Liitytty perheeseen!', `Perheen ${perheCode} joukkueet ja ottelut synkronoitu.`);
             if (isAmbientRequest) {
               setIsAmbientMode(true);
             } else {
@@ -177,12 +177,21 @@ export const App: React.FC = () => {
             const msg =
               res.error === 'unknown_family'
                 ? 'Koodi ei ole voimassa. Tarkista koodi perheeltä.'
+                : res.error === 'family_slots_full'
+                ? 'Perhepaikat täynnä (max 10). Pyydä operaattoria vapauttamaan paikka.'
                 : res.error === 'rate_limited'
                 ? 'Liian monta yritystä — odota hetki ja yritä uudelleen.'
                 : 'Verkkovirhe — tarkista yhteys ja yritä uudelleen.';
-            window.alert(`Perheeseen liittyminen epäonnistui: ${msg}`);
+            notifyFetchError({
+              title: 'Perheeseen liittyminen epäonnistui',
+              message: msg,
+              source: 'Perhejako',
+              retryAction: attemptJoin,
+              retryLabel: 'Yritä liittyä uudelleen'
+            });
           }
-        })();
+        };
+        attemptJoin();
       }
 
       // Handle family share link payload
@@ -204,9 +213,16 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Request persistent storage on startup
+  // Request persistent storage on startup & expose build info
   useEffect(() => {
     ensureStoragePersistence();
+    if (typeof window !== 'undefined') {
+      window.__APP_BUILD_INFO__ = {
+        version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0',
+        commit: typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev',
+        buildTime: typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : new Date().toISOString()
+      };
+    }
   }, []);
 
   // Self-healing sport and indoor venue harmonization for multi-sport child profiles
@@ -225,6 +241,38 @@ export const App: React.FC = () => {
           await db.events.update(eu.id, eu.updates);
         }
 
+        const healPass = await db.events.toArray();
+        for (const ev of healPass) {
+          const patch: Partial<MatchdayEvent> = {};
+          const lat = ev.venue?.coordinates?.lat || 0;
+          const lng = ev.venue?.coordinates?.lng || 0;
+          if (ev.venue && (ev.venue.isApproximateLocation || (lat === 0 && lng === 0)) && ev.venue.name) {
+            try {
+              const geo = await resolveSportsVenue(ev.venue.name);
+              if (geo.coordinates && (geo.coordinates.lat !== 0 || geo.coordinates.lng !== 0) && !geo.isApproximateLocation) {
+                patch.venue = { ...ev.venue, ...geo, isApproximateLocation: false };
+              }
+            } catch {
+              /* keep stored venue */
+            }
+          }
+          if (isTournamentish(ev) && !ev.officialFixtureId) {
+            const normalized = normalizeTournamentArrival({ startTime: ev.startTime, warmupTime: ev.warmupTime });
+            if (normalized.warmupTime !== ev.warmupTime) patch.warmupTime = normalized.warmupTime;
+          }
+          const officialIso = ev.mismatchFlags?.officialStartTimeIso;
+          if (officialIso && officialIso !== ev.startTime) {
+            const timed = applyOfficialKickoffKeepCalendarArrival(
+              { startTime: ev.startTime, warmupTime: ev.warmupTime, endTime: ev.endTime },
+              { startTime: officialIso }
+            );
+            patch.startTime = timed.startTime;
+            patch.warmupTime = timed.warmupTime;
+            patch.endTime = timed.endTime;
+          }
+          if (Object.keys(patch).length) await db.events.update(ev.id, patch);
+        }
+
         // Reconcile and merge any unlinked calendar matches with bare official fixtures on the same day
         const freshEvents = await db.events.toArray();
         const calEvents = freshEvents.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining && !e.officialFixtureId);
@@ -235,8 +283,10 @@ export const App: React.FC = () => {
           for (const fix of fixEvents) {
             const fixDate = new Date(fix.startTime);
             const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-            if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
-              const sim = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+            if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString() && !isTournamentish(cal)) {
+              const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+              const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
+              const sim = Math.max(simHome, simAway);
               if (sim >= 0.70) {
                 const enriched: MatchdayEvent = {
                   ...cal,
@@ -246,8 +296,11 @@ export const App: React.FC = () => {
                   officialFixtureId: fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, ''),
                   reconciliationStatus: 'auto_matched',
                   score: fix.score || cal.score,
-                  tournamentName: fix.tournamentName || cal.tournamentName
+                  tournamentName: fix.tournamentName || cal.tournamentName,
+                  venue: fix.venue || cal.venue,
+                  stats: fix.stats || cal.stats,
                 };
+                applyOfficialKickoffKeepCalendarArrival(enriched, fix);
                 await db.events.put(enriched);
                 await db.events.delete(fix.id);
               }
@@ -267,31 +320,14 @@ export const App: React.FC = () => {
   const arrivalRules = useLiveQuery(() => db.arrivalRules.toArray(), []) || [];
   const homeSync = useLiveQuery(() => db.syncState.get('home_location'), []);
 
-  const homeLocation: HomeLocation = useMemo(() => {
-    if (homeSync && homeSync.syncKey) {
-      try {
-        const parsed = JSON.parse(homeSync.syncKey);
-        if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
-          return parsed;
-        }
-      } catch {
-        // fallback
-      }
-    }
+  // No default home: without a saved home there is no leave time.
+  const homeLocation: HomeLocation | undefined = useMemo(() => {
+    const fromDb = parseStoredHomeLocation(homeSync?.syncKey);
+    if (fromDb) return fromDb;
     if (typeof localStorage !== 'undefined') {
-      const local = localStorage.getItem('pelipaiva_home_location');
-      if (local) {
-        try {
-          const parsed = JSON.parse(local);
-          if (parsed && parsed.coordinates && typeof parsed.coordinates.lat === 'number') {
-            return parsed;
-          }
-        } catch {
-          // fallback
-        }
-      }
+      return parseStoredHomeLocation(localStorage.getItem(HOME_STORAGE_KEY)) ?? undefined;
     }
-    return DEFAULT_HOME_LOCATION;
+    return undefined;
   }, [homeSync]);
 
   const isDemoActive =
@@ -313,79 +349,20 @@ export const App: React.FC = () => {
 
   const handleEventUpdated = async (updated: MatchdayEvent) => {
     await db.events.put(updated).catch(console.warn);
-    if (selectedStatsEvent?.id === updated.id) {
-      setSelectedStatsEvent(updated);
+    if (modalStore.activeModal?.type === 'stats' && modalStore.activeModal.event.id === updated.id) {
+      modalStore.openStats(updated);
     }
   };
 
-  // Filter events by selected profile or player group and deduplicate reconciled events
+  // Reconcile and stitch calendar events with bare fixtures across all profiles
+  const allStitchedEvents = useMemo(() => {
+    return stitchCalendarEventsWithFixtures(rawEvents);
+  }, [rawEvents]);
+
+  // Filter stitched events by selected profile or player group
   const filteredEvents = useMemo(() => {
-    const rawFiltered = [...rawEvents]
-      .filter((e) => {
-        if (e.isHidden) return false;
-        if (activeProfileId === 'all') return true;
-        if (activeProfileId.startsWith('player:')) {
-          const pName = activeProfileId.replace('player:', '').toLowerCase();
-          const profile = profiles.find((p) => p.id === e.profileId);
-          return (profile?.playerName || '').toLowerCase() === pName;
-        }
-        return e.profileId === activeProfileId;
-      });
-
-    // Find all linked officialFixtureIds on enriched calendar events
-    const enrichedFixtureIds = new Set<string>();
-    const bareFixtureIdsToDelete = new Set<string>();
-
-    for (const e of rawFiltered) {
-      if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
-        enrichedFixtureIds.add(e.officialFixtureId);
-      }
-    }
-
-    const calendarMatches = rawFiltered.filter((e) => !e.id.startsWith('fixture-') && !e.isTraining);
-    const bareFixtures = rawFiltered.filter((e) => e.id.startsWith('fixture-'));
-
-    // Dynamic stitch for same-day matches matching squad/club
-    for (const cal of calendarMatches) {
-      const calDate = new Date(cal.startTime);
-      for (const fix of bareFixtures) {
-        if (bareFixtureIdsToDelete.has(fix.id)) continue;
-        const fixDate = new Date(fix.startTime);
-        const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-        if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString()) {
-          const sim = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
-          if (sim >= 0.70) {
-            cal.homeTeam = fix.homeTeam;
-            cal.awayTeam = fix.awayTeam;
-            cal.title = `${fix.homeTeam} vs ${fix.awayTeam}`;
-            cal.officialFixtureId = fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, '');
-            cal.reconciliationStatus = 'auto_matched';
-            cal.score = fix.score || cal.score;
-            cal.tournamentName = fix.tournamentName || cal.tournamentName;
-            if (cal.officialFixtureId) {
-              enrichedFixtureIds.add(cal.officialFixtureId);
-            }
-            bareFixtureIdsToDelete.add(fix.id);
-          }
-        }
-      }
-    }
-
-    // Suppress bare fixture duplicates if an enriched calendar event already represents it
-    const deduplicated = rawFiltered.filter((e) => {
-      if (e.id.startsWith('fixture-')) {
-        if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
-          return false;
-        }
-        if (bareFixtureIdsToDelete.has(e.id)) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    return deduplicated.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  }, [rawEvents, activeProfileId, profiles]);
+    return filterEventsByActiveProfileId(allStitchedEvents, profiles, activeProfileId);
+  }, [allStitchedEvents, activeProfileId, profiles]);
 
   const [clockTick, setClockTick] = useState(0);
 
@@ -396,10 +373,26 @@ export const App: React.FC = () => {
     return () => clearInterval(t);
   }, []);
 
+  const stickyFilterRef = useRef<HTMLDivElement>(null);
+
+  // Measure the sticky filter bar height dynamically so day headers stick right beneath it
+  useEffect(() => {
+    const el = stickyFilterRef.current;
+    if (!el) return;
+    const updateHeight = () => {
+      const h = el.offsetHeight;
+      document.documentElement.style.setProperty('--sticky-filter-height', `${h}px`);
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const snapshot = useMemo(
-    () => runMissionControlGraph(rawEvents, profiles, new Date(), arrivalRules, homeLocation),
+    () => runMissionControlGraph(allStitchedEvents, profiles, new Date(), arrivalRules, homeLocation),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clockTick intentionally restarts the graph each minute
-    [rawEvents, profiles, arrivalRules, clockTick, homeLocation]
+    [allStitchedEvents, profiles, arrivalRules, clockTick, homeLocation]
   );
 
   const { isDismissed, dismiss: dismissConflict } = useDismissedConflicts();
@@ -434,7 +427,7 @@ export const App: React.FC = () => {
     return !isTournamentEvent(e) && !isMatchEvent(e) && !isTrainingEvent(e);
   };
 
-  const categoryCounts = useMemo(() => {
+  const filterCounts = useMemo(() => {
     let tournaments = 0;
     let matches = 0;
     let trainings = 0;
@@ -467,35 +460,30 @@ export const App: React.FC = () => {
   }, [filteredEvents]);
 
   const categoryFilteredEvents = useMemo(() => {
-    if (categoryFilter === 'attending') {
-      return filteredEvents.filter((e) => e.attendanceStatus !== 'out');
-    }
-    if (categoryFilter === 'out') {
-      return filteredEvents.filter((e) => e.attendanceStatus === 'out');
-    }
-    if (categoryFilter === 'tournaments') {
-      return filteredEvents.filter(isTournamentEvent);
-    }
-    if (categoryFilter === 'matches') {
-      return filteredEvents.filter(isMatchEvent);
-    }
-    if (categoryFilter === 'trainings') {
-      return filteredEvents.filter(isTrainingEvent);
-    }
-    if (categoryFilter === 'other') {
-      return filteredEvents.filter(isOtherEvent);
-    }
-    return filteredEvents;
-  }, [filteredEvents, categoryFilter]);
+    return filteredEvents.filter((e) => {
+      // 1. Attendance axis
+      if (attendanceFilter === 'in' && e.attendanceStatus === 'out') return false;
+      if (attendanceFilter === 'out' && e.attendanceStatus !== 'out') return false;
 
-  const nowMs = Date.now();
+      // 2. Event type axis
+      if (eventTypeFilter === 'tournaments' && !isTournamentEvent(e)) return false;
+      if (eventTypeFilter === 'matches' && !isMatchEvent(e)) return false;
+      if (eventTypeFilter === 'trainings' && !isTrainingEvent(e)) return false;
+      if (eventTypeFilter === 'other' && !isOtherEvent(e)) return false;
+
+      return true;
+    });
+  }, [filteredEvents, attendanceFilter, eventTypeFilter]);
+
+  // Today's games (played, live or coming) stay until Helsinki midnight; a game
+  // moves to "aiemmat" only once its Helsinki date is in the past.
   const pastEvents = useMemo(
-    () => categoryFilteredEvents.filter((e) => new Date(e.endTime).getTime() < nowMs - 60 * 60 * 1000),
+    () => categoryFilteredEvents.filter((e) => isPastHelsinkiDay(e)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categoryFilteredEvents, clockTick]
   );
   const upcomingEvents = useMemo(
-    () => categoryFilteredEvents.filter((e) => new Date(e.endTime).getTime() >= nowMs - 60 * 60 * 1000),
+    () => categoryFilteredEvents.filter((e) => !isPastHelsinkiDay(e)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categoryFilteredEvents, clockTick]
   );
@@ -603,12 +591,13 @@ export const App: React.FC = () => {
       }
 
       return { success: true, count: imported };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.warn('Team / Calendar fetch error:', err);
       return {
         success: false,
         count: 0,
-        error: err?.message || 'Kalenterin nouto epäonnistui. Tarkista verkko tai linkki.'
+        error: msg || 'Kalenterin nouto epäonnistui. Tarkista verkko tai linkki.'
       };
     }
   };
@@ -616,12 +605,11 @@ export const App: React.FC = () => {
   const playerNames = Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)));
 
   const openAddTeam = (playerName?: string) => {
-    setImportDefaults({ playerName });
-    setIsSmartImportOpen(true);
+    modalStore.openSmartImport({ playerName });
   };
 
   const openEditProfile = (profile: PlayerProfile) => {
-    setImportDefaults({
+    modalStore.openSmartImport({
       profileId: profile.id,
       playerName: profile.playerName,
       name: profile.teamName,
@@ -630,13 +618,9 @@ export const App: React.FC = () => {
       colorHex: profile.colorHex,
       squadFilters: profile.squadFilters
     });
-    setIsFamilyManageOpen(false);
-    setIsSmartImportOpen(true);
   };
 
-  const activePlayerName = activeProfileId.startsWith('player:')
-    ? activeProfileId.replace('player:', '')
-    : profiles.find((p) => p.id === activeProfileId)?.playerName;
+  const activePlayerName = activePlayerNameForSelection(activeProfileId, profiles);
 
   const handleRefreshAll = async () => {
     setIsSyncing(true);
@@ -700,6 +684,16 @@ export const App: React.FC = () => {
           const freshTransit = resolveTransitPlan(homeLocation, currentVenue.coordinates, ev.weather);
           updates.transit = freshTransit;
           updated = true;
+        } else if (!homeLocation && ev.transit) {
+          // A plan saved from an old default home is not this family's trip.
+          updates.transit = undefined;
+          updated = true;
+        }
+
+        // Old builds stored invented parking facts on each event. Drop them.
+        if ('parking' in ev) {
+          (updates as Record<string, unknown>).parking = undefined;
+          updated = true;
         }
 
         if (updated) {
@@ -713,16 +707,26 @@ export const App: React.FC = () => {
       const fixEvents = freshEvents.filter((e) => e.id.startsWith('fixture-'));
 
       for (const cal of calEvents) {
-        const calDate = cal.startTime.split('T')[0];
+        const calDate = eventDayKey(cal.startTime);
         const match = fixEvents.find((f) => {
-          const fDate = f.startTime.split('T')[0];
+          const fDate = eventDayKey(f.startTime);
           return f.profileId === cal.profileId && fDate === calDate;
         });
         if (match) {
-          await db.events.update(cal.id, {
-            officialFixtureId: match.id,
-            reconciliationStatus: 'auto_matched'
-          });
+          const patch: Partial<MatchdayEvent> = {
+            officialFixtureId: match.officialFixtureId || match.id.replace(/^fixture-[^-]+-/, ''),
+            reconciliationStatus: 'auto_matched',
+            homeTeam: match.homeTeam || cal.homeTeam,
+            awayTeam: match.awayTeam || cal.awayTeam,
+            title: match.homeTeam && match.awayTeam ? `${match.homeTeam} vs ${match.awayTeam}` : cal.title,
+            venue: match.venue || cal.venue,
+            stats: match.stats || cal.stats,
+          };
+          const timed = applyOfficialKickoffKeepCalendarArrival(
+            { startTime: cal.startTime, warmupTime: cal.warmupTime, endTime: cal.endTime },
+            match,
+          );
+          await db.events.update(cal.id, { ...patch, ...timed });
           await db.events.delete(match.id);
         }
       }
@@ -758,47 +762,85 @@ export const App: React.FC = () => {
 
   const handleResolveMismatch = async (
     eventId: string,
-    decision: 'use_official' | 'keep_calendar' | 'unlink'
+    decision: 'use_official' | 'keep_calendar' | 'unlink' | 'dismiss'
   ) => {
-    const ev = rawEvents.find((e) => e.id === eventId);
-    if (!ev) return;
+    const ev = rawEvents.find((e) => e.id === eventId) || await db.events.get(eventId);
+    if (!ev) {
+      console.warn('[MISMATCH] Event not found for resolution:', eventId);
+      return;
+    }
 
-    if (decision === 'use_official' && ev.mismatchFlags) {
-      // Adopt only from machine-readable official data — never from a display
-      // string, and never stamp the override when nothing was adopted (M-42/V59).
-      const officialIso = ev.mismatchFlags.officialStartTimeIso;
-      if (!officialIso) {
-        return handleResolveMismatch(eventId, 'keep_calendar');
-      }
-      const updated: MatchdayEvent = {
+    const nowIso = new Date().toISOString();
+
+    let updated: MatchdayEvent = ev;
+    if (decision === 'use_official') {
+      const officialIso =
+        ev.mismatchFlags?.officialStartTimeIso ||
+        parseHelsinkiClockOnEventDate(ev.startTime, ev.mismatchFlags?.officialStartTime);
+      const officialVenue = ev.mismatchFlags?.officialVenueName;
+      const timed = officialIso
+        ? applyOfficialKickoffKeepCalendarArrival(
+          { startTime: ev.startTime, warmupTime: ev.warmupTime, endTime: ev.endTime },
+          { startTime: officialIso }
+        )
+        : { startTime: ev.startTime, warmupTime: ev.warmupTime, endTime: ev.endTime };
+      updated = {
         ...ev,
-        startTime: officialIso,
-        venue: {
-          ...ev.venue,
-          name: ev.mismatchFlags.officialVenueName || ev.venue.name
-        },
+        ...timed,
+        venue: officialVenue ? { ...ev.venue, name: officialVenue } : ev.venue,
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
         userOverride: {
           action: 'adopt_official',
-          appliedAt: new Date().toISOString(),
+          appliedAt: nowIso,
           notes: 'Päivitetty liiton tietoon'
         }
       };
-      await db.events.put(updated);
     } else if (decision === 'keep_calendar') {
-      const updated: MatchdayEvent = {
+      updated = {
         ...ev,
         mismatchFlags: undefined,
         reconciliationStatus: 'manual_matched',
         userOverride: {
           action: 'keep_calendar',
-          appliedAt: new Date().toISOString(),
+          appliedAt: nowIso,
           notes: 'Säilytetty omat kalenteritiedot'
         }
       };
-      await db.events.put(updated);
+    } else if (decision === 'unlink') {
+      updated = {
+        ...ev,
+        officialFixtureId: undefined,
+        mismatchFlags: undefined,
+        reconciliationStatus: 'unlinked',
+        userOverride: {
+          action: 'unlink',
+          appliedAt: nowIso,
+          notes: 'Ottelulinkki purettu'
+        }
+      };
+    } else {
+      const dismissNote = 'Piilotettu aikatauluristiriita';
+      updated = {
+        ...ev,
+        mismatchFlags: undefined,
+        userOverride: ev.userOverride
+          ? {
+            ...ev.userOverride,
+            appliedAt: nowIso,
+            notes: ev.userOverride.notes
+              ? `${ev.userOverride.notes} • ${dismissNote}`
+              : dismissNote
+          }
+          : {
+            action: 'custom',
+            appliedAt: nowIso,
+            notes: dismissNote
+          }
+      };
     }
+
+    await db.events.put(updated);
   };
 
   if (isAmbientMode) {
@@ -829,41 +871,41 @@ export const App: React.FC = () => {
             setIsOnboardingActive(false);
           }}
           existingProfilesCount={profiles.length}
-          onOpenImportModal={(sport, url, name) => {
-            setImportDefaults({ sport, url, name });
-            setIsSmartImportOpen(true);
-          }}
-          onOpenFamilyShare={() => setIsFamilyShareOpen(true)}
-          onOpenSmartImport={() => setIsSmartImportOpen(true)}
+          onOpenImportModal={(sport, url, name, playerName) => modalStore.openSmartImport({ sport, url, name, playerName })}
+          existingTeams={profiles.map((p) => ({
+            id: p.id,
+            playerName: p.playerName,
+            teamName: p.teamName,
+            sport: p.sport,
+            url: p.calendarUrl || p.associationUrl
+          }))}
+          onOpenFamilyShare={modalStore.openFamilyShare}
+          onOpenSmartImport={modalStore.openSmartImport}
           onQuickAddTeam={async (playerName, teamName, sport, url) => {
             return await handleImportCalendar(playerName, teamName, sport, url);
           }}
           onRemoveTeam={handleRemoveImportedTeam}
         />
-        <Suspense fallback={null}>
-        <SmartImportModal
-          isOpen={isSmartImportOpen}
-          onClose={() => {
-            setIsSmartImportOpen(false);
-            setImportDefaults({});
-          }}
-          existingPlayers={playerNames}
-          onImportClassic={handleImportCalendar}
-          initialSport={importDefaults.sport}
-          initialTeamUrl={importDefaults.url}
-          initialTeamName={importDefaults.name}
-          initialPlayerName={importDefaults.playerName}
-          initialColorHex={importDefaults.colorHex}
-          initialSquadFilters={importDefaults.squadFilters}
-          editingProfileId={importDefaults.profileId}
-        />
-        <FamilyShareModal
-          isOpen={isFamilyShareOpen}
-          onClose={() => setIsFamilyShareOpen(false)}
+        <GlobalModalHost
+          activeModal={modalStore.activeModal}
+          onClose={modalStore.closeModal}
+          allStitchedEvents={allStitchedEvents}
           profiles={profiles}
-          onDataImported={() => setActiveProfileId('all')}
+          homeLocation={homeLocation}
+          saveHomeLocation={saveHomeLocation}
+          existingPlayers={playerNames}
+          handleImportCalendar={handleImportCalendar}
+          openAddTeam={openAddTeam}
+          openEditProfile={openEditProfile}
+          showConflictWarnings={settings.showConflictWarnings}
+          toggleConflictWarnings={toggleConflictWarnings}
+          aiSettings={settings}
+          onToggleAiSetting={updateSetting}
+          setIsOnboardingActive={setIsOnboardingActive}
+          setActiveProfileId={setActiveProfileId}
+          openHomeLocation={modalStore.openHomeLocation}
+          openFamilyShare={modalStore.openFamilyShare}
         />
-        </Suspense>
       </>
     );
   }
@@ -875,249 +917,277 @@ export const App: React.FC = () => {
         isOffline={isOffline}
         isSyncing={isSyncing}
         isDemo={isDemoActive}
+        showConflictWarnings={settings.showConflictWarnings}
+        onToggleConflictWarnings={toggleConflictWarnings}
+        showCopilot={settings.showCopilotAssistant}
+        onSettings={modalStore.openSettings}
         onRefresh={handleRefreshAll}
-        onShare={() => setIsFamilyShareOpen(true)}
+        onShare={modalStore.openFamilyShare}
         onAmbient={() => setIsAmbientMode(true)}
-        onLogistics={() => setIsLogisticsOpen(true)}
-        onImport={() => setIsSmartImportOpen(true)}
-        onOpenHomeLocation={() => setIsHomeLocationOpen(true)}
-        onAsk={() => setIsAskCopilotOpen(true)}
+        onLogistics={modalStore.openLogistics}
+        onImport={modalStore.openSmartImport}
+        onOpenHomeLocation={modalStore.openHomeLocation}
+        onAsk={modalStore.openCopilot}
         onClear={handleClearData}
       />
 
-      <main className="mx-auto max-w-5xl px-4 pt-2">
+      <main className="mx-auto max-w-6xl px-4 pt-2">
         {isDemoActive && (
           <DemoBanner
-            onOpenImport={() => setIsSmartImportOpen(true)}
+            onOpenImport={modalStore.openSmartImport}
             onClearDemo={handleClearData}
           />
         )}
-        {/* Sticky Profile Filter & View Mode Switcher Header (docks cleanly below MissionControlHUD) */}
-        <div className="sticky top-[53px] z-30 -mx-4 px-4 py-2.5 bg-canvas/92 backdrop-blur-md border-b border-border-subtle/50 mb-3 flex flex-col gap-2.5 shadow-xs">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            <div className="flex-1 min-w-0">
-              <MultiProfileHeader
-                profiles={profiles}
-                activeProfileId={activeProfileId}
-                onSelectProfile={(id) => setActiveProfileId(id)}
-                onAddProfile={() => openAddTeam(activePlayerName)}
-                onOpenFamilyManage={() => setIsFamilyManageOpen(true)}
-                onOpenCalendarSubscribe={() => setIsCalendarModalOpen(true)}
-                onRefresh={handleRefreshAll}
-                isSyncing={isSyncing}
-              />
-            </div>
-
-            {/* View Mode Switcher: Cards vs Timeline vs Calendar */}
-            <div
-              role="tablist"
-              aria-label="Näkymän valitsin"
-              className="flex rounded-xl bg-surface-elevated p-1 border border-border-subtle shrink-0 self-end sm:self-auto"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'cards'}
-                onClick={() => setViewMode('cards')}
-                title="Korttinäkymä"
-                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                  viewMode === 'cards'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <LayoutList className="w-3.5 h-3.5" />
-                <span>Kortit</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'timeline'}
-                onClick={() => setViewMode('timeline')}
-                title="Tiivis aikajana"
-                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                  viewMode === 'timeline'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <TableProperties className="w-3.5 h-3.5" />
-                <span>Tiivis</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'calendar'}
-                onClick={() => setViewMode('calendar')}
-                title="Kalenteriruudukko"
-                className={`min-h-[44px] px-3.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
-                  viewMode === 'calendar'
-                    ? 'bg-pitch text-text-inverse shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <CalendarIcon className="w-3.5 h-3.5" />
-                <span>Kalenteri</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Category & Attendance Filters (Kaikki, Osallistuu, Poisjäännit, Turnaukset, Sarjapelit, Treenit, Muu) */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        {/* Sticky Profile Filter & View Mode Switcher Header */}
+        <div
+          ref={stickyFilterRef}
+          className="sticky top-0 z-20 -mx-4 px-4 py-1.5 bg-canvas/95 backdrop-blur-md border-b border-border-subtle/50 mb-2 flex flex-col gap-1.5 shadow-xs"
+        >
+          {/* Row 1: View Mode Switcher */}
+          <div
+            role="tablist"
+            aria-label="Näkymän valitsin"
+            className="grid w-full grid-cols-3 gap-1 rounded-xl bg-surface-elevated p-1 border border-border-subtle"
+          >
             <button
               type="button"
-              onClick={() => setCategoryFilter('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                categoryFilter === 'all'
+              role="tab"
+              aria-selected={viewMode === 'cards'}
+              onClick={() => setViewMode('cards')}
+              title="Korttinäkymä"
+              className={`touch-target min-h-[44px] px-2 sm:px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                viewMode === 'cards'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <LayoutList className="w-4 h-4" />
+              <span>Kortit</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'timeline'}
+              onClick={() => setViewMode('timeline')}
+              title="Tiivis aikajana"
+              className={`touch-target min-h-[44px] px-2 sm:px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                viewMode === 'timeline'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <TableProperties className="w-4 h-4" />
+              <span>Tiivis</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'calendar'}
+              onClick={() => setViewMode('calendar')}
+              title="Kalenteriruudukko"
+              className={`touch-target min-h-[44px] px-2 sm:px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-pitch ${
+                viewMode === 'calendar'
+                  ? 'bg-pitch text-text-inverse shadow-xs'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span>Kalenteri</span>
+            </button>
+          </div>
+
+          {/* Row 2: Profile Carousel */}
+          <div className="min-w-0">
+            <MultiProfileHeader
+              profiles={profiles}
+              activeProfileId={activeProfileId}
+              onSelectProfile={(id) => setActiveProfileId(id)}
+              onAddProfile={() => openAddTeam(activePlayerName)}
+            />
+          </div>
+
+          {/* Row 3: Combined Single Horizontal Filter Ribbon (Attendance + Event Types) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 text-xs">
+            {/* Attendance Filter Chips */}
+            <button
+              type="button"
+              aria-label="Kaikki"
+              onClick={() => setAttendanceFilter('all')}
+              className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                attendanceFilter === 'all'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'bg-surface-elevated text-text-secondary hover:text-text-primary border border-border-subtle'
               }`}
             >
-              <span>Kaikki tapahtumat</span>
-              <span className="text-[10px] opacity-80">({categoryCounts.all})</span>
+              Kaikki ottelut
             </button>
-
-            {/* Attendance: Osallistuu (IN) */}
             <button
               type="button"
-              onClick={() => setCategoryFilter(categoryFilter === 'attending' ? 'all' : 'attending')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                categoryFilter === 'attending'
+              onClick={() => setAttendanceFilter(attendanceFilter === 'in' ? 'all' : 'in')}
+              className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                attendanceFilter === 'in'
                   ? 'bg-pitch text-text-inverse shadow-xs'
                   : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
               }`}
-              title="Näytä vain tapahtumat joihin osallistutaan"
+              title="Näytä vain tapahtumat joihin osallistutaan (IN)"
             >
               <span>🟢 Osallistuu</span>
-              <span className="text-[10px] opacity-80">({categoryCounts.attending})</span>
             </button>
-
-            {/* Attendance: Poisjäännit (OUT) */}
-            <button
-              type="button"
-              onClick={() => setCategoryFilter(categoryFilter === 'out' ? 'all' : 'out')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                categoryFilter === 'out'
-                  ? 'bg-stoppage text-text-inverse shadow-xs'
-                  : categoryCounts.out > 0
-                  ? 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
-                  : 'bg-surface-elevated text-text-muted hover:text-stoppage border border-border-subtle'
-              }`}
-              title="Näytä tapahtumat mihin ei osallistuta (Poisjäännit)"
-            >
-              <span>⛔ Poisjäännit</span>
-              <span className="text-[10px] opacity-80">({categoryCounts.out})</span>
-            </button>
-
-            {categoryCounts.tournaments > 0 && (
+            {(filterCounts.out > 0 || attendanceFilter === 'out') && (
               <button
                 type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'tournaments' ? 'all' : 'tournaments')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'tournaments'
-                    ? 'bg-whistle/20 text-whistle border border-whistle/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-whistle border border-border-subtle'
+                onClick={() => setAttendanceFilter(attendanceFilter === 'out' ? 'all' : 'out')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  attendanceFilter === 'out'
+                    ? 'bg-stoppage text-text-inverse shadow-xs'
+                    : 'bg-stoppage/15 text-stoppage border border-stoppage/40 hover:bg-stoppage/25'
                 }`}
+                title="Näytä vain tapahtumat mihin ei osallistuta (Poisjäännit / OUT)"
               >
-                <Trophy className="w-3 h-3 text-whistle" />
-                <span>Turnaukset</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.tournaments})</span>
+                <span>⛔ Pois ({filterCounts.out})</span>
               </button>
             )}
-            {categoryCounts.matches > 0 && (
+
+            {/* Separator between attendance and event types */}
+            <div className="h-5 w-[1px] bg-border-subtle shrink-0 mx-0.5" aria-hidden="true" />
+
+            {/* Event Type Filter Chips */}
+            {filterCounts.tournaments > 0 && (
               <button
                 type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'matches' ? 'all' : 'matches')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'matches'
-                    ? 'bg-pitch/20 text-pitch border border-pitch/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-pitch border border-border-subtle'
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'tournaments' ? 'all' : 'tournaments')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'tournaments'
+                    ? 'bg-gold/30 text-gold border border-gold shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-gold border border-border-subtle'
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5 text-gold" />
+                <span>Turnaukset</span>
+                <span className="text-[10px] opacity-80">({filterCounts.tournaments})</span>
+              </button>
+            )}
+
+            {filterCounts.matches > 0 && (
+              <button
+                type="button"
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'matches' ? 'all' : 'matches')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'matches'
+                    ? 'bg-pitch/25 text-pitch border border-pitch/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-pitch border border-border-subtle'
                 }`}
               >
                 <span>⚽ Sarjapelit</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.matches})</span>
+                <span className="text-[10px] opacity-80">({filterCounts.matches})</span>
               </button>
             )}
-            {categoryCounts.trainings > 0 && (
+
+            {filterCounts.trainings > 0 && (
               <button
                 type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'trainings' ? 'all' : 'trainings')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'trainings'
-                    ? 'bg-radar/20 text-radar border border-radar/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-radar border border-border-subtle'
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'trainings' ? 'all' : 'trainings')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'trainings'
+                    ? 'bg-blue-500/25 text-blue-400 border border-blue-500/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-blue-400 border border-border-subtle'
                 }`}
               >
                 <span>🏃 Treenit</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.trainings})</span>
+                <span className="text-[10px] opacity-80">({filterCounts.trainings})</span>
               </button>
             )}
-            {categoryCounts.other > 0 && (
+
+            {filterCounts.other > 0 && (
               <button
                 type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'other' ? 'all' : 'other')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  categoryFilter === 'other'
-                    ? 'bg-whistle/20 text-whistle border border-whistle/40 shadow-xs'
-                    : 'bg-surface-elevated text-text-secondary hover:text-whistle border border-border-subtle'
+                onClick={() => setEventTypeFilter(eventTypeFilter === 'other' ? 'all' : 'other')}
+                className={`touch-target min-h-[44px] px-3 rounded-xl font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                  eventTypeFilter === 'other'
+                    ? 'bg-purple-500/25 text-purple-400 border border-purple-500/40 shadow-xs'
+                    : 'bg-surface-elevated text-text-muted hover:text-purple-400 border border-border-subtle'
                 }`}
               >
-                <span>📋 Muu / Talkoot</span>
-                <span className="text-[10px] opacity-80">({categoryCounts.other})</span>
+                <span>📚 Muut</span>
+                <span className="text-[10px] opacity-80">({filterCounts.other})</span>
               </button>
             )}
           </div>
         </div>
 
-        {unDismissedConflicts.length > 0 && (
-          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setIsLogisticsOpen(true)}
-              aria-label={`Logistiikkaristiriita: ${unDismissedConflicts[0]?.message}. Avaa kuskijako.`}
-              className="flex min-h-[44px] flex-1 items-start gap-2.5 text-left cursor-pointer hover:brightness-105 transition-all focus-visible:ring-2 focus-visible:ring-whistle"
-            >
-              <span className="mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse shrink-0">
-                Ristiriita
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-text-primary leading-snug">
-                  {unDismissedConflicts[0]?.message}
+        {settings.showConflictWarnings && unDismissedConflicts.length > 0 && (() => {
+          const firstConflict = unDismissedConflicts[0]!;
+          const dateLabel = firstConflict.formattedDate || (firstConflict.date ? firstConflict.date.slice(5) : '');
+
+          return (
+            <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-2xl border border-whistle/40 bg-whistle/15 px-3.5 py-3 shadow-xs">
+              <button
+                type="button"
+                onClick={modalStore.openLogistics}
+                aria-label={`Logistiikkaristiriita: ${firstConflict.message}. Avaa kuskijako.`}
+                className="flex min-h-[44px] flex-1 items-start gap-2.5 text-left cursor-pointer hover:brightness-105 transition-all focus-visible:ring-2 focus-visible:ring-whistle"
+              >
+                <div className="flex flex-col gap-1 items-start shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-whistle text-text-inverse">
+                    Ristiriita
+                  </span>
+                  {dateLabel && (
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-surface-elevated text-whistle border border-whistle/30">
+                      📅 {dateLabel}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs font-bold text-whistle mt-1 flex items-center gap-1">
-                  <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-text-primary leading-snug">
+                    {firstConflict.message}
+                  </div>
+                  {firstConflict.eventATitle && firstConflict.eventBTitle && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+                      <span className="px-2 py-0.5 rounded-lg bg-surface-elevated/70 border border-border-subtle font-medium text-[11px] truncate max-w-[240px]">
+                        1️⃣ {firstConflict.eventATitle} ({firstConflict.eventATime} @ {firstConflict.venueA})
+                      </span>
+                      <span className="text-text-muted text-[10px]">⚔️</span>
+                      <span className="px-2 py-0.5 rounded-lg bg-surface-elevated/70 border border-border-subtle font-medium text-[11px] truncate max-w-[240px]">
+                        2️⃣ {firstConflict.eventBTitle} ({firstConflict.eventBTime} @ {firstConflict.venueB})
+                      </span>
+                    </div>
+                  )}
+                  {firstConflict.suggestedFix && (
+                    <div data-testid="conflict-advice" className="mt-1.5 text-xs font-semibold text-text-primary">
+                      💡 {firstConflict.suggestedFix}
+                    </div>
+                  )}
+                  <div className="text-xs font-bold text-whistle mt-1.5 flex items-center gap-1">
+                    <span>🚗 Avaa kuskijako & kimppakyydit ➔</span>
+                  </div>
                 </div>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => unDismissedConflicts[0] && dismissConflict(unDismissedConflicts[0])}
-              className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
-              title="Merkitse tämä huomio hoidetuksi ja piilota se"
-            >
-              <span>✓</span>
-              <span>Kuittaa hoidetuksi</span>
-            </button>
-          </div>
-        )}
+              </button>
+              <button
+                type="button"
+                onClick={() => dismissConflict(firstConflict)}
+                className="self-end sm:self-center px-3 py-1.5 rounded-xl bg-surface-elevated text-text-secondary hover:text-pitch hover:border-pitch/40 border border-border-subtle text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 shrink-0 flex items-center gap-1"
+                title="Merkitse tämä huomio hoidetuksi ja piilota se"
+              >
+                <span>✓</span>
+                <span>Kuittaa hoidetuksi</span>
+              </button>
+            </div>
+          );
+        })()}
 
         {viewMode === 'cards' ? (
           <>
             {/* Quick Drop-In Bar & Photo OCR at Top */}
             <QuickDropInBar
               existingPlayers={Array.from(new Set(profiles.map((p) => p.playerName).filter(Boolean)))}
-              activeProfilePlayerName={
-                activeProfileId.startsWith('player:')
-                  ? activeProfileId.replace('player:', '')
-                  : profiles.find((p) => p.id === activeProfileId)?.playerName
-              }
-              onEventCreated={() => {}}
+              activeProfilePlayerName={activePlayerName}
+              onEventCreated={() => setActiveProfileId('all')}
             />
 
-            {snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
+            {settings.showScheduleAdvisories && snapshot.difficultDays && snapshot.difficultDays.length > 0 && (
               <DifficultDayAlert
                 warnings={snapshot.difficultDays}
-                onOpenLogistics={() => setIsLogisticsOpen(true)}
+                onOpenLogistics={modalStore.openLogistics}
               />
             )}
 
@@ -1156,7 +1226,7 @@ export const App: React.FC = () => {
                           // Wire the previously-dead strip buttons (M-44):
                           // select the event so it opens the stats modal.
                           const ev = rawEvents.find((e) => e.id === eventId);
-                          if (ev && !ev.isTraining) setSelectedStatsEvent(ev);
+                          if (ev && !ev.isTraining) modalStore.openStats(ev);
                         }}
                       />
                     )}
@@ -1187,8 +1257,8 @@ export const App: React.FC = () => {
                     key={dayGroup.dateStr}
                     className="rounded-3xl border border-border-strong/70 bg-surface/60 backdrop-blur-sm p-3.5 sm:p-4.5 flex flex-col gap-3.5 shadow-sm"
                   >
-                    {/* Day Section Header (Inside the Day Container) */}
-                    <div className="pb-2.5 border-b border-border-subtle flex items-center justify-between">
+                    {/* Day Section Header (Sticky inside the Day Container) */}
+                    <div className="sticky top-[var(--sticky-filter-height,112px)] z-10 -mx-3.5 -mt-3.5 px-3.5 pt-3.5 pb-2.5 sm:-mx-4.5 sm:-mt-4.5 sm:px-4.5 sm:pt-4.5 bg-surface/95 backdrop-blur-md border-b border-border-subtle rounded-t-3xl flex items-center justify-between shadow-xs transition-all">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 rounded-xl bg-pitch/15 text-pitch">
                           <CalendarIcon className="w-4 h-4" />
@@ -1206,33 +1276,38 @@ export const App: React.FC = () => {
                     <div className="flex flex-col gap-3">
                       {dayGroup.events.map((event) => {
                         const profile = profiles.find((p) => p.id === event.profileId);
-                        const isFeaturedNext = event.id === snapshot.nextEvent?.id;
+                        // A finished game is never "next": it shows as a result card.
+                        const isFeaturedNext = event.id === snapshot.nextEvent?.id && !isFinishedGame(event);
 
                         if (isFeaturedNext) {
                           return (
                             <HeroMatchCard
                               key={event.id}
                               event={event}
-                              allEvents={rawEvents}
+                              allEvents={allStitchedEvents}
                               profile={snapshot.nextPlayer || profile}
                               kit={snapshot.kitByEventId[event.id]}
                               conflicts={snapshot.conflicts}
+                              showConflictWarnings={settings.showConflictWarnings}
+                              showSmartGearAdvice={settings.showSmartGearAdvice}
                               homeLocation={homeLocation}
-                              onOpenHomeModal={() => setIsHomeLocationOpen(true)}
-                              onResolveMismatch={handleResolveMismatch}
+                              onOpenHomeModal={modalStore.openHomeLocation}
                               onNavigate={() => {
-                                const coords = event.parking?.coordinates || event.venue?.coordinates;
-                                const destination =
-                                  coords?.lat != null && coords?.lng != null
-                                    ? `${coords.lat},${coords.lng}`
-                                    : encodeURIComponent(event.venue?.name || 'Kenttä');
-                                window.open(
-                                  `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
-                                  '_blank',
-                                  'noopener,noreferrer'
-                                );
-                              }}
-                              onOpenStats={() => setSelectedStatsEvent(event)}
+                                  const isApprox = event.venue?.isApproximateLocation;
+                                  const coords = (!isApprox ? event.venue?.coordinates : undefined);
+                                  const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                                  const destination =
+                                    hasValidCoords
+                                      ? `${coords.lat},${coords.lng}`
+                                      : encodeURIComponent(event.venue?.name || 'Kenttä');
+                                  window.open(
+                                    `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+                                    '_blank',
+                                    'noopener,noreferrer'
+                                  );
+                                }}
+                              onOpenStats={() => modalStore.openStats(event)}
+                              onResolveMismatch={handleResolveMismatch}
                               onEventUpdated={handleEventUpdated}
                               onEventMerged={handleEventUpdated}
                               onEventDeleted={async (deletedId) => {
@@ -1249,14 +1324,16 @@ export const App: React.FC = () => {
                           <MatchdayCard
                             key={event.id}
                             event={event}
-                            allEvents={rawEvents}
+                            allEvents={allStitchedEvents}
                             playerName={profile?.playerName}
                             colorHex={profile?.colorHex}
                             profile={profile}
                             compact
                             conflicts={snapshot.conflicts}
+                            showConflictWarnings={settings.showConflictWarnings}
+                            showSmartGearAdvice={settings.showSmartGearAdvice}
                             homeLocation={homeLocation}
-                            onOpenHomeModal={() => setIsHomeLocationOpen(true)}
+                            onOpenHomeModal={modalStore.openHomeLocation}
                             onResolveMismatch={handleResolveMismatch}
                             onEventUpdated={handleEventUpdated}
                             onEventMerged={handleEventUpdated}
@@ -1303,26 +1380,34 @@ export const App: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-black text-text-primary">
-                    {categoryFilter === 'out'
+                    {attendanceFilter === 'out'
                       ? 'Ei merkittyjä poisjääntejä'
-                      : categoryFilter !== 'all' || activeProfileId !== 'all'
+                      : attendanceFilter !== 'all' || eventTypeFilter !== 'all' || activeProfileId !== 'all'
                       ? 'Ei tapahtumia valitulla suodatuksella'
                       : 'Ei tulevia otteluita kalenterissa'}
                   </h3>
                   <p className="text-xs text-text-muted max-w-sm">
-                    {categoryFilter === 'out'
+                    {attendanceFilter === 'out'
                       ? 'Kaikkiin tuleviin tapahtumiin osallistutaan normaalisti.'
-                      : categoryFilter !== 'all' || activeProfileId !== 'all'
+                      : attendanceFilter !== 'all' || eventTypeFilter !== 'all' || activeProfileId !== 'all'
                       ? 'Valitulla suodattimella ei löytynyt tulevia tapahtumia. Voit tyhjentää suodattimen nähdäksesi kaikki tapahtumat.'
-                      : 'Tulevia otteluita ei ole vielä julkaistu sarjajärjestelmässä tai kausi on päättynyt.'}
+                      : 'Liitä Nimenhuuto-, MyClub- tai liiton linkki, tai liitä WhatsApp-viesti.'}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => openAddTeam(activePlayerName)}
+                  className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs shadow-md shadow-pitch/20 hover:brightness-110 active:brightness-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-pitch transition-all"
+                >
+                  <span>Tuo joukkue</span>
+                </button>
 
-                {(categoryFilter !== 'all' || activeProfileId !== 'all') && (
+                {(attendanceFilter !== 'all' || eventTypeFilter !== 'all' || activeProfileId !== 'all') && (
                   <button
                     type="button"
                     onClick={() => {
-                      setCategoryFilter('all');
+                      setAttendanceFilter('all');
+                      setEventTypeFilter('all');
                       setActiveProfileId('all');
                     }}
                     className="mt-1 inline-flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-2xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 transition-all cursor-pointer shadow-xs"
@@ -1351,20 +1436,20 @@ export const App: React.FC = () => {
               events={categoryFilteredEvents}
               profiles={profiles}
               viewMode={viewMode}
-              conflicts={unDismissedConflicts}
-              onSelectEvent={(ev) => setSelectedStatsEvent(ev)}
-              onClearFilter={
-                activeProfileId !== 'all' || categoryFilter !== 'all'
-                  ? () => {
-                      setActiveProfileId('all');
-                      setCategoryFilter('all');
-                    }
-                  : undefined
-              }
+              conflicts={snapshot.conflicts}
+              showConflictWarnings={settings.showConflictWarnings}
+              onSelectEvent={(ev) => modalStore.openStats(ev)}
+              onClearFilter={() => {
+                setActiveProfileId('all');
+                setAttendanceFilter('all');
+                setEventTypeFilter('all');
+              }}
               onNavigate={(ev) => {
-                const coords = ev.parking?.coordinates || ev.venue?.coordinates;
+                const isApprox = ev.venue?.isApproximateLocation;
+                const coords = (!isApprox ? ev.venue?.coordinates : undefined);
+                const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
                 const destination =
-                  coords?.lat != null && coords?.lng != null
+                  hasValidCoords
                     ? `${coords.lat},${coords.lng}`
                     : encodeURIComponent(ev.venue?.name || 'Kenttä');
                 window.open(
@@ -1376,138 +1461,51 @@ export const App: React.FC = () => {
             />
           </div>
         )}
+
+        {/* Persistent Build & Version Footer */}
+        <footer className="mt-8 mb-4 pt-4 border-t border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-text-muted">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-text-secondary">PELIPÄIVÄ</span>
+            <span>•</span>
+            <span
+              data-testid="app-version-badge"
+              className="px-2 py-0.5 rounded-md bg-surface-elevated border border-border-subtle font-mono text-[10px] text-text-secondary"
+            >
+              v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0'} (git:{typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'})
+            </span>
+          </div>
+          <div className="text-[10px] opacity-75">
+            Suomen mestaruustason perheurheilun tilannekeskus
+          </div>
+        </footer>
       </main>
 
-      {/* Unified Smart Multi-Tab Importer (Federation URL, Cups, WhatsApp, Excel, OCR) */}
-      <Suspense fallback={null}>
-      <SmartImportModal
-        isOpen={isSmartImportOpen}
-        onClose={() => {
-          setIsSmartImportOpen(false);
-          setImportDefaults({});
-        }}
+      <GlobalModalHost
+        activeModal={modalStore.activeModal}
+        onClose={modalStore.closeModal}
+        allStitchedEvents={allStitchedEvents}
+        profiles={profiles}
+        homeLocation={homeLocation}
+        saveHomeLocation={saveHomeLocation}
         existingPlayers={playerNames}
-        initialSport={importDefaults.sport}
-        initialTeamUrl={importDefaults.url}
-        initialTeamName={importDefaults.name}
-        initialPlayerName={importDefaults.playerName}
-        initialColorHex={importDefaults.colorHex}
-        initialSquadFilters={importDefaults.squadFilters}
-        editingProfileId={importDefaults.profileId}
-        onImportClassic={handleImportCalendar}
+        handleImportCalendar={handleImportCalendar}
+        openAddTeam={openAddTeam}
+        openEditProfile={openEditProfile}
+        showConflictWarnings={settings.showConflictWarnings}
+        toggleConflictWarnings={toggleConflictWarnings}
+        aiSettings={settings}
+        onToggleAiSetting={updateSetting}
+        setIsOnboardingActive={setIsOnboardingActive}
+        setActiveProfileId={setActiveProfileId}
+        openHomeLocation={modalStore.openHomeLocation}
+        openFamilyShare={modalStore.openFamilyShare}
       />
 
-      {/* Family Logistics & Carpooling Modal */}
-      <FamilyLogisticsModal
-        isOpen={isLogisticsOpen}
-        onClose={() => setIsLogisticsOpen(false)}
-        events={rawEvents}
-        profiles={profiles}
-        homeLocation={homeLocation}
-        onOpenHomeModal={() => {
-          setIsLogisticsOpen(false);
-          setIsHomeLocationOpen(true);
-        }}
-      />
+      {/* Real-Time Live Goal & Event Toast Alert Banner */}
+      <LiveMatchToast />
 
-      {/* Home Location & Active Transit Modal */}
-      <HomeLocationModal
-        isOpen={isHomeLocationOpen}
-        onClose={() => setIsHomeLocationOpen(false)}
-        currentHome={homeLocation}
-        onSaveHome={async (h) => {
-          await saveHomeLocation(h);
-          // Recalculate transit & venue coordinates immediately for all events
-          const all = await db.events.toArray();
-          for (const ev of all) {
-            let currentVenue = ev.venue;
-            if (ev.venue?.name) {
-              const freshVenue = await resolveSportsVenue(ev.venue.name);
-              currentVenue = freshVenue;
-            }
-            if (currentVenue?.coordinates) {
-              const freshTransit = resolveTransitPlan(h, currentVenue.coordinates, ev.weather);
-              await db.events.update(ev.id, { venue: currentVenue, transit: freshTransit });
-            }
-          }
-        }}
-      />
-
-      {/* Natural Language Q&A Modal */}
-      <AskCopilotModal
-        isOpen={isAskCopilotOpen}
-        onClose={() => setIsAskCopilotOpen(false)}
-        events={rawEvents}
-        profiles={profiles}
-      />
-
-      {/* Family Management & Child Roster Modal */}
-      <FamilyManageModal
-        isOpen={isFamilyManageOpen}
-        onClose={() => setIsFamilyManageOpen(false)}
-        profiles={profiles}
-        homeLocation={homeLocation}
-        onOpenHomeLocation={() => {
-          setIsFamilyManageOpen(false);
-          setIsHomeLocationOpen(true);
-        }}
-        onOpenImportForPlayer={(playerName) => {
-          setIsFamilyManageOpen(false);
-          openAddTeam(playerName);
-        }}
-        onEditProfile={(profile) => openEditProfile(profile)}
-        onOpenFamilyShare={() => {
-          setIsFamilyManageOpen(false);
-          setIsFamilyShareOpen(true);
-        }}
-        onOpenOnboardingWizard={() => {
-          localStorage.removeItem('pelipaiva_onboarding_done');
-          setIsOnboardingActive(true);
-          setIsFamilyManageOpen(false);
-        }}
-      />
-
-      {/* Zero-Auth Family Share & Backup Modal */}
-      <FamilyShareModal
-        isOpen={isFamilyShareOpen}
-        onClose={() => setIsFamilyShareOpen(false)}
-        profiles={profiles}
-        onDataImported={() => {}}
-      />
-
-      {/* Live Family Calendar Subscription Modal (webcal://) */}
-      <FamilyCalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-        events={rawEvents}
-        profiles={profiles}
-      />
-
-      {/* Global Interactive Match Stats Modal (for Timeline & Calendar selections) */}
-      {selectedStatsEvent && !selectedStatsEvent.isTraining && (
-        <MatchStatsModal
-          isOpen={true}
-          onClose={() => setSelectedStatsEvent(null)}
-          stats={selectedStatsEvent.stats}
-          homeTeam={selectedStatsEvent.homeTeam}
-          awayTeam={selectedStatsEvent.awayTeam || 'Vastustaja'}
-          playerName={profiles.find((p) => p.id === selectedStatsEvent.profileId)?.playerName}
-          playerLog={selectedStatsEvent.playerLog}
-          score={selectedStatsEvent.score}
-          sport={selectedStatsEvent.sport}
-          onSavePlayerLog={async (log, updatedScore) => {
-            const updates: Partial<MatchdayEvent> = {
-              playerLog: log,
-              score: updatedScore || selectedStatsEvent.score
-            };
-            // Persist only the player's own log/score — never the synthetic
-            // preview stats (M-05).
-            await db.events.update(selectedStatsEvent.id, updates).catch(console.warn);
-            setSelectedStatsEvent((prev) => (prev ? { ...prev, ...updates } : null));
-          }}
-        />
-      )}
-      </Suspense>
+      {/* Unified In-App Fetch & Status Notifications */}
+      <NotificationToastContainer />
     </div>
   );
 };

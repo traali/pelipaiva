@@ -1,0 +1,216 @@
+name: Deploy neighbor Pages
+
+# Football, basketball and volleyball repos have no Cloudflare token, so their
+# own CD goes green and publishes nothing. This house has the token.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-neighbors.yml
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  parkkis:
+    name: Deploy Parkkis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/Parkkis
+          ref: master
+          path: Parkkis
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Parkkis/web/package-lock.json
+      - name: Install and build
+        working-directory: Parkkis/web
+        run: npm ci && npm run build
+      - name: Publish Parkkis
+        working-directory: Parkkis/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create parkkis --production-branch=master || true
+          npx --yes wrangler@4 pages deploy dist --project-name=parkkis --commit-dirty=true
+
+  weather:
+    name: Deploy weather-stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/weather-stats
+          ref: main
+          path: weather-stats
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: weather-stats/package-lock.json
+      - name: Install and build
+        working-directory: weather-stats
+        run: npm ci && npm run build
+      - name: Publish weather-stats
+        working-directory: weather-stats
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create weather-stats --production-branch=main || true
+          npx --yes wrangler@4 pages deploy dist --project-name=weather-stats --commit-dirty=true
+
+  federation:
+    name: Deploy sports-federation index
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/sports-federation
+          ref: main
+          path: sports-federation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Publish sports-federation
+        working-directory: sports-federation
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create sports-federation --production-branch=main || true
+          npx --yes wrangler@4 pages deploy site --project-name=sports-federation --commit-dirty=true
+
+  floorball:
+    name: Deploy floorball-stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/floorball-stats
+          ref: main
+          path: floorball-stats
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: floorball-stats/package-lock.json
+      - name: Install and build
+        working-directory: floorball-stats
+        run: npm ci && npm run build
+      - name: Publish floorball-stats
+        working-directory: floorball-stats
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create floorball-stats --production-branch=main || true
+          npx --yes wrangler@4 pages deploy dist --project-name=floorball-stats --commit-dirty=true
+
+  football:
+    name: Deploy football-stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/football-stats
+          ref: main
+          path: football-stats
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: football-stats/package-lock.json
+      - name: Install and build
+        working-directory: football-stats
+        run: npm ci && npm run build
+      - name: Publish both football hostnames
+        working-directory: football-stats
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages deploy dist --project-name=football-stats --commit-dirty=true
+
+  basketball:
+    name: Deploy basketball-stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/basketball-stats
+          ref: main
+          path: basketball-stats
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: basketball-stats/package-lock.json
+      - name: Install and build
+        working-directory: basketball-stats
+        run: npm ci && npm run build
+      - name: Publish basketball-stats
+        working-directory: basketball-stats
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create basketball-stats --production-branch=main || true
+          npx --yes wrangler@4 pages deploy dist --project-name=basketball-stats --commit-dirty=true
+
+  volleyball:
+    name: Deploy volleyball-stats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/volleyball-stats
+          ref: main
+          path: volleyball-stats
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: volleyball-stats/package-lock.json
+      - name: Install and build
+        working-directory: volleyball-stats
+        run: npm ci && npm run build
+      - name: Publish volleyball-stats
+        working-directory: volleyball-stats
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages deploy dist --project-name=volleyball-stats --commit-dirty=true
+
+  reitti:
+    name: Deploy reitti
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: traali/Reitti
+          ref: main
+          path: reitti
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: reitti/package-lock.json
+      - name: Install and build
+        working-directory: reitti
+        run: npm ci && npm run build
+      - name: Publish reitti
+        working-directory: reitti
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create reitti --production-branch=main || true
+          npx --yes wrangler@4 pages deploy dist --project-name=reitti --commit-dirty=true

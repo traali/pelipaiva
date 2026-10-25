@@ -7,9 +7,11 @@ import {
   mergeRosters,
   FamilyRosterV1,
   fetchFamilyRoster,
-  pushFamilyRoster
+  pushFamilyRoster,
+  mergeFamilyEvents,
+  mergeAttendanceOverrides
 } from './familyCloud';
-import { FAMILY_CODE_REGEX, existingRosterPutConflicts, parseFamilyAllowlist } from './familyCode';
+import { FAMILY_CODE_REGEX, existingRosterPutConflicts, parseFamilyAllowlist, mintFamilyCode } from './familyCode';
 import { PlayerProfile } from '../../types/matchday';
 
 describe('familyCloud Sync & Merge Engine', () => {
@@ -31,6 +33,14 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(normalizeFamilyCode('SAKKA4')).toBe('SAKKA-4');
   });
 
+  it('mints a valid Crockford family code', () => {
+    const a = mintFamilyCode();
+    const b = mintFamilyCode();
+    expect(isValidFamilyCode(a)).toBe(true);
+    expect(isValidFamilyCode(b)).toBe(true);
+    expect(a).not.toBe(b);
+  });
+
   it('worker source shares the client Crockford regex and requires If-Match on existing keys', () => {
     const workerSrc = readFileSync(resolve(__dirname, '../../../cloudflare-worker/worker.ts'), 'utf8');
     expect(workerSrc).toContain(FAMILY_CODE_REGEX.source);
@@ -39,7 +49,11 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).toContain('GET: 20');
     expect(workerSrc).toContain('PUT: 5');
     expect(workerSrc).toContain('FAMILY_CODES');
-    expect(workerSrc).toContain('unknown_family');
+    expect(workerSrc).toContain('FAMILY_SLOT_CAP');
+    expect(workerSrc).toContain('family_slots_full');
+    expect(workerSrc).toContain('denyUnknownFamily');
+    expect(workerSrc).not.toMatch(/if \(issued\.size === 0 \|\| !issued\.has\(code\)\)/);
+    expect(workerSrc).not.toMatch(/issued\.size > 0 && !issued/);
     expect(workerSrc).toContain('isAllowedProxyTarget');
     expect(workerSrc).toContain('api.lipas.fi');
     expect(workerSrc).toContain('collectRosterIcsEvents');
@@ -50,7 +64,7 @@ describe('familyCloud Sync & Merge Engine', () => {
     expect(workerSrc).not.toMatch(/FAMILY_CODES\s*=\s*['\"][0-9A-HJKMNP-TV-Z]{5}-/);
   });
 
-  it('allowlist is fail-closed and does not live in the client', () => {
+  it('allowlist parser still works and does not live in the client bundle as issued values', () => {
     expect(parseFamilyAllowlist(undefined).size).toBe(0);
     expect(parseFamilyAllowlist('').size).toBe(0);
     const issued = parseFamilyAllowlist('AAAAA-1, BBBBB-2\nCCCCC-3');
@@ -279,4 +293,93 @@ describe('familyCloud Sync & Merge Engine', () => {
       expect((conflictPush as any).currentRev).toBe(5);
     }
   });
+
+  describe('Manual Events & Attendance Overrides Sync', () => {
+    it('mergeFamilyEvents resolves tombstones and last-write-wins', () => {
+      const recentTombstone = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const local: any[] = [
+        {
+          id: 'me-1',
+          title: 'Vanhempainilta (Local Edit)',
+          startTime: '2026-09-10T18:00:00Z',
+          updatedAt: '2026-09-02T10:00:00Z',
+          authorDeviceId: 'dev-1',
+          profileIds: []
+        },
+        {
+          id: 'me-2',
+          title: 'Hammaslääkäri',
+          startTime: '2026-09-11T09:00:00Z',
+          updatedAt: '2026-09-02T10:00:00Z',
+          deletedAt: recentTombstone,
+          authorDeviceId: 'dev-1',
+          profileIds: []
+        }
+      ];
+
+      const remote: any[] = [
+        {
+          id: 'me-1',
+          title: 'Vanhempainilta (Remote Old)',
+          startTime: '2026-09-10T18:00:00Z',
+          updatedAt: '2026-09-01T10:00:00Z',
+          authorDeviceId: 'dev-2',
+          profileIds: []
+        },
+        {
+          id: 'me-2',
+          title: 'Hammaslääkäri (Remote Active)',
+          startTime: '2026-09-11T09:00:00Z',
+          updatedAt: '2026-09-02T09:00:00Z',
+          authorDeviceId: 'dev-2',
+          profileIds: []
+        },
+        {
+          id: 'me-3',
+          title: 'Koulun myyjäiset',
+          startTime: '2026-09-12T12:00:00Z',
+          updatedAt: '2026-09-02T08:00:00Z',
+          authorDeviceId: 'dev-2',
+          profileIds: []
+        }
+      ];
+
+      const merged = mergeFamilyEvents(local, remote);
+      expect(merged.length).toBe(3);
+
+      const me1 = merged.find((e) => e.id === 'me-1');
+      expect(me1?.title).toBe('Vanhempainilta (Local Edit)');
+
+      const me2 = merged.find((e) => e.id === 'me-2');
+      expect(me2?.deletedAt).toBe(recentTombstone);
+
+      const me3 = merged.find((e) => e.id === 'me-3');
+      expect(me3?.title).toBe('Koulun myyjäiset');
+    });
+
+    it('mergeAttendanceOverrides picks latest updatedAt status per eventId', () => {
+      const local = [
+        { eventId: 'match-1', status: 'out' as const, updatedAt: '2026-09-02T11:00:00Z' },
+        { eventId: 'match-2', status: 'in' as const, updatedAt: '2026-09-01T09:00:00Z' }
+      ];
+      const remote = [
+        { eventId: 'match-1', status: 'in' as const, updatedAt: '2026-09-02T10:00:00Z' },
+        { eventId: 'match-2', status: 'out' as const, updatedAt: '2026-09-02T08:00:00Z' },
+        { eventId: 'match-3', status: 'out' as const, updatedAt: '2026-09-02T07:00:00Z' }
+      ];
+
+      const merged = mergeAttendanceOverrides(local, remote);
+      expect(merged.length).toBe(3);
+
+      const m1 = merged.find((o) => o.eventId === 'match-1');
+      expect(m1?.status).toBe('out'); // Local (11:00) beats remote (10:00)
+
+      const m2 = merged.find((o) => o.eventId === 'match-2');
+      expect(m2?.status).toBe('out'); // Remote (09-02 08:00) beats local (09-01 09:00)
+
+      const m3 = merged.find((o) => o.eventId === 'match-3');
+      expect(m3?.status).toBe('out');
+    });
+  });
 });
+

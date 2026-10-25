@@ -14,10 +14,10 @@ Secret name: `FAMILY_CODES`
 | Fact | Detail |
 | --- | --- |
 | Codes are optional for users | Pelipäivä works fully on one phone with no code (Dexie only). |
-| Codes are not optional for the Worker | Empty or unknown code → **403** `unknown_family`. Fail closed. |
-| Ten slots | Comma-separated Crockford-32 values in one secret. Max storage = 10 KV keys. |
-| Possession = membership | Anyone with a live code can GET/PUT that family’s roster. |
-| Client cannot mint | There is no “Luo perhe-koodi”. Join or `?perhe=`. |
+| Any valid Crockford code | Format `XXXXX-X`. First PUT claims a slot (max 10). New mint or old phone code — both activate the same way. |
+| Ten slots | Claimed `family:` KV keys. Further PUTs of *new* codes → 403 `family_slots_full`. Already-claimed codes stay writable. |
+| Possession = membership | Anyone with the code can GET/PUT that family’s roster. |
+| Client mints | Onboarding / Perhejako → **Luo uusi perhekoodi**, or type an old code and **Aktivoi**. |
 | GitHub cannot mint | Alphabet and regex are public. The **issued list is not**. |
 
 Format: `XXXXX-X`  
@@ -28,7 +28,11 @@ Regex (client + Worker): `^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]$`
 
 ## 1. First-time setup (unlock family sync)
 
-Until this secret exists, every `/api/family/:code` call is 403. Local PWA still works.
+**Empty secret (default):** open [https://pelipaiva.pages.dev/?perhe=YOUR-CODE](https://pelipaiva.pages.dev/?perhe=YOUR-CODE) on the phone that already has the kids/teams. GET returns 404, the PWA PUTs the roster, the slot is claimed. Other phones can then join.
+
+**Lock to a list:** set `FAMILY_CODES` (dashboard or `wrangler secret put`). Unknown codes 403 again.
+
+Until a slot is claimed, `GET /api/family/:code` is 404 (`not_found`) when the secret is empty, or 403 (`unknown_family`) when the secret is set and the code is missing.
 
 ### Dashboard (preferred)
 
@@ -72,7 +76,7 @@ Pick **one** issued code per family. WhatsApp the join template (app copies it a
 Pelipäivä-perhe {CODE}
 Avaa: https://pelipaiva.pages.dev/?perhe={CODE}
 
-Etunimi ja joukkue-URL Cloudflareen 7 pv.
+Etunimi ja joukkue-URL Cloudflareen 30 pv.
 Ottelut tulospalvelusta. Ei sukunimeä, ei vammoja.
 ```
 
@@ -137,7 +141,7 @@ After a dashboard edit, wait a few seconds and re-run the curl checks.
 
 Existing KV row + missing/stale `If-Match` → **409**. First PUT of an empty allowlisted slot has no `If-Match`.
 
-Roster TTL: **7 days** sliding on PUT. Idle family vanishes; same issued code can be used again (404 then first PUT).
+Roster TTL: **30 days** sliding on PUT. Idle family vanishes; same issued code can be used again (404 then first PUT).
 
 ---
 

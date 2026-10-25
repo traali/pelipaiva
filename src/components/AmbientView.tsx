@@ -98,7 +98,9 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
   const shown = cycle[cursor] || snapshot.nextEvent;
   const profile = shown ? profiles.find((p) => p.id === shown.profileId) : undefined;
   const depart = shown ? calculateDepartureCountdown(shown, profile?.arrivalRules, homeLocation) : undefined;
-  const temp = shown?.weather?.isForecastLongRange ? undefined : shown?.weather?.temperatureC;
+  const weather = shown?.weather;
+  const temp =
+    !weather || weather.isCacheFallback || weather.isForecastLongRange ? undefined : weather.temperatureC;
 
   return (
     <div
@@ -152,7 +154,7 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
               {sportLabelFi(shown.sport)}
             </span>
             <span>
-              {shown.isTraining ? 'Treenit' : 'Alkulämpö'}{' '}
+              {shown.isTraining ? 'Treenit' : 'Peli alkaa'}{' '}
               {new Date(shown.startTime).toLocaleTimeString('fi-FI', {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -181,8 +183,13 @@ export const AmbientView: React.FC<AmbientViewProps> = ({ events, profiles = [],
                 )}
               </div>
               <div className="mt-1 font-tabular text-4xl font-semibold text-floodlight md:text-5xl">
-                {depart?.departureTime || '—'}
+                {depart?.hasDepartureTime ? depart.departureTime : '—'}
               </div>
+              {depart && !depart.hasDepartureTime && (
+                <div className="mt-1 text-sm text-text-muted">
+                  {depart.transitPlan.needsHome ? 'Lisää kotiosoite, niin näet lähtöajan' : 'Kentän sijainti puuttuu'}
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-border-subtle bg-surface-elevated p-5">
               <div className="text-sm font-medium uppercase tracking-wide text-text-muted">Sää</div>

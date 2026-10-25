@@ -1,5 +1,6 @@
 import { SportType, EventType } from '../../types/matchday';
 import { NATIONAL_FIELD_ALIASES } from '../geo/sportsGeocoder';
+import { addHelsinkiDays, helsinkiDateISO } from '../agents/time';
 
 export interface ExtractedSportsEvent {
   title: string;
@@ -25,7 +26,7 @@ export interface ExtractedSportsEvent {
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[,\.;:!\?]/g, ' ')
+    .replace(/[,.;:!?]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -41,23 +42,23 @@ export function extractDateFromFinnishText(text: string, baseDate = new Date()):
   if (dateMatch && dateMatch[1] && dateMatch[2]) {
     const day = parseInt(dateMatch[1], 10);
     const month = parseInt(dateMatch[2], 10) - 1;
-    const year = dateMatch[3] ? parseInt(dateMatch[3], 10) : now.getFullYear();
-    const d = new Date(year, month, day, 12, 0, 0);
-    return d.toISOString().split('T')[0] || '2026-08-24';
+    const year = dateMatch[3] ? parseInt(dateMatch[3], 10) : Number(helsinkiDateISO(now).slice(0, 4));
+    const mm = String(month + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return `${year}-${mm}-${dd}`;
   }
 
   // Check for relative words
   const norm = text.toLowerCase();
+  const today = helsinkiDateISO(now);
   if (/\b(?:tänään|tämän\s+päivän)\b/i.test(norm)) {
-    return now.toISOString().split('T')[0] || '2026-08-24';
+    return today;
   }
   if (/\b(?:huomenna|huomisen|huomiseen|huomiselle)\b/i.test(norm)) {
-    const tmrw = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    return tmrw.toISOString().split('T')[0] || '2026-08-25';
+    return addHelsinkiDays(today, 1);
   }
   if (/\b(?:ylihuomenna|ylihuomisen|ylihuomiseen)\b/i.test(norm)) {
-    const dayAfter = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-    return dayAfter.toISOString().split('T')[0] || '2026-08-26';
+    return addHelsinkiDays(today, 2);
   }
 
   // Weekdays with inflections (-na, -n, -in, -lle, -ksi) and common typos
@@ -73,11 +74,14 @@ export function extractDateFromFinnishText(text: string, baseDate = new Date()):
 
   for (const { day: targetDay, pattern } of weekdayPatterns) {
     if (pattern.test(norm)) {
-      const currentDay = now.getDay();
+      const weekday = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Helsinki',
+        weekday: 'short'
+      }).format(now);
+      const currentDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
       let diff = targetDay - currentDay;
-      if (diff <= 0) diff += 7; // Next occurrence
-      const targetDate = new Date(now.getTime() + diff * 24 * 60 * 60 * 1000);
-      return targetDate.toISOString().split('T')[0] || '2026-08-24';
+      if (diff <= 0) diff += 7;
+      return addHelsinkiDays(helsinkiDateISO(now), diff);
     }
   }
 
@@ -105,11 +109,14 @@ export function extractTimesFromFinnishText(text: string): {
     warmup = `${hh}:${mm}`;
   }
 
+  // Strip warmup text so warmup time is not erroneously matched as kickoff
+  const kickoffSearchText = warmupMatch ? norm.replace(warmupMatch[0], ' ') : norm;
+
   // Pattern: "klo 15:00", "klo 15.00 - 16.30", "15:00 alkaen", "ottelu klo 15:00"
   let kickoff = '';
   let end = '';
 
-  const rangeMatch = norm.match(
+  const rangeMatch = kickoffSearchText.match(
     /(?:klo|kello)?\s*(\d{1,2})[:.](\d{2})\s*(?:-|–|klo)?\s*(\d{1,2})[:.](\d{2})/i
   );
   if (rangeMatch && rangeMatch[1] && rangeMatch[2] && rangeMatch[3] && rangeMatch[4]) {
@@ -120,7 +127,7 @@ export function extractTimesFromFinnishText(text: string): {
     kickoff = `${h1}:${m1}`;
     end = `${h2}:${m2}`;
   } else {
-    const singleTimeMatch = norm.match(/(?:klo|kello|klo:)?\s*(\d{1,2})[:.](\d{2})/i);
+    const singleTimeMatch = kickoffSearchText.match(/(?:klo|kello|klo:)?\s*(\d{1,2})[:.](\d{2})/i);
     if (singleTimeMatch && singleTimeMatch[1] && singleTimeMatch[2]) {
       const hh = singleTimeMatch[1].padStart(2, '0');
       const mm = singleTimeMatch[2];
@@ -137,17 +144,6 @@ export function extractTimesFromFinnishText(text: string): {
     const m = Number(mStr);
     const endH = ((h + 1) % 24).toString().padStart(2, '0');
     end = `${endH}:${m.toString().padStart(2, '0')}`;
-  }
-
-  if (!warmup) {
-    const [hStr = '15', mStr = '00'] = kickoff.split(':');
-    const h = Number(hStr);
-    const m = Number(mStr);
-    let totalMins = h * 60 + m - 45;
-    if (totalMins < 0) totalMins += 24 * 60;
-    const wH = Math.floor(totalMins / 60).toString().padStart(2, '0');
-    const wM = (totalMins % 60).toString().padStart(2, '0');
-    warmup = `${wH}:${wM}`;
   }
 
   return { kickoff, warmup, end };
@@ -402,7 +398,7 @@ export function extractKitColorFromText(text: string): string | undefined {
  */
 export function parseFreeformSportsMessage(
   rawText: string,
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): ExtractedSportsEvent {
   const all = parseMultipleSportsMessages(rawText, defaultPlayer);
   return all[0] || parseSingleFreeformBlock(rawText, defaultPlayer);
@@ -444,7 +440,7 @@ function extractMatchTimeInLine(line: string): string | null {
  */
 export function parseMultipleSportsMessages(
   rawText: string,
-  defaultPlayer = 'Maija'
+  defaultPlayer = ''
 ): ExtractedSportsEvent[] {
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length <= 1) {
@@ -535,7 +531,7 @@ export function parseMultipleSportsMessages(
 
 function parseSingleFreeformBlock(
   rawText: string,
-  _defaultPlayer = 'Maija'
+  _defaultPlayer = ''
 ): ExtractedSportsEvent {
   const norm = normalizeText(rawText);
 
@@ -709,6 +705,15 @@ function parseSingleFreeformBlock(
   // For school and non-sport events, warmupTime defaults to kickoffTime (no 45min warmup)
   if (isSchool || isOtherEvent || eventType === 'meeting') {
     times.warmup = times.kickoff;
+  } else if (!times.warmup && times.kickoff) {
+    const [hStr = '15', mStr = '00'] = times.kickoff.split(':');
+    const h = Number(hStr);
+    const m = Number(mStr);
+    let totalMins = h * 60 + m - 45;
+    if (totalMins < 0) totalMins += 24 * 60;
+    const wH = Math.floor(totalMins / 60).toString().padStart(2, '0');
+    const wM = (totalMins % 60).toString().padStart(2, '0');
+    times.warmup = `${wH}:${wM}`;
   }
 
   // 5. Venue

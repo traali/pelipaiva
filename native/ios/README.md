@@ -18,15 +18,20 @@ Default is **off**. Nothing downloads until the user taps **Lataa**.
 
 ## Wire-up (Xcode, on a Mac)
 
-1. New iOS App target, iOS 26+, WKWebView full screen.
-2. Add `FamdayAiBridge.swift` and inject `FamdayAiUserScript.js` at document start.
-3. Register message handler `famdayAi`.
-4. Load `https://pelipaiva.pages.dev`.
-5. Mirror `localStorage.pelipaiva_ondevice_llm` into `UserDefaults` (the bridge fail-closes on `off`).
-6. Optional: Background Asset for official Qwen3 0.6B `.aimodel` → `Application Support/FamdayAi/qwen3-0.6b`.
+1. Create a new iOS App project in Xcode (iOS 26+ target).
+2. Add the Swift and JS files from this directory to your Xcode target:
+   - `FamdayAi/FamdayAiBridge.swift`
+   - `FamdayAi/FamdayAiUserScript.js` (add as a bundle resource)
+   - `FamdayAi/FamdayWebViewController.swift` (set as the root view controller in SceneDelegate or SwiftUI `UIViewControllerRepresentable`)
+3. `FamdayWebViewController` automatically:
+   - Injects `FamdayAiUserScript.js` at document start.
+   - Registers the `famdayAi` message handler (`FamdayAiBridge`).
+   - Mirrors `localStorage.pelipaiva_ondevice_llm` into `UserDefaults` on every navigation and storage change event.
+   - Loads `https://pelipaiva.pages.dev`.
+4. Optional fallback: Download official Qwen3 0.6B `.aimodel` via Apple Background Assets to `Application Support/FamdayAi/qwen3-0.6b` (Wi-Fi only, never embedded in IPA).
 
 Until Qwen is packaged, Apple Intelligence (`LanguageModelSession`) is the
-only neural engine. If Intelligence is unavailable, the PWA stays on
+primary neural engine. If Intelligence is unavailable or off, the PWA remains on
 Aikataulujärki.
 
 Do not enable Private Cloud Compute. Kids’ WhatsApp stays on-device.

@@ -1,16 +1,4 @@
-import type { OfficialLeagueFixture, OfficialTeamData, SportType } from '../../types/matchday';
-
-export interface CupFixtureSeed {
-  id: string;
-  home: string;
-  away: string;
-  start: string;
-  venueName: string;
-  venueCity: string;
-  status: OfficialLeagueFixture['status'];
-  homeScore?: number;
-  awayScore?: number;
-}
+import type { OfficialTeamData, SportType } from '../../types/matchday';
 
 export interface ExampleTournament {
   id: string;
@@ -26,19 +14,6 @@ export interface ExampleTournament {
   categoryId?: string;
   note: string;
   source: 'football-stats' | 'torneopal' | 'espooliikkuu';
-  fixtures: CupFixtureSeed[];
-}
-
-function weekendAt(dow: number, hour: number, minute = 0): string {
-  const now = new Date();
-  const hel = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Helsinki' }));
-  const today = hel.getDay();
-  let add = dow - today;
-  if (dow === 0 && today !== 0) add = 7 - today;
-  const d = new Date(hel);
-  d.setDate(d.getDate() + add);
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
 }
 
 /**
@@ -60,26 +35,6 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
     categoryId: 'B13-8',
     note: 'Football-stats: /turnaukset/hc2026/B13-8/185085 · ei P13 Kolmonen',
     source: 'football-stats',
-    fixtures: [
-      {
-        id: 'hc1',
-        home: 'PPJ/Laru sin',
-        away: 'HJK',
-        start: weekendAt(6, 10, 0),
-        venueName: 'Käpylän Urheilupuisto TN 1',
-        venueCity: 'Helsinki',
-        status: 'upcoming'
-      },
-      {
-        id: 'hc2',
-        home: 'PPJ/Laru sin',
-        away: 'KäPa',
-        start: weekendAt(6, 13, 0),
-        venueName: 'Käpylän Urheilupuisto TN 1',
-        venueCity: 'Helsinki',
-        status: 'upcoming'
-      }
-    ]
   },
   {
     id: 'esli2026-topola',
@@ -95,52 +50,6 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
     categoryId: 'WU12F',
     note: 'Esport Center 2 · Girls 2015 Fun · lohko B',
     source: 'espooliikkuu',
-    fixtures: [
-      {
-        id: 'elt1',
-        home: 'EBT',
-        away: 'TOPOLA',
-        start: weekendAt(6, 9, 45),
-        venueName: 'Esport Center 2',
-        venueCity: 'Espoo',
-        status: 'upcoming',
-        homeScore: 6,
-        awayScore: 52
-      },
-      {
-        id: 'elt2',
-        home: 'TOPOLA',
-        away: 'Jymy',
-        start: weekendAt(6, 15, 0),
-        venueName: 'Esport Center 2',
-        venueCity: 'Espoo',
-        status: 'upcoming',
-        homeScore: 55,
-        awayScore: 6
-      },
-      {
-        id: 'elt3',
-        home: 'TOPOLA',
-        away: 'Helmi Basket/Valkoinen',
-        start: weekendAt(0, 10, 30),
-        venueName: 'Esport Center 2',
-        venueCity: 'Espoo',
-        status: 'played',
-        homeScore: 28,
-        awayScore: 14
-      },
-      {
-        id: 'elt4',
-        home: 'LINKKI',
-        away: 'TOPOLA',
-        start: '2026-08-23T14:00:00+03:00',
-        venueName: 'Esport Center 2',
-        venueCity: 'Espoo',
-        status: 'played',
-        homeScore: 9,
-        awayScore: 45
-      }
-    ]
   },
   {
     id: 'kwm2026-indians',
@@ -156,52 +65,6 @@ export const EXAMPLE_TOURNAMENTS: ExampleTournament[] = [
     categoryId: '2546',
     note: 'Arena Center Myllypuro (Kenttä 6) · P14 Haastaja Lohko B & Jatko-ottelut',
     source: 'torneopal',
-    fixtures: [
-      {
-        id: '222',
-        home: 'Indians',
-        away: 'Oilers NG White',
-        start: '2026-08-22T10:00:00+03:00',
-        venueName: 'Arena Center Myllypuro (Kenttä 6)',
-        venueCity: 'Helsinki',
-        status: 'played',
-        homeScore: 2,
-        awayScore: 12
-      },
-      {
-        id: '221',
-        home: 'RSS Panthers',
-        away: 'Indians',
-        start: '2026-08-22T13:00:00+03:00',
-        venueName: 'Arena Center Myllypuro (Kenttä 6)',
-        venueCity: 'Helsinki',
-        status: 'played',
-        homeScore: 4,
-        awayScore: 9
-      },
-      {
-        id: '224',
-        home: 'FBC Turku',
-        away: 'Indians',
-        start: '2026-08-23T11:15:00+03:00',
-        venueName: 'Arena Center Myllypuro (Kenttä 6)',
-        venueCity: 'Helsinki',
-        status: 'played',
-        homeScore: 7,
-        awayScore: 3
-      },
-      {
-        id: '227',
-        home: 'Indians',
-        away: 'EräViikingit',
-        start: '2026-08-23T14:30:00+03:00',
-        venueName: 'Arena Center Myllypuro (Kenttä 6)',
-        venueCity: 'Helsinki',
-        status: 'played',
-        homeScore: 12,
-        awayScore: 8
-      }
-    ]
   }
 ];
 
@@ -243,51 +106,6 @@ export function isUglyTeamName(name?: string): boolean {
   return false;
 }
 
-function seedToFixture(cup: ExampleTournament, seed: CupFixtureSeed): OfficialLeagueFixture {
-  const start = seed.start;
-  const end = new Date(new Date(start).getTime() + 50 * 60 * 1000).toISOString();
-  const now = new Date().toISOString();
-  return {
-    id: `${cup.source}_${cup.teamId}_${seed.id}`,
-    teamId: cup.teamId,
-    association: cup.source === 'football-stats' ? 'palloliitto' : cup.source === 'espooliikkuu' ? 'basket' : 'torneopal',
-    sport: cup.sport,
-    leagueName: cup.name,
-    homeTeam: seed.home,
-    awayTeam: seed.away,
-    isHome: seed.home.toLowerCase().includes(cup.teamName.toLowerCase().split('·')[0]!.trim().toLowerCase()),
-    startTime: start,
-    endTime: end,
-    venueName: seed.venueName,
-    venueCity: seed.venueCity,
-    competitionId: cup.competitionId,
-    categoryId: cup.categoryId,
-    status: seed.status,
-    homeScore: seed.homeScore,
-    awayScore: seed.awayScore,
-    score:
-      seed.homeScore != null && seed.awayScore != null ? `${seed.homeScore}–${seed.awayScore}` : undefined,
-    matchId: seed.id,
-    officialMatchUrl: cup.url,
-    fetchedAt: now
-  };
-}
-
-export function officialFromExampleCup(cup: ExampleTournament): OfficialTeamData {
-  return {
-    teamId: cup.teamId,
-    association: cup.source === 'football-stats' ? 'palloliitto' : cup.source === 'espooliikkuu' ? 'basket' : 'torneopal',
-    sport: cup.sport,
-    teamName: cup.teamName,
-    leagueName: cup.name,
-    fixtures: cup.fixtures.map((f) => seedToFixture(cup, f)),
-    competitionId: cup.competitionId,
-    categoryId: cup.categoryId,
-    sourceUrl: cup.url,
-    fetchedAt: new Date().toISOString()
-  };
-}
-
 /** Prefer live cup matches. Never replace real league rows with canned HJK/KäPa. */
 export function mergeOfficialWithCupFallback(
   cup: ExampleTournament | undefined,
@@ -307,6 +125,6 @@ export function mergeOfficialWithCupFallback(
       categoryId: official?.categoryId || cup.categoryId
     };
   }
-  if ((official?.fixtures || []).length > 0) return official ?? null;
-  return officialFromExampleCup(cup);
+  // Never fall back to canned cup matches: an empty live cup stays empty.
+  return official ?? null;
 }

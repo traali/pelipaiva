@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   parseICSFeed,
   parseMatchTitle,
@@ -8,6 +8,18 @@ import {
   detectSquadGroups,
   splitICSBySquad
 } from '../../../src/lib/calendar/icsParser';
+
+// parseICSFeed resolves venues over the network (LIPAS, Helsinki servicemap). These
+// tests are about calendar parsing, so they run offline: same assertions, no live
+// API latency (CI hit the 5 s timeout on slow responses).
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    throw new TypeError('offline in tests');
+  }));
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('Tier 2 Boundary: Calendar Permutations, RFC 5545 & DST Robustness', () => {
   // 1. Empty & malformed ICS inputs

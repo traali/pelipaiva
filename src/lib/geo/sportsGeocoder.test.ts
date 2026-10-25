@@ -31,6 +31,20 @@ describe('National Sports Geocoder', () => {
     const kauppi = await resolveSportsVenue('Kauppi TN 1');
     expect(kauppi.name).toContain('Kaupin');
     expect(kauppi.coordinates.lat).toBeCloseTo(61.5034, 2);
+
+    const utti = await resolveSportsVenue('Utti-halli Kouvola, Lennostontie 2, Utti');
+    expect(utti.name).toContain('Utti-halli');
+    expect(utti.isIndoor).toBe(true);
+    expect(utti.coordinates.lat).toBeCloseTo(60.8941, 2);
+    expect(utti.coordinates.lng).toBeCloseTo(26.9158, 2);
+    expect(utti.isApproximateLocation).toBeFalsy();
+
+    const tuusula = await resolveSportsVenue('Tuusulan Salibandyhalli, Kilpailukuja 4, Tuusula');
+    expect(tuusula.name).toContain('Tuusulan Salibandyhalli');
+    expect(tuusula.isApproximateLocation).toBeFalsy();
+    expect(tuusula.coordinates.lat).toBeCloseTo(60.4042, 2);
+    expect(tuusula.coordinates.lng).toBeCloseTo(25.0275, 2);
+    expect(tuusula.isIndoor).toBe(true);
   });
 
   it('contains over 25 curated national slang and venue aliases', () => {

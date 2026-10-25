@@ -9,7 +9,9 @@ import {
   SportType,
   TransitPlan
 } from '../../types/matchday';
-import { resolveTransitPlan } from '../geo/transitEngine';
+import { effectiveTransitPlan, hasRealTravelTime } from '../geo/transitEngine';
+import { isIndoorEvent } from '../sport/isIndoorEvent';
+import { isInventedWarmup } from '../events/eventClock';
 
 export function determineFootwear(
   surface: PitchSurface,
@@ -98,6 +100,8 @@ export function calculateDepartureCountdown(
   countdownMinutes: number;
   leaveHomeDate: Date;
   transitPlan: TransitPlan;
+  /** False when home or venue location is unknown; departureTime is then ''. */
+  hasDepartureTime: boolean;
 } {
   const isTraining = event.isTraining || event.eventType === 'training';
   const isTournament = event.eventType === 'tournament';
@@ -118,15 +122,8 @@ export function calculateDepartureCountdown(
         }
       : undefined;
 
-  const transitPlan =
-    event.transit ||
-    resolveTransitPlan(
-      normalizedHome,
-      event.venue?.coordinates,
-      event.weather,
-      undefined,
-      arrivalRules?.defaultDrivingEstimateMinutes ?? 20
-    );
+  const transitPlan = effectiveTransitPlan(event, normalizedHome);
+  const hasDepartureTime = hasRealTravelTime(transitPlan);
 
   const isNearbyActiveTransit = transitPlan.mode === 'walk' || transitPlan.mode === 'bicycle';
 
@@ -149,14 +146,37 @@ export function calculateDepartureCountdown(
   const transitTravelMins = transitPlan.travelMinutes;
   const defaultBuffer = isNearbyActiveTransit ? 2 : 10;
   const departureBufferMins = arrivalRules?.departureBufferMinutes ?? arrivalRules?.defaultDepartureBufferMinutes ?? defaultBuffer;
-  // Walking from parking only applies if traveling by car
-  const parkingWalkMins = transitPlan.mode === 'car' ? (event.parking?.walkingTimeMinutes ?? 3) : 0;
   const dutyBufferMins = event.volunteerDuty ? (arrivalRules?.volunteerDutyArrivalBufferMinutes ?? 15) : 0;
 
-  // Kickoff time
+  // A real kokoontuminen (not the invented 45 min default) is when you must be there.
+  // Subtracting another warmup offset from kickoff put LÄHDE after PAIKALLA
+  // (Honka: paikalla 10:00, lähde 10:29, 14 min drive).
   const kickoffDate = new Date(event.startTime);
-  const totalOffsetMins = warmupOffset + transitTravelMins + departureBufferMins + parkingWalkMins + dutyBufferMins;
-  const leaveHomeDate = new Date(kickoffDate.getTime() - totalOffsetMins * 60 * 1000);
+  const travelAndSlack = transitTravelMins + departureBufferMins + dutyBufferMins;
+  const explicitArrival =
+    !isTraining && !isSchool && !isOther && event.warmupTime && !isInventedWarmup(event)
+      ? new Date(event.warmupTime)
+      : null;
+  const arriveBy =
+    explicitArrival &&
+    Number.isFinite(explicitArrival.getTime()) &&
+    explicitArrival.getTime() < kickoffDate.getTime() - 5 * 60_000
+      ? explicitArrival
+      : null;
+  const leaveHomeDate = arriveBy
+    ? new Date(arriveBy.getTime() - travelAndSlack * 60 * 1000)
+    : new Date(kickoffDate.getTime() - (warmupOffset + travelAndSlack) * 60 * 1000);
+
+  // No home or no venue pin: no travel time, so no leave time. Never guess one.
+  if (!hasDepartureTime) {
+    return {
+      departureTime: '',
+      countdownMinutes: 0,
+      leaveHomeDate: new Date(Number.NaN),
+      transitPlan,
+      hasDepartureTime: false
+    };
+  }
 
   const now = new Date();
   const countdownMinutes = Math.max(0, Math.round((leaveHomeDate.getTime() - now.getTime()) / 60000));
@@ -171,7 +191,8 @@ export function calculateDepartureCountdown(
     departureTime,
     countdownMinutes,
     leaveHomeDate,
-    transitPlan
+    transitPlan,
+    hasDepartureTime: true
   };
 }
 
@@ -189,26 +210,31 @@ export function generateMatchdayBriefing(
   arrivalRules?: ArrivalRules
 ): MatchdayBriefing {
   const { weather, venue, volunteerDuty } = event;
-  const isOutdoor = !venue.isIndoor;
-  const temp = weather?.temperatureC ?? 15;
+  const isOutdoor = !isIndoorEvent(event);
+  // No weather data means no temperature. Do not assume a mild day.
+  const hasTemp = typeof weather?.temperatureC === 'number' && Number.isFinite(weather.temperatureC);
+  const temp = hasTemp ? weather!.temperatureC : Number.NaN;
   const rain = weather?.precipitationMmh ?? 0;
   const isSchool = event.sport === 'school' || event.eventType === 'school';
   const isOther = event.sport === 'other' || event.eventType === 'other' || event.eventType === 'meeting';
 
   // 1. Conflict Detection across family profiles
   let conflictWarning: string | undefined;
-  const eventStart = new Date(event.startTime).getTime();
-  const eventEnd = new Date(event.endTime).getTime();
+  if (event.attendanceStatus !== 'out' && !event.isHidden) {
+    const eventStart = new Date(event.startTime).getTime();
+    const eventEnd = new Date(event.endTime).getTime();
 
-  const overlapping = allDayEvents.filter((other) => {
-    if (other.id === event.id) return false;
-    const otherStart = new Date(other.startTime).getTime();
-    const otherEnd = new Date(other.endTime).getTime();
-    return eventStart < otherEnd && eventEnd > otherStart;
-  });
+    const overlapping = allDayEvents.filter((other) => {
+      if (other.id === event.id) return false;
+      if (other.attendanceStatus === 'out' || other.isHidden) return false;
+      const otherStart = new Date(other.startTime).getTime();
+      const otherEnd = new Date(other.endTime).getTime();
+      return eventStart < otherEnd && eventEnd > otherStart;
+    });
 
-  if (overlapping.length > 0 && overlapping[0]) {
-    conflictWarning = `⚠️ AIKATAULURUUHKI: Menee päällekkäin tapahtuman "${overlapping[0].title}" kanssa!`;
+    if (overlapping.length > 0 && overlapping[0]) {
+      conflictWarning = `⚠️ AIKATAULURUUHKI: Menee päällekkäin tapahtuman "${overlapping[0].title}" kanssa!`;
+    }
   }
 
   // 2. Footwear & Gear Advice
@@ -238,7 +264,10 @@ export function generateMatchdayBriefing(
 
     const isIceVenue = venue.surface === 'ice' || event.sport === 'icehockey';
 
-    if (isOutdoor) {
+    if (isOutdoor && !hasTemp) {
+      clothingAdvice = 'Sää ei tiedossa: pakkaa sekä lyhyt- että pitkähihainen peliasu.';
+      spectatorGear = 'Sää ei tiedossa: pukeudu säänmukaisesti.';
+    } else if (isOutdoor) {
       if (temp < 6) {
         clothingAdvice = 'Pelaajalle tekninen aluskerrasto, pipo ja ohuet pelihanskat.';
         spectatorGear = 'Kylmä katsomossa! Toppatakki, istuinalusta, lämpimät kengät ja termospullo.';
@@ -295,7 +324,7 @@ export function generateMatchdayBriefing(
 
   const postMatchWhatsApp = isSchool || isOther
     ? `📌 Muistutus: ${event.title} klo ${startTimeFormatted} (${venue.name}).`
-    : `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}. Seuraava peli: [PVM].`;
+    : `🔥 Pelipäivän tulos: ${event.homeTeam} - ${event.awayTeam} päättyi [SYÖTÄ TULOS]! Hieno matsi kentällä ${venue.name}.`;
 
   const SPORT_EMOJIS: Record<SportType, string> = {
     football: '⚽',

@@ -92,6 +92,37 @@ describe('conflictAgent', () => {
     expect(conflicts.length).toBe(0);
   });
 
+  it('does NOT generate any conflict when both kids travel independently (e.g. L walks, S bikes)', () => {
+    const events = [
+      ev({
+        id: 'a',
+        profileId: 'p-simo',
+        startTime: isoOn(0, 17, 15),
+        transit: {
+          mode: 'walk',
+          distanceKm: 0.46,
+          travelMinutes: 6,
+          transitLabel: '🚶 Kävely 6 min (460 m)',
+          isSelfTransit: true
+        }
+      }),
+      ev({
+        id: 'b',
+        profileId: 'p-aada',
+        startTime: isoOn(0, 18, 30),
+        transit: {
+          mode: 'bicycle',
+          distanceKm: 4.28,
+          travelMinutes: 19,
+          transitLabel: '🚴 Pyöräily 19 min (4,3 km)',
+          isSelfTransit: true
+        }
+      })
+    ];
+    const conflicts = conflictAgent(events, profiles);
+    expect(conflicts.length).toBe(0);
+  });
+
   it('flags warmup that starts before the other match ends at a different venue', () => {
     const events = [
       ev({
@@ -121,6 +152,43 @@ describe('conflictAgent', () => {
     const conflicts = conflictAgent(events, profiles);
     expect(conflicts.length).toBe(1);
     expect(conflicts[0]?.message).toContain('Päällekkäisyys');
+  });
+
+  it('skips reconciled event pairs from different calendar sources (same officialFixtureId)', () => {
+    // MyClub calendar event and Torneopal fixture represent the same real-world match.
+    // They share the same officialFixtureId and should never generate a conflict.
+    const events = [
+      ev({
+        id: 'myclub-123',
+        profileId: 'p-simo',
+        startTime: isoOn(0, 16, 45),
+        officialFixtureId: 'fix-abc-456',
+        venue: {
+          name: 'Lauttasaaren urheilupuisto "Pyrkkä"',
+          normalizedName: 'lauttasaaren urheilupuisto pyrkka',
+          coordinates: { lat: 60.16, lng: 24.87 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      }),
+      ev({
+        id: 'fixture-p-simo-fix-abc-456',
+        profileId: 'p-simo',
+        startTime: isoOn(0, 17, 0),
+        officialFixtureId: 'fix-abc-456',
+        venue: {
+          name: 'Lauttasaari TN B',
+          normalizedName: 'lauttasaari tn b',
+          coordinates: { lat: 60.161, lng: 24.871 },
+          isIndoor: false,
+          surface: 'artificial_turf_3g',
+          hasFloodlights: true
+        }
+      })
+    ];
+    const conflicts = conflictAgent(events, profiles);
+    expect(conflicts.length).toBe(0);
   });
 });
 
@@ -262,6 +330,90 @@ describe('tournamentAgent', () => {
     expect(blocks[0]?.matchCount).toBe(2);
     expect(blocks[0]?.colorHex).toBe('#ef4444');
   });
+
+  it('does not stash Sunday and next-week games into Saturday’s day card', () => {
+    const events = [
+      ev({
+        id: 'sat',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: '2026-09-12T12:00:00+03:00',
+        title: 'Westend Indians P14 vs A',
+        homeTeam: 'Westend Indians P14',
+        awayTeam: 'A',
+        venue: {
+          name: 'Utti-halli Kouvola',
+          normalizedName: 'utti-halli',
+          coordinates: { lat: 60.89, lng: 26.91 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      }),
+      ev({
+        id: 'sun',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: '2026-09-13T16:00:00+03:00',
+        title: 'Westend Indians P14 vs B',
+        homeTeam: 'Westend Indians P14',
+        awayTeam: 'B',
+        venue: {
+          name: 'Utti-halli Kouvola',
+          normalizedName: 'utti-halli',
+          coordinates: { lat: 60.89, lng: 26.91 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      }),
+      ev({
+        id: 'later',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: '2026-09-26T10:00:00+03:00',
+        title: 'Westend Indians P14 vs C',
+        homeTeam: 'Westend Indians P14',
+        awayTeam: 'C',
+        venue: {
+          name: 'Utti-halli Kouvola',
+          normalizedName: 'utti-halli',
+          coordinates: { lat: 60.89, lng: 26.91 },
+          isIndoor: true,
+          surface: 'indoor_synthetic',
+          hasFloodlights: true
+        }
+      })
+    ];
+    const blocks = tournamentAgent(events, profiles);
+    expect(blocks.map((b) => b.date)).toEqual(['2026-09-12', '2026-09-13', '2026-09-26']);
+    expect(blocks.every((b) => b.matchCount === 1)).toBe(true);
+  });
+
+  it('keeps two kids as two cards even at the same hall', () => {
+    const events = [
+      ev({
+        id: 's1',
+        profileId: 'p-simo',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: isoOn(0, 12, 0),
+      }),
+      ev({
+        id: 'a1',
+        profileId: 'p-aada',
+        eventType: 'tournament',
+        tournamentName: 'Utti-cup',
+        startTime: isoOn(0, 12, 30)
+      })
+    ];
+    const blocks = tournamentAgent(events, profiles);
+    expect(blocks).toHaveLength(2);
+    expect(new Set(blocks.map((b) => b.profileId)).size).toBe(2);
+  });
 });
 
 describe('runMissionControlGraph', () => {
@@ -283,8 +435,13 @@ describe('runMissionControlGraph', () => {
         }
       })
     ];
-    const snap = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'));
+    const home = { name: 'Koti', address: 'Testikatu 1', coordinates: { lat: 60.29, lng: 25.04 }, maxWalkingDistanceKm: 1.5, maxCyclingDistanceKm: 5 };
+    const snap = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'), [], home);
     expect(snap.leaveBy).toBeTruthy();
+    // No saved home: no leave time, never a guessed drive.
+    const noHome = runMissionControlGraph(events, profiles, new Date('2026-08-22T08:00:00+03:00'));
+    expect(noHome.leaveBy).toBeUndefined();
+    expect(noHome.ambientLine).not.toMatch(/lähde klo/);
     expect(snap.whatsAppShareText.includes('PELIPÄIVÄ')).toBe(true);
     expect(snap.whatsAppShareText.includes('Kyytisuunnitelma')).toBe(true);
     expect(snap.conflicts.length).toBe(1);

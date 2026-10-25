@@ -16,10 +16,13 @@ import {
   Minus,
   Save,
   Target,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { FullMatchStats, PlayerMatchLog, SportType } from '../types/matchday';
 import { springTactile } from '../lib/motion/springs';
+import { SatelliteEmbedDrawer } from './SatelliteEmbedDrawer';
+import { federationMatchLinks, liveSatelliteUrl } from '../lib/sport/federationLinks';
 
 interface MatchStatsModalProps {
   isOpen: boolean;
@@ -27,10 +30,19 @@ interface MatchStatsModalProps {
   stats?: FullMatchStats | null;
   homeTeam: string;
   awayTeam: string;
+  officialFixtureId?: string;
+  /** Event id; `fixture-…` ids carry the TASO fixture id too. */
+  eventId?: string;
+  /** Profile federation URL, needed only for generic Torneopal ids. */
+  associationUrl?: string;
   playerName?: string;
   playerLog?: PlayerMatchLog;
   score?: string;
   sport?: SportType;
+  stage?: string;
+  ageClassLabel?: string;
+  division?: string;
+  showTacticalScout?: boolean;
   onSavePlayerLog?: (log: PlayerMatchLog, updatedScore?: string) => void;
 }
 
@@ -56,16 +68,26 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   isOpen,
   onClose,
   stats: statsProp,
-  homeTeam,
-  awayTeam,
+  homeTeam: rawHomeTeam,
+  awayTeam: rawAwayTeam,
+  officialFixtureId,
+  eventId,
+  associationUrl,
   playerName,
   playerLog,
   score,
   sport = 'football',
+  stage,
+  ageClassLabel,
+  division,
+  showTacticalScout = false,
   onSavePlayerLog
 }) => {
+  const homeTeam = rawHomeTeam || 'Kotijoukkue';
+  const awayTeam = rawAwayTeam || 'Vastustaja';
   const stats: FullMatchStats = statsProp ?? {
-    leagueName: 'Ei virallisia tilastoja',
+    leagueName: '', // unknown: show nothing rather than a placeholder
+    isSynthetic: true,
     homeStanding: blankStanding(homeTeam),
     awayStanding: blankStanding(awayTeam),
     standingsTable: [],
@@ -81,6 +103,14 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   };
   const [activeTab, setActiveTab] = useState<StatsTab>('stats');
   const [selectedTeamName, setSelectedTeamName] = useState<string>(homeTeam);
+  const [isSatelliteDrawerOpen, setIsSatelliteDrawerOpen] = useState(false);
+  
+  // TASO match_id from the fixture id ("palloliitto_60341_4321789" -> "4321789").
+  // Not event.matchNumber: that is the printed game number, another game's id.
+  const matchLinks = federationMatchLinks({ id: eventId, officialFixtureId, sport }, { associationUrl });
+  const satelliteSport = matchLinks?.sport || sport || 'football';
+  // Without a real match_id the app opens a team-name search, never a guessed match.
+  const satelliteMatchKey = matchLinks?.matchId || '';
 
   // Local state for recording player stats
   const [logGoals, setLogGoals] = useState<number>(playerLog?.goals ?? 0);
@@ -228,10 +258,15 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                   <BarChart3 className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold text-pitch uppercase tracking-wider">
-                    {stats.leagueName}
-                  </div>
-                  <div className="text-xs text-text-muted">{stats.round || 'Sarjaottelu'}</div>
+                  {(stage || stats.leagueName) ? (
+                    <div className="text-[11px] font-bold text-pitch uppercase tracking-wider">
+                      {stage || stats.leagueName}
+                      {ageClassLabel ? ` · ${ageClassLabel}` : ''}
+                    </div>
+                  ) : null}
+                  {(division || stats.round) ? (
+                    <div className="text-xs text-text-muted">{[division, stats.round].filter(Boolean).join(' • ')}</div>
+                  ) : null}
                 </div>
               </div>
               <button
@@ -251,28 +286,36 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     {homeTeam}
                   </div>
                   <div className="text-xs text-text-muted">
-                    Sarjasijoitus: {stats.homeStanding.rank}. ({stats.homeStanding.points}p)
+                    {stats.homeStanding && stats.homeStanding.rank > 0 && stats.homeStanding.played > 0 ? (
+                      `Sarjasijoitus: ${stats.homeStanding.rank}. (${stats.homeStanding.points}p)`
+                    ) : (
+                      'Sarjataulukko ei saatavilla'
+                    )}
                   </div>
                 </div>
 
                 {/* Score / Live Clock */}
                 <div className="flex flex-col items-center">
-                  {stats.isSynthetic ? (
+                  {stats.isSynthetic || (!score && !stats.liveScore) ? (
                     <>
                       <span className="text-2xl md:text-3xl font-black text-text-secondary">vs</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
-                        Ei tuloksia vielä
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-pitch/15 border border-pitch/30 text-pitch mt-1">
+                        📅 Tuleva ottelu
                       </span>
                     </>
                   ) : (
                     <>
                       <div className="text-3xl md:text-4xl font-black font-tabular tracking-tight text-text-primary flex items-center justify-center gap-2">
-                        <span className="text-pitch">{stats.liveScore?.home ?? 0}</span>
+                        <span className="text-pitch">
+                          {stats.liveScore?.home ?? (score ? score.split('–')[0]?.trim() || score.split('-')[0]?.trim() : 0)}
+                        </span>
                         <span className="text-text-muted text-xl font-normal">-</span>
-                        <span className="text-radar">{stats.liveScore?.away ?? 0}</span>
+                        <span className="text-radar">
+                          {stats.liveScore?.away ?? (score ? score.split('–')[1]?.trim() || score.split('-')[1]?.trim() : 0)}
+                        </span>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-base border border-border-strong text-text-secondary mt-1">
-                        {stats.liveScore?.period || 'Päättynyt'}
+                        {stats.liveScore?.period || (score ? 'Päättynyt' : '📅 Tuleva ottelu')}
                       </span>
                     </>
                   )}
@@ -284,7 +327,11 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     {awayTeam}
                   </div>
                   <div className="text-xs text-text-muted">
-                    Sarjasijoitus: {stats.awayStanding.rank}. ({stats.awayStanding.points}p)
+                    {stats.awayStanding && stats.awayStanding.rank > 0 && stats.awayStanding.played > 0 ? (
+                      `Sarjasijoitus: ${stats.awayStanding.rank}. (${stats.awayStanding.points}p)`
+                    ) : (
+                      'Sarjataulukko ei saatavilla'
+                    )}
                   </div>
                 </div>
               </div>
@@ -310,6 +357,90 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
               )}
             </div>
 
+            {/* Quick Satellite Launcher Banner */}
+            {(() => {
+              type SportConfigItem = {
+                repo: 'football-stats' | 'floorball-stats' | 'basketball-stats' | 'volleyball-stats';
+                name: string;
+                subtitle: string;
+                url: string;
+                btnColor: string;
+              };
+
+              const sportConfig: Record<string, SportConfigItem> = {
+                football: {
+                  repo: 'football-stats',
+                  name: '⚽ Football Stats (Night Captain)',
+                  subtitle: 'Syväanalyysi, H2H & pelaajakortit',
+                  url: liveSatelliteUrl('football', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
+                  btnColor: 'bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25'
+                },
+                floorball: {
+                  repo: 'floorball-stats',
+                  name: '🏑 Floorball Stats (SSBL)',
+                  subtitle: '3 erää, YV/AV radar & torjunnat',
+                  url: liveSatelliteUrl('floorball', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
+                  btnColor: 'bg-[#5BC0BE]/15 border-[#5BC0BE]/30 text-[#6FFFE9] hover:bg-[#5BC0BE]/25'
+                },
+                basketball: {
+                  repo: 'basketball-stats',
+                  name: '🏀 Basketball Stats (Basket.fi)',
+                  subtitle: '4 neljännestä, virheet & pistemiehet',
+                  url: liveSatelliteUrl('basketball', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
+                  btnColor: 'bg-orange-500/15 border-orange-500/30 text-orange-400 hover:bg-orange-500/25'
+                },
+                volleyball: {
+                  repo: 'volleyball-stats',
+                  name: '🏐 Volleyball Stats Pro',
+                  subtitle: '25 pisteen erät & momenttivirta',
+                  url: liveSatelliteUrl('volleyball', satelliteMatchKey, `${homeTeam} ${awayTeam}`),
+                  btnColor: 'bg-blue-500/15 border-blue-500/30 text-blue-400 hover:bg-blue-500/25'
+                }
+              };
+              const active: SportConfigItem = sportConfig[satelliteSport] || sportConfig['football']!;
+
+              return (
+                <div className="mb-4 flex flex-col gap-2 p-3 rounded-2xl bg-surface-elevated/70 border border-border-subtle">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-bold text-text-primary">{active.name}</span>
+                    <span className="text-[10px] text-text-muted hidden sm:inline">{active.subtitle}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={active.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex min-h-[44px] flex-1 sm:flex-none items-center justify-center gap-1.5 px-4 rounded-xl text-sm font-bold transition-all border shadow-xs ${active.btnColor}`}
+                      aria-label={matchLinks ? `Avaa ottelu: ${matchLinks.appName} (uusi välilehti)` : 'Hae ottelua tilastosovelluksesta (uusi välilehti)'}
+                    >
+                      <span>{matchLinks ? 'Avaa ottelu' : 'Hae sovelluksesta'}</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    {matchLinks && (
+                      <a
+                        href={matchLinks.federationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Avaa tulospalvelussa (uusi välilehti)"
+                        title="Avaa tulospalvelussa"
+                        className="inline-flex min-h-[44px] items-center justify-center gap-1 px-3 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary hover:underline underline-offset-2 transition-colors"
+                      >
+                        <span>Tulospalvelu</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsSatelliteDrawerOpen(true)}
+                      className="inline-flex min-h-[44px] items-center gap-1.5 px-3 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary border border-border-subtle hover:border-border-strong transition-all cursor-pointer"
+                    >
+                      <span>Näytä tässä</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Navigation Sub-Tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none border-b border-border-subtle">
               {[
@@ -320,7 +451,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 { id: 'scorers', label: 'Maalipörssi', icon: Award },
                 { id: 'common', label: 'Yhteiset vastustajat', icon: GitCompare },
                 { id: 'h2h', label: 'Keskinäiset (H2H)', icon: Swords },
-                { id: 'scout', label: 'Taktinen katsaus', icon: BrainCircuit }
+                ...(showTacticalScout ? [{ id: 'scout', label: 'Taktinen katsaus', icon: BrainCircuit }] : [])
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -552,7 +683,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     <textarea
                       value={logNotes}
                       onChange={(e) => setLogNotes(e.target.value)}
-                      placeholder="Esim. Loistava prässi toisella jaksolla, hieno syöttö Maijan maaliin!"
+                      placeholder="Omat muistiinpanot ottelusta"
                       rows={2}
                       className="w-full px-3 py-2 rounded-xl bg-surface-base border border-border-subtle text-xs text-text-primary placeholder:text-text-muted focus-visible:ring-2 focus-visible:ring-pitch resize-none"
                     />
@@ -722,26 +853,28 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
             {/* TAB 3: League Standings Table */}
             {activeTab === 'standings' && (
               <div className="flex flex-col gap-2">
-                <div className="text-[11px] text-text-muted px-1">
-                  💡 Klikkaa mitä tahansa joukkuetta nähdäksesi heidän pelaajakokoonpanonsa ja maalitilastonsa.
-                </div>
-                <div className="rounded-2xl border border-border-subtle overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-surface-elevated text-text-muted text-[11px] font-semibold border-b border-border-subtle">
-                        <tr>
-                          <th className="py-2.5 px-3">#</th>
-                          <th className="py-2.5 px-3">Joukkue</th>
-                          <th className="py-2.5 px-2 text-center">O</th>
-                          <th className="py-2.5 px-2 text-center">V</th>
-                          <th className="py-2.5 px-2 text-center">T</th>
-                          <th className="py-2.5 px-2 text-center">H</th>
-                          <th className="py-2.5 px-2 text-center">ME</th>
-                          <th className="py-2.5 px-3 text-right">Pisteet</th>
-                          <th className="py-2.5 px-3 text-center">Kunto</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-subtle/50">
+                {stats.standingsTable && stats.standingsTable.length > 0 ? (
+                  <>
+                    <div className="text-[11px] text-text-muted px-1">
+                      💡 Klikkaa mitä tahansa joukkuetta nähdäksesi heidän pelaajakokoonpanonsa ja maalitilastonsa.
+                    </div>
+                    <div className="rounded-2xl border border-border-subtle overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-surface-elevated text-text-muted text-[11px] font-semibold border-b border-border-subtle">
+                            <tr>
+                              <th className="py-2.5 px-3">#</th>
+                              <th className="py-2.5 px-3">Joukkue</th>
+                              <th className="py-2.5 px-2 text-center">O</th>
+                              <th className="py-2.5 px-2 text-center">V</th>
+                              <th className="py-2.5 px-2 text-center">T</th>
+                              <th className="py-2.5 px-2 text-center">H</th>
+                              <th className="py-2.5 px-2 text-center">ME</th>
+                              <th className="py-2.5 px-3 text-right">Pisteet</th>
+                              <th className="py-2.5 px-3 text-center">Kunto</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-subtle/50">
                         {stats.standingsTable.map((row) => {
                           const isHome = row.teamName === homeTeam;
                           const isAway = row.teamName === awayTeam;
@@ -799,8 +932,22 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                     </table>
                   </div>
                 </div>
+              </>
+            ) : (
+              <div className="p-5 rounded-2xl bg-surface-elevated/60 border border-border-subtle text-center flex flex-col items-center gap-2 text-xs">
+                <div className="w-10 h-10 rounded-full bg-surface border border-border-strong flex items-center justify-center text-text-muted text-base">
+                  📊
+                </div>
+                <div className="font-bold text-text-primary text-sm">
+                  Sarjataulukko ei saatavilla
+                </div>
+                <p className="text-text-secondary max-w-sm leading-relaxed">
+                  Tälle sarjalle tai harjoitusottelulle ei ole vielä virallisia sarjataulukkotietoja liiton tulospalvelussa.
+                </p>
               </div>
             )}
+          </div>
+        )}
 
             {/* TAB 4: Top Scorers (Maalipörssi) */}
             {activeTab === 'scorers' && (
@@ -942,12 +1089,6 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 <p className="text-xs text-text-secondary leading-relaxed">
                   {stats.scoutAnalysis}
                 </p>
-                {!stats.isSynthetic && (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-surface-base/60 border border-border-subtle text-xs">
-                    <span>Kotijoukkueen kuntopuntari:</span>
-                    <span className="font-bold text-pitch">7 Voittoa peräkkäin 🔥</span>
-                  </div>
-                )}
               </div>
             )}
 
@@ -964,6 +1105,40 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
           </motion.div>
         </div>
       )}
+
+      {/* Embedded Satellite Analytics Drawer */}
+      {(() => {
+        const repo =
+          satelliteSport === 'floorball'
+            ? 'floorball-stats'
+            : satelliteSport === 'basketball'
+            ? 'basketball-stats'
+            : satelliteSport === 'volleyball'
+            ? 'volleyball-stats'
+            : 'football-stats';
+
+        const url = liveSatelliteUrl(satelliteSport, satelliteMatchKey, `${homeTeam} ${awayTeam}`, true);
+
+        const title =
+          satelliteSport === 'floorball'
+            ? `Floorball Stats: ${homeTeam} vs ${awayTeam}`
+            : satelliteSport === 'basketball'
+            ? `Basketball Stats: ${homeTeam} vs ${awayTeam}`
+            : satelliteSport === 'volleyball'
+            ? `Volleyball Stats: ${homeTeam} vs ${awayTeam}`
+            : `Football Stats: ${homeTeam} vs ${awayTeam}`;
+
+        return (
+          <SatelliteEmbedDrawer
+            isOpen={isSatelliteDrawerOpen}
+            onClose={() => setIsSatelliteDrawerOpen(false)}
+            title={title}
+            subtitle="Interaktiivinen syväanalyysi & lajikohtainen tilastokeskus"
+            embedUrl={url}
+            sourceRepo={repo}
+          />
+        );
+      })()}
     </AnimatePresence>
   );
 };

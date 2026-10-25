@@ -16,6 +16,7 @@ import { syncFamilyRosterCycle } from '../lib/sync/familyCloud';
 import { extractTextFromImage } from '../lib/ai/ocrImageParser';
 
 import { rankEventCandidatesForMessage, CandidateRankingResult } from '../lib/ai/eventCandidateRanker';
+import { eventDayKey } from '../lib/agents/time';
 import { sportLabelFi } from '../lib/sport/sportMeta';
 
 interface QuickDropInBarProps {
@@ -34,7 +35,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
   const [selectedPlayer, setSelectedPlayer] = useState(
     activeProfilePlayerName && activeProfilePlayerName !== 'all'
       ? activeProfilePlayerName
-      : existingPlayers[0] || 'Maija'
+      : existingPlayers[0] || ''
   );
   const [selectedSport, setSelectedSport] = useState<SportType>('football');
   const [playerActiveSports, setPlayerActiveSports] = useState<SportType[]>([]);
@@ -68,7 +69,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveError('Kuvasta ei löytynyt luettavaa tekstiä.');
         setTimeout(() => setSaveError(''), 4000);
       }
-    } catch (err: any) {
+    } catch {
       setSaveError('Kuvan lukeminen epäonnistui.');
       setTimeout(() => setSaveError(''), 4000);
     } finally {
@@ -173,7 +174,7 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
               profileId: e.profileId,
               playerName: prof?.playerName || 'Pelaaja',
               title: e.title,
-              dateStr: e.startTime.split('T')[0] || '',
+              dateStr: eventDayKey(e.startTime),
               startTime: new Date(e.startTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }),
               warmupTime: e.warmupTime ? new Date(e.warmupTime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' }) : undefined,
               venueName: e.venue?.name,
@@ -210,8 +211,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveSuccess(false);
         onEventCreated?.();
       }, 1000);
-    } catch (err: any) {
-      setSaveError(err?.message || 'Päivitys epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(msg || 'Päivitys epäonnistui');
       setTimeout(() => setSaveError(''), 4000);
     } finally {
       setIsSaving(false);
@@ -287,8 +289,9 @@ export const QuickDropInBar: React.FC<QuickDropInBarProps> = ({
         setSaveSuccess(false);
         onEventCreated?.();
       }, 1000);
-    } catch (err: any) {
-      setSaveError(err?.message || 'Tallennus epäonnistui');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(msg || 'Tallennus epäonnistui');
       setTimeout(() => setSaveError(''), 4000);
     } finally {
       setIsSaving(false);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2 } from 'lucide-react';
+import { X, Users, Trash2, Plus, Pencil, Share2, PlusCircle, Home, Filter, Loader2, AlertTriangle, Calendar, MessageSquarePlus, BrainCircuit, Shirt } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { HomeLocation, PlayerProfile } from '../types/matchday';
 import { formatHomeTransitSummary } from '../lib/storage/homeLocation';
@@ -9,12 +9,18 @@ import { extractFeedCategories, type FeedCategory } from '../lib/calendar/icsPar
 import { fetchRawIcsFeed, isLikelyIcsUrl, ingestSourceForProfile } from '../lib/clubs/ingestOfficial';
 import { TeamColorPicker } from './TeamColorPicker';
 import { OnDeviceLlmSettings } from './OnDeviceLlmSettings';
+import { ToggleSlider } from './ui/ToggleSlider';
+import type { AppAiSettings } from '../lib/settings/useAppSettings';
 
 interface FamilyManageModalProps {
   isOpen: boolean;
   onClose: () => void;
   profiles: PlayerProfile[];
   homeLocation?: HomeLocation;
+  showConflictWarnings?: boolean;
+  onToggleConflictWarnings?: () => void;
+  aiSettings?: AppAiSettings;
+  onToggleAiSetting?: (key: keyof AppAiSettings, value: boolean) => void;
   onOpenHomeLocation?: () => void;
   onOpenImportForPlayer: (playerName: string) => void;
   onEditProfile: (profile: PlayerProfile) => void;
@@ -27,6 +33,10 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
   onClose,
   profiles,
   homeLocation,
+  showConflictWarnings = false,
+  onToggleConflictWarnings,
+  aiSettings,
+  onToggleAiSetting,
   onOpenHomeLocation,
   onOpenImportForPlayer,
   onEditProfile,
@@ -65,8 +75,8 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
           const counts = new Map<string, number>();
           for (const ev of events) {
             const title = ev.title || '';
-            const match = title.match(/\[([A-Za-z0-9äöåÄÖÅ\s\-]{2,25})\]|Peli\s+kilpa|Peli\s+haastaja|Treenit/i);
-            const cat = match ? match[0].replace(/[\[\]]/g, '') : ev.isTraining ? 'Treenit' : 'Pelit';
+            const match = title.match(/\[([A-Za-z0-9äöåÄÖÅ\s-]{2,25})\]|Peli\s+kilpa|Peli\s+haastaja|Treenit/i);
+            const cat = match ? match[0].replace(/[[\]]/g, '') : ev.isTraining ? 'Treenit' : 'Pelit';
             counts.set(cat, (counts.get(cat) || 0) + 1);
           }
           cats = Array.from(counts.entries()).map(([name, count]) => ({ name, count }));
@@ -88,13 +98,14 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
 
     await db.profiles.update(profile.id, { squadFilters: updated });
 
-    if (profile.calendarUrl) {
+    const sourceUrl = profile.calendarUrl || profile.associationUrl;
+    if (sourceUrl) {
       await ingestSourceForProfile({
         profileId: profile.id,
         playerName: profile.playerName,
         teamName: profile.teamName,
         sport: profile.sport,
-        url: profile.calendarUrl,
+        url: sourceUrl,
         squadFilters: updated,
         includeWeather: true
       });
@@ -273,10 +284,10 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-black text-text-primary truncate">
-                    Kotiosoite: {homeLocation?.name || 'Lauttasaari'}
+                    {homeLocation ? `Kotiosoite: ${homeLocation.name || 'Koti'}` : 'Kotiosoitetta ei ole asetettu'}
                   </div>
                   <div className="text-[11px] text-text-muted truncate">
-                    {homeLocation?.address || 'Aseta koti — lähikentille kävellen / pyörällä'}
+                    {homeLocation ? homeLocation.address : 'Lisää kotiosoite, niin näet lähtöajan'}
                   </div>
                   <div className="text-[11px] text-pitch truncate">
                     {formatHomeTransitSummary(homeLocation)}
@@ -501,6 +512,88 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 className="px-3 py-1 rounded-xl bg-stoppage text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer shadow-sm"
               >
                 Kumoa
+              </button>
+            </div>
+          )}
+
+          {/* Settings Section: Granular AI & Smart Assistant Toggles */}
+          {aiSettings && onToggleAiSetting ? (
+            <div className="space-y-2.5 pt-2 border-t border-border-subtle">
+              <h3 className="text-xs font-black uppercase tracking-wider text-text-muted px-1">
+                Älykkäät apurit & ilmoitukset (Valinnaiset)
+              </h3>
+
+              <ToggleSlider
+                id="family-toggle-conflicts"
+                label="Päällekkäisyysvaroitukset"
+                description="Ilmoita jos perheenjäsenten pelit menevät päällekkäin tai ovat peräkkäin eri kentillä lyhyellä välillä."
+                checked={aiSettings.showConflictWarnings}
+                onChange={(val) => onToggleAiSetting('showConflictWarnings', val)}
+                icon={<AlertTriangle className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-advisories"
+                label="Päivän tilannevaroitus"
+                description="Näytä ruuhkaisina pelipäivinä automaattinen tilannekooste ja toimenpidesuositukset."
+                checked={aiSettings.showScheduleAdvisories}
+                onChange={(val) => onToggleAiSetting('showScheduleAdvisories', val)}
+                icon={<Calendar className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-copilot"
+                label="AI Aikatauluapuri (Kysy Pelipäivältä)"
+                description="Avaa tekoälyavusteinen haku ja kalenteriassistentti valikossa."
+                checked={aiSettings.showCopilotAssistant}
+                onChange={(val) => onToggleAiSetting('showCopilotAssistant', val)}
+                icon={<MessageSquarePlus className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-tactical"
+                label="Taktinen otteluennakko"
+                description="Näytä ottelutilastoissa automaattinen vastustajan kuntokatsaus ja pelitapa-analyysi."
+                checked={aiSettings.showTacticalScout}
+                onChange={(val) => onToggleAiSetting('showTacticalScout', val)}
+                icon={<BrainCircuit className="w-4 h-4" />}
+              />
+
+              <ToggleSlider
+                id="family-toggle-gear"
+                label="Älykäs varusteopas"
+                description="Näytä sääennusteen ja kenttäalustan mukainen kenkä- ja pukeutumissuositus ottelukortissa."
+                checked={aiSettings.showSmartGearAdvice}
+                onChange={(val) => onToggleAiSetting('showSmartGearAdvice', val)}
+                icon={<Shirt className="w-4 h-4" />}
+              />
+            </div>
+          ) : onToggleConflictWarnings && (
+            <div className="p-3.5 rounded-2xl bg-surface-elevated/60 border border-border-subtle flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`p-2 rounded-xl shrink-0 ${showConflictWarnings ? 'bg-whistle/15 text-whistle' : 'bg-surface-base text-text-muted'}`}>
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-text-primary">
+                    Päällekkäisyys- ja kyytivaroitukset
+                  </div>
+                  <div className="text-[11px] text-text-secondary">
+                    {showConflictWarnings ? 'Varoitukset näkyvät aikataulussa ja peleissä' : 'Varoitukset on piilotettu näkyvistä'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleConflictWarnings}
+                className={`touch-target min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  showConflictWarnings
+                    ? 'bg-whistle text-text-inverse border-whistle shadow-xs hover:brightness-105'
+                    : 'bg-surface-base text-text-muted border-border-strong hover:text-text-primary'
+                }`}
+                title="Kytke päälle tai pois"
+              >
+                {showConflictWarnings ? 'Päällä' : 'Pois'}
               </button>
             </div>
           )}

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { startLabel } from '../lib/agents/eventPhase';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronLeft,
@@ -18,17 +19,31 @@ import type { FamilyConflict } from '../lib/agents';
 import { helsinkiDateISO, formatFiTime } from '../lib/agents/time';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
+import { db } from '../lib/storage/db';
+import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
 export interface FamilyVisualCalendarProps {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
   conflicts?: FamilyConflict[];
+  showConflictWarnings?: boolean;
   onSelectEvent?: (event: MatchdayEvent) => void;
   onNavigate?: (event: MatchdayEvent) => void;
   onClearFilter?: () => void;
 }
 
 export type CalendarGranularity = 'month' | 'week' | 'day';
+export const DEFAULT_CALENDAR_GRANULARITY: CalendarGranularity = 'day';
+
+export function getDefaultCalendarLanding(todayISO: string): {
+  selectedDateISO: string;
+  granularity: CalendarGranularity;
+} {
+  return {
+    selectedDateISO: todayISO,
+    granularity: DEFAULT_CALENDAR_GRANULARITY
+  };
+}
 
 export const WEEKDAYS_FI = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su'];
 export const MONTH_NAMES_FI = [
@@ -56,6 +71,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
   events,
   profiles,
   conflicts,
+  showConflictWarnings = false,
   onSelectEvent,
   onNavigate,
   onClearFilter
@@ -68,25 +84,45 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
     return map;
   }, [profiles]);
 
-  const todayISO = useMemo(() => helsinkiDateISO(new Date()), []);
+  const [todayISO, setTodayISO] = useState<string>(() => helsinkiDateISO(new Date()));
+  const previousTodayISORef = useRef(todayISO);
 
-  // Find default active date (first upcoming event date or today)
-  const defaultDateISO = useMemo(() => {
-    const sorted = [...events].sort(
-      (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-    );
-    const upcoming = sorted.find((ev) => helsinkiDateISO(new Date(ev.startTime)) >= todayISO);
-    return upcoming ? helsinkiDateISO(new Date(upcoming.startTime)) : todayISO;
-  }, [events, todayISO]);
+  // Find default active date (today)
+  const defaultDateISO = useMemo(() => todayISO, [todayISO]);
+  const defaultLanding = useMemo(() => getDefaultCalendarLanding(defaultDateISO), [defaultDateISO]);
 
-  const [selectedDateISO, setSelectedDateISO] = useState<string>(defaultDateISO);
-  const [granularity, setGranularity] = useState<CalendarGranularity>('month');
+  const [selectedDateISO, setSelectedDateISO] = useState<string>(defaultLanding.selectedDateISO);
+  const [granularity, setGranularity] = useState<CalendarGranularity>(defaultLanding.granularity);
 
   // Month navigation state: First day of current view month
   const [viewDate, setViewDate] = useState<Date>(() => {
     const [y, m] = defaultDateISO.split('-').map(Number);
     return new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
   });
+
+  useEffect(() => {
+    const tick = () => {
+      const nextToday = helsinkiDateISO(new Date());
+      setTodayISO((prev) => (prev === nextToday ? prev : nextToday));
+    };
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const previousTodayISO = previousTodayISORef.current;
+    if (previousTodayISO !== todayISO) {
+      setSelectedDateISO((current) => (current === previousTodayISO ? todayISO : current));
+      setViewDate((current) => {
+        const currentMonthISO = formatDateKey(new Date(current.getFullYear(), current.getMonth(), 1));
+        const previousMonthISO = `${previousTodayISO.slice(0, 7)}-01`;
+        if (currentMonthISO !== previousMonthISO) return current;
+        const [y, m] = todayISO.split('-').map(Number);
+        return new Date(y ?? new Date().getFullYear(), (m ?? 1) - 1, 1);
+      });
+      previousTodayISORef.current = todayISO;
+    }
+  }, [todayISO]);
 
   // Map events by date ISO string (YYYY-MM-DD)
   const eventsByDate = useMemo(() => {
@@ -107,13 +143,14 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
 
   const { isDismissed, dismiss: dismissConflict } = useDismissedConflicts();
   const activeConflicts = useMemo(
-    () => (conflicts || []).filter((c) => !isDismissed(c)),
-    [conflicts, isDismissed]
+    () => (showConflictWarnings && conflicts ? conflicts.filter((c) => !isDismissed(c)) : []),
+    [showConflictWarnings, conflicts, isDismissed]
   );
 
-  // Conflict days map for instant lookup
+  // Conflict days map for instant lookup (only when showConflictWarnings is true)
   const conflictDateSet = useMemo(() => {
     const set = new Set<string>();
+    if (!showConflictWarnings || !conflicts) return set;
     for (const c of activeConflicts) {
       const evA = events.find((e) => e.id === c.eventAId);
       if (evA) {
@@ -125,7 +162,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
       }
     }
     return set;
-  }, [activeConflicts, events]);
+  }, [showConflictWarnings, conflicts, activeConflicts, events]);
 
   // Month stats calculation
   const currentMonthStats = useMemo(() => {
@@ -512,7 +549,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                       <div className="flex items-center gap-0.5">
                         {cell.hasConflict && (
                           <span
-                            title="Päällekkäisyys tai tiukka siirtymä"
+                            title="Päällekkäisyys tai peräkkäiset pelit eri kentillä"
                             className="text-[10px] text-stoppage animate-pulse"
                           >
                             ⚠️
@@ -717,8 +754,8 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
           <div className="flex flex-col gap-3">
             {selectedDayEvents.map((ev) => {
               const profile = profileMap.get(ev.profileId);
-              const timeStr = `${formatFiTime(ev.startTime)} – ${formatFiTime(ev.endTime)}`;
               const isOut = ev.attendanceStatus === 'out';
+              const timeStr = `${formatFiTime(ev.startTime)} – ${formatFiTime(ev.endTime)}`;
 
               return (
                 <div
@@ -726,11 +763,11 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                   onClick={() => {
                     if (onSelectEvent && !ev.isTraining) onSelectEvent(ev);
                   }}
-                  className={`p-4 rounded-2xl border flex flex-col gap-2.5 relative overflow-hidden transition-all ${
+                  className={`p-4 rounded-2xl ${
                     isOut
-                      ? 'opacity-65 border-dashed border-border-strong/70 bg-surface/40 hover:opacity-100'
-                      : 'bg-surface-elevated border-border-strong'
-                  } ${
+                      ? 'bg-surface/40 border-dashed border-border-strong/60 opacity-65 grayscale-20'
+                      : 'bg-surface-elevated border border-border-strong'
+                  } flex flex-col gap-2.5 relative overflow-hidden transition-all ${
                     !ev.isTraining ? 'hover:border-pitch cursor-pointer' : ''
                   }`}
                 >
@@ -745,7 +782,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-black font-mono text-pitch flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{timeStr}</span>
+                        <span>{startLabel(ev)} klo {timeStr}</span>
                       </span>
                       <span
                         className="text-[11px] font-bold px-2 py-0.5 rounded-md shadow-xs"
@@ -757,7 +794,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                         {profile?.playerName}
                       </span>
                       {isOut && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stoppage/15 text-stoppage border border-stoppage/30">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-stoppage/15 text-stoppage flex items-center gap-0.5">
                           ⛔ Poisjäänti
                         </span>
                       )}
@@ -777,13 +814,15 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                   </div>
 
                   {/* Event Title */}
-                  <div className="pl-2 text-sm font-bold text-text-primary line-clamp-2 break-words">
+                  <h4 className={`text-base font-extrabold ${isOut ? 'line-through text-text-muted' : 'text-text-primary'} pl-2 leading-tight`}>
                     {ev.title}
-                  </div>
+                  </h4>
 
                   {/* Conflict warnings */}
                   {(() => {
-                    const related = activeConflicts.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id);
+                    const related = (!isOut && showConflictWarnings)
+                      ? activeConflicts.filter((c) => c.eventAId === ev.id || c.eventBId === ev.id)
+                      : [];
                     if (related.length === 0) return null;
                     return (
                       <div className="pl-2 flex flex-col gap-1.5">
@@ -803,7 +842,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                                 <div>
                                   {c.overlapMinutes > 0
                                     ? `⚠️ Päällekkäisyys (${c.overlapMinutes} min)`
-                                    : `🚗 Tiukka siirtymä (~${c.travelMinutesEstimate} min ajo)`}
+                                    : `⏱️ Peräkkäin eri kentillä (väli ${c.gapMinutes} min)`}
                                 </div>
                                 <div className="text-[10px] font-medium opacity-90 mt-0.5 leading-tight">
                                   {c.message}
@@ -835,43 +874,73 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                     </div>
                   )}
 
-                  {/* Bottom details: Venue & Navigation */}
-                  <div className="pl-2 flex items-center justify-between text-xs text-text-secondary pt-1.5 border-t border-border-subtle gap-2">
+                  {/* Bottom details: Venue & Navigation / Attendance */}
+                  <div className="pl-2 flex items-center justify-between text-xs text-text-secondary pt-1.5 border-t border-border-subtle gap-2 flex-wrap sm:flex-nowrap">
                     <div className="flex items-center gap-1.5 truncate min-w-0">
                       <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
                       <span className="truncate">{ev.venue.name}</span>
                     </div>
 
-                    {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="min-h-[36px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Attendance Toggle Button (Osallistuu / Poisjäänti) */}
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const nextStatus = isOut ? 'in' : 'out';
+                          await db.events.update(ev.id, { attendanceStatus: nextStatus });
+                          const sync = await db.syncState.get('family').catch(() => null);
+                          await recordAttendanceOverride(sync?.syncKey || '', ev.id, nextStatus, db);
+                        }}
+                        className={`touch-target min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border shadow-2xs ${
+                          isOut
+                            ? 'bg-pitch text-text-inverse border-pitch hover:brightness-110'
+                            : 'bg-surface-elevated text-stoppage hover:bg-stoppage/15 border-border-strong hover:border-stoppage/40'
+                        }`}
+                        title={
+                          isOut
+                            ? 'Pelaaja on merkitty poisjääneeksi — klikkaa merkitäksesi osallistuvaksi'
+                            : 'Merkitse poisjäänti tähän tapahtumaan'
+                        }
+                      >
+                        <span>{isOut ? '↩️ Osallistuu' : '⛔ Ei osallistu'}</span>
+                      </button>
+
+                      {new Date(ev.endTime) <= new Date() || ev.score !== undefined ? (
+                        <span className="min-h-[44px] px-2.5 rounded-xl bg-surface border border-border-strong text-text-primary font-mono font-black text-xs flex items-center gap-1 shadow-2xs">
                           <Trophy className="w-3.5 h-3.5 text-pitch" />
                           <span>{ev.score ? `Tulos: ${ev.score}` : 'Päättynyt'}</span>
                         </span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Navigoi kentälle ${ev.venue.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onNavigate) {
-                            onNavigate(ev);
-                          } else {
-                            const coords = ev.parking?.coordinates || ev.venue.coordinates;
-                            window.open(
-                              `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`,
-                              '_blank',
-                              'noopener,noreferrer'
-                            );
-                          }
-                        }}
-                        className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
-                      >
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>Reitti</span>
-                      </button>
-                    )}
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Navigoi kentälle ${ev.venue.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNavigate) {
+                              onNavigate(ev);
+                            } else {
+                              const isApprox = ev.venue?.isApproximateLocation;
+                              const coords = (!isApprox ? ev.venue.coordinates : undefined);
+                              const hasValidCoords = coords && (coords.lat !== 0 || coords.lng !== 0);
+                              const destination =
+                                hasValidCoords
+                                  ? `${coords.lat},${coords.lng}`
+                                  : encodeURIComponent(ev.venue?.name || 'Kenttä');
+                              window.open(
+                                `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
+                                '_blank',
+                                'noopener,noreferrer'
+                              );
+                            }
+                          }}
+                          className="min-h-[44px] px-3.5 rounded-xl bg-pitch text-text-inverse font-bold text-xs flex items-center gap-1.5 hover:brightness-110 cursor-pointer transition-all shadow-xs shrink-0 focus-visible:ring-2 focus-visible:ring-pitch"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>Reitti</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

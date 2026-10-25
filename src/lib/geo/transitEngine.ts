@@ -1,4 +1,4 @@
-import { Coordinates, HomeLocation, TransitMode, TransitPlan, WeatherCondition } from '../../types/matchday';
+import { Coordinates, HomeLocation, MatchdayEvent, TransitMode, TransitPlan, WeatherCondition } from '../../types/matchday';
 
 /**
  * Calculates straight-line distance in kilometers using the Haversine formula.
@@ -37,29 +37,57 @@ export function resolveTransitPlan(
   home: HomeLocation | null | undefined,
   venueCoords: Coordinates | null | undefined,
   weather?: WeatherCondition,
-  overrideMode?: TransitMode,
-  defaultDrivingMinutes = 20
+  overrideMode?: TransitMode
 ): TransitPlan {
-  // If no home or venue coordinates available, fallback to car
-  if (!home || !venueCoords || !home.coordinates) {
+  // Defensive guard against invalid coordinates, Null Island (0,0), or coordinates outside Finland
+  const isCoordValid = (c?: Coordinates | null) =>
+    Boolean(
+      c &&
+      typeof c.lat === 'number' &&
+      typeof c.lng === 'number' &&
+      !isNaN(c.lat) &&
+      !isNaN(c.lng) &&
+      c.lat >= 59.0 &&
+      c.lat <= 71.0 &&
+      c.lng >= 19.0 &&
+      c.lng <= 32.0
+    );
+
+  const isVenueMissing = !venueCoords || !isCoordValid(venueCoords);
+  const isHomeMissing = !home || !home.coordinates || !isCoordValid(home.coordinates);
+
+  // No guessing: without both ends there is no travel time.
+  if (isVenueMissing || isHomeMissing) {
     return {
       mode: 'car',
       distanceKm: 0,
-      travelMinutes: defaultDrivingMinutes,
-      transitLabel: `🚗 Auto ~${defaultDrivingMinutes} min`,
-      isSelfTransit: false
+      travelMinutes: 0,
+      transitLabel: isVenueMissing ? '📍 Sijainti tuntematon' : '🏠 Lisää kotiosoite',
+      isSelfTransit: false,
+      isUnknownLocation: isVenueMissing,
+      needsHome: isHomeMissing
     };
   }
 
-  const rawDistKm = calculateHaversineDistanceKm(home.coordinates, venueCoords);
+  const h = home as HomeLocation;
+  const rawDistKm = calculateHaversineDistanceKm(h.coordinates, venueCoords as Coordinates);
   // Account for Finnish city street grid detours (approx 1.25x Manhattan/grid factor)
   const distanceKm = Math.max(0.1, Number((rawDistKm * 1.25).toFixed(2)));
   const distLabel = formatTransitDistance(distanceKm);
 
-  const maxWalk = home.maxWalkingDistanceKm ?? 1.5;
-  const maxBike = home.maxCyclingDistanceKm ?? 5.0;
+  const maxWalk = h.maxWalkingDistanceKm ?? 1.5;
+  const maxBike = h.maxCyclingDistanceKm ?? 5.0;
 
-  // Severe weather checks (heavy rain, thunderstorm, freezing blizzard)
+  // Unfavorable cycling / walking weather:
+  // Rain >= 1.0 mm/h, freezing icy conditions <= 0°C, high wind gusts >= 14 m/s (sea bridges), or soaked/snowy ground.
+  const isBadCyclingWeather =
+    weather &&
+    (weather.precipitationMmh >= 1.0 ||
+      weather.temperatureC <= 0 ||
+      weather.windGustMs >= 14 ||
+      weather.turfCondition === 'snowy' ||
+      weather.turfCondition === 'slick');
+
   const isSevereWeather =
     weather &&
     (weather.precipitationMmh >= 2.5 ||
@@ -67,7 +95,7 @@ export function resolveTransitPlan(
       weather.windGustMs >= 17);
 
   let selectedMode: 'walk' | 'bicycle' | 'car' | 'transit' = 'car';
-  const preferred = home.defaultTransitMode || 'auto';
+  const preferred = h.defaultTransitMode || 'auto';
 
   if (overrideMode && overrideMode !== 'auto') {
     selectedMode = overrideMode;
@@ -77,20 +105,20 @@ export function resolveTransitPlan(
     selectedMode = 'transit';
   } else if (preferred === 'walk') {
     if (distanceKm <= maxWalk && !isSevereWeather) selectedMode = 'walk';
-    else if (distanceKm <= maxBike && !isSevereWeather) selectedMode = 'bicycle';
+    else if (distanceKm <= maxBike && !isBadCyclingWeather) selectedMode = 'bicycle';
     else selectedMode = 'car';
   } else if (preferred === 'bicycle') {
-    if (distanceKm <= maxBike && !isSevereWeather) selectedMode = 'bicycle';
+    if (distanceKm <= maxBike && !isBadCyclingWeather) selectedMode = 'bicycle';
     else selectedMode = 'car';
   } else if (distanceKm <= maxWalk && !isSevereWeather) {
     selectedMode = 'walk';
-  } else if (distanceKm <= maxBike && !isSevereWeather) {
+  } else if (distanceKm <= maxBike && !isBadCyclingWeather) {
     selectedMode = 'bicycle';
   } else {
     selectedMode = 'car';
   }
 
-  let travelMinutes = defaultDrivingMinutes;
+  let travelMinutes = 0;
   let transitLabel = '';
   let isSelfTransit = false;
   let weatherWarning: string | undefined;
@@ -102,7 +130,7 @@ export function resolveTransitPlan(
       transitLabel = `🚶 Kävely ${travelMinutes} min (${distLabel})`;
       isSelfTransit = true;
       if (weather && weather.precipitationMmh > 0.5) {
-        weatherWarning = '🌧️ Kevyttä sadetta: sateenvarjo tai sadetakki mukaan';
+        weatherWarning = '🌧️ Sadetta: sateenvarjo tai sadetakki mukaan kävelyyn';
       }
       break;
     }
@@ -113,13 +141,15 @@ export function resolveTransitPlan(
       isSelfTransit = true;
       if (weather && weather.precipitationMmh > 0.5) {
         weatherWarning = '🌧️ Sadetta luvassa: sadevarusteet pyöräilyyn';
+      } else if (weather && weather.temperatureC >= 15 && weather.precipitationMmh === 0) {
+        weatherWarning = undefined;
       }
       break;
     }
     case 'transit': {
       // Public transit average = distance * 2.5 min + 7 min stop buffer
       travelMinutes = Math.max(8, Math.round(distanceKm * 2.5) + 7);
-      transitLabel = `🚌 Bussi/Ratikka ${travelMinutes} min (${distLabel})`;
+      transitLabel = `🚌 Bussi/Ratikka/Metro ${travelMinutes} min (${distLabel})`;
       isSelfTransit = true;
       break;
     }
@@ -129,8 +159,10 @@ export function resolveTransitPlan(
       travelMinutes = Math.max(5, Math.round(distanceKm * 1.6) + 4);
       transitLabel = `🚗 Auto ${travelMinutes} min (${distLabel})`;
       isSelfTransit = false;
-      if (isSevereWeather && (distanceKm <= maxBike || distanceKm <= maxWalk)) {
-        weatherWarning = '🌧️ Sadesää: auto suositeltava pyöräilyn sijaan';
+      if (isBadCyclingWeather && distanceKm <= maxBike && distanceKm > maxWalk) {
+        weatherWarning = '🌧️ Sadesää/tuuli: autokyyti tai metro suositeltava pyöräilyn sijaan';
+      } else if (isSevereWeather && distanceKm <= maxWalk) {
+        weatherWarning = '🌧️ Rankkasade: autokyyti suositeltava kävelyn sijaan';
       }
       break;
     }
@@ -144,4 +176,24 @@ export function resolveTransitPlan(
     isSelfTransit,
     weatherWarning
   };
+}
+
+/** True when a plan has a real, computed travel time (home and venue both known). */
+export function hasRealTravelTime(plan: TransitPlan | null | undefined): boolean {
+  return Boolean(plan && !plan.needsHome && !plan.isUnknownLocation);
+}
+
+/**
+ * The trip plan for one event, always computed from the home that is saved now.
+ * A plan stored on the event may come from an old default home or an older
+ * address, so it is never shown. No home or no exact venue pin gives
+ * needsHome / isUnknownLocation instead of a guessed drive.
+ */
+export function effectiveTransitPlan(
+  event: Pick<MatchdayEvent, 'venue' | 'weather'>,
+  home: HomeLocation | null | undefined
+): TransitPlan {
+  const isApprox = Boolean(event.venue?.isApproximateLocation);
+  const venueCoords = isApprox ? undefined : event.venue?.coordinates;
+  return resolveTransitPlan(home, venueCoords, event.weather);
 }

@@ -1,21 +1,52 @@
-import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import type { HomeLocation, MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { calculateDepartureCountdown } from '../ai/deterministicReasoner';
+import { calculateTeamSimilarity, normalizeTeamName } from '../reconciliation/teamNameMatcher';
 import type { TournamentBlock } from './types';
 import { helsinkiDateISO } from './time';
+
+function venueKey(ev: MatchdayEvent): string {
+  return (ev.venue.normalizedName || ev.venue.name || 'kenttä').toLowerCase().trim();
+}
+
+function tournamentKey(ev: MatchdayEvent): string {
+  return (ev.tournamentName || venueKey(ev) || 'turnaus').toLowerCase().trim();
+}
+
+function involvesTeam(ev: MatchdayEvent, teamName?: string): boolean {
+  if (!teamName) return true;
+  const simHome = calculateTeamSimilarity(teamName, ev.homeTeam || '');
+  const simAway = calculateTeamSimilarity(teamName, ev.awayTeam || '');
+  const simTitle = calculateTeamSimilarity(teamName, ev.title || '');
+  const best = Math.max(simHome, simAway, simTitle);
+  if (best < 0.7) return false;
+  const matched =
+    simHome >= simAway && simHome >= simTitle
+      ? ev.homeTeam
+      : simAway >= simTitle
+        ? ev.awayTeam
+        : ev.title;
+  const a = normalizeTeamName(teamName);
+  const b = normalizeTeamName(matched || '');
+  if (a.color && b.color && a.color !== b.color) return false;
+  if (a.ageGroup && b.ageGroup && a.ageGroup !== b.ageGroup) return false;
+  if (a.squad && b.squad && a.squad !== b.squad) return false;
+  return true;
+}
 
 export function tournamentAgent(
   events: MatchdayEvent[],
   profiles: PlayerProfile[],
-  now?: Date
+  now?: Date,
+  homeLocation?: HomeLocation
 ): TournamentBlock[] {
   const groups = new Map<string, MatchdayEvent[]>();
 
   for (const ev of events) {
-    const explicit = ev.eventType === 'tournament';
+    const explicit = ev.eventType === 'tournament' || Boolean(ev.tournamentName) || Boolean(ev.isTournament);
+    if (!explicit && ev.isTraining) continue;
     const day = helsinkiDateISO(new Date(ev.startTime));
-    const key = explicit
-      ? `${ev.profileId}|${(ev.tournamentName || 'turnaus').toLowerCase().trim()}`
-      : `${ev.profileId}|${ev.venue.normalizedName || ev.venue.name}|${day}`;
+    // One card = one child + one hall + one calendar day (never stash Sun/26.9 into Saturday).
+    const key = `${ev.profileId}|${tournamentKey(ev)}|${venueKey(ev)}|${day}`;
     const list = groups.get(key) || [];
     list.push(ev);
     groups.set(key, list);
@@ -24,10 +55,19 @@ export function tournamentAgent(
   const lookbackMs = now ? now.getTime() - 2 * 3600 * 1000 : null;
   const blocks: TournamentBlock[] = [];
   for (const [, list] of groups) {
-    const matches = list.filter((e) => !e.isTraining && e.eventType !== 'meeting');
-    const isNamed = list.some((e) => e.eventType === 'tournament');
+    let matches = list.filter((e) => !e.isTraining && e.eventType !== 'meeting');
+    const isNamed = list.some((e) => e.eventType === 'tournament' || Boolean(e.tournamentName) || Boolean(e.isTournament));
     if (!isNamed && matches.length < 2) continue;
     if (isNamed && matches.length < 1) continue;
+
+    const firstSeed = matches[0]!;
+    const profile = profiles.find((p) => p.id === firstSeed.profileId);
+    if (!profile) continue;
+
+    const teamHits = matches.filter((m) => involvesTeam(m, profile.teamName));
+    if (teamHits.length >= 1 && teamHits.length < matches.length) {
+      matches = teamHits;
+    }
 
     const sorted = [...matches].sort(
       (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
@@ -35,27 +75,26 @@ export function tournamentAgent(
     const first = sorted[0]!;
     const last = sorted[sorted.length - 1]!;
 
-    // Exclude if all matches in this tournament block have already ended
     if (lookbackMs !== null && new Date(last.endTime).getTime() < lookbackMs) {
       continue;
     }
 
-    const profile = profiles.find((p) => p.id === first.profileId);
-    if (!profile) continue;
     const recovery =
       sorted.length >= 2
         ? Math.round(
             (new Date(sorted[1]!.startTime).getTime() - new Date(first.endTime).getTime()) / 60000
           )
         : 0;
-    const { departureTime } = calculateDepartureCountdown(first, profile?.arrivalRules);
+    const { departureTime } = calculateDepartureCountdown(first, profile?.arrivalRules, homeLocation);
+    const dayIso = helsinkiDateISO(new Date(first.startTime));
 
     blocks.push({
-      id: `tn-${first.id}`,
+      id: `tn-${first.profileId}-${dayIso}-${venueKey(first)}`,
       name: first.tournamentName || `${first.venue.name} · turnauspäivä`,
-      date: helsinkiDateISO(new Date(first.startTime)),
+      date: dayIso,
       venueName: first.venue.name,
       childName: profile?.playerName || 'Lapsi',
+      teamName: profile?.teamName,
       profileId: first.profileId,
       colorHex: profile?.colorHex || '#10b981',
       matchCount: sorted.length,

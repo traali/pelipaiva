@@ -1,0 +1,53 @@
+import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+
+const PLAYER_SELECTION_PREFIX = 'player:';
+
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function normalizePlayerName(value?: string): string {
+  return safeDecodeURIComponent(value || '').trim().toLocaleLowerCase();
+}
+
+export function groupedPlayerNameFromActiveProfileId(activeProfileId: string): string | undefined {
+  if (!activeProfileId.startsWith(PLAYER_SELECTION_PREFIX)) return undefined;
+  return safeDecodeURIComponent(activeProfileId.slice(PLAYER_SELECTION_PREFIX.length)).trim();
+}
+
+export function activePlayerNameForSelection(
+  activeProfileId: string,
+  profiles: PlayerProfile[]
+): string | undefined {
+  const exactProfile = profiles.find((profile) => profile.id === activeProfileId);
+  if (exactProfile) return exactProfile.playerName;
+
+  return groupedPlayerNameFromActiveProfileId(activeProfileId);
+}
+
+export function filterEventsByActiveProfileId(
+  events: MatchdayEvent[],
+  profiles: PlayerProfile[],
+  activeProfileId: string
+): MatchdayEvent[] {
+  if (activeProfileId === 'all') return events;
+
+  if (profiles.some((profile) => profile.id === activeProfileId)) {
+    return events.filter((event) => event.profileId === activeProfileId);
+  }
+
+  const groupedPlayerName = groupedPlayerNameFromActiveProfileId(activeProfileId);
+  if (groupedPlayerName === undefined) return events.filter((event) => event.profileId === activeProfileId);
+
+  const matchingProfileIds = new Set(
+    profiles
+      .filter((profile) => normalizePlayerName(profile.playerName) === normalizePlayerName(groupedPlayerName))
+      .map((profile) => profile.id)
+  );
+
+  return events.filter((event) => matchingProfileIds.has(event.profileId));
+}

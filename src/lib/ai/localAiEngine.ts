@@ -1,9 +1,12 @@
+import { PARKKIS_BASE_URL } from '../../types/contracts';
+import { parkkisVenueUrl } from '../parking/parkkisLink';
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { ExtractedSportsEvent, parseFreeformSportsMessage, parseMultipleSportsMessages } from './messageParserNLP';
-import { parsePastedSpreadsheetText } from './tableAndExcelParser';
+import { parsePastedSpreadsheetText, parseExcelFileBuffer } from './tableAndExcelParser';
+import { parseScheduleImage, type OcrProgressCallback } from './ocrImageParser';
 import { resolveSportsVenue } from '../geo/sportsGeocoder';
 import { fetchFmiMatchWeather } from '../weather/fmiWeatherEngine';
-import { calculateParkingEase } from '../parking/parkingEaseEngine';
+import { DEFAULT_PROXY_URL } from '../api/proxyUrl';
 import { generateMatchdayBriefing } from './deterministicReasoner';
 import { getFinnishTimezoneOffset } from '../stats/statsEngine';
 import { runMissionControlGraph } from '../agents';
@@ -13,8 +16,12 @@ export interface FamilyLogisticsPlan {
   date: string;
   hasConflicts: boolean;
   conflictDetails: string[];
+  /** suggestedFix for each entry in conflictDetails (same index). */
+  conflictFixes: string[];
   departureSchedule: Array<{
     time: string;
+    /** 'leave' = leave home (needs a home), 'arrive' = be at the venue. */
+    timeKind?: 'leave' | 'arrive';
     action: string;
     childName: string;
     venueName: string;
@@ -105,10 +112,8 @@ export async function convertExtractedToMatchdayEvent(
     confidenceScore: extracted.confidenceScore
   };
 
-  const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime);
-  const parking = calculateParkingEase(venue.name, venue.coordinates, new Date(startTime));
+  const weather = await fetchFmiMatchWeather(venue.coordinates, startTime, endTime, DEFAULT_PROXY_URL);
   if (weather) matchEvent.weather = weather;
-  matchEvent.parking = parking;
   matchEvent.briefing = generateMatchdayBriefing(matchEvent, [matchEvent]);
 
   return matchEvent;
@@ -134,6 +139,7 @@ export function planFamilyLogistics(
       date,
       hasConflicts: false,
       conflictDetails: [],
+      conflictFixes: [],
       departureSchedule: [],
       summaryNarrative: 'Ei merkittyjä otteluita tai harjoituksia tälle viikonlopulle.',
       whatsAppShareText: 'Ei otteluita tänä viikonloppuna.'
@@ -144,8 +150,10 @@ export function planFamilyLogistics(
     date,
     hasConflicts: snap.conflicts.some((c) => !c.isResolvedByActiveTransit),
     conflictDetails: snap.conflicts.map((c) => c.message),
+    conflictFixes: snap.conflicts.map((c) => c.suggestedFix),
     departureSchedule: snap.carpool.map((step) => ({
-      time: step.leaveBy,
+      time: step.leaveBy || step.time,
+      timeKind: step.leaveBy ? ('leave' as const) : ('arrive' as const),
       action: step.action,
       childName: step.childName,
       venueName: step.venueName,
@@ -154,6 +162,11 @@ export function planFamilyLogistics(
     summaryNarrative: snap.summary,
     whatsAppShareText: snap.whatsAppShareText
   };
+}
+
+/** "parkki", "parkkeerata", "pysäköinti", "pysäköintikiekko"; not "jääkiekko". */
+export function isParkingQuestion(norm: string): boolean {
+  return /(?:^|[^a-zåäö])(?:parkk|pysäk|pysäköi)/i.test(norm);
 }
 
 /**
@@ -172,9 +185,10 @@ export function queryFamilySchedule(
     return firstName && firstName.length >= 3 && norm.includes(firstName);
   }) || profiles.find((p) => p.playerName && norm.includes(p.playerName.toLowerCase()));
 
+  const activeEvents = events.filter((e) => !e.isHidden && e.attendanceStatus !== 'out');
   const scopedEvents = namedProfile
-    ? events.filter((e) => e.profileId === namedProfile.id)
-    : events;
+    ? activeEvents.filter((e) => e.profileId === namedProfile.id)
+    : activeEvents;
 
   if (
     norm.includes('kyyti') ||
@@ -229,6 +243,21 @@ export function queryFamilySchedule(
     return {
       answer: `Kalenterissasi on ${turfEvents.length} tekonurmella pelattavaa ottelua. Tekonurmelle suositellaan pyöreänappisia AG-kenkiä polvien ja nilkkojen säästämiseksi.`,
       relevantEvents: turfEvents,
+      confidence: 0.9,
+      engineUsed: 'deterministic'
+    };
+  }
+
+  // Parking: Pelipäivä has no parking facts. Parkkis does.
+  if (isParkingQuestion(norm)) {
+    const next = scopedEvents
+      .filter((e) => new Date(e.endTime) >= new Date())
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
+    const link = next ? parkkisVenueUrl(next.venue) : null;
+    const where = next && link ? ` Kenttä ${next.venue.name}: ${link}` : `: ${PARKKIS_BASE_URL}`;
+    return {
+      answer: `Pelipäivä ei arvioi pysäköintiä. Pysäköintitiedot tulevat Parkkis-sovelluksesta${where}`,
+      relevantEvents: next ? [next] : [],
       confidence: 0.9,
       engineUsed: 'deterministic'
     };
@@ -306,10 +335,12 @@ export async function queryFamilyScheduleWithLLM(
   profiles: PlayerProfile[]
 ): Promise<CopilotQueryResult> {
   const fallback = queryFamilySchedule(query, events, profiles);
+  // Parking answers must point to Parkkis, never a model guess.
+  if (isParkingQuestion(query.toLowerCase())) return fallback;
 
   try {
     const boxed = await createOnDeviceLanguageSession(
-      'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta. Älä keksi otteluita, aikoja tai tuloksia joita listassa ei ole.'
+      'Olet Pelipäivä-sovelluksen perheavustaja. Vastaa ystävällisesti, lyhyesti ja selkeästi suomeksi perheen urheilukysymyksiin annetun aikatauludatan pohjalta. Älä keksi otteluita, aikoja tai tuloksia joita listassa ei ole. Pysäköintitietoja sinulla ei ole: ohjaa Parkkis-sovellukseen.'
     );
     if (!boxed) return fallback;
 
@@ -341,24 +372,8 @@ export async function queryFamilyScheduleWithLLM(
 export {
   parseFreeformSportsMessage,
   parseMultipleSportsMessages,
-  parsePastedSpreadsheetText
+  parsePastedSpreadsheetText,
+  parseExcelFileBuffer,
+  parseScheduleImage,
+  type OcrProgressCallback
 };
-
-export async function parseExcelFileBuffer(
-  buffer: ArrayBuffer,
-  sport: Parameters<typeof import('./tableAndExcelParser').parseExcelFileBuffer>[1] = 'football',
-  defaultPlayer = 'Maija'
-) {
-  const mod = await import('./tableAndExcelParser');
-  return mod.parseExcelFileBuffer(buffer, sport, defaultPlayer);
-}
-
-export async function parseScheduleImage(
-  imageSource: File | Blob | string,
-  sport: Parameters<typeof import('./ocrImageParser').parseScheduleImage>[1] = 'football',
-  defaultPlayer = 'Maija',
-  onProgress?: import('./ocrImageParser').OcrProgressCallback
-) {
-  const mod = await import('./ocrImageParser');
-  return mod.parseScheduleImage(imageSource, sport, defaultPlayer, onProgress);
-}

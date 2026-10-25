@@ -25,10 +25,19 @@ export interface FamilyConflict {
   venueA: string;
   venueB: string;
   overlapMinutes: number;
-  travelMinutesEstimate: number;
+  /** Back-to-back: minutes from the first game's end to the next meeting time. 0 for overlaps. */
+  gapMinutes: number;
   message: string;
   suggestedFix: string;
   isResolvedByActiveTransit?: boolean;
+  date?: string;
+  formattedDate?: string;
+  eventATitle?: string;
+  eventBTitle?: string;
+  eventATime?: string;
+  eventBTime?: string;
+  eventASport?: SportType;
+  eventBSport?: SportType;
 }
 
 export interface CarpoolLeg {
@@ -88,6 +97,7 @@ export interface TournamentBlock {
   date: string;
   venueName: string;
   childName: string;
+  teamName?: string;
   profileId: string;
   colorHex: string;
   matchCount: number;

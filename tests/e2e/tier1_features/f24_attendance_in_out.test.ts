@@ -146,4 +146,21 @@ describe('Feature 24: Player Attendance IN / OUT (Poisjäänti) Management', () 
     fetched = await testDb.events.get(baseMondaySimoTraining.id);
     expect(fetched?.attendanceStatus).toBe('in');
   });
+
+  it('should clear briefing conflictWarning when event or overlapping event is marked OUT', async () => {
+    const { generateMatchdayBriefing } = await import('../../../src/lib/ai/deterministicReasoner');
+
+    // 1. Both active -> overlapping generates conflictWarning
+    const briefingActive = generateMatchdayBriefing(baseMondaySimoTraining, [baseMondaySimoTraining, baseMondayLilliTraining]);
+    expect(briefingActive.conflictWarning).toBeDefined();
+
+    // 2. Simo marked OUT -> briefing for Simo should not have conflictWarning
+    const simoOut: MatchdayEvent = { ...baseMondaySimoTraining, attendanceStatus: 'out' };
+    const briefingSimoOut = generateMatchdayBriefing(simoOut, [simoOut, baseMondayLilliTraining]);
+    expect(briefingSimoOut.conflictWarning).toBeUndefined();
+
+    // 3. Lilli's briefing when Simo is OUT -> Lilli also should not have conflictWarning with Simo
+    const briefingLilli = generateMatchdayBriefing(baseMondayLilliTraining, [simoOut, baseMondayLilliTraining]);
+    expect(briefingLilli.conflictWarning).toBeUndefined();
+  });
 });

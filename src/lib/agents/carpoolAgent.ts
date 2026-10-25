@@ -86,3 +86,19 @@ export function carpoolAgent(
 
   return legs;
 }
+
+/** Finnish label for a carpool driver slot (never show the internal id). */
+export function driverSlotLabel(slot: CarpoolLeg['driverSlot'] | string | undefined): string {
+  switch (slot) {
+    case 'kuski-1':
+      return 'Kuski 1';
+    case 'kuski-2':
+      return 'Kuski 2';
+    case 'yhteiskyyti':
+      return 'Yhteiskyyti';
+    case 'oma-kyyti':
+      return 'Omatoiminen kulku';
+    default:
+      return '';
+  }
+}
