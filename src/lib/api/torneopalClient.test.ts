@@ -5,7 +5,9 @@ import {
   listTorneopalAttempts,
   looksLikeCupRequest,
   mapFixture,
-  shouldTryAssociationEndpoint
+  shouldTryAssociationEndpoint,
+  tasoHash,
+  tasoRequestUrl
 } from './torneopalClient';
 import type { ParsedAssociationUrl } from '../../types/matchday';
 
@@ -164,3 +166,12 @@ describe('torneopal match params', () => {
   });
 });
 
+
+describe('TASO signing for basketball and volleyball', () => {
+  it.each(['koripallo-api', 'lentopallo-api'])('signs %s calls with hash last', async (host) => {
+    const url = await tasoRequestUrl(`https://${host}.torneopal.net/taso/rest`, 'getMatch', { match_id: '816603' });
+    expect(url).toContain('match_id=816603&hash=');
+    // Known-good: lentopallo-api answered 200 to this hash on 25.10.2026.
+    expect(url.endsWith('hash=' + (await tasoHash('getMatch', { match_id: '816603' })))).toBe(true);
+  });
+});
