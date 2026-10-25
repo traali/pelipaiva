@@ -10,6 +10,7 @@ main{max-width:640px;margin:0 auto;padding:12px}h1{font-size:1.2rem;margin:.2em 
 table{width:100%;border-collapse:collapse;font-size:.85rem}td,th{padding:4px 3px;text-align:center;border-bottom:1px solid #334155}td:nth-child(2),th:nth-child(2){text-align:left}
 input,select,button{font:inherit;padding:8px;border-radius:8px;border:1px solid #475569;background:#0b1220;color:#e2e8f0;width:100%;margin:4px 0}button{background:#2563eb;border:0;font-weight:700}
 .warn{background:#7c2d12;padding:8px;border-radius:8px}
+.cm{margin-top:6px;padding-top:6px;border-top:1px dashed #334155;font-size:.85rem}.cm b{color:#93c5fd}.cm ul{margin:3px 0;padding-left:18px}.w{color:#4ade80}.l{color:#f87171}.dr{color:#e2e8f0}
 </style></head><body><main>
 <form id="f"><input id="u" placeholder="Liitä fudisturnaus.com -linkki" autocomplete="off"><button>Avaa turnaus</button></form>
 <div id="out"></div></main>
@@ -32,6 +33,15 @@ function fieldAddr(d,f){const name=(f&&f.name)||'';const stem=name.split(/\s+/)[
  const city=((d.address||'').match(/\d{5}\s+(.+)$/)||[])[1]||'';return m?m[1]+(city?', '+city:''):(d.address||'')}
 function groupDone(d,gid){const ms=d.groupStageMatches.filter(m=>m.groupId===gid);return ms.length&&ms.every(m=>m.homeGoals!=null&&m.awayGoals!=null)}
 function resolve(d,gid,rank){const g=d.groups.find(x=>x.id===gid);if(!g||!groupDone(d,gid))return null;const r=g.results.find(x=>x.ranking===rank);return r?{id:r.teamId,name:r.teamName}:null}
+function common(all,me,op,short){const played=all.filter(m=>m.homeGoals!=null&&m.awayGoals!=null&&m.h.id!=null&&m.a.id!=null);
+ const res=id=>{const r={};played.forEach(m=>{let o,f,a;if(m.h.id===id){o=m.a;f=m.homeGoals;a=m.awayGoals}else if(m.a.id===id){o=m.h;f=m.awayGoals;a=m.homeGoals}else return;(r[o.id]=r[o.id]||{name:o.name,g:[]}).g.push([f,a,m.penalties])});return r};
+ const A=res(me.id),B=res(op.id);const cls=(f,a)=>f>a?'w':f<a?'l':'dr';const sc=g=>g.map(([f,a,p])=>`<span class="${cls(f,a)}">${f}–${a}${p?' rp':''}</span>`).join(', ');
+ let h='<div class="cm">';const h2h=A[op.id];if(h2h)h+=`<div><b>Keskinäinen:</b> ${esc(short(me))} ${sc(h2h.g)}</div>`;
+ const ids=Object.keys(A).filter(k=>+k!==op.id&&+k!==me.id&&B[k]);
+ if(!ids.length)return h+'<div><b>Yhteiset vastustajat:</b> <span class="muted">Ei yhteisiä vastustajia vielä</span></div></div>';
+ let da=0,db=0;ids.forEach(k=>{A[k].g.forEach(([f,a])=>da+=f-a);B[k].g.forEach(([f,a])=>db+=f-a)});const sg=n=>(n>0?'+':'')+n;
+ h+=`<div><b>Yhteiset vastustajat:</b></div><ul>${ids.map(k=>`<li>${esc(A[k].name)}: ${esc(short(me))} ${sc(A[k].g)}, ${esc(short(op))} ${sc(B[k].g)}</li>`).join('')}</ul>`;
+ h+=`<div class="muted">Maaliero yhteisiä vastaan: ${esc(short(me))} <b>${sg(da)}</b>, ${esc(short(op))} <b>${sg(db)}</b>${da>db?' – etu '+esc(short(me)):da<db?' – etu '+esc(short(op)):' – tasan'}</div></div>`;return h}
 function render(){const o=$('#out');if(!data){o.innerHTML=state.slug?`<p class="warn">Turnauksen lataus epäonnistui (${esc(err)}). fudisturnaus.com ei salli suoraa hakua.</p>`:'<p class="muted">Esim. https://www.fudisturnaus.com/t/&lt;turnaus&gt;?clubId=20</p>';return}
  const d=data,now=Date.now();
  const club=state.club?+state.club:null;let teams=d.teams||[];const clubTeams=club?teams.filter(t=>t.clubId===club):[];
@@ -43,11 +53,14 @@ function render(){const o=$('#out');if(!data){o.innerHTML=state.slug?`<p class="
  // playoffs that may involve my team (unresolved): match by my group letter
  const myGroups=d.groups.filter(g=>g.results.some(r=>myIds.includes(r.teamId)));
  const mine=all.filter(m=>myIds.includes(m.h.id)||myIds.includes(m.a.id)||(m.po&&m.h.id==null&&myGroups.some(g=>m.homeTeamOriginId===g.id||m.awayTeamOriginId===g.id)));
+ const short=t=>t.name||'';
+ const cm=(m,done)=>{if(done||!myIds.length)return'';const hm=myIds.includes(m.h.id),am=myIds.includes(m.a.id);if(!hm&&!am)return'';const me=hm?m.h:m.a,op=hm?m.a:m.h;
+  if(op.id==null)return'<div class="cm muted">Yhteiset vastustajat: vastustaja ei vielä selvillä</div>';return common(all,me,op,short)};
  const card=m=>{const s=new Date(m.startTime).getTime();const live=now>=s&&now<s+30*60000;const done=m.homeGoals!=null;const f=(d.fields||[]).find(x=>x.id===m.fieldId)||m.field;
   const cls=t=>myIds.includes(t.id)?'me':'';
   return`<div class="card ${live?'live':''}"><div class="t"><span class="time">${fmt.format(s)}</span>${live?'<span class="badge">Käynnissä</span>':''}<span class="muted">${esc(m.po?'Sijoitus '+m.po:(m.group&&m.group.name||'').replace(/^(Lohko \w).*/,'$1'))}</span></div>
   <div class="t" style="margin-top:4px"><div><div class="${cls(m.h)}">${esc(m.h.name)}</div><div class="${cls(m.a)}">${esc(m.a.name)}</div></div><div class="sc">${done?m.homeGoals+'–'+m.awayGoals+(m.penalties?' rp':''):'–'}</div></div>
-  <div class="muted">📍 ${esc(f&&f.name)} · <a target="_blank" href="https://maps.google.com/?q=${encodeURIComponent(fieldAddr(d,f))}">${esc(fieldAddr(d,f))}</a></div></div>`};
+  <div class="muted">📍 ${esc(f&&f.name)} · <a target="_blank" href="https://maps.google.com/?q=${encodeURIComponent(fieldAddr(d,f))}">${esc(fieldAddr(d,f))}</a></div>${cm(m,done)}</div>`};
  const pick=teams.length?`<select id="tp"><option value="">${club?'Seuran joukkueet':'Valitse joukkue'}</option>${teams.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(t=>`<option value="${t.id}" ${+state.team===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select>`:'';
  const tables=(myGroups.length?myGroups:d.groups).map(g=>`<h2>${esc(g.name)}</h2><table><tr><th>#</th><th>Joukkue</th><th>O</th><th>V</th><th>T</th><th>H</th><th>M</th><th>P</th></tr>${g.results.map(r=>`<tr class="${myIds.includes(r.teamId)?'me':''}"><td>${r.ranking}</td><td>${esc(r.teamName)}</td><td>${r.matches}</td><td>${r.wins}</td><td>${r.draws}</td><td>${r.losses}</td><td>${r.goalsFor}-${r.goalsAgainst}</td><td><b>${r.points}</b></td></tr>`).join('')}</table>`).join('');
  o.innerHTML=`${src==='saved'?'<p class="warn">⚠️ Live-haku ei onnistunut ('+esc(err)+'). Näytetään tallennettu kopio – tulokset eivät päivity.</p>':err?'<p class="warn">Päivitys epäonnistui: '+esc(err)+'</p>':''}
