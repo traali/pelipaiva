@@ -31,9 +31,14 @@ export const PALL_SIGNED_HOST = "spl.torneopal.net";
  * Hosts whose official web app signs every call. tulospalvelu.salibandy.fi
  * (bundle index-CkQ23erR.js, 24.10.2026) signs exactly like Palloliitto: same
  * salt, same `<method>?<salt>&k=v…` sha256, key in `Accept: json/<key>`.
- * Basketball and volleyball hosts still answer unsigned calls (checked 24.10.2026).
+ * Since 25.10.2026 koripallo-api and lentopallo-api also 403 unsigned calls; same scheme.
  */
-export const TASO_SIGNED_HOSTS: ReadonlySet<string> = new Set([PALL_SIGNED_HOST, "salibandy-api.torneopal.net"]);
+export const TASO_SIGNED_HOSTS: ReadonlySet<string> = new Set([
+  PALL_SIGNED_HOST,
+  "salibandy-api.torneopal.net",
+  "koripallo-api.torneopal.net",
+  "lentopallo-api.torneopal.net",
+]);
 
 export async function tasoHash(method: string, params: Record<string, string>): Promise<string> {
   let input = `${method}?${PALL_HASH_SALT}`;
