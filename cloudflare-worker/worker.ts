@@ -286,6 +286,7 @@ export default {
       'https://pelipaiva.pages.dev',
       'https://pelipaiva.fi',
       'https://www.pelipaiva.fi',
+      'https://football-stats-agk.pages.dev',
       'http://localhost:5173',
       'http://127.0.0.1:5173'
     ]);
@@ -737,6 +738,29 @@ export default {
           'Content-Disposition': `inline; filename="famday-${familyCode}.ics"`,
           'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360'
         }
+      });
+    }
+
+    // fudisturnaus.com public tournament JSON (no CORS upstream). GET only, path-scoped.
+    const fudisMatch = url.pathname.match(/^\/api\/fudis\/([A-Za-z0-9-]{8,200})$/);
+    if (fudisMatch) {
+      if (request.method !== 'GET') {
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
+      }
+      const target = `https://www.fudisturnaus.com/api/v1/public/tournaments/${fudisMatch[1]}`;
+      let up: Response;
+      try {
+        up = await fetch(target, {
+          headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Pelipaiva tournament viewer)' },
+          cf: { cacheTtl: 30, cacheEverything: true }
+        } as RequestInit);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: 'upstream_fetch_failed', detail: String(e) }), { status: 502, headers: corsHeaders });
+      }
+      const body = await up.text();
+      return new Response(body, {
+        status: up.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': up.ok ? 'public, max-age=30' : 'no-store' }
       });
     }
 
