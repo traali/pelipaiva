@@ -127,7 +127,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
             for (const ev of all) {
               let currentVenue = ev.venue;
               if (ev.venue?.name) {
-                const freshVenue = await resolveSportsVenue(ev.venue.name);
+                const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport });
                 currentVenue = freshVenue;
               }
               if (currentVenue?.coordinates) {

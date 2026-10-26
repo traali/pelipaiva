@@ -1,4 +1,4 @@
-import { PitchSurface, VenueInfo } from '../../types/matchday';
+import { PitchSurface, SportType, VenueInfo } from '../../types/matchday';
 import { db } from '../storage/db';
 
 export const NATIONAL_FIELD_ALIASES: Record<
@@ -350,6 +350,23 @@ export interface VenueResolveHint {
   lat?: number;
   lng?: number;
   city?: string;
+  /** Sport of the event; floorball, basketball, volleyball, futsal and ice hockey are never played on an outdoor turf. */
+  sport?: SportType;
+}
+
+const INDOOR_SPORTS: ReadonlySet<SportType> = new Set<SportType>(['floorball', 'basketball', 'volleyball', 'futsal', 'icehockey']);
+
+/** Indoor sports must not end up labelled as an outdoor artificial turf because the hall name was unknown. */
+function applySportIndoorRule(venue: VenueInfo, rawVenueString: string, sport?: SportType): VenueInfo {
+  if (!sport || !INDOOR_SPORTS.has(sport) || venue.isUserPinned) return venue;
+  const raw = (rawVenueString || '').toLowerCase();
+  if (sport === 'icehockey') {
+    const outdoorIce = /ulko|avojää|tekojää|luistelukenttä|luistinrata/i.test(raw) && !/halli|arena|areena|keskus/i.test(raw);
+    return { ...venue, isIndoor: !outdoorIce, surface: 'ice' };
+  }
+  if (venue.isIndoor) return venue;
+  const isParquet = /koulu|lukio|opisto|liikuntasali|liikuntahalli|palloiluhalli|kisahalli|sali\b/i.test(raw);
+  return { ...venue, isIndoor: true, surface: isParquet ? 'indoor_parquet' : 'indoor_synthetic' };
 }
 
 function extractLipasPoint(site: Record<string, unknown>): { lat: number; lng: number } | null {
@@ -382,6 +399,14 @@ export async function resolveSportsVenue(
   rawVenueString: string,
   hint?: VenueResolveHint
 ): Promise<VenueInfo> {
+  const venue = await resolveSportsVenueByName(rawVenueString, hint);
+  return applySportIndoorRule(venue, rawVenueString, hint?.sport);
+}
+
+async function resolveSportsVenueByName(
+  rawVenueString: string,
+  hint?: VenueResolveHint
+): Promise<VenueInfo> {
   const normalized = (rawVenueString || '')
     .toLowerCase()
     .replace(/[.,\-/()]/g, ' ')
@@ -394,7 +419,7 @@ export async function resolveSportsVenue(
     !/halli|arena|areena|keskus/i.test(normalized);
   const indoorGuess = isIce
     ? !isExplicitOutdoorIce
-    : /halli|arena|center|sali|koulu|lukio|opisto|liikuntasali|monitoimitalo|gym|liikuntahalli/i.test(normalized);
+    : /halli|arena|areena|center|sali|koulu|lukio|opisto|liikuntasali|monitoimitalo|gym|liikuntahalli/i.test(normalized);
 
   const resolveSurfaceGuess = (isInd: boolean): PitchSurface => {
     if (isIce) return 'ice';
