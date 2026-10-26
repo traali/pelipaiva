@@ -160,7 +160,8 @@ export async function ingestOfficialForProfile(opts: {
     const venue = await resolveSportsVenue(fixture.venueName, {
       lat: fixture.venueLat,
       lng: fixture.venueLng,
-      city: fixture.venueCity
+      city: fixture.venueCity,
+      sport: officialData.sport || parsedAssoc?.sport || opts.sport
     });
     const startTime = fixture.startTime;
     const endTime =

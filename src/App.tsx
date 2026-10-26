@@ -248,7 +248,7 @@ export const App: React.FC = () => {
           const lng = ev.venue?.coordinates?.lng || 0;
           if (ev.venue && (ev.venue.isApproximateLocation || (lat === 0 && lng === 0)) && ev.venue.name) {
             try {
-              const geo = await resolveSportsVenue(ev.venue.name);
+              const geo = await resolveSportsVenue(ev.venue.name, { sport: ev.sport });
               if (geo.coordinates && (geo.coordinates.lat !== 0 || geo.coordinates.lng !== 0) && !geo.isApproximateLocation) {
                 patch.venue = { ...ev.venue, ...geo, isApproximateLocation: false };
               }
@@ -667,7 +667,7 @@ export const App: React.FC = () => {
         // Re-resolve venue with latest geocoding and aliases (e.g. Ruukinlahden tekonurmi)
         let currentVenue = ev.venue;
         if (ev.venue?.name) {
-          const freshVenue = await resolveSportsVenue(ev.venue.name);
+          const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport });
           if (
             freshVenue.coordinates.lat !== ev.venue.coordinates?.lat ||
             freshVenue.coordinates.lng !== ev.venue.coordinates?.lng ||
