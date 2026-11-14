@@ -566,6 +566,42 @@ function isCalendarFixtureMatch(cal: MatchdayEvent, fix: MatchdayEvent): boolean
   return false;
 }
 
+function hasExactPin(venue?: MatchdayEvent['venue']): boolean {
+  const c = venue?.coordinates;
+  return Boolean(c && Number.isFinite(c.lat) && Number.isFinite(c.lng) && (c.lat !== 0 || c.lng !== 0) && !venue?.isApproximateLocation);
+}
+
+/**
+ * Official (TASO) venue wins over the club calendar's free text. A differing name is
+ * flagged as venueMismatch for the banner (not after a user decision).
+ */
+function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
+  if (!fix.venue) return;
+  const suppressMismatchFlags = Boolean(cal.userOverride);
+  const calVenueName = cal.venue?.name?.trim() || '';
+  const fixVenueName = fix.venue.name?.trim() || '';
+  if (!calVenueName) {
+    cal.venue = fix.venue;
+    return;
+  }
+  if (!fixVenueName) return;
+  // Keep an exact calendar pin when TASO itself has no exact pin.
+  if (hasExactPin(cal.venue) && !hasExactPin(fix.venue)) return;
+  const venuesDiffer =
+    fixVenueName.toLowerCase() !== calVenueName.toLowerCase() &&
+    (fix.venue.normalizedName || fixVenueName.toLowerCase()) !==
+      (cal.venue?.normalizedName || calVenueName.toLowerCase());
+  if (venuesDiffer && !suppressMismatchFlags) {
+    cal.mismatchFlags = {
+      ...cal.mismatchFlags,
+      venueMismatch: true,
+      calendarVenueName: cal.mismatchFlags?.calendarVenueName || calVenueName,
+      officialVenueName: fixVenueName
+    };
+  }
+  cal.venue = fix.venue;
+}
+
 /**
  * Stitches club calendar events (e.g. MyClub / Nimenhuuto) with bare official fixtures (e.g. Torneopal / SPL)
  * on the same calendar day matching the team or opponent.
@@ -623,6 +659,13 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     // If this calendar day has no TASO games, fall through — Nimenhuuto is often ±1 day
     // off the official Saturday (Westend Yellow 26.9. shown as Sunday 27.9.).
     if (cal.officialFixtureId) {
+      // A saved link must still take the official pin. Nimenhuuto writes free-text
+      // venues without coordinates (Westend Yellow 22.11. "Sipoon Areena Oy, …"),
+      // so the card lost its map and Parkkis although TASO knows the hall.
+      const linkedFixture = bareFixtures.find(
+        (f) => f.officialFixtureId === cal.officialFixtureId || f.id.endsWith(cal.officialFixtureId || '—')
+      );
+      if (linkedFixture) adoptOfficialVenue(cal, linkedFixture);
       const extras = collectSameDay(true);
       const sameDayAny = collectSameDay(false);
       if (extras.length || sameDayAny.length) {
@@ -806,29 +849,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       }
 
       // Venue adoption & mismatch diagnostics
-      const calVenueName = cal.venue?.name?.trim() || '';
-      const fixVenueName = fix.venue?.name?.trim() || '';
-
-      if (fix.venue && !calVenueName) {
-        // Empty/undefined calendar venue: adopt authoritative fixture venue cleanly
-        cal.venue = fix.venue;
-      } else if (fixVenueName && calVenueName) {
-        const venuesDiffer =
-          fixVenueName.toLowerCase() !== calVenueName.toLowerCase() &&
-          (fix.venue?.normalizedName || fixVenueName.toLowerCase()) !==
-            (cal.venue?.normalizedName || calVenueName.toLowerCase());
-        if (!suppressMismatchFlags && venuesDiffer) {
-          cal.mismatchFlags = {
-            ...cal.mismatchFlags,
-            venueMismatch: true,
-            calendarVenueName: calVenueName,
-            officialVenueName: fixVenueName
-          };
-          cal.venue = fix.venue;
-        } else if (fix.venue) {
-          cal.venue = fix.venue;
-        }
-      }
+      adoptOfficialVenue(cal, fix);
       if (suppressMismatchFlags) {
         cal.mismatchFlags = undefined;
       }
