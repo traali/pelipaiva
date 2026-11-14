@@ -143,3 +143,13 @@ describe('dismissed banner', () => {
     expect(out[0]!.mismatchFlags?.venueMismatch).toBeFalsy();
   });
 });
+
+describe('family pin', () => {
+  it('a user-pinned calendar venue is kept and the differing TASO hall is flagged', () => {
+    const pin = { name: 'Oma kenttä', normalizedName: 'oma kenttä', coordinates: { lat: 60.2, lng: 24.9 }, isIndoor: true, surface: 'indoor_parquet' as const, hasFloodlights: true, isUserPinned: true, locationSource: 'user' as const };
+    const cal = ev({ id: 'cal-6', officialFixtureId: '949701', venue: pin });
+    const out = stitchCalendarEventsWithFixtures([cal, fixture]);
+    expect(out[0]!.venue.coordinates).toEqual(pin.coordinates);
+    expect(out[0]!.mismatchFlags?.venueMismatch).toBe(true);
+  });
+});
