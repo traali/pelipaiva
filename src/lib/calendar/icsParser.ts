@@ -579,7 +579,7 @@ export function detectSquadGroups(icsContent: string): { squadName: string; even
   const counts: Record<string, number> = {};
 
   try {
-    const jcalData = ICAL.parse(icsContent);
+    const jcalData = ICAL.parse(withCompleteHelsinkiTimezone(icsContent));
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
@@ -631,7 +631,7 @@ export function extractFeedCategories(icsContent: string): FeedCategory[] {
   };
 
   try {
-    const jcalData = ICAL.parse(icsContent);
+    const jcalData = ICAL.parse(withCompleteHelsinkiTimezone(icsContent));
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
@@ -715,7 +715,7 @@ export function extractFeedCategoryNames(icsContent: string): string[] {
  */
 export function splitICSBySquad(icsContent: string, squadName: string): string {
   try {
-    const jcalData = ICAL.parse(icsContent);
+    const jcalData = ICAL.parse(withCompleteHelsinkiTimezone(icsContent));
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
@@ -834,6 +834,42 @@ export function extractAttendanceStatus(
  * Parses raw iCalendar (.ics) string feeds from Nimenhuuto, MyClub, Jopox, or Torneopal.
  * Timezone-safe (RFC 5545) with deterministic volunteer duty detection and attendance extraction.
  */
+
+/**
+ * Full Europe/Helsinki rules (EU switch, last Sunday of March / October).
+ * MyClub ships a VTIMEZONE whose rules start at the next switch (e.g. DAYLIGHT
+ * from 28.3.2027, STANDARD from 25.10.2026), so ical.js has no rule for any
+ * earlier summer-time row and reads it as UTC: a 9.00 game showed at 12.00.
+ * Feeds that use TZID=Europe/Helsinki without any VTIMEZONE would float on the
+ * device clock. Both get these complete rules instead.
+ */
+const HELSINKI_VTIMEZONE = [
+  'BEGIN:VTIMEZONE',
+  'TZID:Europe/Helsinki',
+  'BEGIN:DAYLIGHT',
+  'DTSTART:19810329T030000',
+  'TZOFFSETFROM:+0200',
+  'TZOFFSETTO:+0300',
+  'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
+  'TZNAME:EEST',
+  'END:DAYLIGHT',
+  'BEGIN:STANDARD',
+  'DTSTART:19961027T040000',
+  'TZOFFSETFROM:+0300',
+  'TZOFFSETTO:+0200',
+  'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU',
+  'TZNAME:EET',
+  'END:STANDARD',
+  'END:VTIMEZONE'
+].join('\r\n');
+
+export function withCompleteHelsinkiTimezone(ics: string): string {
+  if (!/TZID=Europe\/Helsinki/i.test(ics)) return ics;
+  const block = /BEGIN:VTIMEZONE\r?\nTZID:Europe\/Helsinki\r?\n[\s\S]*?END:VTIMEZONE/i;
+  if (block.test(ics)) return ics.replace(block, HELSINKI_VTIMEZONE);
+  return ics.replace(/BEGIN:VCALENDAR\r?\n/i, (m) => `${m}${HELSINKI_VTIMEZONE}\r\n`);
+}
+
 export async function parseICSFeed(
   icsContent: string,
   profileId: string,
@@ -850,7 +886,7 @@ export async function parseICSFeed(
   }
 
   try {
-    const jcalData = ICAL.parse(icsContent);
+    const jcalData = ICAL.parse(withCompleteHelsinkiTimezone(icsContent));
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
