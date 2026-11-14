@@ -3,6 +3,7 @@ import type { MatchdayEvent, PlayerProfile, HomeLocation } from "../../types/mat
 import type { ActiveModal } from "../../lib/modals/useModalStore";
 import { db } from "../../lib/storage/db";
 import { resolveSportsVenue } from "../../lib/geo/sportsGeocoder";
+import { isBetterLocation, shouldReResolveVenue } from "../../lib/geo/venueLocation";
 import { resolveTransitPlan } from "../../lib/geo/transitEngine";
 import { liveSatelliteUrl } from "../SatelliteEmbedDrawer";
 
@@ -126,9 +127,9 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
             const all = await db.events.toArray();
             for (const ev of all) {
               let currentVenue = ev.venue;
-              if (ev.venue?.name) {
-                const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport });
-                currentVenue = freshVenue;
+              if (ev.venue?.name && shouldReResolveVenue(ev.venue)) {
+                const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
+                if (isBetterLocation(ev.venue, freshVenue)) currentVenue = freshVenue;
               }
               if (currentVenue?.coordinates) {
                 const freshTransit = resolveTransitPlan(h, currentVenue.coordinates, ev.weather);
@@ -238,6 +239,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
           playerLog={activeModal.event.playerLog}
           score={activeModal.event.score}
           sport={activeModal.event.sport}
+          venue={activeModal.event.venue}
           showTacticalScout={aiSettings?.showTacticalScout}
           onSavePlayerLog={async (log, updatedScore) => {
             const updates: Partial<MatchdayEvent> = {

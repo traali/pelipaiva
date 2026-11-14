@@ -1,5 +1,6 @@
 import { PARKKIS_BASE_URL } from '../../types/contracts';
 import { parkkisVenueUrl } from '../parking/parkkisLink';
+import { venueLocationStatus } from '../geo/venueLocation';
 import { MatchdayEvent, PlayerProfile } from '../../types/matchday';
 import { ExtractedSportsEvent, parseFreeformSportsMessage, parseMultipleSportsMessages } from './messageParserNLP';
 import { parsePastedSpreadsheetText, parseExcelFileBuffer } from './tableAndExcelParser';
@@ -254,7 +255,11 @@ export function queryFamilySchedule(
       .filter((e) => new Date(e.endTime) >= new Date())
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
     const link = next ? parkkisVenueUrl(next.venue) : null;
-    const where = next && link ? ` Kenttä ${next.venue.name}: ${link}` : `: ${PARKKIS_BASE_URL}`;
+    const approx = next ? venueLocationStatus(next.venue) === 'approximate' : false;
+    const where =
+      next && link
+        ? ` Kenttä ${next.venue.name}${approx ? ' (sijainti arvioitu, tarkista kenttä paikan päältä)' : ''}: ${link}`
+        : `: ${PARKKIS_BASE_URL}`;
     return {
       answer: `Pelipäivä ei arvioi pysäköintiä. Pysäköintitiedot tulevat Parkkis-sovelluksesta${where}`,
       relevantEvents: next ? [next] : [],

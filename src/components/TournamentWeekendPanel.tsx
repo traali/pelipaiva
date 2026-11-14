@@ -4,6 +4,7 @@ import type { TournamentBlock } from '../lib/agents';
 import { formatFiTime } from '../lib/agents';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 
+import { venueSearchQuery } from '../lib/geo/venueLocation';
 interface TournamentWeekendPanelProps {
   blocks: TournamentBlock[];
   onNavigate?: (coordinates: { lat: number; lng: number }) => void;
@@ -217,7 +218,7 @@ export const TournamentWeekendPanel: React.FC<TournamentWeekendPanelProps> = ({ 
                                     const destination =
                                       hasValidCoords
                                         ? `${coords.lat},${coords.lng}`
-                                        : encodeURIComponent(m.venue?.name || 'Kenttä');
+                                        : encodeURIComponent(m.venue ? venueSearchQuery(m.venue) || 'Kenttä' : 'Kenttä');
                                     window.open(
                                       `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                                       '_blank',

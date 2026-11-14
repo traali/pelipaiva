@@ -1,0 +1,195 @@
+{
+ "_note": "Real TASO games of PPJ/Laru sin (team 185085) captured 2026-11-14 from Pelipäivä. The two *-copy events are test variants of real games: one (EsPa/Matinkylä game) with the coordinates removed (as a calendar import with only a venue name), one with the venue marked approximate.",
+ "profiles": [
+  {
+   "id": "p:simo:tulospalvelu.palloliitto.fi:185085",
+   "playerName": "Simo",
+   "teamName": "PPJ/Laru sin",
+   "sport": "football",
+   "primaryColor": "sininen",
+   "colorHex": "#3b82f6",
+   "teamId": "185085",
+   "associationType": "palloliitto",
+   "associationUrl": "https://tulospalvelu.palloliitto.fi/team/185085/fixture"
+  }
+ ],
+ "events": [
+  {
+   "id": "fixture-p:simo:tulospalvelu.palloliitto.fi:185085-palloliitto_185085_4208608",
+   "profileId": "p:simo:tulospalvelu.palloliitto.fi:185085",
+   "title": "KaPy vs PPJ/Laru sin",
+   "eventType": "match",
+   "isTraining": false,
+   "sport": "football",
+   "homeTeam": "KaPy",
+   "awayTeam": "PPJ/Laru sin",
+   "isHomeMatch": false,
+   "startTime": "2026-09-20T17:30:00+03:00",
+   "endTime": "2026-09-20T15:40:00.000Z",
+   "warmupTime": "2026-09-20T13:30:00.000Z",
+   "warmupIsEstimate": true,
+   "stage": "alku",
+   "matchNumber": "357097",
+   "ageClassLabel": "P13 (2014)",
+   "score": "0–1",
+   "venue": {
+    "name": "Hansavalkama TN A",
+    "normalizedName": "hansavalkama tn a",
+    "city": "Espoo",
+    "coordinates": {
+     "lat": 60.190827120241,
+     "lng": 24.586670172221
+    },
+    "isIndoor": false,
+    "surface": "artificial_turf_3g",
+    "hasFloodlights": true,
+    "locationSource": "taso"
+   },
+   "officialFixtureId": "palloliitto_185085_4208608",
+   "reconciliationStatus": "auto_matched",
+   "confidenceScore": 1
+  },
+  {
+   "id": "fixture-p:simo:tulospalvelu.palloliitto.fi:185085-palloliitto_185085_4208620",
+   "profileId": "p:simo:tulospalvelu.palloliitto.fi:185085",
+   "title": "PPJ/Laru sin vs EPS/Punainen",
+   "eventType": "match",
+   "isTraining": false,
+   "sport": "football",
+   "homeTeam": "PPJ/Laru sin",
+   "awayTeam": "EPS/Punainen",
+   "isHomeMatch": true,
+   "startTime": "2026-09-24T18:00:00+03:00",
+   "endTime": "2026-09-24T16:10:00.000Z",
+   "warmupTime": "2026-09-24T14:15:00.000Z",
+   "warmupIsEstimate": true,
+   "stage": "alku",
+   "matchNumber": "357109",
+   "ageClassLabel": "P13 (2014)",
+   "score": "3–6",
+   "venue": {
+    "name": "Lauttasaari TN B",
+    "normalizedName": "lauttasaari tn b",
+    "city": "Helsinki",
+    "coordinates": {
+     "lat": 60.163573520062,
+     "lng": 24.867501722732
+    },
+    "isIndoor": false,
+    "surface": "artificial_turf_3g",
+    "hasFloodlights": true,
+    "locationSource": "taso"
+   },
+   "officialFixtureId": "palloliitto_185085_4208620",
+   "reconciliationStatus": "auto_matched",
+   "confidenceScore": 1
+  },
+  {
+   "id": "fixture-p:simo:tulospalvelu.palloliitto.fi:185085-palloliitto_185085_4208631",
+   "profileId": "p:simo:tulospalvelu.palloliitto.fi:185085",
+   "title": "EsPa/Keltainen 3 vs PPJ/Laru sin",
+   "eventType": "match",
+   "isTraining": false,
+   "sport": "football",
+   "homeTeam": "EsPa/Keltainen 3",
+   "awayTeam": "PPJ/Laru sin",
+   "isHomeMatch": false,
+   "startTime": "2026-10-04T10:15:00+03:00",
+   "endTime": "2026-10-04T08:25:00.000Z",
+   "warmupTime": "2026-10-04T06:15:00.000Z",
+   "warmupIsEstimate": true,
+   "stage": "alku",
+   "matchNumber": "357120",
+   "ageClassLabel": "P13 (2014)",
+   "score": "2–3",
+   "venue": {
+    "name": "Matinkylän Urheilupuisto TN 2 B",
+    "normalizedName": "matinkylä 2 tn b",
+    "city": "Espoo",
+    "coordinates": {
+     "lat": 60.158587670303,
+     "lng": 24.750665607002
+    },
+    "isIndoor": false,
+    "surface": "artificial_turf_3g",
+    "hasFloodlights": true,
+    "locationSource": "taso"
+   },
+   "officialFixtureId": "palloliitto_185085_4208631",
+   "reconciliationStatus": "auto_matched",
+   "confidenceScore": 1
+  },
+  {
+   "id": "fixture-p:simo:tulospalvelu.palloliitto.fi:185085-palloliitto_185085_4208643-calendar-copy",
+   "profileId": "p:simo:tulospalvelu.palloliitto.fi:185085",
+   "title": "PPJ/Laru sin vs Kasiysi/PEP YJ2",
+   "eventType": "match",
+   "isTraining": false,
+   "sport": "football",
+   "homeTeam": "PPJ/Laru sin",
+   "awayTeam": "Kasiysi/PEP YJ2",
+   "isHomeMatch": true,
+   "startTime": "2026-10-08T18:00:00+03:00",
+   "endTime": "2026-10-08T16:10:00.000Z",
+   "warmupTime": "2026-10-08T14:15:00.000Z",
+   "warmupIsEstimate": true,
+   "stage": "alku",
+   "matchNumber": "357132",
+   "ageClassLabel": "P13 (2014)",
+   "score": "5–3",
+   "venue": {
+    "name": "Matinkylän Urheilupuisto TN 2 B",
+    "normalizedName": "matinkylän urheilupuisto tn 2 b",
+    "city": "Espoo",
+    "coordinates": {
+     "lat": 0,
+     "lng": 0
+    },
+    "isApproximateLocation": true,
+    "isIndoor": false,
+    "surface": "artificial_turf_3g",
+    "hasFloodlights": true
+   },
+   "officialFixtureId": null,
+   "reconciliationStatus": "auto_matched",
+   "confidenceScore": 1
+  },
+  {
+   "id": "fixture-p:simo:tulospalvelu.palloliitto.fi:185085-palloliitto_185085_4208631-approx-copy",
+   "profileId": "p:simo:tulospalvelu.palloliitto.fi:185085",
+   "title": "EsPa/Keltainen 3 vs PPJ/Laru sin",
+   "eventType": "match",
+   "isTraining": false,
+   "sport": "football",
+   "homeTeam": "EsPa/Keltainen 3",
+   "awayTeam": "PPJ/Laru sin",
+   "isHomeMatch": false,
+   "startTime": "2026-10-11T10:15:00+03:00",
+   "endTime": "2026-10-11T08:45:00.000Z",
+   "warmupTime": "2026-10-11T06:15:00.000Z",
+   "warmupIsEstimate": true,
+   "stage": "alku",
+   "matchNumber": "357120",
+   "ageClassLabel": "P13 (2014)",
+   "score": "2–3",
+   "venue": {
+    "name": "Matinkylän Urheilupuisto TN 2 B",
+    "normalizedName": "matinkylä 2 tn b",
+    "city": "Espoo",
+    "coordinates": {
+     "lat": 60.158587670303,
+     "lng": 24.750665607002
+    },
+    "isIndoor": false,
+    "surface": "artificial_turf_3g",
+    "hasFloodlights": true,
+    "locationSource": "lipas",
+    "isApproximateLocation": true,
+    "locationQuality": "approximate"
+   },
+   "officialFixtureId": null,
+   "reconciliationStatus": "auto_matched",
+   "confidenceScore": 1
+  }
+ ]
+}

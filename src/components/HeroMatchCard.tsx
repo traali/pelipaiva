@@ -24,7 +24,8 @@ import { sportLabelFi } from '../lib/sport/sportMeta';
 import { springTactile } from '../lib/motion/springs';
 import { KitChecklist } from './KitChecklist';
 import { LeaveTimeCell } from './LeaveTimeCell';
-import { ParkkisLink } from './ParkkisLink';
+import { VenueMapCard } from './VenueMapCard';
+import { venueLocationStatus } from '../lib/geo/venueLocation';
 import { SportGlyph } from './SportGlyph';
 import { getContrastTextColor } from '../lib/sport/teamColors';
 import { resolveEventSourceInfo } from '../lib/events/eventSourceResolver';
@@ -446,9 +447,11 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
           <span className="truncate font-medium">
             {venue.name}
-            {venue.isApproximateLocation && (
+            {venueLocationStatus(venue) === 'approximate' ? (
+              <span className="ml-1 text-[10px] font-semibold text-whistle">(sijainti arvioitu)</span>
+            ) : venueLocationStatus(venue) !== 'exact' ? (
               <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti tuntematon)</span>
-            )}
+            ) : null}
           </span>
           <span className="text-xs text-text-muted">
             • {venue.isIndoor ? 'Sisätila' : 'Ulkokenttä'}
@@ -861,9 +864,9 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
           )}
         </div>
 
-                {/* Parking facts come from Parkkis, not from Pelipäivä */}
-        <div className="mt-2 empty:hidden">
-          <ParkkisLink venue={event.venue} />
+        {/* Where the game is + parking (facts from Parkkis, not from Pelipäivä) */}
+        <div className="mt-3 empty:hidden">
+          <VenueMapCard venue={event.venue} />
         </div>
 
         {/* Applied Notes / Carpool / Volunteer / School Details */}

@@ -7,6 +7,7 @@ import { effectiveTransitPlan } from "../lib/geo/transitEngine";
 import { db } from "../lib/storage/db";
 import { recordAttendanceOverride } from "../lib/sync/familyCloud";
 
+import { venueSearchQuery } from '../lib/geo/venueLocation';
 export function surfaceLabel(surface: PitchSurface, indoor: boolean): string {
   if (indoor) return "Sisähalli";
   switch (surface) {
@@ -110,7 +111,7 @@ export function useMatchdayLogistics({
   const hasValidCoords = Boolean(targetCoords && (targetCoords.lat !== 0 || targetCoords.lng !== 0));
   const destination = hasValidCoords
     ? `${targetCoords!.lat},${targetCoords!.lng}`
-    : encodeURIComponent(event.venue?.name || "Kenttä");
+    : encodeURIComponent(event.venue ? venueSearchQuery(event.venue) || 'Kenttä' : 'Kenttä');
   const travelModeParam =
     transitPlan?.mode === "walk"
       ? "&travelmode=walking"

@@ -19,7 +19,8 @@ import {
   ChevronRight,
   ExternalLink
 } from 'lucide-react';
-import { FullMatchStats, PlayerMatchLog, SportType } from '../types/matchday';
+import { FullMatchStats, PlayerMatchLog, SportType, VenueInfo } from '../types/matchday';
+import { VenueMapCard } from './VenueMapCard';
 import { springTactile } from '../lib/motion/springs';
 import { SatelliteEmbedDrawer } from './SatelliteEmbedDrawer';
 import { federationMatchLinks, liveSatelliteUrl } from '../lib/sport/federationLinks';
@@ -43,6 +44,8 @@ interface MatchStatsModalProps {
   ageClassLabel?: string;
   division?: string;
   showTacticalScout?: boolean;
+  /** Where the game is: map + parking in the game detail view. */
+  venue?: VenueInfo;
   onSavePlayerLog?: (log: PlayerMatchLog, updatedScore?: string) => void;
 }
 
@@ -79,6 +82,7 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
   sport = 'football',
   stage,
   ageClassLabel,
+  venue,
   division,
   showTacticalScout = false,
   onSavePlayerLog
@@ -356,6 +360,12 @@ export const MatchStatsModal: React.FC<MatchStatsModalProps> = ({
                 </div>
               )}
             </div>
+
+            {venue && (
+              <div className="mb-5">
+                <VenueMapCard venue={venue} />
+              </div>
+            )}
 
             {/* Quick Satellite Launcher Banner */}
             {(() => {

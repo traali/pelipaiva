@@ -22,6 +22,7 @@ import { useDismissedConflicts } from '../lib/agents/conflictDismissal';
 import { db } from '../lib/storage/db';
 import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 
+import { venueSearchQuery } from '../lib/geo/venueLocation';
 export interface FamilyVisualCalendarProps {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
@@ -926,7 +927,7 @@ export const FamilyVisualCalendar: React.FC<FamilyVisualCalendarProps> = ({
                               const destination =
                                 hasValidCoords
                                   ? `${coords.lat},${coords.lng}`
-                                  : encodeURIComponent(ev.venue?.name || 'Kenttä');
+                                  : encodeURIComponent(ev.venue ? venueSearchQuery(ev.venue) || 'Kenttä' : 'Kenttä');
                               window.open(
                                 `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                                 '_blank',

@@ -21,8 +21,7 @@ import { MatchdayEvent, FullMatchStats, PlayerMatchLog, PlayerProfile } from '..
 import { springTactile } from '../lib/motion/springs';
 import { NappisvahtiPill } from './NappisvahtiPill';
 import { LeaveTimeCell } from './LeaveTimeCell';
-import { ParkkisLink } from './ParkkisLink';
-import { parkkisVenueUrl } from '../lib/parking/parkkisLink';
+import { VenueMapCard, VenueQuickLinks } from './VenueMapCard';
 import { MatchdayCardWeatherBadge } from './MatchdayCardWeatherBadge';
 import { WeatherSatelliteDrawer } from './WeatherSatelliteDrawer';
 import { isIndoorEvent } from '../lib/sport/isIndoorEvent';
@@ -48,6 +47,7 @@ import { MismatchResolveBanner, type MismatchDecision } from './MismatchResolveB
 import { EventMergeModal } from './EventMergeModal';
 import { MoreHorizontal } from 'lucide-react';
 
+import { venueLocationStatus, venueSearchQuery } from '../lib/geo/venueLocation';
 interface MatchdayCardProps {
   event: MatchdayEvent;
   allEvents?: MatchdayEvent[];
@@ -618,12 +618,15 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
           <div className="flex items-center gap-2 mt-1.5 text-xs md:text-sm text-text-secondary flex-wrap">
             <MapPin className="w-4 h-4 text-text-muted shrink-0" />
-            <span className="truncate">
+            <span className="truncate min-w-0 flex-1">
               {venue.name}
-              {event.venue.isApproximateLocation && (
+              {venueLocationStatus(event.venue) === 'approximate' ? (
+                <span className="ml-1 text-[10px] font-semibold text-whistle">(sijainti arvioitu)</span>
+              ) : venueLocationStatus(event.venue) !== 'exact' ? (
                 <span className="ml-1 text-[10px] font-semibold text-text-muted">(sijainti tuntematon)</span>
-              )}
+              ) : null}
             </span>
+            {!showExtras && <VenueQuickLinks venue={event.venue} />}
           </div>
           <MatchSourceLinks links={matchLinks} className="mt-2" />
         </div>
@@ -908,12 +911,10 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     reason={event.briefing.gearAndPackingAdvice.footwearReason}
                   />
                 )}
-                {parkkisVenueUrl(event.venue) && (
-                  <div className="flex items-center">
-                    <ParkkisLink venue={event.venue} />
-                  </div>
-                )}
               </div>
+
+              {/* Where the game is + parking (facts from Parkkis, not from Pelipäivä) */}
+              <VenueMapCard venue={event.venue} />
 
               {!compact && showSmartGearAdvice && event.briefing && (
                 <div className="p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">
@@ -1015,7 +1016,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
                     const destination =
                       hasValidCoords
                         ? `${targetCoords.lat},${targetCoords.lng}`
-                        : encodeURIComponent(event.venue?.name || 'Kenttä');
+                        : encodeURIComponent(event.venue ? venueSearchQuery(event.venue) || 'Kenttä' : 'Kenttä');
                     const travelModeParam = transitPlan?.mode === 'walk' ? '&travelmode=walking' : transitPlan?.mode === 'bicycle' ? '&travelmode=bicycling' : '';
                     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}${travelModeParam}`;
                     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
@@ -1056,6 +1057,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           stage={event.stage}
           ageClassLabel={event.ageClassLabel}
           division={event.division}
+          venue={event.venue}
           onSavePlayerLog={handleSavePlayerLog}
         />
       )}
