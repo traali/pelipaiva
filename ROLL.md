@@ -29,3 +29,9 @@ Read the last ~15 lines at session start (Chapter). Never rewrite history; only 
 - **Office / Author:** Legate
 - **Verdict:** PASS
 - **Summary:** Vendored check-neighbors.mjs into visit. Graph: federation.neighbors.json. 5-point HOUSE_TEST_SPEC.md. SupportedSport includes weather. Future contract/rule breaks fail closed.
+
+## 2026-11-14 — Map and parking on every game
+- **Office / Author:** Grok Bot (Chief of Staff)
+- **Visitor:** GitHub Copilot PR review as fresh-context Visitor (no blind agent session available; §11 honest limit)
+- **Verdict:** PASS WITH FINDINGS (14 advisory, all fixed; no DEBT)
+- **Summary:** Static OSM map, directions, Parkkis link and Parkkis nearby counts with data date on hero, list rows, next game and game detail. Venue resolution via TASO → alias/pin → LIPAS → hel.fi → OpenStreetMap, labelled exact / arvioitu / haku. Report: .agent/visitations/feat-game-map-parking-2026-11-14.md
