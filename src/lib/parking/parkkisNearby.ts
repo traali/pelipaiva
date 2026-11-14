@@ -156,19 +156,42 @@ export function countNearby(
   return out;
 }
 
-const cache = new Map<string, Promise<ParkkisNearby | null>>();
-let manifestPromise: Promise<string | null> | null = null;
+/** Cached results live 10 minutes; Parkkis's snapshot changes at most daily. */
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const cache = new Map<string, { at: number; p: Promise<ParkkisNearby | null> }>();
+let manifestCache: { at: number; p: Promise<string | null> } | null = null;
+
+class TileFetchError extends Error {}
 
 async function fetchJson(url: string, fetcher: typeof fetch): Promise<unknown | null> {
-  const r = await fetcher(url, { signal: AbortSignal.timeout(6000) });
-  // A missing tile is answered with the SPA's HTML: that means "no data", not an error.
-  if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return null;
+  let r: Response;
+  try {
+    r = await fetcher(url, { signal: AbortSignal.timeout(6000) });
+  } catch {
+    throw new TileFetchError(url);
+  }
+  const type = r.headers.get('content-type') || '';
+  // A missing tile is answered (200) with the SPA's HTML or a 404: "no data here", not an error.
+  if (r.status === 404 || (r.ok && !type.includes('json'))) return null;
+  if (!r.ok) throw new TileFetchError(`${url} ${r.status}`);
   return r.json();
+}
+
+function loadManifestDate(fetcher: typeof fetch, nowMs: number): Promise<string | null> {
+  if (manifestCache && nowMs - manifestCache.at < CACHE_TTL_MS) return manifestCache.p;
+  const p = fetchJson(`${PARKKIS_BASE_URL}/data/manifest.json`, fetcher)
+    .then((m) => (m && typeof (m as { generated_at?: unknown }).generated_at === 'string' ? (m as { generated_at: string }).generated_at : null))
+    .catch(() => null);
+  manifestCache = { at: nowMs, p };
+  // No date: retry on the next lookup instead of keeping the gap.
+  p.then((d) => { if (!d && manifestCache?.p === p) manifestCache = null; });
+  return p;
 }
 
 /**
  * Parking near a venue from Parkkis's snapshot, or null when Parkkis has no
- * tiles there (outside the capital region) or the fetch fails.
+ * tiles there (outside the capital region) or any tile fetch fails — partial
+ * counts are never shown as the 300 m total.
  */
 export function loadParkkisNearby(
   lat: number,
@@ -178,36 +201,33 @@ export function loadParkkisNearby(
 ): Promise<ParkkisNearby | null> {
   if (!inParkkisTileRegion(lat, lng)) return Promise.resolve(null);
   const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  const nowMs = now.getTime();
   const hit = cache.get(key);
-  if (hit) return hit;
+  if (hit && nowMs - hit.at < CACHE_TTL_MS) return hit.p;
   const p = (async () => {
     try {
-      manifestPromise ??= fetchJson(`${PARKKIS_BASE_URL}/data/manifest.json`, fetcher)
-        .then((m) => (m && typeof (m as { generated_at?: unknown }).generated_at === 'string' ? (m as { generated_at: string }).generated_at : null))
-        .catch(() => null);
       const [dataDate, ...tiles] = await Promise.all([
-        manifestPromise,
-        ...tileKeysAround(lat, lng).map((k) =>
-          fetchJson(`${PARKKIS_BASE_URL}/data/tiles/${k}.json`, fetcher).catch(() => null)
-        )
+        loadManifestDate(fetcher, nowMs),
+        ...tileKeysAround(lat, lng).map((k) => fetchJson(`${PARKKIS_BASE_URL}/data/tiles/${k}.json`, fetcher))
       ]);
       const got = tiles as Array<{ slots?: ParkkisFeature[]; espoo?: ParkkisFeature[] } | null>;
       if (!got.some(Boolean)) return null;
       const counts = countNearby(got, lat, lng);
       const date = (dataDate as string | null) ?? null;
-      if (!date) manifestPromise = null; // retry the date next time
       return { ...counts, radiusM: NEARBY_RADIUS_M, dataDate: date, isStale: isStaleDate(date, now) };
     } catch {
       return null;
     }
   })();
-  cache.set(key, p);
-  p.then((v) => { if (!v) cache.delete(key); });
+  const entry = { at: nowMs, p };
+  cache.set(key, entry);
+  // Failures and results without a date are not kept: retried next time.
+  p.then((v) => { if ((!v || !v.dataDate) && cache.get(key) === entry) cache.delete(key); });
   return p;
 }
 
 /** Test hook. */
 export function __resetParkkisNearbyCache(): void {
   cache.clear();
-  manifestPromise = null;
+  manifestCache = null;
 }

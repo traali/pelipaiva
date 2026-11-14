@@ -914,7 +914,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
               </div>
 
               {/* Where the game is + parking (facts from Parkkis, not from Pelipäivä) */}
-              <VenueMapCard venue={event.venue} onFixLocation={() => setIsVenueModalOpen(true)} />
+              <VenueMapCard venue={event.venue} />
 
               {!compact && showSmartGearAdvice && event.briefing && (
                 <div className="p-3 rounded-2xl bg-surface-elevated/40 border border-border-subtle/60 text-xs text-text-secondary flex flex-col gap-1">

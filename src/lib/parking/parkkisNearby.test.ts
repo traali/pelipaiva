@@ -73,6 +73,24 @@ describe('nearby parking from Parkkis data', () => {
     expect(await loadParkkisNearby(60.6459, 24.8375, fetcher)).toBeNull();
   });
 
+  it('a failed tile never yields a partial 300 m total, and is retried', async () => {
+    let fail = true;
+    // A spot in tile 1243_6016 within 300 m of the neighbouring tile to the south.
+    const lat = 60.1615;
+    const keys = tileKeysAround(lat, LNG);
+    expect(keys.length).toBeGreaterThan(1);
+    const other = keys.find((k) => k !== '1243_6016')!;
+    const fetcher = (async (url: string) => {
+      if (url.endsWith('/manifest.json')) return json({ generated_at: '2026-11-12T11:03:31.324Z' });
+      if (url.endsWith('/1243_6016.json')) return json(tile);
+      if (fail && url.endsWith(`/${other}.json`)) return new Response('', { status: 503 });
+      return html();
+    }) as unknown as typeof fetch;
+    expect(await loadParkkisNearby(lat, LNG, fetcher)).toBeNull();
+    fail = false;
+    expect(await loadParkkisNearby(lat, LNG, fetcher)).not.toBeNull();
+  });
+
   it('a missing date is stale', () => {
     expect(isStaleDate(null)).toBe(true);
     expect(isStaleDate('not a date')).toBe(true);

@@ -866,7 +866,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
         {/* Where the game is + parking (facts from Parkkis, not from Pelipäivä) */}
         <div className="mt-3 empty:hidden">
-          <VenueMapCard venue={event.venue} onFixLocation={() => setIsVenueModalOpen(true)} />
+          <VenueMapCard venue={event.venue} />
         </div>
 
         {/* Applied Notes / Carpool / Volunteer / School Details */}

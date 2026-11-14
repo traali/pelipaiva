@@ -10,7 +10,7 @@ import {
   venueSearchQuery
 } from '../lib/geo/venueLocation';
 import { parkkisVenueUrl } from '../lib/parking/parkkisLink';
-import { loadParkkisNearby, type ParkkisNearby } from '../lib/parking/parkkisNearby';
+import { isStaleDate, loadParkkisNearby, type ParkkisNearby } from '../lib/parking/parkkisNearby';
 
 const TILE = 256;
 
@@ -106,7 +106,9 @@ function useParkkisNearby(lat: number | undefined, lng: number | undefined): Par
       alive = false;
     };
   }, [key, lat, lng]);
-  return state && state.key === key ? state.value : null;
+  if (!state || state.key !== key || !state.value) return null;
+  // Staleness is judged against now, not when the snapshot was first read.
+  return { ...state.value, isStale: isStaleDate(state.value.dataDate) };
 }
 
 /** Same wording as Parkkis's own "Sallittu pysäköinti" line, plus the data date. */
@@ -133,11 +135,9 @@ export function parkkisNearbyText(n: ParkkisNearby, approximate: boolean): strin
  */
 export const VenueMapCard: React.FC<{
   venue: VenueInfo | undefined;
-  /** Shows the "Merkitse sijainti" action when the location is unknown. */
-  onFixLocation?: () => void;
   mapHeight?: number;
   className?: string;
-}> = ({ venue, onFixLocation, mapHeight = 132, className }) => {
+}> = ({ venue, mapHeight = 132, className }) => {
   const status = venueLocationStatus(venue);
   const coords = mappableCoordinates(venue);
   const nearby = useParkkisNearby(coords?.lat, coords?.lng);
@@ -210,14 +210,7 @@ export const VenueMapCard: React.FC<{
               <span>Pysäköinti</span>
               <span className="text-[10px] font-semibold text-text-muted">Parkkis</span>
             </a>
-          ) : (
-            onFixLocation && (
-              <button type="button" onClick={onFixLocation} data-testid="venue-fix-location" className={btn}>
-                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Merkitse sijainti</span>
-              </button>
-            )
-          )}
+          ) : null}
         </div>
 
         {parkkisUrl && nearby && (
@@ -227,7 +220,7 @@ export const VenueMapCard: React.FC<{
         )}
         {status === 'search' && (
           <p className="text-[11px] leading-snug text-text-muted">
-            Pysäköinti: Parkkis tarvitsee kentän sijainnin. Merkitse kenttä, niin pysäköinti näkyy tässä.
+            Pysäköinti: Parkkis tarvitsee kentän tarkan sijainnin, eikä sitä löytynyt tulospalvelusta, LIPAS-palvelusta eikä kartalta.
           </p>
         )}
       </div>

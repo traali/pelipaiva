@@ -341,6 +341,8 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                     onKeyDown={
                       isInteractive
                         ? (e) => {
+                            // Nested links/buttons (map, Parkkis, Reitti) keep their own Enter.
+                            if (e.target !== e.currentTarget) return;
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault();
                               onSelectEvent?.(ev);

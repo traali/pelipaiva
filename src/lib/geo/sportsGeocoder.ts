@@ -411,7 +411,7 @@ interface NetworkVenueHit {
 }
 
 /** Per-session memo so a refresh does not re-query the same venue name. */
-const networkVenueCache = new Map<string, NetworkVenueHit | null>();
+const networkVenueCache = new Map<string, NetworkVenueHit>();
 const lipasListCache = new Map<string, Promise<Record<string, unknown>[]>>();
 
 /** Test hook. */
@@ -445,7 +445,7 @@ async function lipasSites(typeCodes: number[]): Promise<Record<string, unknown>[
           headers: { Accept: 'application/json' },
           signal: AbortSignal.timeout(6000)
         });
-        if (!res.ok) break;
+        if (!res.ok) throw new Error(`LIPAS ${res.status}`);
         const payload = await res.json();
         const items: Record<string, unknown>[] = Array.isArray(payload?.items) ? payload.items : [];
         out.push(...items);
@@ -453,10 +453,12 @@ async function lipasSites(typeCodes: number[]): Promise<Record<string, unknown>[
         if (page >= pages) break;
       }
       return out;
-    })().catch(() => []);
+    })();
     lipasListCache.set(qs, p);
+    // A failed or partial list is not kept: the next lookup retries.
+    p.catch(() => lipasListCache.delete(qs));
   }
-  return p;
+  return p.catch(() => []);
 }
 
 /** Strips court/pitch suffixes ("kenttä 3", "TN B") so the place itself is matched. */
@@ -470,7 +472,20 @@ export function venueCoreName(raw: string): string {
     .trim();
 }
 
-async function lookupLipas(raw: string, sport: SportType | undefined, isIce: boolean): Promise<NetworkVenueHit | null> {
+const LIPAS_CITY_BY_NAME: Record<string, number> = { helsinki: 91, espoo: 49, vantaa: 92, kauniainen: 235 };
+const LIPAS_CITY_NAME: Record<number, string> = { 91: 'Helsinki', 49: 'Espoo', 92: 'Vantaa', 235: 'Kauniainen' };
+
+function lipasCityCode(site: Record<string, unknown>): number | undefined {
+  const loc = site.location as Record<string, unknown> | undefined;
+  const city = loc?.city as Record<string, unknown> | undefined;
+  const code = Number(city?.['city-code']);
+  return Number.isFinite(code) ? code : undefined;
+}
+
+async function lookupLipas(raw: string, sport: SportType | undefined, isIce: boolean, cityHint?: string): Promise<NetworkVenueHit | null> {
+  // LIPAS here covers the capital region only; a game known to be elsewhere is not matched to it.
+  const wantCity = cityHint ? LIPAS_CITY_BY_NAME[cityHint.trim().toLowerCase()] : undefined;
+  if (cityHint && wantCity === undefined) return null;
   const types = isIce || sport === 'icehockey'
     ? LIPAS_TYPES_ICE
     : sport && INDOOR_SPORTS.has(sport)
@@ -482,6 +497,7 @@ async function lookupLipas(raw: string, sport: SportType | undefined, isIce: boo
   const core = venueCoreName(raw);
   let best: { site: Record<string, unknown>; score: number } | null = null;
   for (const site of items) {
+    if (wantCity !== undefined && lipasCityCode(site) !== wantCity) continue;
     const score = Math.max(scoreName(String(site.name || ''), raw), scoreName(String(site.name || ''), core));
     if (score >= 50 && (!best || score > best.score)) best = { site, score };
   }
@@ -498,12 +514,13 @@ async function lookupLipas(raw: string, sport: SportType | undefined, isIce: boo
     source: 'lipas',
     address: (location?.address as string | undefined) || undefined,
     postalCode: (location?.['postal-code'] as string | undefined) || undefined,
+    city: LIPAS_CITY_NAME[lipasCityCode(best.site) ?? -1],
     lipasId: Number(best.site['lipas-id']) || undefined,
     indoorHint: typeCode >= 2000 && typeCode < 3000
   };
 }
 
-async function lookupServiceMap(raw: string): Promise<NetworkVenueHit | null> {
+async function lookupServiceMap(raw: string, cityHint?: string): Promise<NetworkVenueHit | null> {
   try {
     const helUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(raw)}&type=unit`;
     const pRes = await fetch(helUrl, { signal: AbortSignal.timeout(5000) });
@@ -517,6 +534,8 @@ async function lookupServiceMap(raw: string): Promise<NetworkVenueHit | null> {
       const lower = name.toLowerCase();
       if (/patsas|veistos|muistomerkki|sculpture/.test(lower)) continue;
       if (!/kenttä|tekonurmi|halli|puisto|urheilu|pallo|areena|tn\b|sali|center/.test(lower)) continue;
+      const muni = String(top.municipality || '').toLowerCase();
+      if (cityHint && muni && muni !== cityHint.trim().toLowerCase()) continue;
       const score = Math.max(scoreName(name, raw), scoreName(name, core));
       if (score >= 50 && (!best || score > best.score)) best = { top, score };
     }
@@ -535,7 +554,9 @@ async function lookupServiceMap(raw: string): Promise<NetworkVenueHit | null> {
       exact: best.score >= 80,
       source: 'servicemap',
       address: addr?.fi,
-      city: 'Helsinki'
+      city: best.top.municipality
+        ? String(best.top.municipality).charAt(0).toUpperCase() + String(best.top.municipality).slice(1)
+        : undefined
     };
   } catch {
     return null;
@@ -705,13 +726,14 @@ async function resolveSportsVenueByName(
 
   if (typeof fetch !== 'undefined' && isSearchableVenueName(rawVenueString)) {
     const cacheKey = `${normalized}|${(hint?.city || '').toLowerCase()}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
-    let found = networkVenueCache.get(cacheKey);
-    if (found === undefined) {
+    let found = networkVenueCache.get(cacheKey) ?? null;
+    if (!found) {
       found =
-        (await lookupLipas(rawVenueString, hint?.sport, isIce)) ||
-        (await lookupServiceMap(rawVenueString)) ||
+        (await lookupLipas(rawVenueString, hint?.sport, isIce, hint?.city)) ||
+        (await lookupServiceMap(rawVenueString, hint?.city)) ||
         (await lookupOsm(rawVenueString, hint?.city));
-      networkVenueCache.set(cacheKey, found);
+      // Only hits are memoised: a miss (often just offline) is retried on the next refresh.
+      if (found) networkVenueCache.set(cacheKey, found);
     }
     if (found) {
       const isIndoor = isIce ? !isExplicitOutdoorIce : found.indoorHint || indoorGuess;

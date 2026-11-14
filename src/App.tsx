@@ -253,7 +253,13 @@ export const App: React.FC = () => {
               // Exact pins replace the unknown spot; an estimate only replaces
               // "unknown" and keeps its honest approximate flag.
               if (isBetterLocation(ev.venue, geo)) {
-                patch.venue = { ...ev.venue, ...geo };
+                // Quality fields come from the new result, never the stale stored ones.
+                patch.venue = {
+                  ...ev.venue,
+                  ...geo,
+                  isApproximateLocation: geo.isApproximateLocation,
+                  locationQuality: geo.locationQuality
+                };
               }
             } catch {
               /* keep stored venue */

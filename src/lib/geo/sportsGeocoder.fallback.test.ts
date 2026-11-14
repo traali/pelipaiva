@@ -80,6 +80,25 @@ describe('venue fallback when TASO sends no coordinates', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('LIPAS halls in another capital-region city are not matched', async () => {
+    mockFetch([[/api\.lipas\.fi/, lipas], [/servicemap/, { results: [] }], [/photon\.komoot\.io/, { features: [] }]]);
+    // Tapiolan liikuntahalli is in Espoo; a Vantaa game must not get its pin.
+    const v = await resolveSportsVenue('Tapiolan liikuntahalli', { city: 'Vantaa', sport: 'floorball' });
+    expect(v.locationSource).not.toBe('lipas');
+    const espoo = await resolveSportsVenue('Tapiolan liikuntahalli', { city: 'Espoo', sport: 'floorball' });
+    expect(espoo.locationSource).toBe('lipas');
+    expect(espoo.city).toBe('Espoo');
+  });
+
+  it('a failed lookup (offline) is retried on the next refresh', async () => {
+    vi.stubGlobal('fetch', async () => { throw new TypeError('offline'); });
+    const off = await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'floorball' });
+    expect(venueLocationStatus(off)).toBe('search');
+    mockFetch([[/api\.lipas\.fi/, lipas]]);
+    const on = await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'floorball' });
+    expect(venueLocationStatus(on)).toBe('exact');
+  });
+
   it('core name drops court suffixes', () => {
     expect(venueCoreName('AC Ruskeasuo kenttä 3')).toBe('AC Ruskeasuo');
     expect(venueCoreName('Lauttasaari TN B')).toBe('Lauttasaari');
