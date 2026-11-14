@@ -195,8 +195,9 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
           e.sport !== 'other' &&
           e.eventType !== 'training' &&
           e.eventType !== 'school' &&
-          e.eventType !== 'other' &&
           e.eventType !== 'meeting' &&
+          // MyClub games arrive as 'other' with "Koti vs Vieras" in the title.
+          (e.eventType !== 'other' || Boolean(e.homeTeam && e.awayTeam) || /\svs\.?\s/i.test(e.title || '')) &&
           new Date(e.endTime).getTime() > nowMs
       )
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());

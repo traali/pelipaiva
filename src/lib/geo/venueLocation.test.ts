@@ -113,3 +113,15 @@ describe('stored venues are not downgraded', () => {
     expect(isBetterLocation(approx, unknown)).toBe(false);
   });
 });
+
+describe('built-in alias corrections', () => {
+  it('re-reads alias pins and accepts a moved alias pin', async () => {
+    const { isAliasCorrection, shouldReResolveVenue } = await import('./venueLocation');
+    const old = { name: 'Lauttasaaren yhteiskoulu (LYK)', coordinates: { lat: 60.1601, lng: 24.8785 }, locationSource: 'alias' as const };
+    const fixed = { ...old, coordinates: { lat: 60.15797, lng: 24.862663 } };
+    expect(shouldReResolveVenue(old)).toBe(true);
+    expect(isAliasCorrection(old, fixed)).toBe(true);
+    expect(isAliasCorrection(fixed, fixed)).toBe(false);
+    expect(isAliasCorrection({ ...old, locationSource: 'taso' as const }, fixed)).toBe(false);
+  });
+});

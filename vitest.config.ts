@@ -5,7 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
-    setupFiles: ['./tests/helpers/setupDexie.ts']
+    setupFiles: ['./tests/helpers/setupDexie.ts', './tests/helpers/setupNoGeoNetwork.ts']
   }
 });
 

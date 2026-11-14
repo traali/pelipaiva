@@ -3,7 +3,7 @@ import type { MatchdayEvent, PlayerProfile, HomeLocation } from "../../types/mat
 import type { ActiveModal } from "../../lib/modals/useModalStore";
 import { db } from "../../lib/storage/db";
 import { resolveSportsVenue } from "../../lib/geo/sportsGeocoder";
-import { isBetterLocation, shouldReResolveVenue } from "../../lib/geo/venueLocation";
+import { isAliasCorrection, isBetterLocation, shouldReResolveVenue } from "../../lib/geo/venueLocation";
 import { resolveTransitPlan } from "../../lib/geo/transitEngine";
 import { liveSatelliteUrl } from "../SatelliteEmbedDrawer";
 
@@ -129,7 +129,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
               let currentVenue = ev.venue;
               if (ev.venue?.name && shouldReResolveVenue(ev.venue)) {
                 const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
-                if (isBetterLocation(ev.venue, freshVenue)) currentVenue = freshVenue;
+                if (isBetterLocation(ev.venue, freshVenue) || isAliasCorrection(ev.venue, freshVenue)) currentVenue = freshVenue;
               }
               if (currentVenue?.coordinates) {
                 const freshTransit = resolveTransitPlan(h, currentVenue.coordinates, ev.weather);

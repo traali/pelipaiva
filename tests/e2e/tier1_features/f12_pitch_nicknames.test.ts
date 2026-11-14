@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { vi } from 'vitest';
 import {
   NATIONAL_FIELD_ALIASES,
   resolveSportsVenue
@@ -73,7 +74,9 @@ describe('Feature 12: 100+ National Pitch Slang Nicknames', () => {
   });
 
   it('should provide fallback coordinates and safe defaults for unknown field names without fabricating Helsinki coordinates', async () => {
-    const unknown = await resolveSportsVenue('Joku Satunnainen Kyläkenttä');
+    // Hermetic: no network answer (offline) must still give the honest unknown result.
+    vi.stubGlobal('fetch', async () => { throw new TypeError('offline'); });
+    const unknown = await resolveSportsVenue('Joku Satunnainen Kyläkenttä').finally(() => vi.unstubAllGlobals());
     expect(unknown.name).toBe('Joku Satunnainen Kyläkenttä');
     expect(unknown.coordinates.lat).toBe(0);
     expect(unknown.coordinates.lng).toBe(0);
