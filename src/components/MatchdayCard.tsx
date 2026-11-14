@@ -1,3 +1,4 @@
+import { honestTitle, isPlaceholderTeam, matchHeading } from '../lib/events/eventTitle';
 import React, { useState } from 'react';
 import { liveText } from '../lib/agents/eventPhase';
 import { motion } from 'motion/react';
@@ -255,7 +256,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
 
           <div className="min-w-0 flex-1">
             <span className="text-xs font-semibold text-text-muted line-through truncate block">
-              {isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
+              {isTraining ? (event.title || 'Harjoitukset') : matchHeading(event)}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
               {isLive ? `${liveText(event)} · alkoi` : isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {formattedKickoff} • {venue?.name || 'Kenttä'}
@@ -491,9 +492,9 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
             </div>
           )}
 
-          {isTraining || isSchool || isOther || !event.awayTeam ? (
+          {isTraining || isSchool || isOther || !event.awayTeam || isPlaceholderTeam(event.homeTeam) || isPlaceholderTeam(event.awayTeam) ? (
             <h2 className="text-lg md:text-xl font-bold tracking-tight text-text-primary break-words">
-              {event.title}
+              {isTraining || isSchool ? event.title : honestTitle(event.title || matchHeading(event))}
             </h2>
           ) : (
             <div className="flex flex-col gap-1.5">

@@ -1,3 +1,4 @@
+import { honestTitle, matchHeading } from '../lib/events/eventTitle';
 import React, { useState, useMemo } from 'react';
 import { liveText } from '../lib/agents/eventPhase';
 import {
@@ -169,7 +170,7 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
 
           <div className="min-w-0 flex-1">
             <span className="text-xs font-semibold text-text-muted line-through truncate block">
-              {event.isTraining ? (event.title || 'Harjoitukset') : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
+              {event.isTraining ? (event.title || 'Harjoitukset') : matchHeading(event)}
             </span>
             <span className="text-[11px] text-text-muted/80 truncate block">
               {isLive ? `${liveText(event)} · alkoi` : event.isTraining ? 'Harjoitus alkaa' : 'Ottelu alkaa'} klo {kickoff} • {event.venue?.name || 'Kenttä'}
@@ -398,8 +399,8 @@ export const HeroMatchCard: React.FC<HeroMatchCardProps> = ({
         {/* Match / Training / School / Other Title */}
         <h2 className="text-xl font-bold tracking-tight text-text-primary md:text-2xl break-words">
           {event.isTraining || event.sport === 'school' || event.sport === 'other' || event.eventType === 'school' || event.eventType === 'meeting' || event.eventType === 'other' || !event.awayTeam
-            ? event.title
-            : `${event.homeTeam} vs ${event.awayTeam || '—'}`}
+            ? (event.isTraining || event.sport === 'school' || event.eventType === 'school' ? event.title : honestTitle(event.title))
+            : matchHeading(event)}
         </h2>
         {event.ageClassLabel && (
           <span
