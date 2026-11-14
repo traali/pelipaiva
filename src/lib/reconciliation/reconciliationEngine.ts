@@ -6,6 +6,16 @@ import {
 } from '../../types/matchday';
 import { calculateTeamSimilarity, normalizeTeamName, MULTILINGUAL_COLORS } from './teamNameMatcher';
 
+/** Club-calendar rows that are never a game: open gyms, practices, camps, meetings. */
+const NON_GAME_RE = /open\s*gym|harjoitu|treeni|training|vuoro|leiri|kokous|palaveri|vanhempainilta|kuntotesti|tapahtuma|juhla/i;
+
+/** A real team name on one side of a calendar row (not empty, a squad tag or the whole title). */
+function isNamedSide(side: string | undefined, title: string | undefined): boolean {
+  const t = (side || '').trim();
+  if (!t || isGenericOrSquadTag(t)) return false;
+  return t !== (title || '').trim();
+}
+
 function isGenericOrSquadTag(tag: string): boolean {
   const t = (tag || '').trim().toLowerCase();
   if (!t || t.length <= 1) return true;
@@ -271,7 +281,9 @@ export function reconcileCalendarWithOfficial(
   const resultMap = new Map<string, ReconciliationResult>();
 
   for (const event of calendarEvents) {
-    if (event.isTraining || event.eventType === 'training' || event.eventType === 'meeting') {
+    const nonGameRow =
+      NON_GAME_RE.test(event.title || '') && !isNamedSide(event.awayTeam, event.title);
+    if (event.isTraining || event.eventType === 'training' || event.eventType === 'meeting' || nonGameRow) {
       resultMap.set(event.id, {
         status: 'unlinked',
         confidenceScore: 0.0
@@ -302,6 +314,17 @@ export function reconcileCalendarWithOfficial(
       let simAway = calculateTeamSimilarity(event.awayTeam, offOpponent);
       let simHome = calculateTeamSimilarity(event.homeTeam, offOpponent);
 
+      // Both calendar sides named ("ToPoLa vs. HNMKY/Stadi"): only the side that is
+      // not our own team may match the TASO opponent. Otherwise ToPoLa's own name
+      // scores against an opponent of the same club (TOPO/White) and a different
+      // game that day gets the wrong teams, time and home/away.
+      if (isNamedSide(event.homeTeam, event.title) && isNamedSide(event.awayTeam, event.title)) {
+        const ownIsHome =
+          calculateTeamSimilarity(event.homeTeam, offOwnTeam) >= calculateTeamSimilarity(event.awayTeam, offOwnTeam);
+        if (ownIsHome) simHome = 0;
+        else simAway = 0;
+      }
+
       // Check learned custom aliases
       if (customAliasesMap) {
         const learnedAway = customAliasesMap.get(event.awayTeam.toLowerCase().trim());
@@ -320,7 +343,7 @@ export function reconcileCalendarWithOfficial(
       // check if this is the team's internal match entry for this exact fixture.
       if (bestMatchSim < 0.40) {
         const isInternalTag = isGenericOrSquadTag(event.awayTeam) || !event.awayTeam;
-        if (isInternalTag) {
+        if (isInternalTag && !NON_GAME_RE.test(`${event.title || ''} ${event.homeTeam || ''}`)) {
           const simOwnHome = calculateTeamSimilarity(event.homeTeam, offOwnTeam);
           const simOwnTitle = calculateTeamSimilarity(event.title, offOwnTeam);
           const simOwn = Math.max(simOwnHome, simOwnTitle);

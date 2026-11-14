@@ -338,7 +338,9 @@ export async function ingestIcsForProfile(opts: {
 
         for (const ev of withMeta) {
           const result = results.get(ev.id);
-          if (!result || result.status === 'unlinked' || !result.officialFixture) continue;
+          // Only a confident link may rewrite a club-calendar row with TASO's teams,
+          // time and home/away. A weaker candidate stays exactly as the club wrote it.
+          if (!result || result.status !== 'auto_matched' || !result.officialFixture) continue;
           ev.reconciliationStatus = result.status;
           ev.confidenceScore = result.confidenceScore;
           ev.officialFixtureId = result.officialFixture.id;
