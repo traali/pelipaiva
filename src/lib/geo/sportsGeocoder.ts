@@ -385,15 +385,40 @@ function extractLipasPoint(site: Record<string, unknown>): { lat: number; lng: n
   return null;
 }
 
+/** Words that name a kind of place, not a place: never enough for a match on their own. */
+const GENERIC_VENUE_WORDS = new Set([
+  'liikuntahalli', 'urheiluhalli', 'palloiluhalli', 'monitoimihalli', 'halli', 'sali', 'liikuntasali',
+  'kenttä', 'kentät', 'urheilukenttä', 'pallokenttä', 'tekonurmi', 'tekonurmikenttä', 'nurmi', 'hiekka',
+  'urheilupuisto', 'liikuntapuisto', 'puisto', 'koulu', 'areena', 'stadion', 'jäähalli', 'kaukalo',
+  'tn', 'nap', 'center', 'keskus', 'urheilukeskus', 'liikuntakeskus'
+]);
+
+/** True when the name has at least one real place word (not just "Liikuntahalli" or "Kenttä E"). */
+export function isDistinctiveVenueName(name: string): boolean {
+  return name
+    .toLowerCase()
+    .split(/[\s,.\-/()]+/)
+    .some((t) => t.length >= 4 && !GENERIC_VENUE_WORDS.has(t) && !/^\d+$/.test(t));
+}
+
 function scoreName(siteName: string, query: string): number {
   const a = siteName.toLowerCase();
   const b = query.toLowerCase();
   if (!a || !b) return 0;
-  if (a === b) return 100;
-  if (a.includes(b) || b.includes(a)) return 80;
-  const tokens = b.split(/\s+/).filter((t) => t.length > 2);
-  const hits = tokens.filter((t) => a.includes(t)).length;
+  if (a === b) return isDistinctiveVenueName(b) ? 100 : 0;
+  const shorter = a.length <= b.length ? a : b;
+  if ((a.includes(b) || b.includes(a)) && isDistinctiveVenueName(shorter)) return 80;
+  const tokens = b.split(/\s+/).filter((t) => t.length > 2 && !GENERIC_VENUE_WORDS.has(t));
+  const hits = tokens.filter((t) => t.length >= 4 && a.includes(t)).length;
   return tokens.length ? (hits / tokens.length) * 60 : 0;
+}
+
+/** "Liikuntahalli, Oraskatu 7, Hyvinkää" → "Hyvinkää": the last comma part when it reads as a town. */
+export function cityFromVenueText(raw: string): string | undefined {
+  const parts = (raw || '').split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return undefined;
+  const last = parts[parts.length - 1]!.replace(/^\d{5}\s+/, '');
+  return /^[A-ZÅÄÖ][a-zåäö-]{2,}$/.test(last) ? last : undefined;
 }
 
 interface NetworkVenueHit {
@@ -725,13 +750,14 @@ async function resolveSportsVenueByName(
   }
 
   if (typeof fetch !== 'undefined' && isSearchableVenueName(rawVenueString)) {
-    const cacheKey = `${normalized}|${(hint?.city || '').toLowerCase()}|${hint?.sport || ''}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
+    const cityHint = hint?.city || cityFromVenueText(rawVenueString);
+    const cacheKey = `${normalized}|${(cityHint || '').toLowerCase()}|${hint?.sport || ''}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
     let found = networkVenueCache.get(cacheKey) ?? null;
     if (!found) {
       found =
-        (await lookupLipas(rawVenueString, hint?.sport, isIce, hint?.city)) ||
-        (await lookupServiceMap(rawVenueString, hint?.city)) ||
-        (await lookupOsm(rawVenueString, hint?.city));
+        (await lookupLipas(rawVenueString, hint?.sport, isIce, cityHint)) ||
+        (await lookupServiceMap(rawVenueString, cityHint)) ||
+        (await lookupOsm(rawVenueString, cityHint));
       // Only hits are memoised: a miss (often just offline) is retried on the next refresh.
       if (found) networkVenueCache.set(cacheKey, found);
     }
@@ -742,7 +768,7 @@ async function resolveSportsVenueByName(
         name: rawVenueString,
         normalizedName: normalized,
         address: found.address,
-        city: found.city || hint?.city,
+        city: found.city || cityHint,
         postalCode: found.postalCode,
         coordinates: { lat: found.lat, lng: found.lng },
         isIndoor,

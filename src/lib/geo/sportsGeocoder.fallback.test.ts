@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { resolveSportsVenue, venueCoreName, __resetVenueNetworkCache } from './sportsGeocoder';
+import { resolveSportsVenue, venueCoreName, cityFromVenueText, isDistinctiveVenueName, __resetVenueNetworkCache } from './sportsGeocoder';
 import { venueLocationStatus } from './venueLocation';
 
 const fx = (name: string) =>
@@ -112,6 +112,20 @@ describe('venue fallback when TASO sends no coordinates', () => {
     const before = calls.length;
     await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'football' });
     expect(calls.length).toBeGreaterThan(before);
+  });
+
+  it('generic names never become an exact pin somewhere else', async () => {
+    mockFetch([[/api\.lipas\.fi/, lipas], [/servicemap/, { results: [] }], [/photon\.komoot\.io/, { features: [] }]]);
+    const hyvinkaa = await resolveSportsVenue('Liikuntahalli, Oraskatu 7, Hyvinkää', { sport: 'floorball' });
+    expect(hyvinkaa.locationSource).not.toBe('lipas');
+    expect(venueLocationStatus(hyvinkaa)).toBe('search');
+    const kenttaE = await resolveSportsVenue('Kenttä E', { sport: 'floorball' });
+    expect(venueLocationStatus(kenttaE)).not.toBe('exact');
+    expect(isDistinctiveVenueName('Liikuntahalli')).toBe(false);
+    expect(isDistinctiveVenueName('E')).toBe(false);
+    expect(isDistinctiveVenueName('Tapiolan liikuntahalli')).toBe(true);
+    expect(cityFromVenueText('Liikuntahalli, Oraskatu 7, Hyvinkää')).toBe('Hyvinkää');
+    expect(cityFromVenueText('Otahalli')).toBeUndefined();
   });
 
   it('core name drops court suffixes', () => {
