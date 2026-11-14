@@ -583,12 +583,12 @@ function findLinkedFixture(fixtures: MatchdayEvent[], officialId?: string): Matc
 /**
  * Official (TASO) venue wins over the club calendar's free text. A differing name is
  * flagged as venueMismatch for the banner (not after a user decision). A user who chose
- * "Säilytä oma" (keep_calendar) or a custom venue keeps it.
+ * "Säilytä oma" (keep_calendar) or set a venue by hand keeps it.
  */
 function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
   if (!fix.venue) return;
-  const action = cal.userOverride?.action;
-  if (action === 'keep_calendar' || action === 'custom') return;
+  // "Piilota" (dismiss) is saved as 'custom' without a venue: it hides the banner, it does not keep the calendar pin.
+  if (cal.userOverride?.action === 'keep_calendar' || cal.userOverride?.overriddenFields?.venue) return;
   const suppressMismatchFlags = Boolean(cal.userOverride);
   const calVenueName = cal.venue?.name?.trim() || '';
   const fixVenueName = fix.venue.name?.trim() || '';

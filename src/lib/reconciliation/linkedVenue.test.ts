@@ -129,3 +129,17 @@ describe('linked fixture lookup', () => {
     expect(card.venue.name).toBe('Sipoon Areena kenttä 1');
   });
 });
+
+describe('dismissed banner', () => {
+  it('"Piilota" (custom, no venue) still takes the TASO pin, without the banner', () => {
+    const cal = ev({
+      id: 'cal-5',
+      officialFixtureId: '949701',
+      venue: { ...tasoVenue, name: 'Sipoon Areena Oy', normalizedName: 'sipoon areena oy', coordinates: { lat: 0, lng: 0 }, isApproximateLocation: true },
+      userOverride: { action: 'custom', appliedAt: '2026-11-14T10:00:00.000Z', notes: 'Piilotettu aikatauluristiriita' },
+    });
+    const out = stitchCalendarEventsWithFixtures([cal, fixture]);
+    expect(out[0]!.venue.coordinates).toEqual(tasoVenue.coordinates);
+    expect(out[0]!.mismatchFlags?.venueMismatch).toBeFalsy();
+  });
+});
