@@ -119,3 +119,13 @@ describe('saved calendar ↔ TASO link keeps the official pin', () => {
     expect(out[0]!.mismatchFlags?.venueMismatch).toBeFalsy();
   });
 });
+
+describe('linked fixture lookup', () => {
+  it('949701 never takes the venue of fixture …1949701', () => {
+    const other = ev({ id: 'fixture-p:simo:1949701', profileId: 'westend', officialFixtureId: '1949701', startTime: '2026-11-08T13:45:00.000Z', endTime: '2026-11-08T14:45:00.000Z', venue: { ...tasoVenue, name: 'Väärä halli', normalizedName: 'väärä halli', coordinates: { lat: 61, lng: 25 } } });
+    const cal = ev({ id: 'cal-4', officialFixtureId: '949701', venue: { ...tasoVenue, name: 'Sipoon Areena Oy', normalizedName: 'sipoon areena oy', coordinates: { lat: 0, lng: 0 }, isApproximateLocation: true } });
+    const out = stitchCalendarEventsWithFixtures([other, cal, fixture]);
+    const card = out.find((e) => e.id === 'cal-4')!;
+    expect(card.venue.name).toBe('Sipoon Areena kenttä 1');
+  });
+});

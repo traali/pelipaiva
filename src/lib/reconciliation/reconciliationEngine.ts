@@ -571,6 +571,15 @@ function hasExactPin(venue?: MatchdayEvent['venue']): boolean {
   return Boolean(c && Number.isFinite(c.lat) && Number.isFinite(c.lng) && (c.lat !== 0 || c.lng !== 0) && !venue?.isApproximateLocation);
 }
 
+/** Exact officialFixtureId first; else an id ending in a delimiter + the id (949701 never matches …1949701). */
+function findLinkedFixture(fixtures: MatchdayEvent[], officialId?: string): MatchdayEvent | undefined {
+  if (!officialId) return undefined;
+  return (
+    fixtures.find((f) => f.officialFixtureId === officialId) ||
+    fixtures.find((f) => [':', '-', '_'].some((d) => f.id.endsWith(`${d}${officialId}`)))
+  );
+}
+
 /**
  * Official (TASO) venue wins over the club calendar's free text. A differing name is
  * flagged as venueMismatch for the banner (not after a user decision). A user who chose
@@ -665,18 +674,12 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       // A saved link must still take the official pin. Nimenhuuto writes free-text
       // venues without coordinates (Westend Yellow 22.11. "Sipoon Areena Oy, …"),
       // so the card lost its map and Parkkis although TASO knows the hall.
-      const linkedFixture = bareFixtures.find(
-        (f) => f.officialFixtureId === cal.officialFixtureId || f.id.endsWith(cal.officialFixtureId || '—')
-      );
+      const linkedFixture = findLinkedFixture(bareFixtures, cal.officialFixtureId);
       if (linkedFixture) adoptOfficialVenue(cal, linkedFixture);
       const extras = collectSameDay(true);
       const sameDayAny = collectSameDay(false);
       if (extras.length || sameDayAny.length) {
-        const linked = bareFixtures.find(
-          (f) =>
-            f.officialFixtureId === cal.officialFixtureId ||
-            f.id.endsWith(cal.officialFixtureId || '—')
-        );
+        const linked = linkedFixture;
         const selfTitle =
           cal.homeTeam && cal.awayTeam ? `${cal.homeTeam} vs ${cal.awayTeam}` : cal.title;
         const merged = [
