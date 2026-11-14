@@ -1,0 +1,314 @@
+{
+ "items": [
+  {
+   "admin": "city-sports",
+   "www": "https://espoo.fi/liikunta",
+   "name": "Espoonlahden liikuntahalli",
+   "construction-year": 1983,
+   "type": {
+    "type-code": 2210
+   },
+   "lipas-id": 82246,
+   "renovation-years": [
+    2021
+   ],
+   "status": "active",
+   "comment": "Espoonlahden liikuntahallissa voi pelata kori-, lento-, käsi- ja sulkapalloa. Lisäksi siellä voi harrastaa voimistelua ja voimailua. Liikuntahallin kokonaispinta-ala on 880 m² (40 m x 22 m). Halli voidaan jakaa kolmeen yhtä suureen osaan katosta laskeutuvilla väliseinillä. Yleisölle on 400 istumapaikkaa, joista osa on siirrettävässä alakatsomossa. Hallissa on 5 pukuhuonetta sekä kuntosali.",
+   "event-date": "2025-09-01T11:01:05.287Z",
+   "name-localized": {
+    "se": "Esbovikens idrottshall"
+   },
+   "location": {
+    "city": {
+     "city-code": 49,
+     "neighborhood": "Espoonlahti"
+    },
+    "address": "Rehtorintie 11",
+    "geometries": {
+     "type": "FeatureCollection",
+     "features": [
+      {
+       "type": "Feature",
+       "geometry": {
+        "type": "Point",
+        "coordinates": [
+         24.6652168518047,
+         60.1464952357751
+        ]
+       }
+      }
+     ]
+    },
+    "postal-code": "02360",
+    "postal-office": "Espoo"
+   },
+   "owner": "city",
+   "renovations": [
+    {
+     "year": 2021,
+     "type": "major-renovation"
+    }
+   ]
+  },
+  {
+   "circumstances": {
+    "storage-capacity": "Varastotilaa on mattorullille ja muille tarvikkeille",
+    "corner-pieces-count": 4,
+    "audience-toilets-count": 4,
+    "bus-park-capacity": 4,
+    "wifi-capacity-sufficient-for-streaming?": true,
+    "fixed-cameras?": true,
+    "stretcher?": true,
+    "field-level-loading-doors?": true,
+    "car-parking-economics-model": "free",
+    "separate-referee-locker-room?": true,
+    "audit-date": "2022-10-21",
+    "led-screens-or-surfaces-for-ads?": true,
+    "saunas-count": 7,
+    "camera-stands?": true,
+    "wired-microfone-quantity": 1,
+    "car-parking-capacity": 80,
+    "broadcast-car-park?": true,
+    "open-floor-space-length-m": 43.07,
+    "wifi-available?": true,
+    "goal-shrinking-elements-count": 0,
+    "scoreboard-count": 2,
+    "restaurateur-contact-info": "Ulkopuolinen ravintoloitsija Vaappuva Ankka",
+    "vip-area-comment": "Käytävää käytetään VIP-tilana",
+    "gym?": true,
+    "ticket-sales-operator": "Tiketti",
+    "locker-room-quality-comment": "Pukuhuonekäytävällä on erilliset wc:t, pukuhuoneissa ei ole vessoja",
+    "detached-chair-quantity": 200,
+    "iff-certification-stickers-in-goals?": true,
+    "audio-mixer-available?": true,
+    "iff-certified-rink?": true,
+    "teams-using": "Esport Oilers, Westend Indians, Tapiolan Koripallo Honka",
+    "doping-test-facilities?": true,
+    "wireless-microfone-quantity": 2,
+    "defibrillator?": true,
+    "open-floor-space-width-m": 24.58,
+    "cafeteria-and-restaurant-capacity-person": 150,
+    "speakers-aligned-towards-stands?": true,
+    "conference-space-quantity": 0,
+    "three-phase-electric-power?": true,
+    "open-floor-space-area-m2": 929,
+    "detached-tables-quantity": 100,
+    "available-goals-count": 4,
+    "player-entrance": "audience-entrance"
+   },
+   "phone-number": "09 816 21",
+   "admin": "city-sports",
+   "www": "https://www.espoo.fi/fi/espoo-liikkuu",
+   "name": "Tapiolan liikuntahalli",
+   "fields": [
+    {
+     "surface-material": "wood",
+     "lighting-corner-2-1-lux": 1028,
+     "lighting-corner-1-1-lux": 1040,
+     "length-m": 40,
+     "safety-area-end-2-m": 1.37,
+     "floor-elasticity": "area",
+     "name": "Kenttä 1",
+     "minimum-height-m": 7.73,
+     "width-m": 20,
+     "audience-stand-access": "from-upper-level",
+     "safety-area-side-1-m": 0.58,
+     "type": "floorball-field",
+     "rink-product": "Unihockey",
+     "surface-material-product": "Taraflex",
+     "safety-area-end-1-m": 1.18,
+     "seating-area-capacity-person": 1050,
+     "safety-area-side-2-m": 0.97,
+     "accessible-seating-capacity-person": 4,
+     "rink-color": "Musta",
+     "stands-total-capacity-person": 1050,
+     "scoreboard-visible-to-benches?": true,
+     "lighting-corner-2-2-lux": 835,
+     "surface-area-m2": 800,
+     "lighting-corner-1-2-lux": 735,
+     "lighting-goal-1-lux": 1331,
+     "lighting-center-point-lux": 1462,
+     "field-id": "931088ce-3a89-4bde-bb00-dec9bcb3af94",
+     "lighting-average-lux": 1093,
+     "lighting-goal-2-lux": 1223,
+     "surface-material-color": "Sininen",
+     "scoreboard-visible-to-officials?": true
+    }
+   ],
+   "construction-year": 1974,
+   "type": {
+    "type-code": 2210
+   },
+   "lipas-id": 88905,
+   "status": "active",
+   "comment": "Tapiolan liikuntahallissa  pelataan mm. koripalloa, salibandya ja lentopalloa. Lisäksi hallista löytyy tilat judolle ja voimailulle.\nIstumapaikkoja katsomossa on 2 600.",
+   "event-date": "2024-08-07T10:11:51.468Z",
+   "name-localized": {
+    "en": "Tapiola sports hall",
+    "se": "Hagalunds idrottshall"
+   },
+   "location": {
+    "city": {
+     "city-code": 49
+    },
+    "address": "Urheilupuistontie 2",
+    "geometries": {
+     "type": "FeatureCollection",
+     "features": [
+      {
+       "type": "Feature",
+       "geometry": {
+        "type": "Point",
+        "coordinates": [
+         24.785111708051,
+         60.1787955431378
+        ]
+       }
+      }
+     ]
+    },
+    "postal-code": "02200",
+    "postal-office": "Espoo"
+   },
+   "owner": "city"
+  },
+  {
+   "email": "myynti@arenacenter.fi",
+   "circumstances": {
+    "storage-capacity": "200m2",
+    "corner-pieces-count": 16,
+    "audience-toilets-count": 2,
+    "wifi-capacity-sufficient-for-streaming?": true,
+    "stretcher?": true,
+    "field-level-loading-doors?": true,
+    "car-parking-economics-model": "paid",
+    "vip-area?": true,
+    "separate-referee-locker-room?": true,
+    "audit-date": "2022-11-30",
+    "led-screens-or-surfaces-for-ads?": true,
+    "saunas-count": 8,
+    "camera-stands?": true,
+    "wired-microfone-quantity": 2,
+    "car-parking-capacity": 200,
+    "broadcast-car-park?": true,
+    "press-conference-space?": true,
+    "open-floor-space-length-m": 43.2,
+    "wifi-available?": true,
+    "goal-shrinking-elements-count": 4,
+    "scoreboard-count": 1,
+    "restaurateur-contact-info": "Arena Center markus.rosas@arenacenter.fi",
+    "cafe-or-restaurant-has-exclusive-rights-for-products?": true,
+    "gym?": true,
+    "ticket-sales-operator": "Urheilutekstiilit",
+    "side-training-space?": true,
+    "locker-room-quality-comment": "yhteiset suihkut pukkareiden välissä",
+    "detached-chair-quantity": 80,
+    "conference-space-total-capacity-person": 30,
+    "iff-certification-stickers-in-goals?": true,
+    "audio-mixer-available?": true,
+    "iff-certified-rink?": true,
+    "teams-using": "M-Team, VKTP, HIFK",
+    "loading-equipment-available?": true,
+    "wireless-microfone-quantity": 1,
+    "defibrillator?": true,
+    "open-floor-space-width-m": 23.4,
+    "cafeteria-and-restaurant-capacity-person": 60,
+    "speakers-aligned-towards-stands?": true,
+    "conference-space-quantity": 1,
+    "three-phase-electric-power?": true,
+    "open-floor-space-area-m2": 1010,
+    "detached-tables-quantity": 30,
+    "available-goals-count": 13,
+    "player-entrance": "audience-entrance"
+   },
+   "audits": [
+    {
+     "audit-date": "2024-09-24",
+     "audit-type": "floorball-circumstances-audit",
+     "audit-performed-by": "40444334"
+    }
+   ],
+   "phone-number": "044 700 7063",
+   "admin": "private-company",
+   "www": "http://arenacenter.fi/ruskeasuo/",
+   "name": "Arena Center Ruskeasuo",
+   "fields": [
+    {
+     "surface-material": "carpet",
+     "lighting-corner-2-1-lux": 309,
+     "lighting-corner-1-1-lux": 288,
+     "length-m": 40,
+     "safety-area-end-2-m": 1.98,
+     "field-accessible-without-strairs?": true,
+     "floor-elasticity": "point",
+     "name": "Kenttä 1",
+     "minimum-height-m": 6.5,
+     "width-m": 20,
+     "audience-stand-access": "from-field-level",
+     "safety-area-side-1-m": 1.32,
+     "type": "floorball-field",
+     "rink-product": "FB Tools Uher Grande",
+     "surface-material-product": "Taraflex",
+     "safety-area-end-1-m": 1.16,
+     "seating-area-capacity-person": 350,
+     "safety-area-side-2-m": 1.47,
+     "rink-color": "Musta",
+     "stands-total-capacity-person": 350,
+     "scoreboard-visible-to-benches?": true,
+     "lighting-corner-2-2-lux": 381,
+     "surface-area-m2": 800,
+     "lighting-corner-1-2-lux": 358,
+     "lighting-goal-1-lux": 443,
+     "lighting-center-point-lux": 474,
+     "field-id": "b9062b7e-5be3-43ac-9705-12dfcf34bfa8",
+     "lighting-average-lux": 384,
+     "lighting-goal-2-lux": 432,
+     "surface-material-color": "Sininen",
+     "scoreboard-visible-to-officials?": true
+    }
+   ],
+   "construction-year": 1998,
+   "type": {
+    "type-code": 2240
+   },
+   "lipas-id": 89210,
+   "status": "active",
+   "comment": "Kolme 19x38 m kenttää, yksi 20x40 m kenttä (katsomo noin 500 hengelle) ja kaksi pienempää sählykenttää 13x18.5m. Mahdollisuus pelata myös sulkapalloa.",
+   "event-date": "2024-09-25T08:14:20.161Z",
+   "name-localized": {
+    "se": "Arena Center Brunakärr"
+   },
+   "location": {
+    "city": {
+     "city-code": 91,
+     "neighborhood": "Reijola"
+    },
+    "address": "Nauvontie 3",
+    "geometries": {
+     "type": "FeatureCollection",
+     "features": [
+      {
+       "type": "Feature",
+       "geometry": {
+        "type": "Point",
+        "coordinates": [
+         24.9019551499108,
+         60.2065434387165
+        ]
+       }
+      }
+     ]
+    },
+    "postal-code": "00280",
+    "postal-office": "HELSINKI"
+   },
+   "owner": "company-ltd"
+  }
+ ],
+ "pagination": {
+  "current-page": 1,
+  "page-size": 100,
+  "total-items": 3,
+  "total-pages": 1
+ }
+}

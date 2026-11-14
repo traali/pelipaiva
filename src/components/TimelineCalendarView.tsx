@@ -22,6 +22,8 @@ import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 import { MatchSourceLinks } from './MatchSourceLinks';
 import { federationMatchLinks } from '../lib/sport/federationLinks';
 
+import { venueSearchQuery } from '../lib/geo/venueLocation';
+import { VenueMapCard, VenueQuickLinks } from './VenueMapCard';
 interface TimelineCalendarViewProps {
   events: MatchdayEvent[];
   profiles: PlayerProfile[];
@@ -177,6 +179,16 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     () => filterVisibleTimelineDays(groupedByDay, selectedTimelineDay, todayKey),
     [groupedByDay, selectedTimelineDay, todayKey]
   );
+
+  // First game (not a training) that has not ended yet among the shown days.
+  const nextGameId = useMemo(() => {
+    const now = Date.now();
+    const upcoming = visibleDayGroups
+      .flatMap((g) => g.events)
+      .filter((e) => !e.isTraining && e.eventType !== 'training' && new Date(e.endTime).getTime() > now)
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    return upcoming[0]?.id ?? null;
+  }, [visibleDayGroups]);
 
   const todayGroup = groupedByDayMap.get(todayKey);
   const hasTodayEvents = Boolean(todayGroup && todayGroup.events.length > 0);
@@ -473,6 +485,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
+                        <VenueQuickLinks venue={ev.venue} />
                         {/* Attendance Toggle Button (Osallistuu / Poisjäänti) */}
                         <button
                           type="button"
@@ -517,7 +530,7 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                                 const destination =
                                   hasValidCoords
                                     ? `${coords.lat},${coords.lng}`
-                                    : encodeURIComponent(ev.venue?.name || 'Kenttä');
+                                    : encodeURIComponent(ev.venue ? venueSearchQuery(ev.venue) || 'Kenttä' : 'Kenttä');
                                 window.open(
                                   `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                                   '_blank',
@@ -567,6 +580,13 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                         />
                       );
                     })()}
+
+                    {/* The next game shows where it is and where to park, right in the list */}
+                    {ev.id === nextGameId && (
+                      <div className="pl-1.5 pt-2" onClick={(e) => e.stopPropagation()}>
+                        <VenueMapCard venue={ev.venue} mapHeight={112} />
+                      </div>
+                    )}
                   </motion.div>
                 );
               })}

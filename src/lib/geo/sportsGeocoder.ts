@@ -1,5 +1,6 @@
 import { PitchSurface, SportType, VenueInfo } from '../../types/matchday';
 import { db } from '../storage/db';
+import { isSearchableVenueName } from './venueLocation';
 
 export const NATIONAL_FIELD_ALIASES: Record<
   string,
@@ -395,6 +396,210 @@ function scoreName(siteName: string, query: string): number {
   return tokens.length ? (hits / tokens.length) * 60 : 0;
 }
 
+interface NetworkVenueHit {
+  name: string;
+  lat: number;
+  lng: number;
+  /** false = real place but unverified match: shown as "Sijainti arvioitu". */
+  exact: boolean;
+  source: 'lipas' | 'servicemap' | 'osm';
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  lipasId?: number;
+  indoorHint?: boolean;
+}
+
+/** Per-session memo so a refresh does not re-query the same venue name. */
+const networkVenueCache = new Map<string, NetworkVenueHit | null>();
+const lipasListCache = new Map<string, Promise<Record<string, unknown>[]>>();
+
+/** Test hook. */
+export function __resetVenueNetworkCache(): void {
+  networkVenueCache.clear();
+  lipasListCache.clear();
+}
+
+/** Capital region: Helsinki, Espoo, Vantaa, Kauniainen. */
+const LIPAS_CITY_CODES = [91, 49, 92, 235];
+/**
+ * Halls and stadiums only: a few hundred sites, 1–2 pages. Plain pitches
+ * (type 1340, ~900 sites) come with TASO coordinates or the alias list.
+ */
+const LIPAS_TYPES_INDOOR = [2210, 2220, 2240, 2230];
+const LIPAS_TYPES_ICE = [2510, 2520, 1530];
+const LIPAS_TYPES_OUTDOOR = [1350, 2230];
+
+async function lipasSites(typeCodes: number[]): Promise<Record<string, unknown>[]> {
+  const qs = [
+    ...LIPAS_CITY_CODES.map((c) => `city-codes=${c}`),
+    ...typeCodes.map((t) => `type-codes=${t}`),
+    'page-size=100'
+  ].join('&');
+  let p = lipasListCache.get(qs);
+  if (!p) {
+    p = (async () => {
+      const out: Record<string, unknown>[] = [];
+      for (let page = 1; page <= 3; page++) {
+        const res = await fetch(`https://api.lipas.fi/v2/sports-sites?${qs}&page=${page}`, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (!res.ok) break;
+        const payload = await res.json();
+        const items: Record<string, unknown>[] = Array.isArray(payload?.items) ? payload.items : [];
+        out.push(...items);
+        const pages = Number(payload?.pagination?.['total-pages']) || 1;
+        if (page >= pages) break;
+      }
+      return out;
+    })().catch(() => []);
+    lipasListCache.set(qs, p);
+  }
+  return p;
+}
+
+/** Strips court/pitch suffixes ("kenttä 3", "TN B") so the place itself is matched. */
+export function venueCoreName(raw: string): string {
+  // No \b here: JS word boundaries do not treat "ä" as a letter.
+  return (raw || '')
+    .replace(/[,(].*$/, ' ')
+    .replace(/(^|\s)(kenttä|kentät|halli|sali|tn|nap|kaukalo)(\s+(\d+[a-z]?|[a-d]))+(?=\s|$)/gi, ' ')
+    .replace(/(^|\s)(kenttä|tn|nap)(?=\s|$)/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function lookupLipas(raw: string, sport: SportType | undefined, isIce: boolean): Promise<NetworkVenueHit | null> {
+  const types = isIce || sport === 'icehockey'
+    ? LIPAS_TYPES_ICE
+    : sport && INDOOR_SPORTS.has(sport)
+      ? LIPAS_TYPES_INDOOR
+      : sport === 'football'
+        ? LIPAS_TYPES_OUTDOOR
+        : [...LIPAS_TYPES_INDOOR, 1350];
+  const items = await lipasSites(types);
+  const core = venueCoreName(raw);
+  let best: { site: Record<string, unknown>; score: number } | null = null;
+  for (const site of items) {
+    const score = Math.max(scoreName(String(site.name || ''), raw), scoreName(String(site.name || ''), core));
+    if (score >= 50 && (!best || score > best.score)) best = { site, score };
+  }
+  if (!best) return null;
+  const point = extractLipasPoint(best.site);
+  if (!point) return null;
+  const location = best.site.location as Record<string, unknown> | undefined;
+  const typeCode = Number((best.site.type as Record<string, unknown> | undefined)?.['type-code']);
+  return {
+    name: String(best.site.name || raw).trim(),
+    lat: point.lat,
+    lng: point.lng,
+    exact: best.score >= 80,
+    source: 'lipas',
+    address: (location?.address as string | undefined) || undefined,
+    postalCode: (location?.['postal-code'] as string | undefined) || undefined,
+    lipasId: Number(best.site['lipas-id']) || undefined,
+    indoorHint: typeCode >= 2000 && typeCode < 3000
+  };
+}
+
+async function lookupServiceMap(raw: string): Promise<NetworkVenueHit | null> {
+  try {
+    const helUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(raw)}&type=unit`;
+    const pRes = await fetch(helUrl, { signal: AbortSignal.timeout(5000) });
+    if (!pRes.ok) return null;
+    const pJson = await pRes.json();
+    const results: Array<Record<string, unknown>> = pJson.results || [];
+    const core = venueCoreName(raw);
+    let best: { top: Record<string, unknown>; score: number } | null = null;
+    for (const top of results) {
+      const name = String((top.name as Record<string, string> | undefined)?.fi || '');
+      const lower = name.toLowerCase();
+      if (/patsas|veistos|muistomerkki|sculpture/.test(lower)) continue;
+      if (!/kenttä|tekonurmi|halli|puisto|urheilu|pallo|areena|tn\b|sali|center/.test(lower)) continue;
+      const score = Math.max(scoreName(name, raw), scoreName(name, core));
+      if (score >= 50 && (!best || score > best.score)) best = { top, score };
+    }
+    if (!best) return null;
+    const loc = best.top.location as Record<string, unknown> | undefined;
+    const coords = loc?.coordinates as number[] | undefined;
+    if (!coords || coords.length < 2) return null;
+    const [lng, lat] = coords;
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) return null;
+    const nameObj = best.top.name as Record<string, string> | undefined;
+    const addr = best.top.street_address as Record<string, string> | undefined;
+    return {
+      name: nameObj?.fi || raw,
+      lat: Number(lat),
+      lng: Number(lng),
+      exact: best.score >= 80,
+      source: 'servicemap',
+      address: addr?.fi,
+      city: 'Helsinki'
+    };
+  } catch {
+    return null;
+  }
+}
+
+const OSM_SPORTY = /^(sports_centre|stadium|pitch|sports_hall|ice_rink|track|school|college|community_centre|recreation_ground)$/;
+
+function sameCity(a: string | undefined, b: string | undefined): boolean {
+  const n = (s: string | undefined) => (s || '').toLowerCase().trim();
+  return Boolean(n(a)) && n(a) === n(b);
+}
+
+/**
+ * OpenStreetMap (Photon) as the last resort, with a quality check: the hit
+ * must be in Finland, in the event's city when it is known, and its name must
+ * match. A strong name match on a sports place is the place; anything weaker
+ * is only "Sijainti arvioitu".
+ */
+async function lookupOsm(raw: string, city: string | undefined): Promise<NetworkVenueHit | null> {
+  try {
+    const core = venueCoreName(raw) || raw;
+    const q = city && !core.toLowerCase().includes(city.toLowerCase()) ? `${core} ${city}` : core;
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&bbox=19.0,59.3,31.7,70.2`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const feats: Array<Record<string, unknown>> = Array.isArray(json?.features) ? json.features : [];
+    let best: { f: Record<string, unknown>; score: number; sporty: boolean } | null = null;
+    for (const f of feats) {
+      const p = (f.properties || {}) as Record<string, string>;
+      if (p.countrycode && p.countrycode !== 'FI') continue;
+      if (city && !(sameCity(p.city, city) || sameCity(p.county, city) || sameCity(p.district, city) || sameCity(p.locality, city))) continue;
+      const name = String(p.name || '');
+      const score = Math.max(scoreName(name, raw), scoreName(name, core));
+      if (score < 60) continue;
+      const sporty = OSM_SPORTY.test(String(p.osm_value || ''));
+      const rank = score + (sporty ? 10 : 0);
+      if (!best || rank > best.score + (best.sporty ? 10 : 0)) best = { f, score, sporty };
+    }
+    if (!best) return null;
+    const coords = ((best.f.geometry || {}) as Record<string, unknown>).coordinates as number[] | undefined;
+    if (!coords || coords.length < 2) return null;
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const p = (best.f.properties || {}) as Record<string, string>;
+    const exact = best.sporty && best.score >= 80 && core.length >= 5;
+    return {
+      name: p.name || raw,
+      lat,
+      lng,
+      exact,
+      source: 'osm',
+      address: [p.street, p.housenumber].filter(Boolean).join(' ') || undefined,
+      city: p.city || city,
+      postalCode: p.postcode || undefined,
+      indoorHint: /sports_centre|sports_hall|ice_rink/.test(String(p.osm_value || '')) ? true : undefined
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveSportsVenue(
   rawVenueString: string,
   hint?: VenueResolveHint
@@ -455,7 +660,8 @@ async function resolveSportsVenueByName(
       coordinates: { lat: hint.lat, lng: hint.lng },
       isIndoor: isInd,
       surface: aliasHit?.[1].surface ?? resolveSurfaceGuess(isInd),
-      hasFloodlights: aliasHit?.[1].hasFloodlights ?? true
+      hasFloodlights: aliasHit?.[1].hasFloodlights ?? true,
+      locationSource: 'taso'
     };
   }
 
@@ -469,7 +675,8 @@ async function resolveSportsVenueByName(
         isIndoor: customPin.isIndoor,
         surface: (customPin.surface as PitchSurface) || 'artificial_turf_3g',
         hasFloodlights: true,
-        isUserPinned: true
+        isUserPinned: true,
+        locationSource: 'user'
       };
     }
   } catch {
@@ -490,94 +697,45 @@ async function resolveSportsVenueByName(
         coordinates: { lat: data.lat, lng: data.lng },
         isIndoor: data.isIndoor,
         surface: data.surface,
-        hasFloodlights: data.hasFloodlights
+        hasFloodlights: data.hasFloodlights,
+        locationSource: 'alias'
       };
     }
   }
 
-  if (typeof fetch !== 'undefined' && rawVenueString) {
-    try {
-      const lipasUrl =
-        'https://api.lipas.fi/v2/sports-sites?city-codes=91,49,92&type-codes=1110,1340,1350&page-size=200';
-      const res = await fetch(lipasUrl, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(5000)
-      });
-      if (res.ok) {
-        const payload = await res.json();
-        const items: Record<string, unknown>[] = Array.isArray(payload?.items) ? payload.items : [];
-        let best: { site: Record<string, unknown>; score: number } | null = null;
-        for (const site of items) {
-          const score = scoreName(String(site.name || ''), rawVenueString);
-          if (score >= 50 && (!best || score > best.score)) best = { site, score };
-        }
-        if (best) {
-          const point = extractLipasPoint(best.site);
-          if (point) {
-            const typeName = String(
-              (best.site.type as Record<string, unknown> | undefined)?.name ||
-                (best.site.type as Record<string, unknown> | undefined)?.['type-code'] ||
-                ''
-            ).toLowerCase();
-            const isIndoor = isIce ? !isExplicitOutdoorIce : (/halli|sali|areena/.test(typeName) || indoorGuess);
-            const location = best.site.location as Record<string, unknown> | undefined;
-            const city = location?.city as Record<string, unknown> | undefined;
-            return {
-              name: String(best.site.name || rawVenueString),
-              normalizedName: normalized,
-              address: location?.address as string | undefined,
-              city: (city?.name as string) || undefined,
-              postalCode: location?.['postal-code'] as string | undefined,
-              coordinates: point,
-              isIndoor,
-              surface: resolveSurfaceGuess(isIndoor),
-              hasFloodlights: true,
-              lipasId: Number(best.site['lipas-id']) || undefined
-            };
-          }
-        }
-      }
-    } catch {
-      // fallback
+  if (typeof fetch !== 'undefined' && isSearchableVenueName(rawVenueString)) {
+    const cacheKey = `${normalized}|${(hint?.city || '').toLowerCase()}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
+    let found = networkVenueCache.get(cacheKey);
+    if (found === undefined) {
+      found =
+        (await lookupLipas(rawVenueString, hint?.sport, isIce)) ||
+        (await lookupServiceMap(rawVenueString)) ||
+        (await lookupOsm(rawVenueString, hint?.city));
+      networkVenueCache.set(cacheKey, found);
     }
-
-    try {
-      const helUrl = `https://api.hel.fi/servicemap/v2/search/?q=${encodeURIComponent(rawVenueString)}&type=unit`;
-      const pRes = await fetch(helUrl, { signal: AbortSignal.timeout(5000) });
-      if (pRes.ok) {
-        const pJson = await pRes.json();
-        const results: Array<Record<string, unknown>> = pJson.results || [];
-        const sporty = results.find((top) => {
-          const name = String((top.name as Record<string, string> | undefined)?.fi || '').toLowerCase();
-          if (/patsas|veistos|muistomerkki|sculpture/.test(name)) return false;
-          return /kenttä|tekonurmi|halli|puisto|urheilu|pallo|areena|tn\b/.test(name);
-        });
-        const top = sporty;
-        const loc = top?.location as Record<string, unknown> | undefined;
-        const coords = loc?.coordinates as number[] | undefined;
-        if (top && coords && coords.length >= 2) {
-          const [lng, lat] = coords;
-          const nameObj = top.name as Record<string, string> | undefined;
-          const addr = top.street_address as Record<string, string> | undefined;
-          return {
-            name: nameObj?.fi || rawVenueString,
-            normalizedName: normalized,
-            address: addr?.fi,
-            coordinates: { lat: Number(lat), lng: Number(lng) },
-            isIndoor: indoorGuess,
-            surface: resolveSurfaceGuess(indoorGuess),
-            hasFloodlights: true
-          };
-        }
-      }
-    } catch {
-      // fallback
+    if (found) {
+      const isIndoor = isIce ? !isExplicitOutdoorIce : found.indoorHint || indoorGuess;
+      return {
+        name: found.exact ? found.name : rawVenueString,
+        normalizedName: normalized,
+        address: found.address,
+        city: found.city || hint?.city,
+        postalCode: found.postalCode,
+        coordinates: { lat: found.lat, lng: found.lng },
+        isIndoor,
+        surface: resolveSurfaceGuess(isIndoor),
+        hasFloodlights: true,
+        ...(found.exact ? {} : { isApproximateLocation: true, locationQuality: 'approximate' as const }),
+        locationSource: found.source,
+        ...(found.lipasId ? { lipasId: found.lipasId } : {})
+      };
     }
   }
 
   return {
     name: rawVenueString || 'Tuntematon kenttä',
     normalizedName: normalized,
+    ...(hint?.city ? { city: hint.city } : {}),
     coordinates: { lat: 0, lng: 0 },
     // Flag the unverifiable fallback so UI can show "Sijainti tuntematon"
     // instead of presenting Helsinki as fact (M-15/G-06/F-11).

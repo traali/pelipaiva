@@ -31,6 +31,7 @@ import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
+import { isBetterLocation, shouldReResolveVenue, venueSearchQuery } from './lib/geo/venueLocation';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 import { harmonizeStartupSports } from './lib/sport/startupHarmonizer';
 import { LiveMatchToast } from './components/LiveMatchToast';
@@ -248,9 +249,11 @@ export const App: React.FC = () => {
           const lng = ev.venue?.coordinates?.lng || 0;
           if (ev.venue && (ev.venue.isApproximateLocation || (lat === 0 && lng === 0)) && ev.venue.name) {
             try {
-              const geo = await resolveSportsVenue(ev.venue.name, { sport: ev.sport });
-              if (geo.coordinates && (geo.coordinates.lat !== 0 || geo.coordinates.lng !== 0) && !geo.isApproximateLocation) {
-                patch.venue = { ...ev.venue, ...geo, isApproximateLocation: false };
+              const geo = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
+              // Exact pins replace the unknown spot; an estimate only replaces
+              // "unknown" and keeps its honest approximate flag.
+              if (isBetterLocation(ev.venue, geo)) {
+                patch.venue = { ...ev.venue, ...geo };
               }
             } catch {
               /* keep stored venue */
@@ -666,13 +669,15 @@ export const App: React.FC = () => {
 
         // Re-resolve venue with latest geocoding and aliases (e.g. Ruukinlahden tekonurmi)
         let currentVenue = ev.venue;
-        if (ev.venue?.name) {
-          const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport });
-          if (
+        // Exact pins (TASO coordinates, user pins) are kept: a name-only
+        // re-resolve would replace TASO's own coordinates with a guess.
+        if (ev.venue?.name && shouldReResolveVenue(ev.venue)) {
+          const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
+          if (isBetterLocation(ev.venue, freshVenue) && (
             freshVenue.coordinates.lat !== ev.venue.coordinates?.lat ||
             freshVenue.coordinates.lng !== ev.venue.coordinates?.lng ||
             freshVenue.name !== ev.venue.name
-          ) {
+          )) {
             currentVenue = freshVenue;
             updates.venue = freshVenue;
             updated = true;
@@ -1299,7 +1304,7 @@ export const App: React.FC = () => {
                                   const destination =
                                     hasValidCoords
                                       ? `${coords.lat},${coords.lng}`
-                                      : encodeURIComponent(event.venue?.name || 'Kenttä');
+                                      : encodeURIComponent(event.venue ? venueSearchQuery(event.venue) || 'Kenttä' : 'Kenttä');
                                   window.open(
                                     `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                                     '_blank',
@@ -1451,7 +1456,7 @@ export const App: React.FC = () => {
                 const destination =
                   hasValidCoords
                     ? `${coords.lat},${coords.lng}`
-                    : encodeURIComponent(ev.venue?.name || 'Kenttä');
+                    : encodeURIComponent(ev.venue ? venueSearchQuery(ev.venue) || 'Kenttä' : 'Kenttä');
                 window.open(
                   `https://www.google.com/maps/dir/?api=1&destination=${destination}`,
                   '_blank',

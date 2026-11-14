@@ -70,6 +70,14 @@ export interface VenueInfo {
   hasFloodlights: boolean;
   /** True when coordinates are the Helsinki fallback, not a verified venue (M-15). */
   isApproximateLocation?: boolean;
+  /**
+   * 'approximate' = coordinates are a real but unverified match (partial name
+   * hit, street- or district-level geocode). Shown as "Sijainti arvioitu",
+   * never as the exact pitch. Only meaningful with isApproximateLocation.
+   */
+  locationQuality?: 'approximate';
+  /** Where the coordinates came from: TASO venue fields, LIPAS, hel.fi, OpenStreetMap, a built-in alias or the user's own pin. */
+  locationSource?: 'taso' | 'alias' | 'lipas' | 'servicemap' | 'osm' | 'user';
   lipasId?: number;
   isUserPinned?: boolean;
 }
