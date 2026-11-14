@@ -25,8 +25,8 @@ describe('National Sports Geocoder', () => {
     expect(lyk.name).toContain('Lauttasaaren yhteiskoulu');
     expect(lyk.isIndoor).toBe(true);
     expect(lyk.surface).toBe('indoor_parquet');
-    expect(lyk.coordinates.lat).toBeCloseTo(60.1601, 2);
-    expect(lyk.coordinates.lng).toBeCloseTo(24.8785, 2);
+    expect(lyk.coordinates.lat).toBeCloseTo(60.158, 3);
+    expect(lyk.coordinates.lng).toBeCloseTo(24.8627, 3);
 
     const kauppi = await resolveSportsVenue('Kauppi TN 1');
     expect(kauppi.name).toContain('Kaupin');

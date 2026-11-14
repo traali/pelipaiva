@@ -90,13 +90,16 @@ describe('venue fallback when TASO sends no coordinates', () => {
     expect(espoo.city).toBe('Espoo');
   });
 
-  it('a failed lookup (offline) is retried on the next refresh', async () => {
+  it('a failed lookup (offline) is retried once the short miss window passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
     vi.stubGlobal('fetch', async () => { throw new TypeError('offline'); });
     const off = await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'floorball' });
     expect(venueLocationStatus(off)).toBe('search');
     mockFetch([[/api\.lipas\.fi/, lipas]]);
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000);
     const on = await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'floorball' });
     expect(venueLocationStatus(on)).toBe('exact');
+    vi.useRealTimers();
   });
 
   it('an exact network hit keeps the schedule text with the court number', async () => {

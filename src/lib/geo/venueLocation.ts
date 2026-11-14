@@ -109,7 +109,18 @@ export function venueLocationLabel(venue: VenueLike | undefined | null): string 
  */
 export function shouldReResolveVenue(venue: VenueLike | undefined | null): boolean {
   if (!venue?.name) return false;
+  // Built-in aliases are ours and offline: re-reading them picks up corrected pins.
+  if (venue.locationSource === 'alias') return true;
   return venueLocationStatus(venue) !== 'exact';
+}
+
+/** A corrected built-in alias pin for the same venue (same quality, moved coordinates). */
+export function isAliasCorrection(prev: VenueLike | undefined | null, next: VenueLike | undefined | null): boolean {
+  if (prev?.locationSource !== 'alias' || next?.locationSource !== 'alias') return false;
+  if (venueLocationStatus(next) !== 'exact') return false;
+  const a = prev?.coordinates;
+  const b = next?.coordinates;
+  return Boolean(a && b && (Math.abs(a.lat - b.lat) > 1e-5 || Math.abs(a.lng - b.lng) > 1e-5));
 }
 
 /** True when `next` locates the venue better than `prev` (search < approximate < exact). */

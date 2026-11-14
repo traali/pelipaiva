@@ -31,7 +31,7 @@ import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
-import { isBetterLocation, shouldReResolveVenue, venueSearchQuery } from './lib/geo/venueLocation';
+import { isAliasCorrection, isBetterLocation, shouldReResolveVenue, venueSearchQuery } from './lib/geo/venueLocation';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
 import { harmonizeStartupSports } from './lib/sport/startupHarmonizer';
 import { LiveMatchToast } from './components/LiveMatchToast';
@@ -247,12 +247,12 @@ export const App: React.FC = () => {
           const patch: Partial<MatchdayEvent> = {};
           const lat = ev.venue?.coordinates?.lat || 0;
           const lng = ev.venue?.coordinates?.lng || 0;
-          if (ev.venue && (ev.venue.isApproximateLocation || (lat === 0 && lng === 0)) && ev.venue.name) {
+          if (ev.venue && (ev.venue.isApproximateLocation || (lat === 0 && lng === 0) || ev.venue.locationSource === 'alias') && ev.venue.name) {
             try {
               const geo = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
               // Exact pins replace the unknown spot; an estimate only replaces
               // "unknown" and keeps its honest approximate flag.
-              if (isBetterLocation(ev.venue, geo)) {
+              if (isBetterLocation(ev.venue, geo) || isAliasCorrection(ev.venue, geo)) {
                 // Quality fields come from the new result, never the stale stored ones.
                 patch.venue = {
                   ...ev.venue,
@@ -680,7 +680,7 @@ export const App: React.FC = () => {
         if (ev.venue?.name && shouldReResolveVenue(ev.venue)) {
           const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
           // Quality alone decides: a verified pin at the same spot is still an upgrade.
-          if (isBetterLocation(ev.venue, freshVenue)) {
+          if (isBetterLocation(ev.venue, freshVenue) || isAliasCorrection(ev.venue, freshVenue)) {
             currentVenue = freshVenue;
             updates.venue = freshVenue;
             updated = true;

@@ -69,12 +69,13 @@ export const NATIONAL_FIELD_ALIASES: Record<
   'kupla': { name: 'Käpylän Kuplahalli', lat: 60.2140, lng: 24.9460, isIndoor: true, surface: 'artificial_turf_3g', hasFloodlights: true },
   'töölön kisahalli': { name: 'Töölön Kisahalli (Kisis)', lat: 60.1835, lng: 24.9282, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'kisis': { name: 'Töölön Kisahalli (Kisis)', lat: 60.1835, lng: 24.9282, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'lauttasaaren yhteiskoulu': { name: 'Lauttasaaren yhteiskoulu (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'lauttasaaren yhteiskoulu uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'lauttasaaren yhteiskoulun uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'lyk': { name: 'Lauttasaaren yhteiskoulu (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'lyk uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
-  'lyk vanha': { name: 'Lauttasaaren yhteiskoulu Vanha (LYK)', lat: 60.1601, lng: 24.8785, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  // LYK halls are at Isokaari 19 (hel.fi ServiceMap + LIPAS + TASO agree); the old 60.1601,24.8785 was ~900 m off.
+  'lauttasaaren yhteiskoulu': { name: 'Lauttasaaren yhteiskoulu (LYK)', lat: 60.15797, lng: 24.862663, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lauttasaaren yhteiskoulu uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.15797, lng: 24.862663, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lauttasaaren yhteiskoulun uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.15797, lng: 24.862663, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lyk': { name: 'Lauttasaaren yhteiskoulu (LYK)', lat: 60.15797, lng: 24.862663, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lyk uusi': { name: 'Lauttasaaren yhteiskoulu Uusi (LYK)', lat: 60.15797, lng: 24.862663, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
+  'lyk vanha': { name: 'Lauttasaaren yhteiskoulu Vanha (LYK)', lat: 60.158474, lng: 24.86319, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport center': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport center 2': { name: 'Esport Center 2', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
   'esport tapiola': { name: 'Esport Center Tapiola', lat: 60.1756, lng: 24.8054, isIndoor: true, surface: 'indoor_parquet', hasFloodlights: true },
@@ -436,12 +437,16 @@ interface NetworkVenueHit {
 }
 
 /** Per-session memo so a refresh does not re-query the same venue name. */
-const networkVenueCache = new Map<string, NetworkVenueHit>();
+const networkVenueCache = new Map<string, { at: number; hit: NetworkVenueHit | null }>();
+const networkVenueInflight = new Map<string, Promise<NetworkVenueHit | null>>();
+/** A miss is remembered briefly (one import or refresh batch), then retried: it may have been offline. */
+const NETWORK_MISS_TTL_MS = 5 * 60 * 1000;
 const lipasListCache = new Map<string, Promise<Record<string, unknown>[]>>();
 
 /** Test hook. */
 export function __resetVenueNetworkCache(): void {
   networkVenueCache.clear();
+  networkVenueInflight.clear();
   lipasListCache.clear();
 }
 
@@ -752,14 +757,23 @@ async function resolveSportsVenueByName(
   if (typeof fetch !== 'undefined' && isSearchableVenueName(rawVenueString)) {
     const cityHint = hint?.city || cityFromVenueText(rawVenueString);
     const cacheKey = `${normalized}|${(cityHint || '').toLowerCase()}|${hint?.sport || ''}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
-    let found = networkVenueCache.get(cacheKey) ?? null;
-    if (!found) {
-      found =
-        (await lookupLipas(rawVenueString, hint?.sport, isIce, cityHint)) ||
-        (await lookupServiceMap(rawVenueString, cityHint)) ||
-        (await lookupOsm(rawVenueString, cityHint));
-      // Only hits are memoised: a miss (often just offline) is retried on the next refresh.
-      if (found) networkVenueCache.set(cacheKey, found);
+    const cached = networkVenueCache.get(cacheKey);
+    let found: NetworkVenueHit | null;
+    if (cached && (cached.hit || Date.now() - cached.at < NETWORK_MISS_TTL_MS)) {
+      found = cached.hit;
+    } else {
+      let pending = networkVenueInflight.get(cacheKey);
+      if (!pending) {
+        pending = (async () =>
+          (await lookupLipas(rawVenueString, hint?.sport, isIce, cityHint)) ||
+          (await lookupServiceMap(rawVenueString, cityHint)) ||
+          (await lookupOsm(rawVenueString, cityHint)))();
+        networkVenueInflight.set(cacheKey, pending);
+        pending
+          .then((hit) => networkVenueCache.set(cacheKey, { at: Date.now(), hit }))
+          .finally(() => networkVenueInflight.delete(cacheKey));
+      }
+      found = await pending;
     }
     if (found) {
       const isIndoor = isIce ? !isExplicitOutdoorIce : found.indoorHint || indoorGuess;
