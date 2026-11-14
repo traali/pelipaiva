@@ -153,3 +153,13 @@ describe('family pin', () => {
     expect(out[0]!.mismatchFlags?.venueMismatch).toBe(true);
   });
 });
+
+describe('adopt official', () => {
+  it('"Päivitä liiton tietoon" replaces a family pin with the TASO venue', () => {
+    const pin = { name: 'Oma kenttä', normalizedName: 'oma kenttä', coordinates: { lat: 60.2, lng: 24.9 }, isIndoor: true, surface: 'indoor_parquet' as const, hasFloodlights: true, isUserPinned: true, locationSource: 'user' as const };
+    const cal = ev({ id: 'cal-7', officialFixtureId: '949701', venue: pin, userOverride: { action: 'adopt_official', appliedAt: '2026-11-14T10:00:00.000Z' } });
+    const out = stitchCalendarEventsWithFixtures([cal, fixture]);
+    expect(out[0]!.venue.coordinates).toEqual(tasoVenue.coordinates);
+    expect(out[0]!.mismatchFlags?.venueMismatch).toBeFalsy();
+  });
+});

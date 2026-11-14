@@ -609,8 +609,8 @@ function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
       officialVenueName: fixVenueName
     };
   }
-  // A family's own pin is never replaced (the conflict is still flagged).
-  if (cal.venue?.isUserPinned || cal.venue?.locationSource === 'user') return;
+  // A family's own pin stays (conflict still flagged) unless they chose "Päivitä liiton tietoon".
+  if ((cal.venue?.isUserPinned || cal.venue?.locationSource === 'user') && cal.userOverride?.action !== 'adopt_official') return;
   // Keep an exact calendar pin when TASO itself has no exact pin (the conflict is still flagged).
   if (hasExactPin(cal.venue) && !hasExactPin(fix.venue)) return;
   cal.venue = fix.venue;
