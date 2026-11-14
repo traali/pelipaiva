@@ -679,11 +679,8 @@ export const App: React.FC = () => {
         // re-resolve would replace TASO's own coordinates with a guess.
         if (ev.venue?.name && shouldReResolveVenue(ev.venue)) {
           const freshVenue = await resolveSportsVenue(ev.venue.name, { sport: ev.sport, city: ev.venue.city });
-          if (isBetterLocation(ev.venue, freshVenue) && (
-            freshVenue.coordinates.lat !== ev.venue.coordinates?.lat ||
-            freshVenue.coordinates.lng !== ev.venue.coordinates?.lng ||
-            freshVenue.name !== ev.venue.name
-          )) {
+          // Quality alone decides: a verified pin at the same spot is still an upgrade.
+          if (isBetterLocation(ev.venue, freshVenue)) {
             currentVenue = freshVenue;
             updates.venue = freshVenue;
             updated = true;

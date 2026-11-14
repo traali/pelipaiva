@@ -725,7 +725,7 @@ async function resolveSportsVenueByName(
   }
 
   if (typeof fetch !== 'undefined' && isSearchableVenueName(rawVenueString)) {
-    const cacheKey = `${normalized}|${(hint?.city || '').toLowerCase()}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
+    const cacheKey = `${normalized}|${(hint?.city || '').toLowerCase()}|${hint?.sport || ''}|${isIce ? 'ice' : indoorGuess ? 'in' : 'out'}`;
     let found = networkVenueCache.get(cacheKey) ?? null;
     if (!found) {
       found =
@@ -738,7 +738,8 @@ async function resolveSportsVenueByName(
     if (found) {
       const isIndoor = isIce ? !isExplicitOutdoorIce : found.indoorHint || indoorGuess;
       return {
-        name: found.exact ? found.name : rawVenueString,
+        // The schedule's own text (with any court/pitch number) stays the label.
+        name: rawVenueString,
         normalizedName: normalized,
         address: found.address,
         city: found.city || hint?.city,

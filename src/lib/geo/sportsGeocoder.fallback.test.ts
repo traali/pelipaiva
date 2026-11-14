@@ -99,6 +99,21 @@ describe('venue fallback when TASO sends no coordinates', () => {
     expect(venueLocationStatus(on)).toBe('exact');
   });
 
+  it('an exact network hit keeps the schedule text with the court number', async () => {
+    mockFetch([[/api\.lipas\.fi/, EMPTY_LIPAS], [/servicemap/, { results: [] }], [/photon\.komoot\.io/, photonPaavola]]);
+    const v = await resolveSportsVenue('Paavolatalon liikuntahalli kenttä 1', { city: 'Hyvinkää', sport: 'floorball' });
+    expect(venueLocationStatus(v)).toBe('exact');
+    expect(v.name).toBe('Paavolatalon liikuntahalli kenttä 1');
+  });
+
+  it('lookups for different sports are not shared through the cache', async () => {
+    const calls = mockFetch([[/api\.lipas\.fi/, lipas]]);
+    await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'floorball' });
+    const before = calls.length;
+    await resolveSportsVenue('Tapiolan liikuntahalli', { sport: 'football' });
+    expect(calls.length).toBeGreaterThan(before);
+  });
+
   it('core name drops court suffixes', () => {
     expect(venueCoreName('AC Ruskeasuo kenttä 3')).toBe('AC Ruskeasuo');
     expect(venueCoreName('Lauttasaari TN B')).toBe('Lauttasaari');

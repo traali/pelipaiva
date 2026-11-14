@@ -116,12 +116,15 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
 
   const [todayKey, setTodayKey] = useState<string>(() => helsinkiDateISO(new Date()));
   const [selectedTimelineDay, setSelectedTimelineDay] = useState<string>('today');
+  // Minute-resolution clock: only changes once a minute, so memos stay cheap.
+  const [nowMs, setNowMs] = useState(() => Math.floor(Date.now() / 60_000) * 60_000);
   const previousTodayKeyRef = useRef(todayKey);
 
   useEffect(() => {
     const tick = () => {
       const nextToday = helsinkiDateISO(new Date());
       setTodayKey((prev) => (prev === nextToday ? prev : nextToday));
+      setNowMs(Math.floor(Date.now() / 60_000) * 60_000);
     };
     const intervalId = window.setInterval(tick, 60_000);
     return () => window.clearInterval(intervalId);
@@ -180,15 +183,25 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
     [groupedByDay, selectedTimelineDay, todayKey]
   );
 
-  // First game (not a training) that has not ended yet among the shown days.
+  // First match (no training, school, meeting or other) that has not ended yet
+  // among the shown days; re-picked every minute so an ended game hands over.
   const nextGameId = useMemo(() => {
-    const now = Date.now();
     const upcoming = visibleDayGroups
       .flatMap((g) => g.events)
-      .filter((e) => !e.isTraining && e.eventType !== 'training' && new Date(e.endTime).getTime() > now)
+      .filter(
+        (e) =>
+          !e.isTraining &&
+          e.sport !== 'school' &&
+          e.sport !== 'other' &&
+          e.eventType !== 'training' &&
+          e.eventType !== 'school' &&
+          e.eventType !== 'other' &&
+          e.eventType !== 'meeting' &&
+          new Date(e.endTime).getTime() > nowMs
+      )
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     return upcoming[0]?.id ?? null;
-  }, [visibleDayGroups]);
+  }, [visibleDayGroups, nowMs]);
 
   const todayGroup = groupedByDayMap.get(todayKey);
   const hasTodayEvents = Boolean(todayGroup && todayGroup.events.length > 0);

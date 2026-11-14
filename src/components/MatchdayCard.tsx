@@ -1057,6 +1057,7 @@ export const MatchdayCard: React.FC<MatchdayCardProps> = ({
           stage={event.stage}
           ageClassLabel={event.ageClassLabel}
           division={event.division}
+          venue={event.venue}
           onSavePlayerLog={handleSavePlayerLog}
         />
       )}

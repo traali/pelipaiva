@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MapPin, Navigation, Search } from 'lucide-react';
 import type { VenueInfo } from '../types/matchday';
 import {
@@ -40,14 +40,27 @@ const StaticVenueMap: React.FC<{ lat: number; lng: number; approximate: boolean;
 }) => {
   const z = approximate ? 14 : 16;
   const { x, y } = worldPixel(lat, lng, z);
-  const tx = Math.floor(x / TILE);
-  const ty = Math.floor(y / TILE);
+  // Cover the measured box (phone or wide desktop card), no more tiles than needed.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(420);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => setWidth(Math.max(1, Math.round(el.getBoundingClientRect().width)));
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const n = 2 ** z;
   const tiles: Array<{ key: string; src: string; left: number; top: number }> = [];
-  for (let dx = -1; dx <= 1; dx++)
-    for (let dy = -1; dy <= 1; dy++) {
-      const ix = tx + dx;
-      const iy = ty + dy;
+  const x0 = Math.floor((x - width / 2) / TILE);
+  const x1 = Math.floor((x + width / 2) / TILE);
+  const y0 = Math.floor((y - height / 2) / TILE);
+  const y1 = Math.floor((y + height / 2) / TILE);
+  for (let ix = x0; ix <= x1; ix++)
+    for (let iy = y0; iy <= y1; iy++) {
       if (iy < 0 || iy >= n) continue;
       tiles.push({
         key: `${ix}_${iy}`,
@@ -57,7 +70,7 @@ const StaticVenueMap: React.FC<{ lat: number; lng: number; approximate: boolean;
       });
     }
   return (
-    <div className="relative w-full overflow-hidden bg-surface-elevated" style={{ height }} aria-hidden="true">
+    <div ref={boxRef} className="relative w-full overflow-hidden bg-surface-elevated" style={{ height }} aria-hidden="true">
       {tiles.map((t) => (
         <img
           key={t.key}
