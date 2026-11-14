@@ -86,4 +86,36 @@ describe('saved calendar ↔ TASO link keeps the official pin', () => {
     const out = stitchCalendarEventsWithFixtures([cal, noPin]);
     expect(out[0]!.venue.coordinates).toEqual(tasoVenue.coordinates);
   });
+
+  it('flags a different coordinate-less official hall while keeping the exact calendar pin', () => {
+    const cal = ev({
+      id: 'cal-2',
+      officialFixtureId: '949701',
+      venue: { ...tasoVenue, name: 'Otahalli Otaniemi', normalizedName: 'otahalli', coordinates: { lat: 60.184418, lng: 24.835045 }, locationSource: 'alias' },
+    });
+    const noPin = ev({
+      id: 'fixture-p:simo:949701',
+      profileId: 'westend',
+      officialFixtureId: '949701',
+      venue: { ...tasoVenue, coordinates: { lat: 0, lng: 0 }, isApproximateLocation: true },
+    });
+    const out = stitchCalendarEventsWithFixtures([cal, noPin]);
+    expect(out[0]!.venue.name).toBe('Otahalli Otaniemi');
+    expect(out[0]!.mismatchFlags?.venueMismatch).toBe(true);
+    expect(out[0]!.mismatchFlags?.officialVenueName).toBe('Sipoon Areena kenttä 1');
+  });
+
+  it('a saved "Säilytä oma" (keep_calendar) choice keeps the calendar venue', () => {
+    const own = { name: 'Otahalli Otaniemi', normalizedName: 'otahalli', coordinates: { lat: 60.184418, lng: 24.835045 }, isIndoor: true, surface: 'indoor_parquet' as const, hasFloodlights: true };
+    const cal = ev({
+      id: 'cal-3',
+      officialFixtureId: '949701',
+      venue: own,
+      userOverride: { action: 'keep_calendar', appliedAt: '2026-11-14T10:00:00.000Z' },
+    });
+    const out = stitchCalendarEventsWithFixtures([cal, fixture]);
+    expect(out[0]!.venue.name).toBe('Otahalli Otaniemi');
+    expect(out[0]!.venue.coordinates).toEqual(own.coordinates);
+    expect(out[0]!.mismatchFlags?.venueMismatch).toBeFalsy();
+  });
 });

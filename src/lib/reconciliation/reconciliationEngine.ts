@@ -573,10 +573,13 @@ function hasExactPin(venue?: MatchdayEvent['venue']): boolean {
 
 /**
  * Official (TASO) venue wins over the club calendar's free text. A differing name is
- * flagged as venueMismatch for the banner (not after a user decision).
+ * flagged as venueMismatch for the banner (not after a user decision). A user who chose
+ * "Säilytä oma" (keep_calendar) or a custom venue keeps it.
  */
 function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
   if (!fix.venue) return;
+  const action = cal.userOverride?.action;
+  if (action === 'keep_calendar' || action === 'custom') return;
   const suppressMismatchFlags = Boolean(cal.userOverride);
   const calVenueName = cal.venue?.name?.trim() || '';
   const fixVenueName = fix.venue.name?.trim() || '';
@@ -585,8 +588,6 @@ function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
     return;
   }
   if (!fixVenueName) return;
-  // Keep an exact calendar pin when TASO itself has no exact pin.
-  if (hasExactPin(cal.venue) && !hasExactPin(fix.venue)) return;
   const venuesDiffer =
     fixVenueName.toLowerCase() !== calVenueName.toLowerCase() &&
     (fix.venue.normalizedName || fixVenueName.toLowerCase()) !==
@@ -599,6 +600,8 @@ function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
       officialVenueName: fixVenueName
     };
   }
+  // Keep an exact calendar pin when TASO itself has no exact pin (the conflict is still flagged).
+  if (hasExactPin(cal.venue) && !hasExactPin(fix.venue)) return;
   cal.venue = fix.venue;
 }
 
