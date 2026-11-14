@@ -287,6 +287,8 @@ export default {
       'https://pelipaiva.fi',
       'https://www.pelipaiva.fi',
       'https://football-stats-agk.pages.dev',
+      // GitHub Pages copy of traali/football-stats (fudisturnaus tournament pages)
+      'https://traali.github.io',
       'http://localhost:5173',
       'http://127.0.0.1:5173'
     ]);
