@@ -33,7 +33,7 @@ import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { isAliasCorrection, isBetterLocation, shouldReResolveVenue, venueSearchQuery } from './lib/geo/venueLocation';
 import { useDismissedConflicts } from './lib/agents/conflictDismissal';
-import { harmonizeStartupSports } from './lib/sport/startupHarmonizer';
+import { applyStartupHarmonizerToDb } from './lib/sport/applyStartupHarmonizer';
 import { LiveMatchToast } from './components/LiveMatchToast';
 import { NotificationToastContainer } from './components/ui/NotificationToastContainer';
 import {
@@ -232,17 +232,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
-        const allProfiles = await db.profiles.toArray();
-        const allEvents = await db.events.toArray();
-
-        const { profileUpdates, eventUpdates } = harmonizeStartupSports(allProfiles, allEvents);
-
-        for (const pu of profileUpdates) {
-          await db.profiles.update(pu.id, pu.updates);
-        }
-        for (const eu of eventUpdates) {
-          await db.events.update(eu.id, eu.updates);
-        }
+        await applyStartupHarmonizerToDb(db);
 
         const healPass = await db.events.toArray();
         for (const ev of healPass) {
@@ -671,6 +661,9 @@ export const App: React.FC = () => {
 
       await Promise.allSettled(fetchTasks);
 
+      // Heal leftover official Winterliiga/futsal labels before any sport overwrite.
+      await applyStartupHarmonizerToDb(db);
+
       // 2. Re-evaluate sport, re-resolve venue coordinates & recalculate transit for ALL stored events
       const allEvents = await db.events.toArray();
       const allProfiles = await db.profiles.toArray();
@@ -681,10 +674,16 @@ export const App: React.FC = () => {
         let updated = false;
         const updates: Partial<MatchdayEvent> = {};
 
-        // Sync event sport to profile sport if profile sport changed
+        // Sync event sport to profile sport if the profile changed, but never
+        // relabel an official football / Winterliiga game as futsal.
         if (prof?.sport && ev.sport !== prof.sport) {
-          updates.sport = prof.sport;
-          updated = true;
+          const official = ev.id.startsWith('fixture-') || Boolean(ev.officialFixtureId);
+          const winter = /winterliiga/i.test(`${ev.title || ''} ${ev.leagueName || ''} ${ev.tournamentName || ''}`);
+          const keepOfficialFootball = official && ev.sport === 'football' && (winter || prof.sport === 'futsal');
+          if (!keepOfficialFootball) {
+            updates.sport = prof.sport;
+            updated = true;
+          }
         }
 
         // Re-resolve venue with latest geocoding and aliases (e.g. Ruukinlahden tekonurmi)

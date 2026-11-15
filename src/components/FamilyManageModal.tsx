@@ -254,7 +254,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 15 }}
           transition={springTactile.snappy}
-          className="liquid-glass rounded-3xl p-6 max-w-lg w-full border border-pitch/30 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+          className="liquid-glass rounded-3xl p-6 max-w-lg w-full border border-pitch/30 shadow-2xl overflow-hidden h-[90dvh] max-h-[90dvh] flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-border-subtle shrink-0">
@@ -273,14 +273,14 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full bg-surface-elevated text-text-muted hover:text-text-primary cursor-pointer"
+              className="min-h-[44px] min-w-[44px] p-2 rounded-full bg-surface-elevated text-text-muted hover:text-text-primary cursor-pointer flex items-center justify-center"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Body: List of Children & Teams */}
-          <div className="py-4 overflow-y-auto flex-1 flex flex-col gap-4">
+          <div className="py-4 overflow-y-auto flex-1 min-h-0 flex flex-col gap-4">
             {/* Home Location Settings Card */}
             <div className="p-3.5 rounded-2xl bg-surface border border-pitch/30 flex items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -306,7 +306,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     onClose();
                     onOpenHomeLocation();
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer shrink-0 transition-all shadow-xs"
+                  className="min-h-[44px] px-4 rounded-xl bg-pitch text-text-inverse text-xs font-bold hover:brightness-110 cursor-pointer shrink-0 transition-all shadow-xs flex items-center"
                 >
                   Muokkaa
                 </button>
@@ -334,7 +334,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     <button
                       type="button"
                       onClick={() => onOpenImportForPlayer(playerName)}
-                      className="py-1 px-2.5 rounded-lg bg-surface border border-border-strong text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
+                      className="min-h-[44px] px-3 rounded-lg bg-surface border border-border-strong text-pitch hover:bg-pitch hover:text-text-inverse text-xs font-bold flex items-center gap-1 cursor-pointer transition-all"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Lisää joukkue</span>
@@ -369,13 +369,13 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                             type="button"
                             title="Vaihda joukkueen väri"
                             onClick={() => setColorForId(colorForId === p.id ? null : p.id)}
-                            className="h-8 w-8 shrink-0 rounded-full border-2 border-border-strong"
+                            className="h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 rounded-full border-2 border-border-strong"
                             style={{ background: p.colorHex }}
                           />
                           <div className="min-w-0">
                             <div className="font-bold text-text-primary truncate">{p.teamName}</div>
                             <div className="text-[10px] text-text-muted line-clamp-1">
-                              {p.calendarUrl || (p.associationUrl ? 'Virallinen sarja / tulospalvelu' : 'Manuaaliset merkinnät')}
+                              {p.calendarUrl ? 'Seuran kalenteri' : (p.associationUrl ? 'Virallinen sarja / tulospalvelu' : 'Manuaaliset merkinnät')}
                             </div>
                           </div>
                         </div>
@@ -385,7 +385,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleOpenCategories(p)}
-                              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              className={`min-h-[44px] min-w-[44px] p-2 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                                 filterProfileId === p.id || (p.squadFilters && p.squadFilters.length > 0)
                                   ? 'text-pitch bg-pitch/15 border border-pitch/30'
                                   : 'text-text-muted hover:text-pitch hover:bg-pitch/10'
@@ -441,7 +441,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                                     key={cat.name}
                                     type="button"
                                     onClick={() => handleToggleCategoryFilter(p, cat.name)}
-                                    className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                    className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                                       isExcluded
                                         ? 'bg-surface text-text-muted line-through border border-dashed border-border-strong opacity-60'
                                         : 'bg-pitch/15 text-pitch border border-pitch/30 hover:bg-pitch/25'
@@ -492,7 +492,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     type="button"
                     onClick={handleAddNewPlayer}
                     disabled={!newPlayerName.trim()}
-                    className="py-2 px-3 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50"
+                    className="min-h-[44px] py-2 px-3 rounded-xl bg-pitch text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer disabled:opacity-50"
                   >
                     Jatka joukkuevalintaan
                   </button>
@@ -502,7 +502,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddingPlayer(true)}
-                className="w-full py-3 px-4 rounded-2xl bg-surface-elevated/70 border border-dashed border-border-strong hover:border-pitch text-text-secondary hover:text-text-primary text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                className="w-full min-h-[44px] py-3 px-4 rounded-2xl bg-surface-elevated/70 border border-dashed border-border-strong hover:border-pitch text-text-secondary hover:text-text-primary text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
               >
                 <PlusCircle className="w-4 h-4 text-pitch" />
                 <span>+ Lisää uusi perheenjäsen / pelaaja</span>
@@ -642,7 +642,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
               <button
                 type="button"
                 onClick={onToggleConflictWarnings}
-                className={`touch-target min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                className={`touch-target min-h-[44px] px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                   showConflictWarnings
                     ? 'bg-whistle text-text-inverse border-whistle shadow-xs hover:brightness-105'
                     : 'bg-surface-base text-text-muted border-border-strong hover:text-text-primary'
@@ -662,7 +662,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 onClose();
                 onOpenFamilyShare();
               }}
-              className="w-full py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-surface-elevated border border-border-strong hover:border-pitch text-text-primary text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5 text-pitch" />
               <span>Liity perhe-koodilla / WhatsApp</span>
@@ -674,7 +674,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                 onClose();
                 onOpenOnboardingWizard();
               }}
-              className="text-[11px] font-semibold text-text-muted hover:text-pitch text-center cursor-pointer py-1"
+              className="min-h-[44px] text-[11px] font-semibold text-text-muted hover:text-pitch text-center cursor-pointer py-2 flex items-center justify-center"
             >
               Avaa ohjattu aloitusvelho uudelleen →
             </button>

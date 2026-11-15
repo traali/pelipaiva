@@ -652,6 +652,30 @@ function adoptOfficialVenue(cal: MatchdayEvent, fix: MatchdayEvent): void {
  * - Reconciles venues: adopts Torneopal venue and flags non-breaking venueMismatch for the UI banner.
  * - Suppresses bare fixture duplicates, guaranteeing a single enriched event card.
  */
+
+/** Typical MyClub kokoontuminen is 30–45 min before kickoff. Same-day games hours later are a different match. */
+export const CONFIDENT_MEETUP_MAX_MIN = 75;
+
+export function isConfidentMeetupOffset(calendarStartIso: string, officialStartIso: string): boolean {
+  const cal = new Date(calendarStartIso).getTime();
+  const off = new Date(officialStartIso).getTime();
+  if (!Number.isFinite(cal) || !Number.isFinite(off)) return false;
+  const diffMin = (off - cal) / 60000;
+  return diffMin >= -5 && diffMin <= CONFIDENT_MEETUP_MAX_MIN;
+}
+
+/** Football vs futsal must not block a Winterliiga MyClub row from the official game. A real "Futsal" calendar title stays separate. */
+export function sportsPreventStitch(cal: MatchdayEvent, fix: MatchdayEvent): boolean {
+  if (!fix.sport || !cal.sport || fix.sport === cal.sport) return false;
+  const calBlob = `${cal.title || ''} ${cal.notes || ''} ${cal.leagueName || ''} ${cal.tournamentName || ''}`;
+  const fixBlob = `${fix.title || ''} ${fix.notes || ''} ${fix.leagueName || ''} ${fix.tournamentName || ''}`;
+  const winter = /winterliiga/i.test(`${calBlob} ${fixBlob}`);
+  const calIsFutsalRow = /futsal/i.test(calBlob);
+  const pair = new Set([cal.sport, fix.sport]);
+  if (winter && !calIsFutsalRow && pair.has('football') && pair.has('futsal')) return false;
+  return true;
+}
+
 export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): MatchdayEvent[] {
   const rawAll = rawEvents.filter((e) => !e.isHidden).map((e) => ({ ...e }));
 
@@ -682,7 +706,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       bareFixtures.filter((fix) => {
         if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
         if (!includeLinked && fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
-        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+        if (sportsPreventStitch(cal, fix)) return false;
         if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
         if (includeLinked && (fix.officialFixtureId === cal.officialFixtureId || fix.id.endsWith(cal.officialFixtureId || '—'))) {
           return false;
@@ -740,7 +764,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     const sameDayTeam = bareFixtures.filter((fix) => {
       if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
       if (fix.officialFixtureId && enrichedFixtureIds.has(fix.officialFixtureId)) return false;
-      if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+      if (sportsPreventStitch(cal, fix)) return false;
       if (helsinkiDayKey(calDate) !== helsinkiDayKey(new Date(fix.startTime))) return false;
       return isTournamentish(cal)
         ? isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix)
@@ -749,9 +773,14 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
 
     if (sameDayTeam.length >= 1) {
       const afterMeetup = sameDayTeam.filter((f) => isKickoffAfterKokoontuminen(cal, f.startTime));
-      bestFix = afterMeetup[0] || sameDayTeam[0];
-      if (sameDayTeam.length >= 2) {
-        sameDayPool = sameDayTeam;
+      const inWindow = afterMeetup.filter((f) => isConfidentMeetupOffset(cal.startTime, f.startTime));
+      if (isTournamentish(cal) || sameDayTeam.length >= 2) {
+        // A turnaus or same-day doubleheader keeps every official game on this card.
+        bestFix = inWindow[0] || afterMeetup[0] || sameDayTeam[0];
+        if (sameDayTeam.length >= 2) sameDayPool = sameDayTeam;
+      } else if (inWindow.length) {
+        // A single league game only stitches when kokoontuminen is up to 75 min before kickoff (30–45 is typical).
+        bestFix = inWindow[0];
       }
     } else if (!isTournamentish(cal)) {
       for (const fix of bareFixtures) {
@@ -761,7 +790,9 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         const fixDate = new Date(fix.startTime);
         const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
         if (diffMins > 180 || helsinkiDayKey(calDate) !== helsinkiDayKey(fixDate)) continue;
+        if (sportsPreventStitch(cal, fix)) continue;
         if (!isKickoffAfterKokoontuminen(cal, fix.startTime)) continue;
+        if (!isConfidentMeetupOffset(cal.startTime, fix.startTime)) continue;
 
         if (isCalendarFixtureMatch(cal, fix)) {
           if (diffMins < bestDiffMins) {
@@ -784,7 +815,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
         ) {
           return false;
         }
-        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+        if (sportsPreventStitch(cal, fix)) return false;
         const delta = helsinkiDayDelta(calDate, new Date(fix.startTime));
         if (Math.abs(delta) !== 1) return false;
         // 23:30 and 00:30 are different Helsinki days but the same match. A real
@@ -826,7 +857,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       const dayKey = helsinkiDayKey(new Date(bestFix.startTime));
       const siblings = bareFixtures.filter((fix) => {
         if (usedFixtureIds.has(fix.id) || bareFixtureIdsToDelete.has(fix.id)) return false;
-        if (fix.sport && cal.sport && fix.sport !== cal.sport) return false;
+        if (sportsPreventStitch(cal, fix)) return false;
         if (helsinkiDayKey(new Date(fix.startTime)) !== dayKey) return false;
         return isCalendarFixtureMatch(cal, fix) || fixtureInvolvesOwnTeam(cal, fix);
       }).sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -856,6 +887,13 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       cal.reconciliationStatus = 'auto_matched';
       cal.score = fix.score || cal.score;
       cal.tournamentName = cal.tournamentName || fix.tournamentName;
+      if (fix.leagueName && !cal.leagueName) cal.leagueName = fix.leagueName;
+      const mergeBlob = `${cal.title || ''} ${cal.leagueName || ''} ${fix.title || ''} ${fix.leagueName || ''}`;
+      if (/winterliiga/i.test(mergeBlob) && !/futsal/i.test(`${cal.title || ''} ${cal.notes || ''}`)) {
+        cal.sport = 'football';
+      } else if (!cal.sport) {
+        cal.sport = fix.sport;
+      }
 
       applyOfficialKickoffKeepCalendarArrival(cal, fix);
       if (sameDayPool.length >= 2) {

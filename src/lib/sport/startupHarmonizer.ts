@@ -103,16 +103,17 @@ export function harmonizeStartupSports(
       }
     }
 
-    // Rule D: Winterliiga is football. Official Palloliitto fixtures on a
-    // football team must not stay labelled futsal just because a mixed feed
-    // or a missing sport_id once defaulted them that way.
+    // Rule D: Winterliiga is football. Official fixtures on a football team
+    // must not stay labelled futsal just because an older ingest used the
+    // URL parse or a team-level sport and never stored leagueName.
     const leagueBlob = `${ev.title} ${ev.notes || ''} ${ev.leagueName || ''} ${ev.tournamentName || ''}`;
     const currentSport = updates.sport || ev.sport;
+    const isOfficial = ev.id.startsWith('fixture-') || Boolean(ev.officialFixtureId);
     if (/winterliiga/i.test(leagueBlob) && currentSport !== 'football') {
       updates.sport = 'football';
       needsUpdate = true;
     } else if (
-      ev.id.startsWith('fixture-') &&
+      isOfficial &&
       profile?.sport === 'football' &&
       currentSport === 'futsal' &&
       !/futsal/i.test(leagueBlob)

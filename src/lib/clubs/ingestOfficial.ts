@@ -157,11 +157,12 @@ export async function ingestOfficialForProfile(opts: {
     : officialData.fixtures;
 
   const events: MatchdayEvent[] = await mapPool(fixtures, 4, async (fixture) => {
+    const eventSport = fixture.sport || officialData.sport || parsedAssoc?.sport || opts.sport;
     const venue = await resolveSportsVenue(fixture.venueName, {
       lat: fixture.venueLat,
       lng: fixture.venueLng,
       city: fixture.venueCity,
-      sport: officialData.sport || parsedAssoc?.sport || opts.sport
+      sport: eventSport
     });
     const startTime = fixture.startTime;
     const endTime =
@@ -177,7 +178,7 @@ export async function ingestOfficialForProfile(opts: {
       title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
       eventType: thisCup ? 'tournament' : 'match',
       isTraining: false,
-      sport: officialData.sport || parsedAssoc?.sport || opts.sport,
+      sport: eventSport,
       homeTeam: fixture.homeTeam,
       awayTeam: fixture.awayTeam,
       isHomeMatch: fixture.isHome,
