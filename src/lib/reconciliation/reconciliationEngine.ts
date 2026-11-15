@@ -5,6 +5,7 @@ import {
   ReconciliationResult
 } from '../../types/matchday';
 import { calculateTeamSimilarity, normalizeTeamName, MULTILINGUAL_COLORS } from './teamNameMatcher';
+import { eventOfficialMatchKey } from '../sport/federationLinks';
 
 /** Club-calendar rows that are never a game: open gyms, practices, camps, meetings. */
 const NON_GAME_RE = /open\s*gym|harjoitu|treeni|training|vuoro|leiri|kokous|palaveri|vanhempainilta|kuntotesti|tapahtuma|juhla/i;
@@ -676,16 +677,107 @@ export function sportsPreventStitch(cal: MatchdayEvent, fix: MatchdayEvent): boo
   return true;
 }
 
+
+export function eventProfileIds(ev: MatchdayEvent): string[] {
+  const ids = [ev.profileId, ...(ev.linkedProfileIds || [])].filter(Boolean);
+  return [...new Set(ids)];
+}
+
+function mergeLinkedProfiles(primary: MatchdayEvent, others: MatchdayEvent[]): void {
+  const ids = new Set(eventProfileIds(primary));
+  for (const other of others) {
+    for (const id of eventProfileIds(other)) ids.add(id);
+  }
+  ids.delete(primary.profileId);
+  primary.linkedProfileIds = ids.size ? [...ids] : primary.linkedProfileIds;
+}
+
+function officialCopySport(copies: MatchdayEvent[]): MatchdayEvent['sport'] {
+  const blob = copies.map((c) => `${c.title || ''} ${c.leagueName || ''} ${c.tournamentName || ''} ${c.notes || ''}`).join(' ');
+  if (/winterliiga/i.test(blob)) return 'football';
+  if (copies.some((c) => c.sport === 'football')) return 'football';
+  return copies[0]!.sport;
+}
+
+function pickPrimaryForMatchGroup(copies: MatchdayEvent[]): MatchdayEvent {
+  const calendar = copies.find((c) => !c.id.startsWith('fixture-'));
+  if (calendar) return calendar;
+  return (
+    copies.find((c) => c.sport === 'football' || /winterliiga/i.test(`${c.leagueName || ''} ${c.title || ''}`)) ||
+    copies[0]!
+  );
+}
+
+/**
+ * One TASO match_id is one game, even when two family teams (or two profile
+ * IDs) ingested their own copy. Heal the sport and keep the "whose team" tags.
+ */
+export function dedupeOfficialEventsByMatchId(events: MatchdayEvent[]): MatchdayEvent[] {
+  const groups = new Map<string, MatchdayEvent[]>();
+  const unmatched: MatchdayEvent[] = [];
+  for (const ev of events) {
+    const key = eventOfficialMatchKey(ev);
+    if (!key) {
+      unmatched.push(ev);
+      continue;
+    }
+    const list = groups.get(key) || [];
+    list.push(ev);
+    groups.set(key, list);
+  }
+
+  const out: MatchdayEvent[] = [...unmatched];
+  for (const [, copies] of groups) {
+    if (copies.length === 1) {
+      out.push(copies[0]!);
+      continue;
+    }
+    const primary = { ...pickPrimaryForMatchGroup(copies) };
+    const others = copies.filter((c) => c.id !== primary.id);
+    const official =
+      copies.find((c) => c.id.startsWith('fixture-')) ||
+      copies.find((c) => c.officialFixtureId) ||
+      primary;
+    if (!primary.officialFixtureId) {
+      primary.officialFixtureId = official.officialFixtureId || official.id.replace(/^fixture-[^-]+-/, '');
+    }
+    if (official.homeTeam && official.awayTeam && !isTournamentish(primary)) {
+      primary.homeTeam = official.homeTeam;
+      primary.awayTeam = official.awayTeam;
+      primary.title = `${official.homeTeam} vs ${official.awayTeam}`;
+      primary.startTime = official.startTime;
+      if (official.endTime) primary.endTime = official.endTime;
+      if (official.leagueName && !primary.leagueName) primary.leagueName = official.leagueName;
+      if (official.venue) adoptOfficialVenue(primary, official);
+    } else if (official.leagueName && !primary.leagueName) {
+      primary.leagueName = official.leagueName;
+    }
+    if (!isTournamentish(primary) && official.startTime && official.startTime !== primary.startTime) {
+      applyOfficialKickoffKeepCalendarArrival(primary, official);
+    }
+    primary.sport = officialCopySport(copies);
+    mergeLinkedProfiles(primary, others);
+    out.push(primary);
+  }
+  return out;
+}
+
 export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): MatchdayEvent[] {
-  const rawAll = rawEvents.filter((e) => !e.isHidden).map((e) => ({ ...e }));
+  const rawVisible = rawEvents.filter((e) => !e.isHidden).map((e) => ({ ...e }));
+  const officialOnly = rawVisible.filter((e) => e.id.startsWith('fixture-'));
+  const calendarOnly = rawVisible.filter((e) => !e.id.startsWith('fixture-'));
+  const rawAll = [...calendarOnly, ...dedupeOfficialEventsByMatchId(officialOnly)];
 
   const enrichedFixtureIds = new Set<string>();
+  const claimedMatchIds = new Set<string>();
   const bareFixtureIdsToDelete = new Set<string>();
   const usedFixtureIds = new Set<string>();
 
   for (const e of rawAll) {
     if (e.officialFixtureId && !e.id.startsWith('fixture-')) {
       enrichedFixtureIds.add(e.officialFixtureId);
+      const already = eventOfficialMatchKey(e);
+      if (already) claimedMatchIds.add(already);
     }
   }
 
@@ -929,6 +1021,8 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
       if (cal.officialFixtureId) {
         enrichedFixtureIds.add(cal.officialFixtureId);
       }
+      const claimed = eventOfficialMatchKey(cal) || eventOfficialMatchKey(fix);
+      if (claimed) claimedMatchIds.add(claimed);
     }
   }
 
@@ -936,6 +1030,10 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
   const filteredEvents = rawAll.filter((e) => {
     if (e.id.startsWith('fixture-')) {
       if (e.officialFixtureId && enrichedFixtureIds.has(e.officialFixtureId)) {
+        return false;
+      }
+      const matchKey = eventOfficialMatchKey(e);
+      if (matchKey && claimedMatchIds.has(matchKey)) {
         return false;
       }
       if (bareFixtureIdsToDelete.has(e.id)) {
@@ -997,7 +1095,7 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     }
   }
 
-  return finalEvents.sort(
+  return dedupeOfficialEventsByMatchId(finalEvents).sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   );
 }

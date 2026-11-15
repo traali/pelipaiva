@@ -1,4 +1,5 @@
 import type { MatchdayEvent, PlayerProfile } from '../../types/matchday';
+import { eventProfileIds } from '../reconciliation/reconciliationEngine';
 
 const PLAYER_SELECTION_PREFIX = 'player:';
 
@@ -37,11 +38,11 @@ export function filterEventsByActiveProfileId(
   if (activeProfileId === 'all') return events;
 
   if (profiles.some((profile) => profile.id === activeProfileId)) {
-    return events.filter((event) => event.profileId === activeProfileId);
+    return events.filter((event) => eventProfileIds(event).includes(activeProfileId));
   }
 
   const groupedPlayerName = groupedPlayerNameFromActiveProfileId(activeProfileId);
-  if (groupedPlayerName === undefined) return events.filter((event) => event.profileId === activeProfileId);
+  if (groupedPlayerName === undefined) return events.filter((event) => eventProfileIds(event).includes(activeProfileId));
 
   const matchingProfileIds = new Set(
     profiles
@@ -49,5 +50,5 @@ export function filterEventsByActiveProfileId(
       .map((profile) => profile.id)
   );
 
-  return events.filter((event) => matchingProfileIds.has(event.profileId));
+  return events.filter((event) => eventProfileIds(event).some((id) => matchingProfileIds.has(id)));
 }

@@ -500,6 +500,8 @@ export interface EventChatMessage {
 export interface MatchdayEvent {
   id: string;
   profileId: string;
+  /** Other family team profiles that also ingested this same official match. */
+  linkedProfileIds?: string[];
   sport: SportType;
   eventType: EventType;
   isTraining: boolean;
