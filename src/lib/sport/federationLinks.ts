@@ -86,6 +86,13 @@ export function parseOfficialFixtureId(id: string | undefined | null): ParsedOff
   return { association: m[1] as AssociationType, teamId: m[2]!, matchId: m[3]! };
 }
 
+/** TASO match_id shared by every team's copy of the same official game. */
+export function eventOfficialMatchKey(ev: { id?: string; officialFixtureId?: string }): string | null {
+  return parseOfficialFixtureId(ev.officialFixtureId)?.matchId
+    || (ev.id ? parseOfficialFixtureId(ev.id)?.matchId : null)
+    || null;
+}
+
 const ASSOCIATION_SPORT: Partial<Record<AssociationType, FederationSport>> = {
   palloliitto: 'football',
   salibandy: 'floorball',

@@ -21,6 +21,7 @@ import { db } from '../lib/storage/db';
 import { recordAttendanceOverride } from '../lib/sync/familyCloud';
 import { MatchSourceLinks } from './MatchSourceLinks';
 import { federationMatchLinks } from '../lib/sport/federationLinks';
+import { eventProfileIds } from '../lib/reconciliation/reconciliationEngine';
 
 import { venueSearchQuery } from '../lib/geo/venueLocation';
 import { VenueMapCard, VenueQuickLinks } from './VenueMapCard';
@@ -331,6 +332,15 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
             <div className="flex flex-col gap-2">
               {dayGroup.events.map((ev) => {
                 const profile = profileMap.get(ev.profileId);
+                const tagProfiles: PlayerProfile[] = [];
+                const seenNames = new Set<string>();
+                for (const id of eventProfileIds(ev)) {
+                  const p = profileMap.get(id);
+                  const name = (p?.playerName || '').trim().toLocaleLowerCase();
+                  if (!p || !name || seenNames.has(name)) continue;
+                  seenNames.add(name);
+                  tagProfiles.push(p);
+                }
                 const start = new Date(ev.startTime);
                 const end = new Date(ev.endTime);
                 const tz = { hour: '2-digit' as const, minute: '2-digit' as const, timeZone: 'Europe/Helsinki' };
@@ -384,15 +394,18 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                           <span>{startLabel(ev)} klo {timeStr}</span>
                         </span>
 
-                        <span
-                          className="text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 truncate max-w-[140px] shadow-xs"
-                          style={{
-                            backgroundColor: profile?.colorHex || '#3b82f6',
-                            color: getContrastTextColor(profile?.colorHex)
-                          }}
-                        >
-                          <span>{profile?.playerName || 'Pelaaja'}</span>
-                        </span>
+                        {(tagProfiles.length ? tagProfiles : [profile].filter(Boolean)).map((tag) => (
+                          <span
+                            key={tag!.id}
+                            className="text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 truncate max-w-[140px] shadow-xs"
+                            style={{
+                              backgroundColor: tag!.colorHex || '#3b82f6',
+                              color: getContrastTextColor(tag!.colorHex)
+                            }}
+                          >
+                            <span>{tag!.playerName || 'Pelaaja'}</span>
+                          </span>
+                        ))}
 
                         {isOut && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stoppage/15 text-stoppage border border-stoppage/30">
