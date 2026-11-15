@@ -2,6 +2,7 @@ import { db, PelipaivaDB } from '../storage/db';
 import { PlayerProfile, SportType } from '../../types/matchday';
 import { generateStableProfileId, readdProfileIds, slugPlayerName } from '../clubs/attachTeam';
 import { ingestSourceForProfile } from '../clubs/ingestOfficial';
+import { applyStartupHarmonizerToDb } from '../sport/applyStartupHarmonizer';
 import { swatchForHex } from '../sport/teamColors';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
 import { detectSportFromText } from '../ai/eventCandidateRanker';
@@ -388,36 +389,40 @@ export async function hydrateRosterProfiles(
       needsHydration.push(p);
     }
   }
-  if (needsHydration.length === 0) return;
+  if (needsHydration.length > 0) {
+    const chunkSize = 2;
+    for (let i = 0; i < needsHydration.length; i += chunkSize) {
+      const chunk = needsHydration.slice(i, i + chunkSize);
+      await Promise.allSettled(
+        chunk.map(async (profile) => {
+          try {
+            const url = profile.associationUrl || profile.calendarUrl;
+            if (!url) return;
 
-  const chunkSize = 2;
-  for (let i = 0; i < needsHydration.length; i += chunkSize) {
-    const chunk = needsHydration.slice(i, i + chunkSize);
-    await Promise.allSettled(
-      chunk.map(async (profile) => {
-        try {
-          const url = profile.associationUrl || profile.calendarUrl;
-          if (!url) return;
+            await ingestSourceForProfile({
+              profileId: profile.id,
+              playerName: profile.playerName,
+              teamName: profile.teamName,
+              sport: profile.sport,
+              url,
+              database: databaseInstance,
+              includeWeather: true
+            });
+          } catch (err) {
+            console.warn(`[FAMILY_CLOUD] Hydration failed for ${profile.playerName}:`, err);
+          }
+        })
+      );
 
-          await ingestSourceForProfile({
-            profileId: profile.id,
-            playerName: profile.playerName,
-            teamName: profile.teamName,
-            sport: profile.sport,
-            url,
-            database: databaseInstance,
-            includeWeather: true
-          });
-        } catch (err) {
-          console.warn(`[FAMILY_CLOUD] Hydration failed for ${profile.playerName}:`, err);
-        }
-      })
-    );
-
-    if (i + chunkSize < needsHydration.length) {
-      await new Promise((r) => setTimeout(r, 150));
+      if (i + chunkSize < needsHydration.length) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
     }
   }
+
+  // Stored official games (from an earlier build) must be healed even when
+  // hydration is skipped because the profile already has events.
+  await applyStartupHarmonizerToDb(databaseInstance);
 }
 
 // Single-flight in-memory mutex to prevent concurrent sync races for the same family code (M-16)

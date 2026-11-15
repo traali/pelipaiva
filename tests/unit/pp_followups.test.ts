@@ -110,6 +110,35 @@ describe('Winterliiga and official football sport', () => {
     const result = harmonizeStartupSports(profiles, events);
     expect(result.eventUpdates.find((u) => u.id === events[0]!.id)?.updates.sport).toBe('football');
   });
+
+  it('heals the live 15.11 official card even when leagueName was never stored', () => {
+    const profiles: PlayerProfile[] = [
+      {
+        id: 'p:simo:tulospalvelu.palloliitto.fi:35224455',
+        playerName: 'Simo',
+        teamName: 'PPJ/Laru Oranssi',
+        sport: 'football',
+        primaryColor: 'oranssi',
+        colorHex: '#f97316'
+      }
+    ];
+    const events: MatchdayEvent[] = [
+      ev({
+        id: 'fixture-p:simo:tulospalvelu.palloliitto.fi:35224455-palloliitto_35224455_4379327',
+        profileId: profiles[0]!.id,
+        officialFixtureId: 'palloliitto_35224455_4379327',
+        title: 'PPJ/Laru Oranssi vs HJS/Sininen',
+        sport: 'futsal',
+        startTime: '2026-11-15T13:00:00.000Z',
+        endTime: '2026-11-15T14:00:00.000Z',
+        homeTeam: 'PPJ/Laru Oranssi',
+        awayTeam: 'HJS/Sininen',
+        venue: { name: 'Pikkupekka Areena' }
+      })
+    ];
+    const result = harmonizeStartupSports(profiles, events);
+    expect(result.eventUpdates.find((u) => u.id === events[0]!.id)?.updates.sport).toBe('football');
+  });
 });
 
 describe('MyClub Winterliiga merges with the official game', () => {
@@ -143,6 +172,98 @@ describe('MyClub Winterliiga merges with the official game', () => {
     expect(card.awayTeam).toBe('HJS/Sininen');
     expect(card.officialFixtureId).toBe(fix.officialFixtureId);
     expect(stitched.some((e) => e.id === fix.id)).toBe(false);
+  });
+
+  it('merges the live 14:30 MyClub WINTERLIIGA card into the 15:00 official game even if the official card is still labelled futsal', () => {
+    const official = ev({
+      id: 'fixture-p:simo:tulospalvelu.palloliitto.fi:35224455-palloliitto_35224455_4379327',
+      officialFixtureId: 'palloliitto_35224455_4379327',
+      title: 'PPJ/Laru Oranssi vs HJS/Sininen',
+      sport: 'futsal',
+      homeTeam: 'PPJ/Laru Oranssi',
+      awayTeam: 'HJS/Sininen',
+      startTime: '2026-11-15T13:00:00.000Z',
+      endTime: '2026-11-15T14:00:00.000Z',
+      venue: { name: 'Pikkupekka Areena' }
+    });
+    const winter = ev({
+      id: 'ics-winter-oranssi',
+      title: 'PPJ Laru 2013: WINTERLIIGA - ORANSSI',
+      sport: 'football',
+      homeTeam: 'PPJ Laru 2013 ORANSSI',
+      awayTeam: '',
+      startTime: '2026-11-15T12:30:00.000Z',
+      endTime: '2026-11-15T14:00:00.000Z',
+      venue: { name: 'Pikkupekka Areena' }
+    });
+    const futsal = ev({
+      id: 'ics-futsal-oranssi',
+      title: 'PPJ Laru 2013: Futsal - Oranssi',
+      sport: 'futsal',
+      homeTeam: 'PPJ Laru 2013 Oranssi',
+      awayTeam: '',
+      startTime: '2026-11-15T10:45:00.000Z',
+      endTime: '2026-11-15T12:00:00.000Z'
+    });
+    const stitched = stitchCalendarEventsWithFixtures([winter, official, futsal]);
+    const visible = stitched.filter((e) => !e.isHidden);
+    expect(visible).toHaveLength(2);
+    const card = visible.find((e) => e.id === winter.id)!;
+    expect(card.startTime).toBe(official.startTime);
+    expect(card.endTime).toBe(official.endTime);
+    expect(card.sport).toBe('football');
+    expect(card.officialFixtureId).toBe(official.officialFixtureId);
+    expect(card.homeTeam).toBe('PPJ/Laru Oranssi');
+    expect(card.awayTeam).toBe('HJS/Sininen');
+    expect(visible.some((e) => e.id === official.id)).toBe(false);
+    const futsalCard = visible.find((e) => e.id === futsal.id)!;
+    expect(futsalCard.sport).toBe('futsal');
+    expect(futsalCard.startTime).toBe(futsal.startTime);
+    expect(futsalCard.officialFixtureId).toBeFalsy();
+  });
+
+  it('still keeps the 12:45 Futsal card separate after the official card is healed to football', () => {
+    const official = ev({
+      id: 'fixture-p:simo:tulospalvelu.palloliitto.fi:35224455-palloliitto_35224455_4379327',
+      officialFixtureId: 'palloliitto_35224455_4379327',
+      title: 'PPJ/Laru Oranssi vs HJS/Sininen',
+      sport: 'football',
+      homeTeam: 'PPJ/Laru Oranssi',
+      awayTeam: 'HJS/Sininen',
+      startTime: '2026-11-15T13:00:00.000Z',
+      endTime: '2026-11-15T14:00:00.000Z',
+      venue: { name: 'Pikkupekka Areena' }
+    });
+    const winter = ev({
+      id: 'ics-winter-oranssi',
+      title: 'PPJ Laru 2013: WINTERLIIGA - ORANSSI',
+      sport: 'football',
+      homeTeam: 'PPJ Laru 2013 ORANSSI',
+      awayTeam: '',
+      startTime: '2026-11-15T12:30:00.000Z',
+      endTime: '2026-11-15T14:00:00.000Z',
+      venue: { name: 'Pikkupekka Areena' }
+    });
+    const futsal = ev({
+      id: 'ics-futsal-oranssi',
+      title: 'PPJ Laru 2013: Futsal - Oranssi',
+      sport: 'futsal',
+      homeTeam: 'PPJ Laru 2013 Oranssi',
+      awayTeam: '',
+      startTime: '2026-11-15T10:45:00.000Z',
+      endTime: '2026-11-15T12:00:00.000Z'
+    });
+    const stitched = stitchCalendarEventsWithFixtures([winter, official, futsal]);
+    const visible = stitched.filter((e) => !e.isHidden);
+    expect(visible).toHaveLength(2);
+    const card = visible.find((e) => e.id === winter.id)!;
+    expect(card.startTime).toBe(official.startTime);
+    expect(card.sport).toBe('football');
+    expect(card.officialFixtureId).toBe(official.officialFixtureId);
+    const futsalCard = visible.find((e) => e.id === futsal.id)!;
+    expect(futsalCard.sport).toBe('futsal');
+    expect(futsalCard.startTime).toBe(futsal.startTime);
+    expect(futsalCard.officialFixtureId).toBeFalsy();
   });
 });
 
