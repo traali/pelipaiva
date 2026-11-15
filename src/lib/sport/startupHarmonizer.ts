@@ -1,5 +1,6 @@
 import type { MatchdayEvent, PitchSurface, PlayerProfile } from '../../types/matchday';
 import { detectSportFromText } from '../ai/eventCandidateRanker';
+import { parseMatchTitle, sideMatchesOwnTeam } from '../calendar/icsParser';
 
 export interface HarmonizationResult {
   profileUpdates: Array<{ id: string; updates: Partial<PlayerProfile> }>;
@@ -98,6 +99,40 @@ export function harmonizeStartupSports(
       );
       if (!hasExplicitFootballText) {
         updates.sport = profile.sport;
+        needsUpdate = true;
+      }
+    }
+
+    // Rule D: Winterliiga is football. Official Palloliitto fixtures on a
+    // football team must not stay labelled futsal just because a mixed feed
+    // or a missing sport_id once defaulted them that way.
+    const leagueBlob = `${ev.title} ${ev.notes || ''} ${ev.leagueName || ''} ${ev.tournamentName || ''}`;
+    const currentSport = updates.sport || ev.sport;
+    if (/winterliiga/i.test(leagueBlob) && currentSport !== 'football') {
+      updates.sport = 'football';
+      needsUpdate = true;
+    } else if (
+      ev.id.startsWith('fixture-') &&
+      profile?.sport === 'football' &&
+      currentSport === 'futsal' &&
+      !/futsal/i.test(leagueBlob)
+    ) {
+      updates.sport = 'football';
+      needsUpdate = true;
+    }
+
+    // "KaU vs. ToPoLa" (or KlaNMKY vs. ToPoLa) is away when ToPoLa is this player's team.
+    if (ev.isHomeMatch === true && profile?.playerName && ev.awayTeam) {
+      const aliases = [...effectiveProfiles.values()]
+        .filter(
+          (p) => (p.playerName || '').trim().toLowerCase() === profile.playerName.trim().toLowerCase() && p.teamName
+        )
+        .map((p) => p.teamName);
+      const parsed = parseMatchTitle(ev.title, profile.teamName, aliases);
+      const awayIsOwn = sideMatchesOwnTeam(ev.awayTeam, aliases) || parsed.isHomeMatch === false;
+      const homeIsOwn = sideMatchesOwnTeam(ev.homeTeam, aliases);
+      if (awayIsOwn && !homeIsOwn) {
+        updates.isHomeMatch = false;
         needsUpdate = true;
       }
     }

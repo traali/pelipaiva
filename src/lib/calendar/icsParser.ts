@@ -172,7 +172,48 @@ export function classifyCalendarEvent(title: string, description: string = ''): 
  * - "Friendly: KäPa vs Ilves"
  * - "Turnaus / Pelitapahtuma"
  */
-export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): ParsedTitleResult {
+
+/** Fold a team name for own-team side checks (ToPoLa = TOPOLA). */
+export function foldTeamName(value: string): string {
+  return (value || '')
+    .toLowerCase()
+    .replace(/[àáâäå]/g, 'a')
+    .replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i')
+    .replace(/[òóôö]/g, 'o')
+    .replace(/[ùúûü]/g, 'u')
+    .replace(/[ýÿ]/g, 'y')
+    .replace(/æ/g, 'ae')
+    .replace(/ø/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function teamTokens(value: string): string[] {
+  return (value || '')
+    .split(/[^A-Za-zÅÄÖåäö0-9]+/)
+    .map((part) => foldTeamName(part))
+    .filter((part) => part.length >= 3);
+}
+
+export function sideMatchesOwnTeam(side: string | undefined, aliases: string[]): boolean {
+  const a = foldTeamName(side || '');
+  if (!a || a.length < 3) return false;
+  const aTokens = teamTokens(side || '');
+  for (const alias of aliases) {
+    const b = foldTeamName(alias);
+    if (!b || b.length < 3) continue;
+    if (a === b) return true;
+    // "PPJ" matches "PPJ/Laru", "ToPoLa" matches "TOPOLA". Do not let
+    // "KaU" match the word "kausi" inside a calendar prefix.
+    const bTokens = teamTokens(alias);
+    if (aTokens.some((tok) => bTokens.includes(tok))) return true;
+  }
+  return false;
+}
+
+export function parseMatchTitle(rawTitle: string, defaultTeamName?: string, ownTeamAliases: string[] = []): ParsedTitleResult {
   if (!rawTitle) {
     return {
       eventType: 'other',
@@ -317,18 +358,28 @@ export function parseMatchTitle(rawTitle: string, defaultTeamName?: string): Par
     }
   }
 
-  // Determine isHomeMatch if defaultTeamName or calendarOwnerTeam is provided
+  // Determine isHomeMatch from the calendar owner and any official team aliases
+  // for the same player (ToPoLa / TOPOLA). "KaU vs. ToPoLa" is an away game.
+  const aliases = [
+    defaultTeamName,
+    calendarOwnerTeam,
+    ...ownTeamAliases
+  ].filter((s): s is string => Boolean(s && s.trim()));
   const homeRef = (defaultTeamName || calendarOwnerTeam || '').toLowerCase();
-  if (homeRef && awayTeam) {
-    if (
-      awayTeam.toLowerCase().includes(homeRef) ||
-      (homeRef.includes('topola') && awayTeam.toLowerCase().includes('topola'))
-    ) {
+  if (awayTeam && (aliases.length || homeRef)) {
+    const awayIsOwn =
+      sideMatchesOwnTeam(awayTeam, aliases) ||
+      (homeRef.includes('topola') && awayTeam.toLowerCase().includes('topola'));
+    const homeIsOwn =
+      sideMatchesOwnTeam(homeTeam, aliases) ||
+      (homeRef.includes('topola') && homeTeam.toLowerCase().includes('topola'));
+    if (awayIsOwn && !homeIsOwn) {
       isHomeMatch = false;
-    } else if (
-      homeTeam.toLowerCase().includes(homeRef) ||
-      (homeRef.includes('topola') && homeTeam.toLowerCase().includes('topola'))
-    ) {
+    } else if (homeIsOwn && !awayIsOwn) {
+      isHomeMatch = true;
+    } else if (homeRef && awayTeam.toLowerCase().includes(homeRef)) {
+      isHomeMatch = false;
+    } else if (homeRef && homeTeam.toLowerCase().includes(homeRef)) {
       isHomeMatch = true;
     }
   }
@@ -876,7 +927,8 @@ export async function parseICSFeed(
   sport: SportType = 'football',
   defaultTeamName?: string,
   squadFilters?: string[],
-  playerName?: string
+  playerName?: string,
+  ownTeamAliases: string[] = []
 ): Promise<MatchdayEvent[]> {
   const events: MatchdayEvent[] = [];
   if (!icsContent || typeof icsContent !== 'string') return events;
@@ -890,9 +942,9 @@ export async function parseICSFeed(
     const vcalendar = new ICAL.Component(jcalData);
     const vevents = vcalendar.getAllSubcomponents('vevent');
 
-    const calName = (vcalendar.getFirstPropertyValue('x-wr-calname') as string) || '';
-    const feedSportHint = detectSportFromText(`${calName} ${defaultTeamName || ''} ${icsContent.slice(0, 3000)}`);
-    const resolvedSport = sport === 'football' && feedSportHint ? feedSportHint : sport;
+    // Per-event text decides sport. A mixed football+futsal MyClub feed must not
+    // relabel every row (Winterliiga included) just because "Futsal" appears later.
+    const resolvedSport = sport;
 
     const venueCache = new Map<string, any>();
 
@@ -900,7 +952,7 @@ export async function parseICSFeed(
       const event = new ICAL.Event(vevent);
 
       const title = event.summary || 'Tuntematon tapahtuma';
-      const location = event.location || 'Töölön Pallokenttä';
+      const location = (event.location || '').trim();
       const description = event.description || '';
       const category = (vevent.getFirstPropertyValue('categories') as string) || '';
 
@@ -917,7 +969,7 @@ export async function parseICSFeed(
         }
       }
 
-      const parsedTitle = parseMatchTitle(title, defaultTeamName);
+      const parsedTitle = parseMatchTitle(title, defaultTeamName, ownTeamAliases);
       const isTournament =
         parsedTitle.eventType === 'tournament' ||
         /turnaus|tournament|cup\b|memorial|pelitapahtuma/i.test(`${title} ${description} ${category}`);
@@ -936,11 +988,22 @@ export async function parseICSFeed(
       const attendanceStatus = extractAttendanceStatus(vevent, title, description, playerName);
 
       // Geocode venue with LIPAS.fi and Slang aliases (use embedded hint if available)
-      const venueQuery = parsedTitle.embeddedVenueHint || location;
-      let venue = venueCache.get(venueQuery);
-      if (!venue) {
+      const venueQuery = (parsedTitle.embeddedVenueHint || location).trim();
+      let venue = venueQuery ? venueCache.get(venueQuery) : undefined;
+      if (venueQuery && !venue) {
         venue = await geocodeSportsVenue(venueQuery);
         venueCache.set(venueQuery, venue);
+      }
+      if (!venue) {
+        venue = {
+          name: '',
+          normalizedName: '',
+          coordinates: { lat: 0, lng: 0 },
+          isIndoor: false,
+          surface: 'gravel',
+          hasFloodlights: false,
+          isApproximateLocation: true
+        };
       }
 
       // Handle RFC 5545 recurring event series (RRULE / RDATE / EXDATE)

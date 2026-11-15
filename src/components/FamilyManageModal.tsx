@@ -53,6 +53,11 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
     message: string;
     undoAction: () => Promise<void>;
   } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { kind: 'team'; id: string; label: string }
+    | { kind: 'child'; name: string; labels: string[] }
+    | null
+  >(null);
 
   const handleOpenCategories = async (p: PlayerProfile) => {
     if (filterProfileId === p.id) {
@@ -336,11 +341,17 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteChild(playerName, playerProfiles)}
-                      className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
+                      onClick={() =>
+                        setPendingDelete({
+                          kind: 'child',
+                          name: playerName,
+                          labels: playerProfiles.map((p) => p.teamName)
+                        })
+                      }
+                      className="min-h-[44px] min-w-[44px] p-2 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer flex items-center justify-center"
                       title={`Poista pelaaja ${playerName} ja kaikki joukkueet`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -387,18 +398,18 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
                           <button
                             type="button"
                             onClick={() => { onEditProfile(p); }}
-                            className="p-1.5 rounded-lg text-text-muted hover:text-pitch hover:bg-pitch/10 cursor-pointer"
+                            className="min-h-[44px] min-w-[44px] p-2 rounded-lg text-text-muted hover:text-pitch hover:bg-pitch/10 cursor-pointer flex items-center justify-center"
                             title="Muokkaa joukkuetta / kategoriat"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteProfile(p.id)}
-                            className="p-1.5 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer"
+                            onClick={() => setPendingDelete({ kind: 'team', id: p.id, label: p.teamName })}
+                            className="min-h-[44px] min-w-[44px] p-2 rounded-lg text-text-muted hover:text-radar hover:bg-radar/10 cursor-pointer flex items-center justify-center"
                             title="Poista joukkue"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -499,6 +510,51 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
             )}
           </div>
 
+          {pendingDelete && (
+            <div
+              role="alertdialog"
+              aria-labelledby="confirm-delete-title"
+              aria-describedby="confirm-delete-desc"
+              className="my-2 p-4 rounded-2xl bg-stoppage/15 border border-stoppage/40 text-text-primary flex flex-col gap-3"
+            >
+              <div>
+                <div id="confirm-delete-title" className="text-sm font-black">
+                  {pendingDelete.kind === 'team' ? 'Poista joukkue?' : 'Poista pelaaja?'}
+                </div>
+                <p id="confirm-delete-desc" className="text-xs text-text-secondary mt-1">
+                  {pendingDelete.kind === 'team'
+                    ? `Joukkue ${pendingDelete.label} ja sen ottelut poistetaan tältä perheeltä. Tätä voi vielä perua hetken aikaa.`
+                    : `Pelaaja ${pendingDelete.name} ja joukkueet ${pendingDelete.labels.join(', ')} poistetaan. Tätä voi vielä perua hetken aikaa.`}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingDelete(null)}
+                  className="flex-1 min-h-[44px] px-3 rounded-xl bg-surface-elevated border border-border-strong text-xs font-bold cursor-pointer"
+                >
+                  Peruuta
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const pending = pendingDelete;
+                    setPendingDelete(null);
+                    if (pending.kind === 'team') {
+                      await handleDeleteProfile(pending.id);
+                    } else {
+                      const childProfiles = profiles.filter((p) => p.playerName === pending.name);
+                      await handleDeleteChild(pending.name, childProfiles);
+                    }
+                  }}
+                  className="flex-1 min-h-[44px] px-3 rounded-xl bg-stoppage text-text-inverse text-xs font-bold cursor-pointer"
+                >
+                  Poista
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Floating Undo Snackbar */}
           {undoState && (
             <div
@@ -509,7 +565,7 @@ export const FamilyManageModal: React.FC<FamilyManageModalProps> = ({
               <button
                 type="button"
                 onClick={undoState.undoAction}
-                className="px-3 py-1 rounded-xl bg-stoppage text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer shadow-sm"
+                className="min-h-[44px] px-4 rounded-xl bg-stoppage text-text-inverse font-bold text-xs hover:brightness-110 cursor-pointer shadow-sm"
               >
                 Kumoa
               </button>

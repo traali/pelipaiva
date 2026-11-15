@@ -77,3 +77,31 @@ export function generateStableProfileId(playerName: string, url: string): string
   return `p:${s}:${k}`;
 }
 
+
+/** Drop season/cup query params so a deliberate re-add matches the canonical team id. */
+export function urlWithoutSeason(url: string): string {
+  const raw = (url || '').trim();
+  if (!raw) return raw;
+  try {
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    const u = new URL(normalized);
+    for (const key of ['season', 'turnaus', 'competition_id']) {
+      u.searchParams.delete(key);
+    }
+    const qs = u.searchParams.toString();
+    return `${u.origin}${u.pathname}${qs ? `?${qs}` : ''}`;
+  } catch {
+    return raw;
+  }
+}
+
+/** Stable profile ids that a deliberate re-add of this team should revive (with and without season). */
+export function readdProfileIds(playerName: string, url: string): string[] {
+  const ids = new Set<string>();
+  const trimmed = (url || '').trim();
+  if (!trimmed) return [];
+  ids.add(generateStableProfileId(playerName, trimmed));
+  const bare = urlWithoutSeason(trimmed);
+  if (bare && bare !== trimmed) ids.add(generateStableProfileId(playerName, bare));
+  return [...ids];
+}
