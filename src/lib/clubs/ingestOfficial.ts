@@ -190,6 +190,7 @@ export async function ingestOfficialForProfile(opts: {
       matchNumber: fixture.matchNumber,
       ...(fixture.ageClassLabel ? { ageClassLabel: fixture.ageClassLabel } : {}),
       score: fixture.score,
+      leagueName: fixture.leagueName || officialData.leagueName || undefined,
       venue,
       officialFixtureId: fixture.id,
       ...(fixture.liveScore ? { liveScore: fixture.liveScore, liveBreak: fixture.liveBreak, liveUpdatedAt: fixture.fetchedAt } : {}),
@@ -292,16 +293,31 @@ export async function ingestIcsForProfile(opts: {
   const database = opts.database || db;
   const text = await fetchRawIcsFeed(opts.url);
   if (!text) return 0;
+  const allProfiles = await database.profiles.toArray();
+  const self = allProfiles.find((p) => p.id === opts.profileId);
+  const playerName = self?.playerName;
+  const ownTeamAliases = allProfiles
+    .filter(
+      (p) =>
+        playerName &&
+        (p.playerName || '').trim().toLowerCase() === playerName.trim().toLowerCase() &&
+        p.teamName
+    )
+    .map((p) => p.teamName);
   const parsed = await parseICSFeed(
     text,
     opts.profileId,
     opts.sport,
     opts.teamName,
-    opts.squadFilters
+    opts.squadFilters,
+    playerName,
+    ownTeamAliases
   );
   const withMeta: MatchdayEvent[] = [];
   for (const ev of parsed) {
-    const weather = await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime, DEFAULT_PROXY_URL);
+    const weather = ev.venue?.coordinates
+      ? await fetchFmiMatchWeather(ev.venue.coordinates, ev.startTime, ev.endTime, DEFAULT_PROXY_URL)
+      : undefined;
     const fullEv: MatchdayEvent = { ...ev };
     if (weather) fullEv.weather = weather;
     fullEv.briefing = generateMatchdayBriefing(fullEv, parsed);

@@ -12,7 +12,8 @@ import {
   RefreshCw,
   MessageCircle,
   Key,
-  Tv
+  Tv,
+  Users
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { helsinkiDateISO } from '../lib/agents/time';
@@ -33,13 +34,15 @@ interface FamilyShareModalProps {
   onClose: () => void;
   profiles?: PlayerProfile[];
   onDataImported: () => void;
+  onOpenFamilyManage?: () => void;
 }
 
 export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
   isOpen,
   onClose,
   profiles = [],
-  onDataImported
+  onDataImported,
+  onOpenFamilyManage
 }) => {
   const [activeTab, setActiveTab] = useState<'code' | 'link' | 'nest' | 'backup'>('link');
   const [familyCode, setFamilyCode] = useState<string>('');
@@ -327,6 +330,20 @@ export const FamilyShareModal: React.FC<FamilyShareModalProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {onOpenFamilyManage && (
+              <button
+                type="button"
+                onClick={onOpenFamilyManage}
+                className="mb-4 w-full min-h-[44px] px-4 rounded-2xl bg-pitch/15 hover:bg-pitch/25 border border-pitch/30 flex items-center justify-between gap-2 text-sm font-bold text-text-primary transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-pitch" />
+                  Hallitse pelaajia ja joukkueita
+                </span>
+                <span className="text-text-muted text-xs">➔</span>
+              </button>
+            )}
 
             {/* Tab selector */}
             <div className="flex rounded-xl bg-surface-elevated p-1 mb-5 border border-border-subtle">

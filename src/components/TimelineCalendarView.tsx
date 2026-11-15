@@ -402,11 +402,6 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        {isOut && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-stoppage/15 text-stoppage flex items-center gap-0.5">
-                            ⛔ Poisjäänti
-                          </span>
-                        )}
                         {isTournament && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-pitch/15 text-pitch flex items-center gap-0.5">
                             <Trophy className="w-3 h-3" />
@@ -491,13 +486,17 @@ export const TimelineCalendarView: React.FC<TimelineCalendarViewProps> = ({
                     {/* Bottom Row: Venue, Nappisvahti & Navigation / Result / Attendance */}
                     <div className="pl-1.5 pt-2 border-t border-border-subtle/60 flex items-center justify-between text-xs text-text-secondary gap-2 flex-wrap sm:flex-nowrap">
                       <div className="flex items-center gap-1.5 truncate min-w-0">
-                        <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                        <span className="truncate font-medium">{ev.venue.name}</span>
-                        {surfaceLabel(ev.venue.surface, ev.venue.isIndoor) && (
-                          <span className="text-[10px] text-text-muted shrink-0">
-                            • {surfaceLabel(ev.venue.surface, ev.venue.isIndoor)}
-                          </span>
-                        )}
+                        {ev.venue?.name ? (
+                          <>
+                            <MapPin className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                            <span className="truncate font-medium">{ev.venue.name}</span>
+                            {surfaceLabel(ev.venue.surface, ev.venue.isIndoor) && (
+                              <span className="text-[10px] text-text-muted shrink-0">
+                                • {surfaceLabel(ev.venue.surface, ev.venue.isIndoor)}
+                              </span>
+                            )}
+                          </>
+                        ) : null}
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">

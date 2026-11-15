@@ -514,6 +514,8 @@ export interface MatchdayEvent {
   warmupIsEstimate?: boolean;
   isTournament?: boolean;
   tournamentName?: string;
+  /** Official competition name, e.g. "Winterliiga 2026–2027". */
+  leagueName?: string;
   stage?: string; // e.g. "P14 Haastaja Lohko B" or "Jatko-ottelut"
   division?: string; // e.g. "WU13 1div."
   roundInfo?: string;

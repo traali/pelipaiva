@@ -12,6 +12,7 @@ import {
   Share2,
   CalendarPlus,
   CheckCircle2,
+  Users,
 } from 'lucide-react';
 import { springTactile } from '../lib/motion/springs';
 import { ToggleSlider } from './ui/ToggleSlider';
@@ -24,6 +25,7 @@ interface SettingsModalProps {
   onToggleSetting: (key: keyof AppAiSettings, value: boolean) => void;
   onOpenHomeLocation?: () => void;
   onOpenFamilyShare?: () => void;
+  onOpenFamilyManage?: () => void;
   onOpenImport?: () => void;
 }
 
@@ -34,6 +36,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleSetting,
   onOpenHomeLocation,
   onOpenFamilyShare,
+  onOpenFamilyManage,
   onOpenImport,
 }) => {
   // Escape closes the dialog, like the other modals (keyboard users).
@@ -193,11 +196,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onClose();
                     onOpenFamilyShare();
                   }}
-                  className="w-full p-3 rounded-2xl bg-surface-elevated/50 hover:bg-surface-elevated border border-border-subtle flex items-center justify-between text-xs font-bold text-text-primary transition-all cursor-pointer"
+                  className="w-full min-h-[44px] p-3 rounded-2xl bg-surface-elevated/50 hover:bg-surface-elevated border border-border-subtle flex items-center justify-between text-xs font-bold text-text-primary transition-all cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5">
                     <Share2 className="w-4 h-4 text-pitch" />
                     <span>Perhejako & Varmuuskopiot</span>
+                  </div>
+                  <span className="text-text-muted">➔</span>
+                </button>
+              )}
+
+              {onOpenFamilyManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenFamilyManage();
+                  }}
+                  className="w-full min-h-[44px] p-3 rounded-2xl bg-surface-elevated/50 hover:bg-surface-elevated border border-border-subtle flex items-center justify-between text-xs font-bold text-text-primary transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Users className="w-4 h-4 text-pitch" />
+                    <span>Pelaajat ja joukkueet</span>
                   </div>
                   <span className="text-text-muted">➔</span>
                 </button>

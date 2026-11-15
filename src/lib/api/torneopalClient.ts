@@ -480,6 +480,20 @@ export function ageClassLabelFor(
   return `${ac.label} (${ac.birthYear})`;
 }
 
+
+/** TASO's own sport_id wins over the URL parse. Winterliiga is football, not futsal. */
+export function sportFromTaso(
+  parsed: ParsedAssociationUrl,
+  row?: Record<string, unknown>
+): SportType {
+  const blob = `${str(row?.competition_name)} ${str(row?.category_name)} ${str(row?.tournament_name)} ${str(row?.competition_season_description)}`;
+  if (/winterliiga/i.test(blob)) return "football";
+  const id = (str(row?.sport_id) || str(row?.tournament_sport_id)).toLowerCase();
+  if (id === "futsal") return "futsal";
+  if (id === "football" || id === "soccer") return "football";
+  return parsed.sport;
+}
+
 export function mapFixture(
   match: Record<string, unknown>,
   parsed: ParsedAssociationUrl,
@@ -531,7 +545,7 @@ export function mapFixture(
     id: `${parsed.association}_${parsed.teamId}_${matchId || str(match.date)}`,
     teamId: parsed.teamId,
     association: parsed.association,
-    sport: parsed.sport,
+    sport: sportFromTaso(parsed, match),
     leagueName: str(match.competition_name) || [str(match.category_name), str(match.group_name)].filter(Boolean).join(" · "),
     homeTeam: home,
     awayTeam: away,
@@ -773,7 +787,7 @@ export async function fetchTorneopalTeamData(
   return {
     teamId: parsed.teamId,
     association: parsed.association,
-    sport: parsed.sport,
+    sport: sportFromTaso(parsed, team) || sportFromTaso(parsed, primary) || parsed.sport,
     teamName,
     leagueName,
     fixtures,

@@ -25,7 +25,7 @@ import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
-import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents } from './lib/sync/familyCloud';
+import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents, retractTombstonesForReadd } from './lib/sync/familyCloud';
 import { HOME_STORAGE_KEY, parseStoredHomeLocation, saveHomeLocation } from './lib/storage/homeLocation';
 import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
 import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
@@ -57,6 +57,8 @@ export const App: React.FC = () => {
   const [isOverviewExpanded, setIsOverviewExpanded] = useState<boolean>(false);
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
+      // A ?perhe= join must not sit on the welcome screen until a reload.
+      if (new URLSearchParams(window.location.search).get('perhe')) return false;
       return localStorage.getItem('pelipaiva_onboarding_done') !== 'true';
     }
     return true;
@@ -163,9 +165,9 @@ export const App: React.FC = () => {
         const attemptJoin = async () => {
           const res = await syncFamilyRosterCycle(perheCode, db);
           if (res.success) {
-            await syncManualEvents(perheCode, db);
             localStorage.setItem('pelipaiva_onboarding_done', 'true');
             setIsOnboardingActive(false);
+            await syncManualEvents(perheCode, db);
             notifySuccess('Liitytty perheeseen!', `Perheen ${perheCode} joukkueet ja ottelut synkronoitu.`);
             if (isAmbientRequest) {
               setIsAmbientMode(true);
@@ -580,6 +582,18 @@ export const App: React.FC = () => {
     }
 
     try {
+      const syncForTombstones = await db.syncState.get('family');
+      if (syncForTombstones?.syncKey) {
+        const tombKey = `pelipaiva_tombstones_${syncForTombstones.syncKey}`;
+        try {
+          const current = JSON.parse(localStorage.getItem(tombKey) || '[]');
+          const next = retractTombstonesForReadd(Array.isArray(current) ? current : [], playerName, url, profileId);
+          localStorage.setItem(tombKey, JSON.stringify(next));
+        } catch {
+          /* ignore malformed local tombstones */
+        }
+      }
+
       const imported = await ingestSourceForProfile({
         profileId,
         playerName,
@@ -913,6 +927,7 @@ export const App: React.FC = () => {
           setActiveProfileId={setActiveProfileId}
           openHomeLocation={modalStore.openHomeLocation}
           openFamilyShare={modalStore.openFamilyShare}
+          openFamilyManage={modalStore.openFamilyManage}
         />
       </>
     );
@@ -1507,6 +1522,7 @@ export const App: React.FC = () => {
         setActiveProfileId={setActiveProfileId}
         openHomeLocation={modalStore.openHomeLocation}
         openFamilyShare={modalStore.openFamilyShare}
+          openFamilyManage={modalStore.openFamilyManage}
       />
 
       {/* Real-Time Live Goal & Event Toast Alert Banner */}

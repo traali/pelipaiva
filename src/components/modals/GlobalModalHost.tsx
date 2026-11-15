@@ -57,6 +57,7 @@ export interface GlobalModalHostProps {
   setActiveProfileId: (val: string) => void;
   openHomeLocation: () => void;
   openFamilyShare: () => void;
+  openFamilyManage?: () => void;
   openSmartImport?: () => void;
 }
 
@@ -79,6 +80,7 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
   setActiveProfileId,
   openHomeLocation,
   openFamilyShare,
+  openFamilyManage,
   openSmartImport,
 }) => {
   return (
@@ -197,6 +199,14 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
             onClose();
             openFamilyShare();
           }}
+          onOpenFamilyManage={
+            openFamilyManage
+              ? () => {
+                  onClose();
+                  openFamilyManage();
+                }
+              : undefined
+          }
           onOpenImport={() => {
             onClose();
             openSmartImport?.();
@@ -211,6 +221,14 @@ export const GlobalModalHost: React.FC<GlobalModalHostProps> = ({
           onClose={onClose}
           profiles={profiles}
           onDataImported={() => setActiveProfileId("all")}
+          onOpenFamilyManage={
+            openFamilyManage
+              ? () => {
+                  onClose();
+                  openFamilyManage();
+                }
+              : undefined
+          }
         />
       )}
 

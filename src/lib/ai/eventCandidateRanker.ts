@@ -116,9 +116,10 @@ export function detectSportFromText(text: string): SportType | undefined {
 
   // 8. Football (Jalkapallo / Futis)
   if (
-    /(?:^|[^a-zäöå0-9])(?:jalkapallo[a-zäöå0-9_]*|futis[a-zäöå0-9_]*|nappikset[a-zäöå0-9_]*|säärisuojat[a-zäöå0-9_]*|viheriö|nurmi|tekonurmi|bollis|spl|ppj|pallo-pojat|hjk|honka|vjs|pk-35|gnistan|käpa|fcfj|eps|ebk|palloliitto|piirisarja|veikkausliiga|ykkösliiga|ykkönen|11vs11|8vs8|5vs5)(?:$|[^a-zäöå0-9])/i.test(norm) ||
+    /(?:^|[^a-zäöå0-9])(?:jalkapallo[a-zäöå0-9_]*|futis[a-zäöå0-9_]*|nappikset[a-zäöå0-9_]*|säärisuojat[a-zäöå0-9_]*|viheriö|nurmi|tekonurmi|bollis|spl|ppj|pallo-pojat|hjk|honka|vjs|pk-35|gnistan|käpa|fcfj|eps|ebk|palloliitto|piirisarja|winterliiga|veikkausliiga|ykkösliiga|ykkönen|11vs11|8vs8|5vs5)(?:$|[^a-zäöå0-9])/i.test(norm) ||
     norm.includes('jalkapallo') ||
-    norm.includes('futis')
+    norm.includes('futis') ||
+    norm.includes('winterliiga')
   ) {
     return 'football';
   }

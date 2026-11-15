@@ -1,6 +1,6 @@
 import { db, PelipaivaDB } from '../storage/db';
 import { PlayerProfile, SportType } from '../../types/matchday';
-import { generateStableProfileId, slugPlayerName } from '../clubs/attachTeam';
+import { generateStableProfileId, readdProfileIds, slugPlayerName } from '../clubs/attachTeam';
 import { ingestSourceForProfile } from '../clubs/ingestOfficial';
 import { swatchForHex } from '../sport/teamColors';
 import { isValidFamilyCode, normalizeFamilyCode } from './familyCode';
@@ -184,6 +184,31 @@ export function getStableProfileId(p: {
 /**
  * Merges local profiles and remote roster, respecting tombstones and stable IDs.
  */
+
+/** p:simo:host:185085:etejp26 → p:simo:host:185085 so a live re-add clears the bare tombstone. */
+export function canonicalAssociationProfileId(id: string): string | undefined {
+  const parts = (id || '').split(':');
+  if (parts.length >= 4 && parts[0] === 'p' && /^\d+$/.test(parts[3] || '')) {
+    return parts.slice(0, 4).join(':');
+  }
+  return undefined;
+}
+
+export function retractTombstonesForReadd(
+  tombstones: TombstoneRecord[],
+  playerName: string,
+  url: string,
+  profileId?: string
+): TombstoneRecord[] {
+  const ids = new Set(readdProfileIds(playerName, url));
+  if (profileId) {
+    ids.add(profileId);
+    const canonical = canonicalAssociationProfileId(profileId);
+    if (canonical) ids.add(canonical);
+  }
+  return tombstones.filter((t) => !ids.has(t.id));
+}
+
 export function mergeRosters(
   localProfiles: PlayerProfile[],
   remoteRoster: FamilyRosterV1 | null,
@@ -200,6 +225,20 @@ export function mergeRosters(
   if (remoteRoster?.tombstones) {
     for (const t of remoteRoster.tombstones) {
       tombstoneMap.set(t.id, t.deletedAt);
+    }
+  }
+
+  // A roster that still lists a profile, without a tombstone for that id, is a
+  // deliberate re-add. Local leftover tombstones must not keep deleting it.
+  if (remoteRoster?.profiles) {
+    const remoteTombstoneIds = new Set((remoteRoster.tombstones || []).map((t) => t.id));
+    for (const rp of remoteRoster.profiles) {
+      if (remoteTombstoneIds.has(rp.id)) continue;
+      tombstoneMap.delete(rp.id);
+      const canonical = canonicalAssociationProfileId(rp.id);
+      if (canonical && !remoteTombstoneIds.has(canonical)) {
+        tombstoneMap.delete(canonical);
+      }
     }
   }
 
