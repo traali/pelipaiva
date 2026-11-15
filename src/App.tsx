@@ -20,15 +20,14 @@ import { TournamentWeekendPanel } from './components/TournamentWeekendPanel';
 import { runMissionControlGraph } from './lib/agents';
 import { startLiveRefresh } from './lib/live/liveRefresh';
 import { ingestSourceForProfile } from './lib/clubs/ingestOfficial';
-import { eventDayKey, helsinkiDateISO, isFinishedGame, isPastHelsinkiDay, parseHelsinkiClockOnEventDate } from './lib/agents/time';
+import { helsinkiDateISO, isFinishedGame, isPastHelsinkiDay, parseHelsinkiClockOnEventDate } from './lib/agents/time';
 import { pickNextTeamColor, colorFromNameHint, swatchForHex } from './lib/sport/teamColors';
 import { exampleTournamentFromUrl } from './lib/clubs/exampleTournaments';
 import { searchPopularClubs } from './lib/clubs/popularClubsCatalog';
 import { findExistingTeamProfile, generateStableProfileId } from './lib/clubs/attachTeam';
 import { syncFamilyRosterCycle, hydrateRosterProfiles, syncManualEvents, retractTombstonesForReadd } from './lib/sync/familyCloud';
 import { HOME_STORAGE_KEY, parseStoredHomeLocation, saveHomeLocation } from './lib/storage/homeLocation';
-import { calculateTeamSimilarity } from './lib/reconciliation/teamNameMatcher';
-import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish } from './lib/reconciliation/reconciliationEngine';
+import { stitchCalendarEventsWithFixtures, applyOfficialKickoffKeepCalendarArrival, normalizeTournamentArrival, isTournamentish, isPersistableCalendarOfficialLink, unstitchOverlinkedCalendarEvents } from './lib/reconciliation/reconciliationEngine';
 import { resolveTransitPlan } from './lib/geo/transitEngine';
 import { resolveSportsVenue } from './lib/geo/sportsGeocoder';
 import { isAliasCorrection, isBetterLocation, shouldReResolveVenue, venueSearchQuery } from './lib/geo/venueLocation';
@@ -234,6 +233,38 @@ export const App: React.FC = () => {
       try {
         await applyStartupHarmonizerToDb(db);
 
+        const beforeUnstitch = await db.events.toArray();
+        const unstitched = unstitchOverlinkedCalendarEvents(beforeUnstitch);
+        const unstitchedIds = new Set(
+          beforeUnstitch
+            .filter((ev) => ev.officialFixtureId && unstitched.some((u) => u.id === ev.id && !u.officialFixtureId))
+            .map((ev) => ev.profileId)
+        );
+        if (unstitchedIds.size > 0 || unstitched.length !== beforeUnstitch.length) {
+          const keepIds = new Set(unstitched.map((ev) => ev.id));
+          const removed = beforeUnstitch.filter((ev) => !keepIds.has(ev.id));
+          if (removed.length) await db.events.bulkDelete(removed.map((ev) => ev.id));
+          await db.events.bulkPut(unstitched);
+        }
+        if (unstitchedIds.size > 0) {
+          const allProfiles = await db.profiles.toArray();
+          await Promise.allSettled(
+            [...unstitchedIds].map(async (profileId) => {
+              const prof = allProfiles.find((p) => p.id === profileId);
+              const url = prof?.calendarUrl || prof?.associationUrl;
+              if (!prof || !url) return;
+              await ingestSourceForProfile({
+                profileId: prof.id,
+                playerName: prof.playerName,
+                teamName: prof.teamName,
+                sport: prof.sport,
+                url,
+                includeWeather: false
+              });
+            })
+          );
+        }
+
         const healPass = await db.events.toArray();
         for (const ev of healPass) {
           const patch: Partial<MatchdayEvent> = {};
@@ -280,32 +311,23 @@ export const App: React.FC = () => {
         const fixEvents = freshEvents.filter((e) => e.id.startsWith('fixture-'));
 
         for (const cal of calEvents) {
-          const calDate = new Date(cal.startTime);
           for (const fix of fixEvents) {
-            const fixDate = new Date(fix.startTime);
-            const diffMins = Math.abs(fixDate.getTime() - calDate.getTime()) / 60000;
-            if (diffMins <= 180 && calDate.toDateString() === fixDate.toDateString() && !isTournamentish(cal)) {
-              const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
-              const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
-              const sim = Math.max(simHome, simAway);
-              if (sim >= 0.70) {
-                const enriched: MatchdayEvent = {
-                  ...cal,
-                  homeTeam: fix.homeTeam,
-                  awayTeam: fix.awayTeam,
-                  title: `${fix.homeTeam} vs ${fix.awayTeam}`,
-                  officialFixtureId: fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, ''),
-                  reconciliationStatus: 'auto_matched',
-                  score: fix.score || cal.score,
-                  tournamentName: fix.tournamentName || cal.tournamentName,
-                  venue: fix.venue || cal.venue,
-                  stats: fix.stats || cal.stats,
-                };
-                applyOfficialKickoffKeepCalendarArrival(enriched, fix);
-                await db.events.put(enriched);
-                await db.events.delete(fix.id);
-              }
-            }
+            if (!isPersistableCalendarOfficialLink(cal, fix)) continue;
+            const enriched: MatchdayEvent = {
+              ...cal,
+              homeTeam: fix.homeTeam,
+              awayTeam: fix.awayTeam,
+              title: `${fix.homeTeam} vs ${fix.awayTeam}`,
+              officialFixtureId: fix.officialFixtureId || fix.id.replace(/^fixture-[^-]+-/, ''),
+              reconciliationStatus: 'auto_matched',
+              score: fix.score || cal.score,
+              tournamentName: fix.tournamentName || cal.tournamentName,
+              venue: fix.venue || cal.venue,
+              stats: fix.stats || cal.stats,
+            };
+            applyOfficialKickoffKeepCalendarArrival(enriched, fix);
+            await db.events.put(enriched);
+            await db.events.delete(fix.id);
           }
         }
       } catch (err) {
@@ -728,11 +750,7 @@ export const App: React.FC = () => {
       const fixEvents = freshEvents.filter((e) => e.id.startsWith('fixture-'));
 
       for (const cal of calEvents) {
-        const calDate = eventDayKey(cal.startTime);
-        const match = fixEvents.find((f) => {
-          const fDate = eventDayKey(f.startTime);
-          return f.profileId === cal.profileId && fDate === calDate;
-        });
+        const match = fixEvents.find((f) => isPersistableCalendarOfficialLink(cal, f));
         if (match) {
           const patch: Partial<MatchdayEvent> = {
             officialFixtureId: match.officialFixtureId || match.id.replace(/^fixture-[^-]+-/, ''),

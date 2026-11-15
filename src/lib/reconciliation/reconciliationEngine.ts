@@ -271,7 +271,8 @@ export function computeMismatchDiagnostics(
  * Conservative fuzzy join engine that links calendar events with official league fixtures.
  * Only auto-matches when:
  * - Match date is the same calendar day
- * - Time window is within ±3 hours (180 mins)
+ * - Kokoontuminen is within the confident meetup window of kickoff (75 min)
+ * - Sport does not conflict (a Futsal calendar row never links to a football official)
  * - Opponent similarity is >= 0.85
  */
 export function reconcileCalendarWithOfficial(
@@ -304,10 +305,20 @@ export function reconcileCalendarWithOfficial(
       // Date must match or be within 24h
       if (eventDayKey !== fixDayKey) continue;
 
-      // Time proximity check: ±3h (180 minutes)
+      // Time proximity: kokoontuminen must be within the confident window of kickoff.
       const timeDiffMins = Math.abs(fixDate.getTime() - eventDate.getTime()) / 60000;
-      if (timeDiffMins > 180) continue;
+      if (!isConfidentMeetupOffset(event.startTime, fixture.startTime)) continue;
       if (!isKickoffAfterKokoontuminen(event, fixture.startTime)) continue;
+      if (
+        sportsPreventStitch(event, {
+          ...event,
+          sport: fixture.sport,
+          title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
+          leagueName: fixture.leagueName
+        })
+      ) {
+        continue;
+      }
 
       // Opponent comparison
       const offOpponent = fixture.isHome ? fixture.awayTeam : fixture.homeTeam;
@@ -677,6 +688,119 @@ export function sportsPreventStitch(cal: MatchdayEvent, fix: MatchdayEvent): boo
   return true;
 }
 
+/** A MyClub row may be linked only when sport agrees (or Winterliiga exception) and kokoontuminen is within the confident window. */
+export function canAutoLinkCalendarToOfficial(
+  cal: MatchdayEvent,
+  official: Pick<MatchdayEvent, 'startTime'> & Partial<Pick<MatchdayEvent, 'sport' | 'title' | 'leagueName' | 'tournamentName' | 'notes' | 'isTraining'>>
+): boolean {
+  if (cal.isTraining || cal.eventType === 'training' || official.isTraining) return false;
+  if (official.sport) {
+    const fix = {
+      sport: official.sport,
+      title: official.title || '',
+      leagueName: official.leagueName || '',
+      tournamentName: official.tournamentName || '',
+      notes: official.notes || ''
+    } as MatchdayEvent;
+    if (sportsPreventStitch(cal, fix)) return false;
+  }
+  return isConfidentMeetupOffset(cal.startTime, official.startTime);
+}
+
+export function isPersistableCalendarOfficialLink(cal: MatchdayEvent, fix: MatchdayEvent): boolean {
+  if (cal.id.startsWith('fixture-') || cal.isTraining || isTournamentish(cal)) return false;
+  if (!canAutoLinkCalendarToOfficial(cal, fix)) return false;
+  const calDay = helsinkiDayKey(new Date(cal.startTime));
+  const fixDay = helsinkiDayKey(new Date(fix.startTime));
+  if (calDay !== fixDay) return false;
+  const simHome = calculateTeamSimilarity(cal.homeTeam || cal.title, fix.homeTeam);
+  const simAway = calculateTeamSimilarity(cal.homeTeam || cal.title || cal.awayTeam, fix.awayTeam);
+  return Math.max(simHome, simAway) >= 0.70;
+}
+
+export function calendarArrivalIso(ev: MatchdayEvent): string | undefined {
+  const officialIso = ev.mismatchFlags?.officialStartTimeIso || ev.startTime;
+  const officialMs = new Date(officialIso).getTime();
+  if (!Number.isFinite(officialMs)) return ev.warmupTime;
+  const arrivals = [ev.warmupTime]
+    .filter((t): t is string => Boolean(t))
+    .map((t) => ({ t, ms: new Date(t).getTime() }))
+    .filter((x) => Number.isFinite(x.ms) && x.ms < officialMs)
+    .sort((a, b) => b.ms - a.ms);
+  return arrivals[0]?.t;
+}
+
+/** A stored MyClub row that was linked across a different sport or more than the kokoontuminen window. */
+export function shouldUnstitchOverlinkedCalendar(ev: MatchdayEvent): boolean {
+  if (ev.id.startsWith('fixture-') || !ev.officialFixtureId) return false;
+  if (ev.userOverride?.action === 'adopt_official' || ev.userOverride?.action === 'keep_calendar') return false;
+  const officialStart = ev.mismatchFlags?.officialStartTimeIso || ev.startTime;
+  const arrival = calendarArrivalIso(ev);
+  if (arrival && !isConfidentMeetupOffset(arrival, officialStart)) return true;
+  if (typeof ev.mismatchFlags?.timeDiffMinutes === 'number' && ev.mismatchFlags.timeDiffMinutes > CONFIDENT_MEETUP_MAX_MIN) {
+    return true;
+  }
+  if (officialStart && arrival) {
+    const probe = { ...ev, startTime: arrival, officialFixtureId: undefined };
+    if (!canAutoLinkCalendarToOfficial(probe, { ...ev, startTime: officialStart })) return true;
+  }
+  return false;
+}
+
+/**
+ * Undo a persisted official link that should never have been made, and
+ * re-emit the official fixture if the startup linker had deleted it.
+ */
+export function unstitchOverlinkedCalendarEvents(events: MatchdayEvent[]): MatchdayEvent[] {
+  const officialStillPresent = (officialId: string, skipId: string) =>
+    events.some((e) => {
+      if (e.id === skipId) return false;
+      return e.officialFixtureId === officialId || eventOfficialMatchKey(e) === (parseMatchKey(officialId) || officialId);
+    });
+
+  function parseMatchKey(officialId: string): string | null {
+    return eventOfficialMatchKey({ officialFixtureId: officialId, id: officialId });
+  }
+
+  const out: MatchdayEvent[] = [];
+  const addedFixtureIds = new Set<string>();
+
+  for (const ev of events) {
+    if (!shouldUnstitchOverlinkedCalendar(ev)) {
+      out.push(ev);
+      continue;
+    }
+    const officialId = ev.officialFixtureId!;
+    const officialStart = ev.mismatchFlags?.officialStartTimeIso || ev.startTime;
+    const arrival = calendarArrivalIso(ev) || ev.startTime;
+    const calendar: MatchdayEvent = {
+      ...ev,
+      startTime: arrival,
+      officialFixtureId: undefined,
+      reconciliationStatus: undefined,
+      mismatchFlags: undefined,
+      officialGameTimes: undefined
+    };
+    out.push(calendar);
+
+    const fixtureEventId = `fixture-${ev.profileId}-${officialId}`;
+    if (!officialStillPresent(officialId, ev.id) && !addedFixtureIds.has(fixtureEventId) && !events.some((e) => e.id === fixtureEventId && e.id !== ev.id)) {
+      addedFixtureIds.add(fixtureEventId);
+      out.push({
+        ...ev,
+        id: fixtureEventId,
+        officialFixtureId: officialId,
+        startTime: officialStart,
+        warmupTime: officialStart,
+        mismatchFlags: undefined,
+        officialGameTimes: undefined,
+        reconciliationStatus: undefined
+      });
+    }
+  }
+  return out;
+}
+
 
 export function eventProfileIds(ev: MatchdayEvent): string[] {
   const ids = [ev.profileId, ...(ev.linkedProfileIds || [])].filter(Boolean);
@@ -866,13 +990,15 @@ export function stitchCalendarEventsWithFixtures(rawEvents: MatchdayEvent[]): Ma
     if (sameDayTeam.length >= 1) {
       const afterMeetup = sameDayTeam.filter((f) => isKickoffAfterKokoontuminen(cal, f.startTime));
       const inWindow = afterMeetup.filter((f) => isConfidentMeetupOffset(cal.startTime, f.startTime));
-      if (isTournamentish(cal) || sameDayTeam.length >= 2) {
-        // A turnaus or same-day doubleheader keeps every official game on this card.
+      if (isTournamentish(cal)) {
+        // A turnaus can sit hours before the first official game.
         bestFix = inWindow[0] || afterMeetup[0] || sameDayTeam[0];
         if (sameDayTeam.length >= 2) sameDayPool = sameDayTeam;
       } else if (inWindow.length) {
-        // A single league game only stitches when kokoontuminen is up to 75 min before kickoff (30–45 is typical).
+        // A non-turnaus MyClub row only stitches when kokoontuminen is within the confident window
+        // (30–45 min is typical, 75 min is the maximum). Same-day siblings can then share the card.
         bestFix = inWindow[0];
+        if (sameDayTeam.length >= 2) sameDayPool = sameDayTeam;
       }
     } else if (!isTournamentish(cal)) {
       for (const fix of bareFixtures) {

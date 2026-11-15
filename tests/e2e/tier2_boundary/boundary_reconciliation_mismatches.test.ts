@@ -74,20 +74,19 @@ describe('Tier 2 Boundary: Reconciliation, Fuzzy Join & Mismatch Diagnostics', (
     expect(item?.confidenceScore).toBeLessThan(0.60);
   });
 
-  // 3. Time window boundary tolerances (±3 hours / 180 minutes)
-  it('should match within ±179 minutes time difference (within 3h boundary)', () => {
+  // 3. Time window: kokoontuminen must be within the confident meetup window (75 min).
+  it('should still consider a candidate 75 minutes before kickoff', () => {
     const event = createMockEvent({ startTime: '2026-05-16T15:00:00.000Z' });
-    const fixture = createMockFixture({ startTime: '2026-05-16T17:59:00.000Z' }); // +179 min
+    const fixture = createMockFixture({ startTime: '2026-05-16T16:15:00.000Z' }); // +75 min
 
     const result = reconcileCalendarWithOfficial([event], [fixture]);
     const item = result.get(event.id);
-    expect(item?.status).toBe('candidate_match');
-    expect(item?.confidenceScore).toBeGreaterThanOrEqual(0.60);
+    expect(item?.status).not.toBe('unlinked');
   });
 
-  it('should NOT match when time difference exceeds 180 minutes (e.g. 181 min / 3h 1m)', () => {
+  it('should NOT match when kokoontuminen is more than 75 minutes before kickoff', () => {
     const event = createMockEvent({ startTime: '2026-05-16T15:00:00.000Z' });
-    const fixture = createMockFixture({ startTime: '2026-05-16T18:01:00.000Z' }); // +181 min
+    const fixture = createMockFixture({ startTime: '2026-05-16T16:16:00.000Z' }); // +76 min
 
     const result = reconcileCalendarWithOfficial([event], [fixture]);
     const item = result.get(event.id);

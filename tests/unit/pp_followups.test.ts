@@ -3,7 +3,7 @@ import { detectSportFromText } from '../../src/lib/ai/eventCandidateRanker';
 import { parseMatchTitle, parseICSFeed, sideMatchesOwnTeam } from '../../src/lib/calendar/icsParser';
 import { sportFromTaso, mapFixture } from '../../src/lib/api/torneopalClient';
 import type { ParsedAssociationUrl } from '../../src/types/matchday';
-import { stitchCalendarEventsWithFixtures, eventProfileIds } from '../../src/lib/reconciliation/reconciliationEngine';
+import { stitchCalendarEventsWithFixtures, eventProfileIds, isPersistableCalendarOfficialLink, unstitchOverlinkedCalendarEvents, canAutoLinkCalendarToOfficial } from '../../src/lib/reconciliation/reconciliationEngine';
 import { eventOfficialMatchKey } from '../../src/lib/sport/federationLinks';
 import { filterEventsByActiveProfileId } from '../../src/lib/profiles/activeProfileSelection';
 import { filterVisibleTimelineDays } from '../../src/components/TimelineCalendarView';
@@ -400,6 +400,112 @@ describe('Official fixtures are one card per TASO match_id', () => {
     expect(today).toHaveLength(1);
     expect(today[0]!.events.some((e) => e.id === futsalOranssi.id)).toBe(true);
     expect(today[0]!.events.some((e) => e.startTime === '2026-11-15T13:00:00.000Z')).toBe(true);
+  });
+});
+
+
+describe('12:45 Futsal - Oranssi is not folded into the 15:00 Winterliiga game', () => {
+  const myclubId = 'p:simo:myclub:oranssi';
+  const oranssiId = 'p:simo:tulospalvelu.palloliitto.fi:35224455';
+
+  // Real family event from the 14.11 IndexedDB dump (tokens not included).
+  const futsalLive = ev({
+    id: 'ppj.myclub.fi-11689359',
+    profileId: myclubId,
+    title: 'PPJ Laru 2013: Futsal - Oranssi',
+    sport: 'futsal',
+    eventType: 'match',
+    homeTeam: 'PPJ Laru 2013 Oranssi',
+    awayTeam: '',
+    startTime: '2026-11-15T10:45:00.000Z',
+    endTime: '2026-11-15T14:00:00.000Z',
+    warmupTime: '2026-11-15T10:00:00.000Z',
+    venue: { name: 'Kameleonten Areena Leppävaara' }
+  });
+  const winterLive = ev({
+    id: 'ppj.myclub.fi-11752200',
+    profileId: myclubId,
+    title: 'PPJ Laru 2013: WINTERLIIGA - ORANSSI ',
+    sport: 'football',
+    homeTeam: 'PPJ Laru 2013 ORANSSI',
+    awayTeam: '',
+    startTime: '2026-11-15T12:30:00.000Z',
+    endTime: '2026-11-15T14:00:00.000Z',
+    warmupTime: '2026-11-15T11:45:00.000Z',
+    venue: { name: 'Pikkupekka Areena, Siltavoudintie 21, 00640 Helsinki' }
+  });
+  const officialLive = ev({
+    id: 'fixture-p:simo:tulospalvelu.palloliitto.fi:35224455-palloliitto_35224455_4379327',
+    profileId: oranssiId,
+    officialFixtureId: 'palloliitto_35224455_4379327',
+    title: 'PPJ/Laru Oranssi vs HJS/Sininen',
+    sport: 'football',
+    homeTeam: 'PPJ/Laru Oranssi',
+    awayTeam: 'HJS/Sininen',
+    startTime: '2026-11-15T13:00:00.000Z',
+    endTime: '2026-11-15T14:00:00.000Z',
+    venue: { name: 'Pikkupekka Areena' },
+    leagueName: 'Winterliiga 2026–2027'
+  });
+  const officialStillFutsal = ev({ ...officialLive, sport: 'futsal', leagueName: undefined });
+
+  it('does not persist-link a Futsal MyClub row to the Winterliiga official (sport or 135 min offset)', () => {
+    expect(isPersistableCalendarOfficialLink(futsalLive, officialLive)).toBe(false);
+    expect(canAutoLinkCalendarToOfficial(futsalLive, officialLive)).toBe(false);
+    // Even when the official card is still wrongly labelled Futsal, 12:45 is 135 min before 15:00.
+    expect(isPersistableCalendarOfficialLink(futsalLive, officialStillFutsal)).toBe(false);
+    expect(canAutoLinkCalendarToOfficial(futsalLive, officialStillFutsal)).toBe(false);
+  });
+
+  it('still persist-links the 14:30 WINTERLIIGA MyClub row to the 15:00 official game', () => {
+    expect(isPersistableCalendarOfficialLink(winterLive, officialLive)).toBe(true);
+  });
+
+  it('keeps the real 12:45–16:00 Futsal card when stitching with the official 15:00 game', () => {
+    const visible = stitchCalendarEventsWithFixtures([futsalLive, winterLive, officialLive]).filter((e) => !e.isHidden);
+    const futsalCard = visible.find((e) => e.id === futsalLive.id)!;
+    expect(futsalCard).toBeTruthy();
+    expect(futsalCard.sport).toBe('futsal');
+    expect(futsalCard.startTime).toBe(futsalLive.startTime);
+    expect(futsalCard.title).toMatch(/Futsal/i);
+    expect(futsalCard.officialFixtureId).toBeFalsy();
+    expect(visible.filter((e) => e.startTime === officialLive.startTime)).toHaveLength(1);
+    expect(visible.some((e) => e.startTime === winterLive.startTime)).toBe(false);
+  });
+
+  it('restores a stored 12:45 row that the 180-minute startup linker had overwritten', () => {
+    // What the App.tsx self-heal wrote: same MyClub id, official title/kickoff, official fixture deleted.
+    const swallowed = ev({
+      id: futsalLive.id,
+      profileId: myclubId,
+      title: 'PPJ/Laru Oranssi vs HJS/Sininen',
+      sport: 'football',
+      homeTeam: 'PPJ/Laru Oranssi',
+      awayTeam: 'HJS/Sininen',
+      startTime: officialLive.startTime,
+      endTime: officialLive.endTime,
+      warmupTime: futsalLive.startTime,
+      officialFixtureId: officialLive.officialFixtureId,
+      reconciliationStatus: 'auto_matched',
+      venue: { name: 'Pikkupekka Areena' },
+      mismatchFlags: {
+        timeMismatch: true,
+        timeDiffMinutes: 135,
+        calendarStartTime: '12.45',
+        officialStartTime: '15.00',
+        officialStartTimeIso: officialLive.startTime
+      }
+    });
+    const restored = unstitchOverlinkedCalendarEvents([swallowed]);
+    const calendar = restored.find((e) => e.id === futsalLive.id)!;
+    expect(calendar.officialFixtureId).toBeFalsy();
+    expect(calendar.startTime).toBe(futsalLive.startTime);
+    const official = restored.find((e) => e.id.startsWith('fixture-') || e.officialFixtureId === officialLive.officialFixtureId)!;
+    expect(official.startTime).toBe(officialLive.startTime);
+
+    const visible = stitchCalendarEventsWithFixtures(restored).filter((e) => !e.isHidden);
+    expect(visible.some((e) => e.id === futsalLive.id && e.startTime === futsalLive.startTime)).toBe(true);
+    expect(visible.filter((e) => e.startTime === officialLive.startTime)).toHaveLength(1);
   });
 });
 
